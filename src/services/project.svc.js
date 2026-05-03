@@ -6,10 +6,10 @@
 
 // ── Constants ───────────────────────────────────────────────
 export const PROJECT_STATUS = {
-  planning:  'Chuẩn bị thi công',
-  active:    'Đang thi công',
+  planning: 'Chuẩn bị thi công',
+  active: 'Đang thi công',
   completed: 'Đã hoàn thành (chưa quyết toán)',
-  closed:    'Đã quyết toán'
+  closed: 'Đã quyết toán'
 };
 
 export const PROJECT_COMPANY = Object.freeze({
@@ -19,8 +19,8 @@ export const PROJECT_COMPANY = Object.freeze({
 });
 
 const _PROJ_DATE_RE = /^\d{4}-\d{2}-\d{2}$|^\d{2}\/\d{2}\/\d{4}$|^\d{2}-\d{2}-\d{4}$/;
-const _VALID_STATUSES = new Set(['planning','active','completed','closed']);
-const _PROJ_VALID_TYPES = new Set(['CT','SC','OTHER']);
+const _VALID_STATUSES = new Set(['planning', 'active', 'completed', 'closed']);
+const _PROJ_VALID_TYPES = new Set(['CT', 'SC', 'OTHER']);
 export const _PROJ_FACTORS = { CT: 1.6, SC: 1.0, OTHER: 1.2 };
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -273,9 +273,15 @@ window._projectSvc = {
 };
 
 // Direct globals
-window._hdLookup  = hdLookup;
-window._hdKeyOf   = hdKeyOf;
-window._getProjectById      = _getProjectByIdGlobal;
-window._getProjectNameById  = _getProjectNameByIdGlobal;
-window._getProjectIdByName  = _getProjectIdByNameGlobal;
-window._resolveCtName       = _resolveCtNameGlobal;
+window._hdLookup = hdLookup;
+window._hdKeyOf = hdKeyOf;
+window._getProjectById = _getProjectByIdGlobal;
+window._getProjectNameById = _getProjectNameByIdGlobal;
+window._getProjectIdByName = _getProjectIdByNameGlobal;
+window._resolveCtName = _resolveCtNameGlobal;
+window.getAllProjects = () => getSortedProjects(window.projects || []); // <-- Dòng bạn vừa thêm vào
+window.getProjectById = (id) => getProjectById(id, window.projects || []);
+window.getProjectNameById = (id) => { const p = getProjectById(id, window.projects || []); return p ? p.name : ''; };
+window.findProjectIdByName = (name) => findProjectIdByName(name, window.projects || []);
+window.resolveProjectName = (record) => resolveProjectName(record, window.projects || []);
+window.getProjectAutoStartDate = getProjectAutoStartDate;
