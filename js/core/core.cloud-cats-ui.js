@@ -439,6 +439,31 @@ const _CATITEM_TYPE_MAP = {
   // congTrinh không có ở đây — được quản lý bởi projects_v1
 };
 
+// ── Canonical display format rules ────────────────────────────
+// Nhận cả catId ('loaiChiPhi', 'tbTen', ...) lẫn type key ('loai', 'tbteb', ...)
+const _CAT_FORMAT_RULES = {
+  loaiChiPhi: 'title', tbTen:  'title',  // catId → Title Case
+  loai:       'title', tbteb:  'title',  // type  → Title Case
+  nhaCungCap: 'upper', nguoiTH: 'upper', thauPhu: 'upper', congNhan: 'upper',
+  ncc:        'upper', nguoi:   'upper', tp:      'upper', cn:       'upper',
+};
+
+/**
+ * Chuẩn hóa tên danh mục theo loại (nguồn chính thức duy nhất cho rule format).
+ * loaiChiPhi / loai / tbTen / tbteb → Title Case (chữ đầu mỗi từ viết hoa).
+ * Các loại còn lại → UPPERCASE.
+ * Giữ dấu tiếng Việt. Trim + chuẩn hóa khoảng trắng.
+ */
+function normalizeCatDisplayName(catIdOrType, name) {
+  name = (name || '').trim().replace(/\s+/g, ' ');
+  if (!name) return name;
+  if ((_CAT_FORMAT_RULES[catIdOrType] || 'upper') === 'title') {
+    return name.toLowerCase().split(' ').filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+  return name.toUpperCase();
+}
+
 /**
  * Đồng bộ string array → cat_items_v1 sau mỗi lần user thay đổi danh mục.
  * Tự detect thêm mới (add) và xóa (isDeleted=true).
@@ -450,6 +475,16 @@ function _syncCatItems(catId, nameArr) {
   const allItems = load('cat_items_v1', {});
   const typeItems = (allItems[type] || []).slice();
   const now = Date.now();
+
+  // Canonicalize tên các item đang tồn tại (sửa "COPHA" → "Copha", v.v.)
+  typeItems.forEach(item => {
+    if (item.isDeleted) return;
+    const canonical = normalizeCatDisplayName(type, item.name);
+    if (canonical !== item.name) {
+      item.name = canonical;
+      item.updatedAt = now;
+    }
+  });
 
   // Dedup nameArr trước (phòng khi array đã bị rác từ trước)
   const seenNorm = new Set();
@@ -497,18 +532,37 @@ function _rebuildCatArrsFromItems() {
   _dedupCatItemsNow();
   const allItems = load('cat_items_v1', {});
   if (!allItems || !Object.keys(allItems).length) return;
-  // Dedup output: phòng trường hợp cat_items_v1 vẫn còn rác sau dedup
-  const nameArr = (items) => {
+
+  // Canonicalize item.name trong cat_items_v1 (sửa "COPHA" → "Copha", v.v.)
+  const now = Date.now();
+  let itemsChanged = false;
+  Object.keys(allItems).forEach(type => {
+    (allItems[type] || []).forEach(item => {
+      if (item.isDeleted) return;
+      const canonical = normalizeCatDisplayName(type, item.name);
+      if (canonical !== item.name) {
+        item.name = canonical;
+        item.updatedAt = now;
+        itemsChanged = true;
+      }
+    });
+  });
+  // Dùng save() thay _memSet() khi có thay đổi để push lên cloud
+  if (itemsChanged) save('cat_items_v1', allItems);
+
+  // Rebuild string arrays với tên đã canonical + dedup
+  const nameArr = (items, type) => {
     const seen = new Set();
-    return (items || []).filter(i => !i.isDeleted).map(i => i.name)
+    return (items || []).filter(i => !i.isDeleted)
+      .map(i => normalizeCatDisplayName(type, i.name))
       .filter(name => { const k = _catNormKey(name); return seen.has(k) ? false : (seen.add(k), true); });
   };
-  if (allItems.loai)  { cats.loaiChiPhi = nameArr(allItems.loai);  _memSet('cat_loai',  cats.loaiChiPhi); }
-  if (allItems.ncc)   { cats.nhaCungCap = nameArr(allItems.ncc);   _memSet('cat_ncc',   cats.nhaCungCap); }
-  if (allItems.nguoi) { cats.nguoiTH    = nameArr(allItems.nguoi); _memSet('cat_nguoi', cats.nguoiTH); }
-  if (allItems.tp)    { cats.thauPhu    = nameArr(allItems.tp);    _memSet('cat_tp',    cats.thauPhu); }
-  if (allItems.cn)    { cats.congNhan   = nameArr(allItems.cn);    _memSet('cat_cn',    cats.congNhan); }
-  if (allItems.tbteb) { cats.tbTen      = nameArr(allItems.tbteb); _memSet('cat_tbteb', cats.tbTen); }
+  if (allItems.loai)  { cats.loaiChiPhi = nameArr(allItems.loai,  'loai');  _memSet('cat_loai',  cats.loaiChiPhi); }
+  if (allItems.ncc)   { cats.nhaCungCap = nameArr(allItems.ncc,   'ncc');   _memSet('cat_ncc',   cats.nhaCungCap); }
+  if (allItems.nguoi) { cats.nguoiTH    = nameArr(allItems.nguoi, 'nguoi'); _memSet('cat_nguoi', cats.nguoiTH); }
+  if (allItems.tp)    { cats.thauPhu    = nameArr(allItems.tp,    'tp');    _memSet('cat_tp',    cats.thauPhu); }
+  if (allItems.cn)    { cats.congNhan   = nameArr(allItems.cn,    'cn');    _memSet('cat_cn',    cats.congNhan); }
+  if (allItems.tbteb) { cats.tbTen      = nameArr(allItems.tbteb, 'tbteb'); _memSet('cat_tbteb', cats.tbTen); }
 }
 
 /**

@@ -475,20 +475,38 @@ async function pullChanges(yr, callback, opts = {}) {
             });
           merged[type] = [...byId.values()];
         });
+
+        // Canonicalize item.name trong merged (sửa "COPHA" → "Copha", v.v.)
+        if (typeof normalizeCatDisplayName === 'function') {
+          Object.keys(merged).forEach(type => {
+            (merged[type] || []).forEach(item => {
+              if (item.isDeleted) return;
+              const canonical = normalizeCatDisplayName(type, item.name);
+              if (canonical !== item.name) {
+                item.name = canonical;
+                item.updatedAt = nowMs;
+              }
+            });
+          });
+        }
+
         _memSet('cat_items_v1', merged);
-        // Rebuild string arrays từ merged items — áp dụng soft-delete + dedup
-        const nameArr = (items) => {
+        // Rebuild string arrays với tên canonical + dedup
+        const nameArr = (items, type) => {
           const seen = new Set();
-          return (items || []).filter(i => !i.isDeleted).map(i => i.name)
+          return (items || []).filter(i => !i.isDeleted)
+            .map(i => typeof normalizeCatDisplayName === 'function'
+              ? normalizeCatDisplayName(type, i.name)
+              : i.name)
             .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
         };
-        if (merged.loai)  { _memSet('cat_loai',  nameArr(merged.loai)); }
-        if (merged.ncc)   { _memSet('cat_ncc',   nameArr(merged.ncc)); }
-        if (merged.nguoi) { _memSet('cat_nguoi', nameArr(merged.nguoi)); }
-        if (merged.tp)    { _memSet('cat_tp',    nameArr(merged.tp)); }
-        if (merged.cn)    { _memSet('cat_cn',    nameArr(merged.cn)); }
-        if (merged.tbteb) { _memSet('cat_tbteb', nameArr(merged.tbteb)); }
-        console.log('[Sync] ▼ catItems merged — soft-deletes applied');
+        if (merged.loai)  { _memSet('cat_loai',  nameArr(merged.loai,  'loai')); }
+        if (merged.ncc)   { _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc')); }
+        if (merged.nguoi) { _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi')); }
+        if (merged.tp)    { _memSet('cat_tp',    nameArr(merged.tp,    'tp')); }
+        if (merged.cn)    { _memSet('cat_cn',    nameArr(merged.cn,    'cn')); }
+        if (merged.tbteb) { _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb')); }
+        console.log('[Sync] ▼ catItems merged — soft-deletes applied, names canonicalized');
       }
       if (catsData?.projects && Array.isArray(catsData.projects)) {
         const local  = load('projects_v1', []);
@@ -667,6 +685,9 @@ async function manualSync() {
 
     // Bước 3: Push — đợi xong mới refresh UI (tránh reload sớm trước khi push xong)
     await pushChanges({ silent: false });
+
+    // Reset flag để _migrateCatNamesFormat chạy lại scan data ở lần renderSettings tiếp theo
+    if (typeof resetCatNamesMigrated === 'function') resetCatNamesMigrated();
 
     // Bước 4: Render — dùng afterDataChange nếu có, fallback inline
     if (typeof afterDataChange === 'function') afterDataChange();

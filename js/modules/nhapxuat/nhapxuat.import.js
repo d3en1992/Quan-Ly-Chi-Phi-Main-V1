@@ -380,7 +380,11 @@ function _applyImport() {
     const _mergeCatArr = (key, incoming, catId, assign) => {
       if (!incoming || !incoming.length) return 0;
       const current = load(key, []);
-      const combined = _deduplicateCatNames([...current, ...incoming]);
+      // Canonicalize incoming names trước khi merge (áp dụng rule Title Case / UPPERCASE)
+      const canonIn = (incoming || []).map(n =>
+        typeof normalizeCatDisplayName === 'function' ? normalizeCatDisplayName(catId, n) : n
+      );
+      const combined = _deduplicateCatNames([...current, ...canonIn]);
       const added = combined.filter(v => !current.some(c2 => _normStr(c2) === _normStr(v)));
       if (!added.length) return 0;
       save(key, combined);
@@ -599,6 +603,9 @@ function _applyImport() {
       if (typeof _syncActiveYearCompat === 'function') _syncActiveYearCompat();
     }
   }
+
+  // Reset flag scan data để renderSettings chạy lại sau import
+  if (typeof resetCatNamesMigrated === 'function') resetCatNamesMigrated();
 
   // ── 4. Refresh UI ──────────────────────────────────────────
   if (typeof buildYearSelect      === 'function') buildYearSelect();

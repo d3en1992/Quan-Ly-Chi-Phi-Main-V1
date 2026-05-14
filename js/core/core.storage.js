@@ -200,6 +200,8 @@ const _SYNC_DATA_KEYS = new Set([
   // Roles & years: cần pending guard giống cat arrays
   'cat_cn_roles',  // vai trò công nhân — save() từ updateCNRole() và rebuildCCCategories()
   'cat_ct_years',  // năm theo công trình — save() từ saveCats('congTrinh')
+  // cat_items_v1: source of truth per-item — cần pending khi canonicalize tên để push cloud
+  'cat_items_v1',
 ]);
 
 function _incPending() {

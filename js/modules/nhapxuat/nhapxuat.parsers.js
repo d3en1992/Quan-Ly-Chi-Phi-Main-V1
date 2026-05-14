@@ -103,14 +103,20 @@ function _isEmptyRow(row) {
 function _formatCatName(type, name) {
   if (!name) return name;
   const t = String(name).trim();
-  if (['ncc', 'nguoi', 'tp'].includes(type)) {
+  // Delegate sang helper canonical chung nếu đã load (core.cloud-cats-ui.js load trước)
+  if (typeof normalizeCatDisplayName === 'function') {
+    // 'tb' trong parsers map sang 'tbteb' trong cat_items_v1
+    const mappedType = type === 'tb' ? 'tbteb' : type;
+    return normalizeCatDisplayName(mappedType, t);
+  }
+  // Fallback (không nên xảy ra trong runtime bình thường)
+  if (['ncc', 'nguoi', 'tp', 'cn'].includes(type)) {
     return t.toUpperCase();
   }
-  if (['loai', 'tb'].includes(type)) {
-    // Title Case: chữ đầu mỗi từ viết hoa
+  if (['loai', 'tb', 'tbteb'].includes(type)) {
     return t.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
   }
-  return t; // 'ct', 'cn' — giữ nguyên
+  return t; // 'ct' — giữ nguyên
 }
 
 // Issue 2: Dedup trong cùng file import (trước khi check vs DB)

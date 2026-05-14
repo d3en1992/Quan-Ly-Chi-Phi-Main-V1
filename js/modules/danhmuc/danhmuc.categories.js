@@ -72,9 +72,13 @@ document.getElementById('ct-modal').addEventListener('click',e=>{ if(e.target===
 //  DANH MỤC — NORMALIZE + DEDUP
 // ══════════════════════════════
 
-// Chuẩn hóa tên theo loại danh mục
+// Chuẩn hóa tên theo loại danh mục — wrapper của normalizeCatDisplayName (core.cloud-cats-ui.js)
 // loaiChiPhi / tbTen → Title Case; còn lại → UPPERCASE
 function normalizeName(catId, val) {
+  if (typeof normalizeCatDisplayName === 'function') {
+    return normalizeCatDisplayName(catId, val);
+  }
+  // Fallback (không nên xảy ra trong runtime — core.cloud-cats-ui.js load trước)
   val = (val || '').trim();
   if (!val) return val;
   if (catId === 'loaiChiPhi' || catId === 'tbTen') {
@@ -254,9 +258,13 @@ function scanAndFixAllDataFormats() {
 
 // Chuẩn hóa dữ liệu hiện có: loaiChiPhi + tbTen → Title Case
 // Idempotent: chỉ save khi thực sự có thay đổi
+// Flag chỉ dùng cho bước scanAndFixAllDataFormats (scan record nghiệp vụ — tốn kém hơn)
+// Canonicalize cats arrays luôn chạy (rẻ, idempotent)
 let _catNamesMigrated = false;
+// Gọi từ sync/import để cho phép _migrateCatNamesFormat chạy lại ở lần renderSettings tiếp theo
+function resetCatNamesMigrated() { _catNamesMigrated = false; }
 function _migrateCatNamesFormat() {
-  if (_catNamesMigrated) return;
+  const needScanData = !_catNamesMigrated;
   _catNamesMigrated = true;
   let changed = false;
   // Bước 1: chuẩn hóa + dedup mảng cats (Title Case / UPPERCASE + loại bỏ bản trùng)
@@ -277,8 +285,8 @@ function _migrateCatNamesFormat() {
     }
   });
   if (changed) console.log('[DM] _migrateCatNamesFormat: chuẩn hóa + dedup cats xong');
-  // Bước 2: quét và sửa tất cả data cũ trong DB
-  scanAndFixAllDataFormats();
+  // Bước 2: quét và sửa tất cả data cũ trong DB (chỉ chạy khi cần — tốn kém hơn)
+  if (needScanData) scanAndFixAllDataFormats();
 }
 
 // ══════════════════════════════
