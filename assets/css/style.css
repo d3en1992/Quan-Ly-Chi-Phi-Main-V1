@@ -1627,3 +1627,88 @@ body { overscroll-behavior-y: none; }
 .editing-row {
   background: #fff7e6 !important;
 }
+
+/* ── Sheet Grid: Excel-like spreadsheet behavior ── */
+
+/* Active cell (focus) — vàng đậm, viền 2px */
+.sheet-active {
+  background: #fffbef !important;
+  box-shadow: inset 0 0 0 2px var(--gold) !important;
+  position: relative; z-index: 1;
+}
+.sheet-active input,
+.sheet-active select {
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Selected range — nền vàng nhạt */
+.sheet-selected {
+  background: rgba(200, 135, 10, 0.10) !important;
+  outline: 1px solid rgba(200, 135, 10, 0.25);
+  outline-offset: -1px;
+}
+.sheet-selected input,
+.sheet-selected select {
+  background: transparent !important;
+}
+
+/* Paste flash */
+.sheet-paste-flash {
+  animation: sheetPasteFlash 0.5s ease-out;
+}
+@keyframes sheetPasteFlash {
+  from { background: rgba(22, 163, 74, 0.22) !important; }
+  to   { background: transparent; }
+}
+
+/* Backward compat (class cũ) */
+.sheet-cell-active   { background: #fffbef !important; box-shadow: inset 0 0 0 2px var(--gold) !important; }
+.sheet-cell-selected { background: rgba(200, 135, 10, 0.10) !important; }
+.sheet-cell-paste-flash { animation: sheetPasteFlash 0.5s ease-out; }
+
+/* Invalid cell (autocomplete không khớp danh mục) */
+.sheet-cell-invalid,
+.cell-input.invalid,
+.bare-select.invalid {
+  background: #fff1f2 !important;
+  box-shadow: inset 0 -2px 0 #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.sheet-cell-invalid::placeholder,
+.cell-input.invalid::placeholder {
+  color: #b91c1c;
+}
+
+/* ── Autocomplete Dropdown ── */
+.sheet-autocomplete {
+  background: var(--paper);
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.06);
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 13px;
+  padding: 4px 0;
+  scrollbar-width: thin;
+}
+.sheet-autocomplete::-webkit-scrollbar { width: 5px; }
+.sheet-autocomplete::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
+
+.sheet-autocomplete-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+  transition: background 0.08s;
+}
+.sheet-autocomplete-item:hover,
+.sheet-autocomplete-item.active {
+  background: var(--gold-bg);
+  color: var(--gold);
+  font-weight: 600;
+}
+

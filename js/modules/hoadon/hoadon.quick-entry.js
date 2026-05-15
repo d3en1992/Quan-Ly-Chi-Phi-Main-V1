@@ -8,85 +8,146 @@ function initTable(n=10) {
   document.getElementById('entry-tbody').innerHTML='';
   for(let i=0;i<n;i++) addRow();
   calcSummary();
+  _initQuickSheetGrid();
+}
+
+function _initQuickSheetGrid() {
+  if (typeof initSheetGrid !== 'function') return;
+  initSheetGrid({
+    name: 'quick',
+    tbody: '#entry-tbody',
+    rowSelector: 'tr',
+    cellSelector: 'input',
+    addRow: () => addRow(),
+    afterChange: () => calcSummary(),
+    columns: [
+      { field: 'loai',  type: 'autocomplete',
+        source: () => { const d = typeof _dedupCatArr === 'function' ? _dedupCatArr : a => [...a].filter(Boolean); return d(cats.loaiChiPhi||[]); },
+        required: true, copyFromAbove: true },
+      { field: 'ct',    type: 'project-autocomplete',
+        source: () => {
+          const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects||[]);
+          return projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+        },
+        required: true, copyFromAbove: true },
+      { field: 'tien',  type: 'money' },
+      { field: 'nd',    type: 'text', suggestFromAbove: true },
+      { field: 'nguoi', type: 'autocomplete',
+        source: () => { const d = typeof _dedupCatArr === 'function' ? _dedupCatArr : a => [...a].filter(Boolean); return d(cats.nguoiTH||[]); },
+        copyFromAbove: true },
+      { field: 'ncc',   type: 'autocomplete',
+        source: () => { const d = typeof _dedupCatArr === 'function' ? _dedupCatArr : a => [...a].filter(Boolean); return d(cats.nhaCungCap||[]); },
+        copyFromAbove: true }
+    ]
+  });
+}
+
+// Đọc projectId từ ô ct (input có data-pid, hoặc select dùng _readPidFromSel)
+function _readCtPid(el) {
+  if (!el) return null;
+  if (el.tagName === 'INPUT') {
+    if (el.dataset.pid) return el.dataset.pid;
+    const name = (el.value||'').trim();
+    if (name && typeof findProjectIdByName === 'function') return findProjectIdByName(name) || null;
+    return null;
+  }
+  return typeof _readPidFromSel === 'function' ? _readPidFromSel(el) : null;
 }
 
 function addRows(n) { for(let i=0;i<n;i++) addRow(); }
 
-// Rebuild tất cả dropdowns trong bảng nhập nhanh và form chi tiết
-// Gọi khi danh mục hoặc công trình thay đổi (realtime, không reload)
-function refreshEntryDropdowns() {
-  // Helper nội bộ: dedup + sort (dùng _dedupCatArr nếu danhmuc.js đã load, fallback nếu chưa)
-  const _dd = arr => typeof _dedupCatArr === 'function'
-    ? _dedupCatArr(arr)
-    : [...arr].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
-  document.querySelectorAll('#entry-tbody tr').forEach(tr => {
-    const loaiSel  = tr.querySelector('[data-f="loai"]');
-    const ctSel    = tr.querySelector('[data-f="ct"]');
-    const nguoiSel = tr.querySelector('[data-f="nguoi"]');
-    const nccSel   = tr.querySelector('[data-f="ncc"]');
-    if(loaiSel) {
-      const v = loaiSel.value;
-      loaiSel.innerHTML = '<option value="">-- Chọn --</option>' +
-        _dd(cats.loaiChiPhi).map(c=>`<option value="${x(c)}" ${c===v?'selected':''}>${x(c)}</option>`).join('');
+// Validate tất cả ô danh mục trong bảng nhập nhanh trước khi lưu.
+// Trả về { ok, count } — nếu ok=false thì các ô sai đã được đánh dấu đỏ.
+function validateQuickEntryCategories() {
+  if (typeof validateCategoryCell !== 'function') return { ok: true, count: 0 };
+
+  const dedupArr = typeof _dedupCatArr === 'function' ? _dedupCatArr : a => [...new Set(a.filter(Boolean))];
+  const loaiOpts  = dedupArr(cats.loaiChiPhi  || []);
+  const nguoiOpts = dedupArr(cats.nguoiTH     || []);
+  const nccOpts   = dedupArr(cats.nhaCungCap  || []);
+  const projOpts  = (() => {
+    const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects || []);
+    return projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+  })();
+
+  let invalidCount = 0;
+
+  document.querySelectorAll('#entry-tbody tr').forEach((tr, rowIdx) => {
+    const loaiEl  = tr.querySelector('[data-f="loai"]');
+    const ctEl    = tr.querySelector('[data-f="ct"]');
+    const nguoiEl = tr.querySelector('[data-f="nguoi"]');
+    const nccEl   = tr.querySelector('[data-f="ncc"]');
+    const tien    = parseInt(tr.querySelector('[data-f="tien"]')?.dataset.raw || '0', 10) || 0;
+
+    const loaiVal  = (loaiEl?.value  || '').trim();
+    const ctVal    = (ctEl?.value    || '').trim();
+    const nguoiVal = (nguoiEl?.value || '').trim();
+    const nccVal   = (nccEl?.value   || '').trim();
+
+    // Bỏ qua dòng hoàn toàn trống
+    if (!loaiVal && !ctVal && !nguoiVal && !nccVal && !tien) return;
+
+    const rowNum = rowIdx + 1;
+
+    const loaiRes = validateCategoryCell(loaiEl, loaiOpts, { required: true, label: 'Dòng ' + rowNum + ' — Loại chi phí' });
+    if (!loaiRes.ok) invalidCount++;
+
+    const ctRes = validateCategoryCell(ctEl, projOpts, { required: true, label: 'Dòng ' + rowNum + ' — Công trình' });
+    if (!ctRes.ok) invalidCount++;
+
+    if (nguoiVal) {
+      const nguoiRes = validateCategoryCell(nguoiEl, nguoiOpts, { required: false, label: 'Dòng ' + rowNum + ' — Người TH' });
+      if (!nguoiRes.ok) invalidCount++;
+    } else if (nguoiEl && typeof clearCellInvalid === 'function') {
+      clearCellInvalid(nguoiEl);
     }
-    if(ctSel) {
-      const v = ctSel.value;
-      ctSel.innerHTML = _buildProjOpts(v, '-- Chọn --');
-    }
-    if(nguoiSel) {
-      const v = nguoiSel.value;
-      nguoiSel.innerHTML = '<option value="">-- Chọn --</option>' +
-        _dd(cats.nguoiTH).map(c=>`<option value="${x(c)}" ${c===v?'selected':''}>${x(c)}</option>`).join('');
-    }
-    if(nccSel) {
-      const v = nccSel.value;
-      nccSel.innerHTML = '<option value="">-- Chọn --</option>' +
-        _dd(cats.nhaCungCap).map(c=>`<option value="${x(c)}" ${c===v?'selected':''}>${x(c)}</option>`).join('');
+
+    if (nccVal) {
+      const nccRes = validateCategoryCell(nccEl, nccOpts, { required: false, label: 'Dòng ' + rowNum + ' — NCC' });
+      if (!nccRes.ok) invalidCount++;
+    } else if (nccEl && typeof clearCellInvalid === 'function') {
+      clearCellInvalid(nccEl);
     }
   });
+
+  return { ok: invalidCount === 0, count: invalidCount };
+}
+
+// Gọi khi danh mục hoặc công trình thay đổi — với input autocomplete không cần rebuild
+function refreshEntryDropdowns() {
   if(typeof _initDetailFormSelects === 'function') _initDetailFormSelects();
 }
 
 function addRow(d={}) {
   const tbody = document.getElementById('entry-tbody');
-  // PHẦN 6: copy loai/CT từ dòng trên nếu không có dữ liệu truyền vào
+  // Copy loai/CT từ dòng trên nếu không có dữ liệu truyền vào
   if(!d.loai && !d.congtrinh) {
     const lastRow = tbody.querySelector('tr:last-child');
     if(lastRow) {
       const prevLoai = lastRow.querySelector('[data-f="loai"]')?.value || '';
       const prevCt   = lastRow.querySelector('[data-f="ct"]')?.value   || '';
-      if(prevLoai || prevCt) d = { ...d, loai: prevLoai, congtrinh: prevCt };
+      const prevPid  = lastRow.querySelector('[data-f="ct"]')?.dataset?.pid || '';
+      if(prevLoai || prevCt) d = { ...d, loai: prevLoai, congtrinh: prevCt, projectId: prevPid || d.projectId };
     }
   }
   const num = tbody.children.length + 1;
-  const ctDef = d.congtrinh || '';
 
   const tr = document.createElement('tr');
-
-  // Dùng _dedupCatArr (từ danhmuc.js) để loại rỗng + trùng normalizeKey + sort tiếng Việt
-  const _dd = arr => typeof _dedupCatArr === 'function'
-    ? _dedupCatArr(arr)
-    : [...arr].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
-  const loaiOpts  = `<option value="">-- Chọn --</option>` + _dd(cats.loaiChiPhi).map(v=>`<option value="${x(v)}" ${v===(d.loai||'')?'selected':''}>${x(v)}</option>`).join('');
-  const ctOpts    = _buildProjOpts(ctDef, '-- Chọn --');
-  const nguoiOpts = `<option value="">-- Chọn --</option>` + _dd(cats.nguoiTH).map(v=>`<option value="${x(v)}" ${v===(d.nguoi||'')?'selected':''}>${x(v)}</option>`).join('');
-  const nccOpts   = `<option value="">-- Chọn --</option>` + _dd(cats.nhaCungCap).map(v=>`<option value="${x(v)}" ${v===(d.ncc||'')?'selected':''}>${x(v)}</option>`).join('');
-
   tr.innerHTML = `
     <td class="row-num">${num}</td>
-    <td><select class="cell-input" data-f="loai">${loaiOpts}</select></td>
-    <td><select class="cell-input" data-f="ct">${ctOpts}</select></td>
+    <td><input class="cell-input" data-f="loai" autocomplete="off" placeholder="Loại chi phí..." value="${x(d.loai||'')}"></td>
+    <td><input class="cell-input" data-f="ct" autocomplete="off" data-pid="${x(d.projectId||'')}" placeholder="Công trình..." value="${x(d.congtrinh||'')}"></td>
     <td><input class="cell-input right tien-input" data-f="tien" data-raw="${d.tien||''}" placeholder="0" value="${d.tien?numFmt(d.tien):''}" inputmode="decimal"></td>
     <td><input class="cell-input" data-f="nd" value="${x(d.nd||'')}" placeholder="Nội dung..."></td>
-    <td><select class="cell-input" data-f="nguoi">${nguoiOpts}</select></td>
-    <td><select class="cell-input" data-f="ncc">${nccOpts}</select></td>
+    <td><input class="cell-input" data-f="nguoi" autocomplete="off" placeholder="Người TH..." value="${x(d.nguoi||'')}"></td>
+    <td><input class="cell-input" data-f="ncc" autocomplete="off" placeholder="NCC..." value="${x(d.ncc||'')}"></td>
     <td><button class="del-btn" onclick="delRow(this)">✕</button></td>
   `;
 
   // Thousand-separator logic for tien input
   const tienInput = tr.querySelector('[data-f="tien"]');
   tienInput.addEventListener('input', function() {
-    const raw = this.value.replace(/[.,]/g,'');
+    const raw = this.value.replace(/[.,\s]/g,'');
     this.dataset.raw = raw;
     if(raw) this.value = numFmt(parseInt(raw,10)||0);
     calcSummary();
@@ -97,50 +158,13 @@ function addRow(d={}) {
     this.value = raw ? numFmt(raw) : '';
   });
 
-  tr.querySelectorAll('input,select').forEach(el => {
-    if(el.dataset.f!=='tien') {
-      el.addEventListener('input', calcSummary);
+  tr.querySelectorAll('input').forEach(el => {
+    if(el.dataset.f !== 'tien') {
       el.addEventListener('change', calcSummary);
     }
   });
 
-  // PHẦN 5: Enter key → nhảy xuống dòng dưới (chỉ áp dụng cho input)
-  const entryInputs = [...tr.querySelectorAll('input')];
-  entryInputs.forEach(inp => {
-    inp.addEventListener('keydown', function(e) {
-      if(e.key !== 'Enter') return;
-      e.preventDefault();
-      const allRows = [...document.querySelectorAll('#entry-tbody tr')];
-      const curIdx  = allRows.indexOf(tr);
-      const colIdx  = entryInputs.indexOf(this);
-      let targetRow;
-      if(curIdx < allRows.length - 1) {
-        targetRow = allRows[curIdx + 1];
-      } else {
-        addRows(1);
-        targetRow = [...document.querySelectorAll('#entry-tbody tr')][curIdx + 1];
-      }
-      if(targetRow) {
-        const targets = [...targetRow.querySelectorAll('input')];
-        (targets[colIdx] || targets[0])?.focus();
-      }
-    });
-  });
-
   tbody.appendChild(tr);
-
-  // Orphaned CT: nếu ctDef không khớp với bất kỳ option nào → thêm option tạm
-  if (ctDef) {
-    const ctSel = tr.querySelector('[data-f="ct"]');
-    if (ctSel && !ctSel.value) {
-      const orphan = document.createElement('option');
-      orphan.value = ctDef;
-      orphan.textContent = ctDef + ' (*)';
-      if (d.projectId) orphan.dataset.pid = d.projectId;
-      ctSel.appendChild(orphan);
-      ctSel.value = ctDef;
-    }
-  }
 }
 
 function delRow(btn) { btn.closest('tr').remove(); renumber(); calcSummary(); }
@@ -168,14 +192,21 @@ function saveAllRows(skipDupCheck) {
   const date = document.getElementById('entry-date').value;
   if(!date) { toast('Vui lòng chọn ngày!','error'); return; }
 
+  // Validate danh mục — đánh dấu ô đỏ và chặn lưu nếu có ô sai
+  const _catVal = validateQuickEntryCategories();
+  if (!_catVal.ok) {
+    toast('Có ' + _catVal.count + ' ô danh mục không hợp lệ. Vui lòng chọn đúng từ gợi ý/Danh Mục.', 'error');
+    return;
+  }
+
   // Thu thập tất cả dòng hợp lệ
   const rows = [];
   let errRow = 0;
   document.querySelectorAll('#entry-tbody tr').forEach(tr => {
     const loai   = (tr.querySelector('[data-f="loai"]')?.value||'').trim();
-    const ctSel  = tr.querySelector('[data-f="ct"]');
-    const ct     = (ctSel?.value||'').trim();
-    const ctPid  = _readPidFromSel(ctSel);
+    const ctEl   = tr.querySelector('[data-f="ct"]');
+    const ct     = (ctEl?.value||'').trim();
+    const ctPid  = _readCtPid(ctEl);
     const tien   = parseInt(tr.querySelector('[data-f="tien"]')?.dataset.raw||'0',10)||0;
     if(!loai&&!ct&&!tien) return;
     if(!ct||!loai) { errRow++; tr.style.background='#fdecea'; return; }

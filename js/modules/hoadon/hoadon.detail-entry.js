@@ -17,8 +17,32 @@ function goInnerSub(btn, id) {
       document.getElementById('detail-ngay').value = document.getElementById('entry-date')?.value || today();
       for(let i=0; i<5; i++) addDetailRow();
     }
+    _initDetailSheetGrid();
   }
   renderTodayInvoices(); // cập nhật bảng theo ngày của subtab vừa chuyển
+}
+
+function _initDetailSheetGrid() {
+  if (typeof initSheetGrid !== 'function') return;
+  initSheetGrid({
+    name: 'detail',
+    tbody: '#detail-tbody',
+    rowSelector: 'tr',
+    cellSelector: 'input',
+    addRow: () => addDetailRow(),
+    afterChange: () => {
+      getDetailRows().forEach(tr => calcDetailRow(tr));
+      calcDetailTotals();
+      generateDetailNd();
+    },
+    columns: [
+      { field: 'ten',    type: 'text',   suggestFromAbove: true },
+      { field: 'dv',     type: 'text',   copyFromAbove: true },
+      { field: 'sl',     type: 'number' },
+      { field: 'dongia', type: 'money' },
+      { field: 'ck',     type: 'discount' }
+    ]
+  });
 }
 
 function _initDetailFormSelects() {
@@ -125,30 +149,6 @@ function addDetailRow(d={}) {
   });
   tr.querySelector('[data-f="ten"]').addEventListener('input', generateDetailNd);
 
-  // Enter key: nhảy đến cùng cột trong dòng tiếp theo; tạo dòng mới nếu ở dòng cuối
-  tr.querySelectorAll('input').forEach(inp => {
-    inp.addEventListener('keydown', function(e) {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const allRows = getDetailRows();
-      const curIdx = allRows.indexOf(tr);
-      const inputs = [...tr.querySelectorAll('input')];
-      const colIdx = inputs.indexOf(this);
-      let targetRow;
-      if (curIdx < allRows.length - 1) {
-        targetRow = allRows[curIdx + 1];
-      } else {
-        addDetailRow();
-        targetRow = getDetailRows()[curIdx + 1];
-      }
-      if (targetRow) {
-        const targetInputs = [...targetRow.querySelectorAll('input')];
-        const target = targetInputs[colIdx] || targetInputs[0];
-        if (target) target.focus();
-      }
-    });
-  });
-
   tbody.appendChild(tr);
   if(d.dongia || d.sl || d.ck) calcDetailRow(tr);
 }
@@ -201,6 +201,51 @@ function generateDetailNd() {
   if(ndEl) ndEl.value = buildNDFromItems(items);
 }
 
+// Validate các ô danh mục trong form hóa đơn chi tiết.
+// Trả về { ok, count, msgs }.
+function validateDetailHeaderCategories() {
+  if (typeof validateCategoryCell !== 'function') return { ok: true, count: 0, msgs: [] };
+
+  const dedupArr = typeof _dedupCatArr === 'function' ? _dedupCatArr : a => [...new Set(a.filter(Boolean))];
+  const loaiOpts  = dedupArr(cats.loaiChiPhi  || []);
+  const nguoiOpts = dedupArr(cats.nguoiTH     || []);
+  const nccOpts   = dedupArr(cats.nhaCungCap  || []);
+  const projOpts  = (() => {
+    const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects || []);
+    return projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+  })();
+
+  let invalidCount = 0;
+  const msgs = [];
+
+  const loaiEl  = document.getElementById('detail-loai');
+  const ctEl    = document.getElementById('detail-ct');
+  const nccEl   = document.getElementById('detail-ncc');
+  const nguoiEl = document.getElementById('detail-nguoi');
+
+  const loaiRes = validateCategoryCell(loaiEl, loaiOpts, { required: true, label: 'Loại chi phí' });
+  if (!loaiRes.ok) { invalidCount++; msgs.push('Loại chi phí'); }
+
+  const ctRes = validateCategoryCell(ctEl, projOpts, { required: true, label: 'Công trình' });
+  if (!ctRes.ok) { invalidCount++; msgs.push('Công trình'); }
+
+  if ((nccEl?.value || '').trim()) {
+    const nccRes = validateCategoryCell(nccEl, nccOpts, { required: false, label: 'NCC' });
+    if (!nccRes.ok) { invalidCount++; msgs.push('NCC'); }
+  } else if (nccEl && typeof clearCellInvalid === 'function') {
+    clearCellInvalid(nccEl);
+  }
+
+  if ((nguoiEl?.value || '').trim()) {
+    const nguoiRes = validateCategoryCell(nguoiEl, nguoiOpts, { required: false, label: 'Người TH' });
+    if (!nguoiRes.ok) { invalidCount++; msgs.push('Người TH'); }
+  } else if (nguoiEl && typeof clearCellInvalid === 'function') {
+    clearCellInvalid(nguoiEl);
+  }
+
+  return { ok: invalidCount === 0, count: invalidCount, msgs };
+}
+
 function saveDetailInvoice() {
   const ngay = document.getElementById('detail-ngay').value;
   if(!ngay) { toast('Vui lòng chọn ngày!','error'); return; }
@@ -210,6 +255,13 @@ function saveDetailInvoice() {
   const ct = _detCtSel.value;
   const _detCtPid = _detCtSel.selectedOptions[0]?.dataset?.pid || null;
   if(!ct) { toast('Vui lòng chọn công trình!','error'); return; }
+
+  // Validate danh mục — đánh dấu ô đỏ và chặn lưu nếu có ô sai
+  const _hdCatVal = validateDetailHeaderCategories();
+  if (!_hdCatVal.ok) {
+    toast('Thông tin không hợp lệ: ' + _hdCatVal.msgs.join(', ') + '. Vui lòng chọn từ danh mục.', 'error');
+    return;
+  }
 
   const detailNguoi = (document.getElementById('detail-nguoi')?.value||'').trim();
   const items = [];
@@ -257,6 +309,7 @@ function saveDetailInvoice() {
 function clearDetailForm() {
   document.getElementById('detail-tbody').innerHTML = '';
   for(let i=0; i<5; i++) addDetailRow();
+  _initDetailSheetGrid();
   const ckEl = document.getElementById('detail-footer-ck');
   if(ckEl) ckEl.value = '';
   const ndEl = document.getElementById('detail-nd');
@@ -279,6 +332,14 @@ function clearDetailForm() {
 function _setSelectFlexible(sel, val) {
   if (!sel) return;
   const target = (val == null ? '' : String(val)).trim();
+
+  // Input (autocomplete): set value trực tiếp
+  if (sel.tagName === 'INPUT') {
+    sel.value = target;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+
   if (!target) { sel.value = ''; sel.dispatchEvent(new Event('change', { bubbles: true })); return; }
   const targetLower = target.toLowerCase();
   let matched = null;
@@ -288,7 +349,6 @@ function _setSelectFlexible(sel, val) {
   if (matched) {
     sel.value = matched.value;
   } else {
-    // Orphan: NCC/Người trong HĐ không còn trong danh mục → thêm option tạm
     const orphan = document.createElement('option');
     orphan.value = target;
     orphan.textContent = target + ' (*)';
