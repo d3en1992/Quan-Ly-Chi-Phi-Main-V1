@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check js/app/auth.js)",
+      "Bash(node --check js/app/main.js)"
+    ]
+  }
+}
