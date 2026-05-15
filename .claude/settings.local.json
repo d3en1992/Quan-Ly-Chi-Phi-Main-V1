@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(node --check js/app/auth.js)",
-      "Bash(node --check js/app/main.js)"
+      "Bash(node --check js/app/main.js)",
+      "Bash(git worktree *)",
+      "PowerShell(git worktree prune)"
     ]
   }
 }

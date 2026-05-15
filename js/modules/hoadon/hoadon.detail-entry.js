@@ -98,7 +98,7 @@ function renderDetailRowHTML(d, num) {
       style="width:100%;text-align:center;padding:7px 4px"></td>
     <td style="padding:0"><input data-f="sl" type="number" step="0.01" min="0"
       value="${d.sl||''}" placeholder="1"
-      style="width:100%;text-align:center;border:none;background:transparent;padding:7px 4px;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;-moz-appearance:textfield"
+      style="width:100%;text-align:center;border:none;background:transparent;padding:7px 4px;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;-moz-appearance:textfield;-webkit-appearance:textfield;appearance:textfield"
       inputmode="decimal"></td>
     <td><input class="cell-input right" data-f="dongia" data-raw="${d.dongia||''}"
       value="${d.dongia?numFmt(d.dongia):''}" placeholder="0" inputmode="decimal"></td>

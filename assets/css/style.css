@@ -167,6 +167,9 @@ body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: v
 .cell-input.mono { font-family: 'IBM Plex Mono', monospace; }
 .cell-input.right { text-align: right; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
 .cell-input.center { text-align: center; }
+/* Ẩn spinner của input[type=number] (cột SL) */
+input[data-f="sl"]::-webkit-inner-spin-button,
+input[data-f="sl"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 /* Dropdown công trình trong bảng không bị cắt tên */
 select.cell-input[data-f="ct"] { min-width: 180px; }
 
