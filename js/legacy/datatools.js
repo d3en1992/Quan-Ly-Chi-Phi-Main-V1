@@ -578,17 +578,25 @@ function _dbKPIWeekly(yr, invoiceData, ungData, thauPhuTotal) {
 
   const weeklyData = _dbCalcWeeklyData(invoiceData, ungData);
 
-  // Tuần KPI: ưu tiên tuần hiện tại, fallback tuần mới nhất có phát sinh
-  const today     = new Date();
-  const todayISO  = isoFromParts(today.getFullYear(), today.getMonth()+1, today.getDate());
-  const currKey   = snapToSunday(todayISO);
-  let weekKPIKey  = '';
-  let weekKPITotal = 0;
-  if (weeklyData[currKey] && weeklyData[currKey].total) {
-    weekKPIKey = currKey; weekKPITotal = weeklyData[currKey].total;
+  // Tuần KPI:
+  // - Nếu đang xem đúng năm hiện tại → LUÔN hiển thị tuần hiện tại (dù tổng = 0)
+  //   vì tuần mới bắt đầu chưa có dữ liệu là bình thường
+  // - Nếu xem năm khác (quá khứ/tương lai) → fallback sang tuần mới nhất có phát sinh
+  const today    = new Date();
+  const todayISO = isoFromParts(today.getFullYear(), today.getMonth()+1, today.getDate());
+  const currKey  = snapToSunday(todayISO);
+  const isCurrentYear = (today.getFullYear() === yr);
+  let weekKPIKey, weekKPITotal;
+
+  if (isCurrentYear) {
+    // Luôn chỉ đến tuần đang chạy — kể cả khi = 0 đ
+    weekKPIKey   = currKey;
+    weekKPITotal = (weeklyData[currKey] || { total: 0 }).total;
   } else {
+    // Năm khác → tuần mới nhất có phát sinh
     const keys = Object.keys(weeklyData).filter(k => weeklyData[k].total > 0).sort();
-    if (keys.length) { weekKPIKey = keys[keys.length-1]; weekKPITotal = weeklyData[weekKPIKey].total; }
+    weekKPIKey   = keys.length ? keys[keys.length - 1] : currKey;
+    weekKPITotal = weekKPIKey && weeklyData[weekKPIKey] ? weeklyData[weekKPIKey].total : 0;
   }
 
   // Tuần chi cao nhất
@@ -641,8 +649,8 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
     const v    = vals[i];
     const cx   = i * (colW + gap);
     const isSel = w.key === selectedDashboardWeekKey;
-    // Nhãn: hiển thị mỗi 4 tuần để tránh chồng chéo
-    const lbl  = (i % 4 === 0) ? viShort(w.sun) : '';
+    // Nhãn: mỗi 2 tuần để cân bằng giữa dễ đọc và không chồng chéo
+    const lbl  = (i % 2 === 0) ? viShort(w.sun) : '';
     const lblColor = isSel ? '#e67e22' : 'var(--ink3)';
 
     if (!v.total) {
@@ -654,9 +662,11 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       </g>`;
     }
 
-    const hInv = Math.max(0, Math.round((v.inv    / maxVal) * H));
-    const hTP  = Math.max(0, Math.round((v.ungTP  / maxVal) * H));
-    const hNCC = Math.max(0, Math.round((v.ungNCC / maxVal) * H));
+    // Minimum 4px để cột nhỏ (vài triệu giữa các cột trăm triệu) vẫn thấy được
+    const MIN_H = 4;
+    const hInv = v.inv    > 0 ? Math.max(MIN_H, Math.round((v.inv    / maxVal) * H)) : 0;
+    const hTP  = v.ungTP  > 0 ? Math.max(MIN_H, Math.round((v.ungTP  / maxVal) * H)) : 0;
+    const hNCC = v.ungNCC > 0 ? Math.max(MIN_H, Math.round((v.ungNCC / maxVal) * H)) : 0;
     // Sắp xếp chồng từ dưới lên: NCC → TP → INV
     const yNCC = H - hNCC;
     const yTP  = yNCC - hTP;

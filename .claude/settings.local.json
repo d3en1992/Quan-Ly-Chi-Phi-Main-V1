@@ -6,7 +6,10 @@
       "Bash(git worktree *)",
       "PowerShell(git worktree prune)",
       "Bash(node --check js/legacy/datatools.js)",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\legacy\\\\datatools.js\")"
     ]
   }
 }
