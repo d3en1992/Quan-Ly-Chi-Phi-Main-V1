@@ -4,7 +4,9 @@
       "Bash(node --check js/app/auth.js)",
       "Bash(node --check js/app/main.js)",
       "Bash(git worktree *)",
-      "PowerShell(git worktree prune)"
+      "PowerShell(git worktree prune)",
+      "Bash(node --check js/legacy/datatools.js)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
     ]
   }
 }

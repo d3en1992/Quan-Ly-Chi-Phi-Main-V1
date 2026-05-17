@@ -295,6 +295,11 @@ async function _doResetAll() {
 // Dashboard CT filter (dùng trong page-dashboard)
 var selectedCT = '';
 
+// Trạng thái tuần đang chọn trong chế độ 1 năm
+// Key = Sunday ISO (YYYY-MM-DD), reset khi đổi năm/filter
+var selectedDashboardWeekKey = '';
+var _dashLastYr = -1; // theo dõi năm lần render trước để reset tuần
+
 // ══════════════════════════════════════════════════════════════
 // [MODULE: DASHBOARD] — KPI · Bar chart · Pie · Top5 · By CT
 // Tìm nhanh: Ctrl+F → "MODULE: DASHBOARD"
@@ -302,40 +307,73 @@ var selectedCT = '';
 
 function renderDashboard() {
   const ay = typeof activeYears !== 'undefined' ? activeYears : new Set();
-  const yr = ay.size === 0 ? 0 : (ay.size === 1 ? [...ay][0] : 0);
+  const isSingleYear = ay.size === 1;
+  const yr = isSingleYear ? [...ay][0] : 0;
   const yrLabel = ay.size === 0 ? 'Tất cả năm'
-                : ay.size === 1 ? `Năm ${[...ay][0]}`
+                : ay.size === 1 ? `Năm ${yr}`
                 : 'Năm ' + [...ay].sort((a,b)=>a-b).join(', ');
+
   _dbPopulateCTFilter();
 
-  // Tầng 1: tổng quan năm (không filter CT)
-  const dataYear = getInvoicesCached().filter(i => inActiveYear(i.ngay));
+  // Reset tuần đang chọn khi đổi chế độ năm hoặc đổi sang năm khác
+  const modeKey = isSingleYear ? yr : 0;
+  if (modeKey !== _dashLastYr) {
+    selectedDashboardWeekKey = '';
+    _dashLastYr = modeKey;
+  }
 
-  // Tầng 2: chi tiết theo CT (có filter)
+  const barTitle = document.getElementById('db-bar-title');
+  const pieTitle = document.getElementById('db-pie-title');
+
+  // Dữ liệu hóa đơn trong năm (không filter CT cho KPI tổng quan)
+  const dataYear   = getInvoicesCached().filter(i => inActiveYear(i.ngay));
+  // Dữ liệu hóa đơn đã filter CT (cho Top5, bảng chi tiết)
   const dataDetail = getInvoicesCached().filter(i =>
-    inActiveYear(i.ngay) &&
-    (!selectedCT || resolveProjectName(i) === selectedCT)
+    inActiveYear(i.ngay) && (!selectedCT || resolveProjectName(i) === selectedCT)
   );
 
-  if (!dataYear.length) {
+  // Tiền ứng trong năm (dùng cho cả 2 chế độ)
+  const ungAllYear = (typeof ungRecords !== 'undefined' ? ungRecords : [])
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay));
+
+  // Tổng hợp đồng thầu phụ trong năm: giaTri + phatSinh, bỏ deletedAt
+  const thauPhuTotal = (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
+    .filter(c => !c.deletedAt && c.ngay && inActiveYear(c.ngay))
+    .reduce((s, c) => s + (c.giaTri || 0) + (c.phatSinh || 0), 0);
+
+  const hasData = dataYear.length > 0 || (isSingleYear && ungAllYear.length > 0);
+
+  if (!hasData) {
     ['db-kpi-row','db-bar-chart','db-pie-chart','db-top5','db-ung-ct','db-tb-ct'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<div class="db-empty">Chưa có dữ liệu cho ' + yrLabel + '</div>';
     });
+    if (barTitle) barTitle.textContent = isSingleYear ? 'Chi Phí Theo Tuần' : 'Chi Phí Theo Tháng';
+    if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
     return;
   }
 
-  // Tổng quan năm — không bị filter CT
-  _dbKPI(dataYear, yr);
-  _dbBarChart(dataYear);
-  _dbPieChart(dataYear);
+  if (isSingleYear) {
+    // ── CHẾ ĐỘ 1 NĂM: biểu đồ theo tuần ──────────────────────
+    if (barTitle) barTitle.textContent = 'Chi Phí Theo Tuần';
+    if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
+    _dbKPIWeekly(yr, dataYear, ungAllYear, thauPhuTotal);
+    _dbBarChartWeekly(yr, dataYear, ungAllYear);
+    _dbPieChartWeekly(dataYear, ungAllYear);
+  } else {
+    // ── CHẾ ĐỘ NHIỀU NĂM / TẤT CẢ: biểu đồ theo tháng ───────
+    if (barTitle) barTitle.textContent = 'Chi Phí Theo Tháng';
+    if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
+    _dbKPI(dataYear, yr, thauPhuTotal);
+    _dbBarChart(dataYear);
+    _dbPieChart(dataYear);
+  }
 
-  // Chi tiết theo CT — bị filter khi chọn CT
+  // Phần chi tiết theo CT — luôn hiển thị
   _dbTop5(dataDetail);
   _dbUngByCT();
   _dbTBByCT();
-
-  renderCtPage();   // Chi tiết từng CT (gộp từ tab cũ)
+  renderCtPage();
 }
 
 // ── Populate CT filter dropdown (Dashboard) ────────────────────
@@ -346,19 +384,22 @@ function _dbPopulateCTFilter() {
 }
 
 // ── KPI Cards ─────────────────────────────────────────────────
-function _dbKPI(data, yr) {
-  const total   = data.reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
-  const months  = new Set(data.map(i => i.ngay?.slice(0,7))).size;
-  const avgMonth= months ? Math.round(total / months) : 0;
-  const maxInv  = data.reduce((mx, i) => (i.thanhtien||i.tien||0) > (mx.thanhtien||mx.tien||0) ? i : mx, data[0]);
-  const ctSet   = new Set(data.map(i => resolveProjectName(i)).filter(Boolean));
+function _dbKPI(data, yr, thauPhuTotal) {
+  thauPhuTotal = thauPhuTotal || 0;
+  const invTotal = data.reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+  const total    = invTotal + thauPhuTotal;
+  const months   = new Set(data.map(i => i.ngay?.slice(0,7))).size;
+  const avgMonth = months ? Math.round(total / months) : 0;
+  const maxInv   = data.reduce((mx, i) => (i.thanhtien||i.tien||0) > (mx.thanhtien||mx.tien||0) ? i : mx, data[0]);
+  const ctSet    = new Set(data.map(i => resolveProjectName(i)).filter(Boolean));
+  const tpSub    = thauPhuTotal > 0 ? ' + TP ' + fmtS(thauPhuTotal) : '';
 
   const cards = [
-    { label:'Tổng Chi Phí ' + yr,  val: fmtM(total),      sub: data.length + ' hóa đơn',         cls:'accent-gold'  },
-    { label:'TB / Tháng',           val: fmtM(avgMonth),   sub: months + ' tháng có phát sinh',    cls:'accent-blue'  },
-    { label:'HĐ Lớn Nhất',          val: fmtM(maxInv.thanhtien||maxInv.tien||0),
-                                    sub: (maxInv.nd||maxInv.loai||'').slice(0,30),                  cls:'accent-red'   },
-    { label:'Công Trình',           val: ctSet.size,       sub: 'đang theo dõi năm ' + yr,         cls:'accent-green' },
+    { label:'Tổng Chi Phí ' + (yr||''), val: fmtM(total),   sub: data.length + ' HĐ' + tpSub,    cls:'accent-gold'  },
+    { label:'TB / Tháng',               val: fmtM(avgMonth), sub: months + ' tháng có phát sinh', cls:'accent-blue'  },
+    { label:'HĐ Lớn Nhất',              val: fmtM(maxInv.thanhtien||maxInv.tien||0),
+                                         sub: (maxInv.nd||maxInv.loai||'').slice(0,30),            cls:'accent-red'   },
+    { label:'Công Trình',               val: ctSet.size,     sub: 'đang theo dõi năm ' + (yr||''),cls:'accent-green' },
   ];
 
   document.getElementById('db-kpi-row').innerHTML = cards.map(k =>
@@ -477,6 +518,272 @@ function _dbPieChart(data) {
   document.getElementById('db-pie-chart').innerHTML =
     `<svg viewBox="0 0 160 160" width="140" height="140" class="db-pie-svg">${slices}</svg>
      <div class="db-legend">${legend}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// WEEKLY DASHBOARD (chế độ 1 năm)
+// Dùng helpers từ chamcong.core.js: snapToSunday, ccSaturdayISO,
+// weekLabel, viShort, isoFromParts — chỉ gọi tại runtime (an toàn)
+// ══════════════════════════════════════════════════════════════
+
+// Trả về mảng { sun, sat, key } cho TẤT CẢ tuần trong năm yr
+// Tuần CN → T7, đúng chuẩn Chấm Công
+function _dbGetWeeksInYear(yr) {
+  const jan1    = new Date(yr, 0, 1);
+  const firstSun = new Date(yr, 0, 1 - jan1.getDay()); // CN đầu tiên trước/bằng Jan 1
+  const dec31   = new Date(yr, 11, 31);
+  const weeks   = [];
+  let sun = new Date(firstSun);
+  while (sun <= dec31) {
+    const sunISO = isoFromParts(sun.getFullYear(), sun.getMonth()+1, sun.getDate());
+    const sat    = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 6);
+    const satISO = isoFromParts(sat.getFullYear(), sat.getMonth()+1, sat.getDate());
+    weeks.push({ sun: sunISO, sat: satISO, key: sunISO });
+    sun = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + 7);
+  }
+  return weeks;
+}
+
+// Tính chi phí theo tuần từ hóa đơn + tiền ứng
+// Trả về { [sunISO]: { inv, ungTP, ungNCC, total } }
+function _dbCalcWeeklyData(invoiceData, ungData) {
+  const result = {};
+  function ensure(k) {
+    if (!result[k]) result[k] = { inv: 0, ungTP: 0, ungNCC: 0, total: 0 };
+    return result[k];
+  }
+  invoiceData.forEach(i => {
+    if (!i.ngay) return;
+    const amt = i.thanhtien || i.tien || 0;
+    if (!amt) return;
+    const w = ensure(snapToSunday(i.ngay));
+    w.inv += amt; w.total += amt;
+  });
+  ungData.forEach(r => {
+    if (!r.ngay || (r.loai !== 'thauphu' && r.loai !== 'nhacungcap')) return;
+    const amt = r.tien || 0;
+    if (!amt) return;
+    const w = ensure(snapToSunday(r.ngay));
+    if (r.loai === 'thauphu') w.ungTP += amt; else w.ungNCC += amt;
+    w.total += amt;
+  });
+  return result;
+}
+
+// ── KPI Cards (chế độ tuần) ───────────────────────────────────
+function _dbKPIWeekly(yr, invoiceData, ungData, thauPhuTotal) {
+  thauPhuTotal = thauPhuTotal || 0;
+  const totalInv  = invoiceData.reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+  const totalCost = totalInv + thauPhuTotal;
+
+  const weeklyData = _dbCalcWeeklyData(invoiceData, ungData);
+
+  // Tuần KPI: ưu tiên tuần hiện tại, fallback tuần mới nhất có phát sinh
+  const today     = new Date();
+  const todayISO  = isoFromParts(today.getFullYear(), today.getMonth()+1, today.getDate());
+  const currKey   = snapToSunday(todayISO);
+  let weekKPIKey  = '';
+  let weekKPITotal = 0;
+  if (weeklyData[currKey] && weeklyData[currKey].total) {
+    weekKPIKey = currKey; weekKPITotal = weeklyData[currKey].total;
+  } else {
+    const keys = Object.keys(weeklyData).filter(k => weeklyData[k].total > 0).sort();
+    if (keys.length) { weekKPIKey = keys[keys.length-1]; weekKPITotal = weeklyData[weekKPIKey].total; }
+  }
+
+  // Tuần chi cao nhất
+  let maxWeekKey = '', maxWeekTotal = 0;
+  Object.entries(weeklyData).forEach(([k, v]) => {
+    if (v.total > maxWeekTotal) { maxWeekTotal = v.total; maxWeekKey = k; }
+  });
+
+  // Số công trình có phát sinh
+  const ctSet = new Set();
+  invoiceData.forEach(i => { const n = resolveProjectName(i); if (n) ctSet.add(n); });
+  ungData.forEach(r => { const n = resolveProjectName(r); if (n) ctSet.add(n); });
+
+  const weekKPISub = weekKPIKey ? 'Tuần ' + weekLabel(weekKPIKey) : 'Chưa có dữ liệu';
+  const maxWeekSub = maxWeekKey ? weekLabel(maxWeekKey) : '—';
+
+  const cards = [
+    { label: 'Tổng Chi Phí ' + yr,   val: fmtM(totalCost),    sub: 'HĐ + HĐ Thầu Phụ',       cls: 'accent-gold'  },
+    { label: 'Tổng Chi Tuần',         val: fmtM(weekKPITotal), sub: weekKPISub,                 cls: 'accent-blue'  },
+    { label: 'Tuần Chi Cao Nhất',     val: fmtM(maxWeekTotal), sub: maxWeekSub,                 cls: 'accent-red'   },
+    { label: 'Công Trình',            val: ctSet.size,         sub: 'phát sinh năm ' + yr,      cls: 'accent-green' },
+  ];
+
+  document.getElementById('db-kpi-row').innerHTML = cards.map(k =>
+    `<div class="db-kpi-card ${k.cls}">
+       <div class="db-kpi-label">${k.label}</div>
+       <div class="db-kpi-val">${k.val}</div>
+       <div class="db-kpi-sub">${k.sub}</div>
+     </div>`
+  ).join('');
+}
+
+// ── Biểu đồ cột chồng theo tuần (SVG) ────────────────────────
+function _dbBarChartWeekly(yr, invoiceData, ungData) {
+  const C_INV = '#f0a500'; // amber — Hóa đơn / CP-HĐ
+  const C_TP  = '#8B4513'; // nâu   — Ứng thầu phụ
+  const C_NCC = '#8e9ca6'; // xám   — Ứng nhà cung cấp
+
+  const weeks      = _dbGetWeeksInYear(yr);
+  const weeklyData = _dbCalcWeeklyData(invoiceData, ungData);
+  const vals       = weeks.map(w => weeklyData[w.key] || { inv:0, ungTP:0, ungNCC:0, total:0 });
+  const maxVal     = Math.max(...vals.map(v => v.total), 1);
+
+  const H    = 150;
+  const colW = 22;
+  const gap  = 3;
+  const svgW = weeks.length * (colW + gap);
+
+  const bars = weeks.map((w, i) => {
+    const v    = vals[i];
+    const cx   = i * (colW + gap);
+    const isSel = w.key === selectedDashboardWeekKey;
+    // Nhãn: hiển thị mỗi 4 tuần để tránh chồng chéo
+    const lbl  = (i % 4 === 0) ? viShort(w.sun) : '';
+    const lblColor = isSel ? '#e67e22' : 'var(--ink3)';
+
+    if (!v.total) {
+      return `<g onclick="_dbSelectWeek('${w.key}')" style="cursor:pointer">
+        <rect x="${cx}" y="${H-2}" width="${colW}" height="2" rx="1" fill="var(--line)" opacity=".3">
+          <title>Tuần CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}: không có phát sinh</title>
+        </rect>
+        <text x="${cx+colW/2}" y="${H+20}" text-anchor="middle" font-size="7.5" fill="${lblColor}">${lbl}</text>
+      </g>`;
+    }
+
+    const hInv = Math.max(0, Math.round((v.inv    / maxVal) * H));
+    const hTP  = Math.max(0, Math.round((v.ungTP  / maxVal) * H));
+    const hNCC = Math.max(0, Math.round((v.ungNCC / maxVal) * H));
+    // Sắp xếp chồng từ dưới lên: NCC → TP → INV
+    const yNCC = H - hNCC;
+    const yTP  = yNCC - hTP;
+    const yInv = yTP  - hInv;
+    const hTot = hInv + hTP + hNCC || 2;
+    const yTop = H - hTot;
+
+    const titleTxt = `Tuần CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}\nHóa đơn: ${fmtM(v.inv)}\nỨng TP: ${fmtM(v.ungTP)}\nỨng NCC: ${fmtM(v.ungNCC)}\nTổng: ${fmtM(v.total)}`;
+    const amt = v.total>=1e9 ? (v.total/1e9).toFixed(1)+'tỷ' : v.total>=1e6 ? Math.round(v.total/1e6)+'tr' : '';
+    const selStroke = isSel ? `stroke="#e67e22" stroke-width="1.5"` : 'stroke="none"';
+
+    return `<g onclick="_dbSelectWeek('${w.key}')" style="cursor:pointer">
+      ${hNCC>0 ? `<rect x="${cx}" y="${yNCC}" width="${colW}" height="${hNCC}" fill="${C_NCC}" opacity=".85"/>` : ''}
+      ${hTP >0 ? `<rect x="${cx}" y="${yTP}"  width="${colW}" height="${hTP}"  fill="${C_TP}"  opacity=".85"/>` : ''}
+      ${hInv>0 ? `<rect x="${cx}" y="${yInv}" width="${colW}" height="${hInv}" fill="${C_INV}" opacity=".85"/>` : ''}
+      <rect x="${cx}" y="${yTop}" width="${colW}" height="${hTot}" fill="transparent" ${selStroke} rx="2">
+        <title>${titleTxt}</title>
+      </rect>
+      ${amt && hTot>16 ? `<text x="${cx+colW/2}" y="${yTop-3}" text-anchor="middle" font-size="7.5" fill="var(--ink2)">${amt}</text>` : ''}
+      <text x="${cx+colW/2}" y="${H+20}" text-anchor="middle" font-size="7.5" fill="${lblColor}">${lbl}</text>
+    </g>`;
+  }).join('');
+
+  const selNote = selectedDashboardWeekKey
+    ? `<span style="color:#e67e22;font-weight:700">📌 Tuần ${weekLabel(selectedDashboardWeekKey)} — click lại để bỏ chọn</span>`
+    : '';
+
+  document.getElementById('db-bar-chart').innerHTML =
+    `<div style="overflow-x:auto">
+       <svg viewBox="0 -10 ${svgW} ${H+30}" width="${svgW}" style="min-height:${H+30}px;display:block">
+         ${bars}
+         <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
+       </svg>
+     </div>
+     <div style="display:flex;gap:14px;font-size:11px;margin-top:8px;flex-wrap:wrap;color:var(--ink2)">
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_INV};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_TP};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng thầu phụ</span>
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_NCC};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng NCC</span>
+       ${selNote}
+     </div>`;
+}
+
+// ── Pie Chart tỷ trọng (chế độ tuần) ─────────────────────────
+// Hiển thị tỷ trọng 3 nguồn: Hóa đơn, Ứng TP, Ứng NCC
+// Nếu selectedDashboardWeekKey → lọc theo tuần đó; không thì tổng năm
+function _dbPieChartWeekly(invoiceData, ungData) {
+  const C_INV = '#f0a500';
+  const C_TP  = '#8B4513';
+  const C_NCC = '#8e9ca6';
+
+  let invTotal, ungTPTotal, ungNCCTotal, titleHtml;
+
+  if (selectedDashboardWeekKey) {
+    const sun = selectedDashboardWeekKey;
+    const sat = ccSaturdayISO(sun);
+    invTotal   = invoiceData.filter(i => i.ngay >= sun && i.ngay <= sat)
+                            .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+    ungTPTotal  = ungData.filter(r => r.loai === 'thauphu'    && r.ngay >= sun && r.ngay <= sat)
+                          .reduce((s, r) => s + (r.tien || 0), 0);
+    ungNCCTotal = ungData.filter(r => r.loai === 'nhacungcap' && r.ngay >= sun && r.ngay <= sat)
+                          .reduce((s, r) => s + (r.tien || 0), 0);
+    titleHtml = `Tỷ Trọng Tuần<br><span style="font-size:11px;font-weight:400">CN ${viShort(sun)} – T7 ${viShort(sat)}</span>`;
+  } else {
+    invTotal    = invoiceData.reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+    ungTPTotal  = ungData.filter(r => r.loai === 'thauphu')
+                          .reduce((s, r) => s + (r.tien || 0), 0);
+    ungNCCTotal = ungData.filter(r => r.loai === 'nhacungcap')
+                          .reduce((s, r) => s + (r.tien || 0), 0);
+    titleHtml = 'Tỷ Trọng Chi Phí';
+  }
+
+  const titleEl = document.getElementById('db-pie-title');
+  if (titleEl) titleEl.innerHTML = titleHtml;
+
+  const total = invTotal + ungTPTotal + ungNCCTotal;
+  if (!total) {
+    document.getElementById('db-pie-chart').innerHTML = '<div class="db-empty">Chưa có dữ liệu</div>';
+    return;
+  }
+
+  const entries = [
+    { name: 'Hóa đơn/CP-HĐ', val: invTotal,    color: C_INV },
+    { name: 'Ứng thầu phụ',   val: ungTPTotal,  color: C_TP  },
+    { name: 'Ứng NCC',        val: ungNCCTotal, color: C_NCC },
+  ].filter(e => e.val > 0);
+
+  const R = 70, CX = 80, CY = 80;
+  let startAngle = -Math.PI / 2;
+  const slices = entries.map(e => {
+    const pct   = e.val / total;
+    const angle = pct * Math.PI * 2;
+    const x1 = CX + R * Math.cos(startAngle);
+    const y1 = CY + R * Math.sin(startAngle);
+    startAngle += angle;
+    const x2    = CX + R * Math.cos(startAngle);
+    const y2    = CY + R * Math.sin(startAngle);
+    const large = angle > Math.PI ? 1 : 0;
+    return `<path d="M${CX},${CY} L${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z"
+              fill="${e.color}" stroke="#fff" stroke-width="2">
+              <title>${e.name}: ${Math.round(pct*100)}% (${fmtM(e.val)})</title>
+            </path>`;
+  }).join('');
+
+  const legend = entries.map(e =>
+    `<div class="db-legend-row">
+       <div class="db-legend-dot" style="background:${e.color}"></div>
+       <span style="flex:1;color:var(--ink2)">${e.name}</span>
+       <span class="db-legend-pct" style="color:${e.color}">${Math.round(e.val/total*100)}%</span>
+     </div>`
+  ).join('');
+
+  document.getElementById('db-pie-chart').innerHTML =
+    `<svg viewBox="0 0 160 160" width="140" height="140" class="db-pie-svg">${slices}</svg>
+     <div class="db-legend">${legend}</div>`;
+}
+
+// ── Chọn/bỏ chọn tuần (click cột tuần) ───────────────────────
+function _dbSelectWeek(weekKey) {
+  selectedDashboardWeekKey = (selectedDashboardWeekKey === weekKey) ? '' : weekKey;
+  const ay = typeof activeYears !== 'undefined' ? activeYears : new Set();
+  if (ay.size !== 1) return;
+  const yr      = [...ay][0];
+  const invData = getInvoicesCached().filter(i => inActiveYear(i.ngay));
+  const ungData = (typeof ungRecords !== 'undefined' ? ungRecords : [])
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay));
+  _dbBarChartWeekly(yr, invData, ungData);
+  _dbPieChartWeekly(invData, ungData);
 }
 
 // ── Top 5 hóa đơn lớn nhất ────────────────────────────────────
