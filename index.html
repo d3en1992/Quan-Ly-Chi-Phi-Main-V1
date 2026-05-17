@@ -1,424 +1,1916 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chi Phí Công Trình</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chi Phí Công Trình</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Bootstrap 5 CSS — nạp TRƯỚC style.css để các quy tắc tùy chỉnh có thể ghi đè -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/style.css" />
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-</head>
-<body>
-
-<!-- ── Template Phiếu HĐ Chính (ẩn) ── -->
-<div id="hdchinh-template" style="display:none; position:fixed; left:-9999px; top:0; width:800px; background:#fff; padding:40px; box-sizing:border-box; font-family:'IBM Plex Sans',Arial,sans-serif; color:#1a1814;">
-  <div style="text-align:center; margin-bottom:30px; border-bottom:2px solid #1a1814; padding-bottom:15px;">
-    <div style="font-size:24px; font-weight:800; letter-spacing:1px; color:#1a1814; text-transform:uppercase;">Hợp Đồng Chính Công Ty</div>
-    <div id="phdc-ct-name" style="font-size:16px; font-weight:700; color:#555; margin-top:8px;"></div>
-  </div>
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 40px; margin-bottom:25px; font-size:14px;">
-    <div>Công trình: <b id="phdc-ct-label"></b></div>
-    <div>Thời gian: <b id="phdc-date"></b></div>
-    <div>Người thực hiện: <b id="phdc-nguoi"></b></div>
-    <div>Giá trị HĐ: <b id="phdc-giatri"></b></div>
-    <div>Phát sinh: <b id="phdc-phatsinh"></b></div>
-    <div style="color:#c8870a; font-size:16px;">Tổng tiền: <b id="phdc-tong"></b></div>
-  </div>
-  <div style="margin-bottom:10px; font-size:14px; font-weight:800; text-transform:uppercase; color:#1a1814;">📋 Khối lượng chi tiết</div>
-  <table style="width:100%; border-collapse:collapse; margin-bottom:30px; font-size:13px; border:1px solid #1a1814;">
-    <thead>
-      <tr style="background:#1a1814; color:#fff;">
-        <th style="padding:10px; border:1px solid #1a1814; text-align:left;">Tên hạng mục</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:center; width:60px;">ĐVT</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:center; width:80px;">Khối lượng</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:right; width:120px;">Đơn giá</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:right; width:140px;">Thành tiền</th>
-      </tr>
-    </thead>
-    <tbody id="phdc-tbody"></tbody>
-    <tfoot>
-      <tr style="background:#f5f0e8; font-weight:800;">
-        <td colspan="4" style="padding:10px; border:1px solid #1a1814; text-align:right;">TỔNG CỘNG CHI TIẾT</td>
-        <td id="phdc-total-detail" style="padding:10px; border:1px solid #1a1814; text-align:right;"></td>
-      </tr>
-    </tfoot>
-  </table>
-  <div style="display:flex; justify-content:space-between; margin-top:40px;">
-    <div style="text-align:center; width:200px;">
-      <div style="font-weight:700; margin-bottom:60px;">Đại diện Công ty</div>
-      <div style="border-top:1px solid #aaa; padding-top:5px;">(Ký và ghi rõ họ tên)</div>
-    </div>
-    <div style="text-align:center; width:200px;">
-      <div style="font-weight:700; margin-bottom:60px;">Đại diện Chủ đầu tư</div>
-      <div style="border-top:1px solid #aaa; padding-top:5px;">(Ký và ghi rõ họ tên)</div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Template Phiếu HĐ Thầu Phụ (ẩn) ── -->
-<div id="hdthauphu-template" style="display:none; position:fixed; left:-9999px; top:0; width:800px; background:#fff; padding:40px; box-sizing:border-box; font-family:'IBM Plex Sans',Arial,sans-serif; color:#1a1814;">
-  <div style="text-align:center; margin-bottom:30px; border-bottom:2px solid #1a1814; padding-bottom:15px;">
-    <div style="font-size:24px; font-weight:800; letter-spacing:1px; color:#1a1814; text-transform:uppercase;">Hợp Đồng Thầu Phụ</div>
-    <div id="phdtp-ct-name" style="font-size:16px; font-weight:700; color:#555; margin-top:8px;"></div>
-  </div>
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 40px; margin-bottom:25px; font-size:14px;">
-    <div>Công trình: <b id="phdtp-ct-label"></b></div>
-    <div>Ngày ký: <b id="phdtp-date"></b></div>
-    <div>Thầu phụ: <b id="phdtp-thauphu"></b></div>
-    <div>Nội dung: <b id="phdtp-nd"></b></div>
-    <div>Giá trị HĐ: <b id="phdtp-giatri"></b></div>
-    <div>Phát sinh: <b id="phdtp-phatsinh"></b></div>
-    <div style="color:#c8870a; font-size:16px; grid-column: span 2;">Tổng giá trị: <b id="phdtp-tong"></b></div>
-  </div>
-  <div style="margin-bottom:10px; font-size:14px; font-weight:800; text-transform:uppercase; color:#1a1814;">📋 Khối lượng chi tiết</div>
-  <table style="width:100%; border-collapse:collapse; margin-bottom:30px; font-size:13px; border:1px solid #1a1814;">
-    <thead>
-      <tr style="background:#1a1814; color:#fff;">
-        <th style="padding:10px; border:1px solid #1a1814; text-align:left;">Tên hạng mục</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:center; width:60px;">ĐVT</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:center; width:80px;">Khối lượng</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:right; width:120px;">Đơn giá</th>
-        <th style="padding:10px; border:1px solid #1a1814; text-align:right; width:140px;">Thành tiền</th>
-      </tr>
-    </thead>
-    <tbody id="phdtp-tbody"></tbody>
-    <tfoot>
-      <tr style="background:#f5f0e8; font-weight:800;">
-        <td colspan="4" style="padding:10px; border:1px solid #1a1814; text-align:right;">TỔNG CỘNG CHI TIẾT</td>
-        <td id="phdtp-total-detail" style="padding:10px; border:1px solid #1a1814; text-align:right;"></td>
-      </tr>
-    </tfoot>
-  </table>
-  <div style="display:flex; justify-content:space-between; margin-top:40px;">
-    <div style="text-align:center; width:200px;">
-      <div style="font-weight:700; margin-bottom:60px;">Đại diện Công ty</div>
-      <div style="border-top:1px solid #aaa; padding-top:5px;">(Ký và ghi rõ họ tên)</div>
-    </div>
-    <div style="text-align:center; width:200px;">
-      <div style="font-weight:700; margin-bottom:60px;">Đại diện Thầu phụ</div>
-      <div style="border-top:1px solid #aaa; padding-top:5px;">(Ký và ghi rõ họ tên)</div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Template Phiếu Thu Tiền (ẩn) ── -->
-<div id="phieuthu-template" style="display:none; position:fixed; left:-9999px; top:0; width:680px; background:#fff; padding:40px; box-sizing:border-box; font-family:'IBM Plex Sans',Arial,sans-serif; color:#1a1814;">
-  <div style="text-align:center; margin-bottom:30px; border-bottom:2px solid #1a1814; padding-bottom:15px;">
-    <div style="font-size:24px; font-weight:800; letter-spacing:1px; color:#1a1814;">BIÊN NHẬN THU TIỀN</div>
-    <div id="ppt-ct-name" style="font-size:14px; color:#555; margin-top:5px;"></div>
-  </div>
-  <table style="width:100%; border-collapse:collapse; font-size:14px;">
-    <tr>
-      <td style="padding:12px 0; width:140px; color:#555;">Ngày thu:</td>
-      <td style="padding:12px 0; font-weight:700;" id="ppt-date"></td>
-    </tr>
-    <tr>
-      <td style="padding:12px 0; color:#555;">Công trình:</td>
-      <td style="padding:12px 0; font-weight:700;" id="ppt-ct-label"></td>
-    </tr>
-    <tr>
-      <td style="padding:12px 0; color:#555;">Người nộp/Người thu:</td>
-      <td style="padding:12px 0; font-weight:700;" id="ppt-nguoi"></td>
-    </tr>
-    <tr>
-      <td style="padding:12px 0; color:#555;">Số tiền thu:</td>
-      <td style="padding:12px 0; font-weight:800; font-size:20px; color:#1a7a45;" id="ppt-tien"></td>
-    </tr>
-    <tr>
-      <td style="padding:12px 0; vertical-align:top; color:#555;">Nội dung:</td>
-      <td style="padding:12px 0; font-weight:600; line-height:1.5;" id="ppt-nd"></td>
-    </tr>
-  </table>
-  <div style="margin-top:50px; display:flex; justify-content:space-between;">
-    <div style="text-align:center; width:200px;">
-      <div style="font-weight:700; margin-bottom:70px;">Người nộp tiền</div>
-      <div style="font-style:italic; font-size:12px; color:#888;">(Ký và ghi rõ họ tên)</div>
-    </div>
-    <div style="text-align:center; width:200px;">
-      <div style="font-weight:700; margin-bottom:70px;">Người thu tiền</div>
-      <div style="font-style:italic; font-size:12px; color:#888;">(Ký và ghi rõ họ tên)</div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Template Phiếu Lương (ẩn, dùng để chụp ảnh) ── -->
-<div id="phieu-luong-template">
-  <div class="pl-header">
-    <div class="pl-title">PHIẾU THANH TOÁN LƯƠNG</div>
-    <div class="pl-subtitle" id="pl-ct-name"></div>
-  </div>
-  <div class="pl-meta">
-    <div>Công trình: <b id="pl-ct-label"></b></div>
-    <div>Thời gian: <b id="pl-period"></b></div>
-    <div>Ngày in: <b id="pl-date"></b></div>
-  </div>
-  <table class="pl-table">
-    <thead>
-      <tr>
-        <th style="text-align:left;min-width:120px">Tên Công Nhân</th>
-        <th>Số Ngày Công</th>
-        <th>Lương / Ngày</th>
-        <th>Phụ Cấp</th>
-        <th>Thành Tiền</th>
-      </tr>
-    </thead>
-    <tbody id="pl-tbody"></tbody>
-    <tfoot>
-      <tr class="pl-total-row">
-        <td colspan="4" style="text-align:right">TỔNG CỘNG</td>
-        <td id="pl-total-cell"></td>
-      </tr>
-    </tfoot>
-  </table>
-  <!-- ── Phần tổng hợp chi phí & công nợ ── -->
-  <div id="pl-summary" style="margin:10px 0 6px;padding:13px 16px;border:1.5px solid #c8870a;border-radius:6px;background:#fffbf3;font-family:'IBM Plex Sans',Arial,sans-serif;font-size:13px;line-height:1.9">
-    <!-- Dòng chi phí -->
-    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;padding-bottom:8px;border-bottom:1px dashed #e0cfa0">
-      <span style="color:#555">Hóa đơn mua lẻ:&nbsp;<strong id="pl-sum-hdml" style="font-family:'IBM Plex Mono',monospace;color:#c0392b;font-size:14px"></strong></span>
-      <span style="color:#1a6e3a">Tổng cộng:&nbsp;<strong id="pl-sum-thuclanh" style="font-family:'IBM Plex Mono',monospace;font-size:16px"></strong></span>
-    </div>
-    <!-- Dòng công nợ -->
-    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;padding-top:7px">
-      <span style="color:#555">Trừ nợ ứng:&nbsp;<strong id="pl-sum-tru" style="font-family:'IBM Plex Mono',monospace;color:#c0392b"></strong></span>
-      <span style="color:#555">Vay mới:&nbsp;<strong id="pl-sum-loan" style="font-family:'IBM Plex Mono',monospace;color:#c8870a"></strong></span>
-      <span style="color:#555">Tổng nợ còn:&nbsp;<strong id="pl-sum-nocon" style="font-family:'IBM Plex Mono',monospace;font-size:14px"></strong></span>
-    </div>
-  </div>
-  <div class="pl-footer">
-    <div class="pl-grand-total" id="pl-grand-total"></div>
-    <div class="pl-grand-label">( Bằng chữ — vui lòng ghi tay )</div>
-    <div class="pl-sign">
-      <div class="pl-sign-box">
-        <div class="pl-sign-line">Người nhận tiền</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  </head>
+  <body>
+    <!-- ── Template Phiếu HĐ Chính (ẩn) ── -->
+    <div
+      id="hdchinh-template"
+      style="
+        display: none;
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 800px;
+        background: #fff;
+        padding: 40px;
+        box-sizing: border-box;
+        font-family: &quot;IBM Plex Sans&quot;, Arial, sans-serif;
+        color: #1a1814;
+      "
+    >
+      <div
+        style="
+          text-align: center;
+          margin-bottom: 30px;
+          border-bottom: 2px solid #1a1814;
+          padding-bottom: 15px;
+        "
+      >
+        <div
+          style="
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #1a1814;
+            text-transform: uppercase;
+          "
+        >
+          Hợp Đồng Chính Công Ty
+        </div>
+        <div
+          id="phdc-ct-name"
+          style="
+            font-size: 16px;
+            font-weight: 700;
+            color: #555;
+            margin-top: 8px;
+          "
+        ></div>
+      </div>
+      <div
+        style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px 40px;
+          margin-bottom: 25px;
+          font-size: 14px;
+        "
+      >
+        <div>Công trình: <b id="phdc-ct-label"></b></div>
+        <div>Thời gian: <b id="phdc-date"></b></div>
+        <div>Người thực hiện: <b id="phdc-nguoi"></b></div>
+        <div>Giá trị HĐ: <b id="phdc-giatri"></b></div>
+        <div>Phát sinh: <b id="phdc-phatsinh"></b></div>
+        <div style="color: #c8870a; font-size: 16px">
+          Tổng tiền: <b id="phdc-tong"></b>
+        </div>
+      </div>
+      <div
+        style="
+          margin-bottom: 10px;
+          font-size: 14px;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: #1a1814;
+        "
+      >
+        📋 Khối lượng chi tiết
+      </div>
+      <table
+        style="
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 30px;
+          font-size: 13px;
+          border: 1px solid #1a1814;
+        "
+      >
+        <thead>
+          <tr style="background: #1a1814; color: #fff">
+            <th
+              style="padding: 10px; border: 1px solid #1a1814; text-align: left"
+            >
+              Tên hạng mục
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: center;
+                width: 60px;
+              "
+            >
+              ĐVT
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: center;
+                width: 80px;
+              "
+            >
+              Khối lượng
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+                width: 120px;
+              "
+            >
+              Đơn giá
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+                width: 140px;
+              "
+            >
+              Thành tiền
+            </th>
+          </tr>
+        </thead>
+        <tbody id="phdc-tbody"></tbody>
+        <tfoot>
+          <tr style="background: #f5f0e8; font-weight: 800">
+            <td
+              colspan="4"
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+              "
+            >
+              TỔNG CỘNG CHI TIẾT
+            </td>
+            <td
+              id="phdc-total-detail"
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+              "
+            ></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div
+        style="display: flex; justify-content: space-between; margin-top: 40px"
+      >
+        <div style="text-align: center; width: 200px">
+          <div style="font-weight: 700; margin-bottom: 60px">
+            Đại diện Công ty
+          </div>
+          <div style="border-top: 1px solid #aaa; padding-top: 5px">
+            (Ký và ghi rõ họ tên)
+          </div>
+        </div>
+        <div style="text-align: center; width: 200px">
+          <div style="font-weight: 700; margin-bottom: 60px">
+            Đại diện Chủ đầu tư
+          </div>
+          <div style="border-top: 1px solid #aaa; padding-top: 5px">
+            (Ký và ghi rõ họ tên)
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- ── Template Phiếu Tạm Ứng (ẩn, dùng để chụp ảnh) ── -->
-<div id="phieu-ung-template" style="
-  display:none; position:fixed; left:-9999px; top:0;
-  width:680px; background:#ffffff; padding:32px 36px;
-  box-sizing:border-box; font-family:'IBM Plex Sans',Arial,sans-serif; color:#1a1814;">
-  <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1a1814;padding-bottom:16px">
-    <div style="font-size:20px;font-weight:800;letter-spacing:1px">PHIẾU TẠM ỨNG TIỀN</div>
-    <div id="pul-ct-name" style="font-size:13px;color:#555;margin-top:4px"></div>
-  </div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:18px;font-size:12px;color:#555">
-    <div>Công trình: <b id="pul-ct-label"></b></div>
-    <div>Ngày in: <b id="pul-date"></b></div>
-  </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px">
-    <thead>
-      <tr>
-        <th style="background:#1a1814;color:#fff;padding:8px 10px;text-align:left;white-space:nowrap">Ngày Ứng</th>
-        <th style="background:#1a1814;color:#fff;padding:8px 10px;text-align:left">Người Nhận</th>
-        <th style="background:#1a1814;color:#fff;padding:8px 10px;text-align:left">Nội Dung</th>
-        <th style="background:#1a1814;color:#fff;padding:8px 10px;text-align:right;white-space:nowrap">Số Tiền</th>
-      </tr>
-    </thead>
-    <tbody id="pul-tbody"></tbody>
-    <tfoot>
-      <tr style="background:#f5f0e8">
-        <td colspan="3"
-          style="padding:9px 10px;text-align:right;font-weight:700;border-top:2px solid #1a1814">
-          TỔNG CỘNG
-        </td>
-        <td id="pul-total-cell"
-          style="padding:9px 10px;text-align:right;font-weight:700;border-top:2px solid #1a1814"></td>
-      </tr>
-    </tfoot>
-  </table>
-  <div style="border-top:2px solid #1a1814;padding-top:16px;text-align:center">
-    <div id="pul-grand-total"
-      style="font-size:18px;font-weight:800;color:#c8870a;letter-spacing:.5px"></div>
-    <div style="font-size:11px;color:#888;margin-top:2px">( Bằng chữ — vui lòng ghi tay )</div>
-    <div style="display:flex;justify-content:space-between;margin-top:28px;font-size:12px;color:#555">
-      <div style="text-align:center;min-width:140px">
-        <div style="border-top:1px solid #aaa;margin-top:40px;padding-top:4px">Người lập phiếu</div>
+    <!-- ── Template Phiếu HĐ Thầu Phụ (ẩn) ── -->
+    <div
+      id="hdthauphu-template"
+      style="
+        display: none;
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 800px;
+        background: #fff;
+        padding: 40px;
+        box-sizing: border-box;
+        font-family: &quot;IBM Plex Sans&quot;, Arial, sans-serif;
+        color: #1a1814;
+      "
+    >
+      <div
+        style="
+          text-align: center;
+          margin-bottom: 30px;
+          border-bottom: 2px solid #1a1814;
+          padding-bottom: 15px;
+        "
+      >
+        <div
+          style="
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #1a1814;
+            text-transform: uppercase;
+          "
+        >
+          Hợp Đồng Thầu Phụ
+        </div>
+        <div
+          id="phdtp-ct-name"
+          style="
+            font-size: 16px;
+            font-weight: 700;
+            color: #555;
+            margin-top: 8px;
+          "
+        ></div>
       </div>
-      <div style="text-align:center;min-width:140px">
-        <div style="border-top:1px solid #aaa;margin-top:40px;padding-top:4px">Người nhận tiền</div>
+      <div
+        style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px 40px;
+          margin-bottom: 25px;
+          font-size: 14px;
+        "
+      >
+        <div>Công trình: <b id="phdtp-ct-label"></b></div>
+        <div>Ngày ký: <b id="phdtp-date"></b></div>
+        <div>Thầu phụ: <b id="phdtp-thauphu"></b></div>
+        <div>Nội dung: <b id="phdtp-nd"></b></div>
+        <div>Giá trị HĐ: <b id="phdtp-giatri"></b></div>
+        <div>Phát sinh: <b id="phdtp-phatsinh"></b></div>
+        <div style="color: #c8870a; font-size: 16px; grid-column: span 2">
+          Tổng giá trị: <b id="phdtp-tong"></b>
+        </div>
+      </div>
+      <div
+        style="
+          margin-bottom: 10px;
+          font-size: 14px;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: #1a1814;
+        "
+      >
+        📋 Khối lượng chi tiết
+      </div>
+      <table
+        style="
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 30px;
+          font-size: 13px;
+          border: 1px solid #1a1814;
+        "
+      >
+        <thead>
+          <tr style="background: #1a1814; color: #fff">
+            <th
+              style="padding: 10px; border: 1px solid #1a1814; text-align: left"
+            >
+              Tên hạng mục
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: center;
+                width: 60px;
+              "
+            >
+              ĐVT
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: center;
+                width: 80px;
+              "
+            >
+              Khối lượng
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+                width: 120px;
+              "
+            >
+              Đơn giá
+            </th>
+            <th
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+                width: 140px;
+              "
+            >
+              Thành tiền
+            </th>
+          </tr>
+        </thead>
+        <tbody id="phdtp-tbody"></tbody>
+        <tfoot>
+          <tr style="background: #f5f0e8; font-weight: 800">
+            <td
+              colspan="4"
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+              "
+            >
+              TỔNG CỘNG CHI TIẾT
+            </td>
+            <td
+              id="phdtp-total-detail"
+              style="
+                padding: 10px;
+                border: 1px solid #1a1814;
+                text-align: right;
+              "
+            ></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div
+        style="display: flex; justify-content: space-between; margin-top: 40px"
+      >
+        <div style="text-align: center; width: 200px">
+          <div style="font-weight: 700; margin-bottom: 60px">
+            Đại diện Công ty
+          </div>
+          <div style="border-top: 1px solid #aaa; padding-top: 5px">
+            (Ký và ghi rõ họ tên)
+          </div>
+        </div>
+        <div style="text-align: center; width: 200px">
+          <div style="font-weight: 700; margin-bottom: 60px">
+            Đại diện Thầu phụ
+          </div>
+          <div style="border-top: 1px solid #aaa; padding-top: 5px">
+            (Ký và ghi rõ họ tên)
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
 
-<input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(event)">
-<input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importJSON(this.files[0])">
-
-<!-- ── Bin ID Modal ── -->
-
-
-<!-- ── Duplicate Invoice Warning Modal ── -->
-<div class="dup-modal-overlay" id="dup-modal-overlay">
-  <div class="dup-modal">
-    <div class="dup-modal-head">
-      <span class="dup-icon">⚠️</span>
-      <div>
-        <h3>Phát hiện hóa đơn trùng lặp</h3>
-        <div style="font-size:12px;color:#888;margin-top:2px" id="dup-modal-subtitle"></div>
+    <!-- ── Template Phiếu Thu Tiền (ẩn) ── -->
+    <div
+      id="phieuthu-template"
+      style="
+        display: none;
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 680px;
+        background: #fff;
+        padding: 40px;
+        box-sizing: border-box;
+        font-family: &quot;IBM Plex Sans&quot;, Arial, sans-serif;
+        color: #1a1814;
+      "
+    >
+      <div
+        style="
+          text-align: center;
+          margin-bottom: 30px;
+          border-bottom: 2px solid #1a1814;
+          padding-bottom: 15px;
+        "
+      >
+        <div
+          style="
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #1a1814;
+          "
+        >
+          BIÊN NHẬN THU TIỀN
+        </div>
+        <div
+          id="ppt-ct-name"
+          style="font-size: 14px; color: #555; margin-top: 5px"
+        ></div>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+        <tr>
+          <td style="padding: 12px 0; width: 140px; color: #555">Ngày thu:</td>
+          <td style="padding: 12px 0; font-weight: 700" id="ppt-date"></td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; color: #555">Công trình:</td>
+          <td style="padding: 12px 0; font-weight: 700" id="ppt-ct-label"></td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; color: #555">Người nộp/Người thu:</td>
+          <td style="padding: 12px 0; font-weight: 700" id="ppt-nguoi"></td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; color: #555">Số tiền thu:</td>
+          <td
+            style="
+              padding: 12px 0;
+              font-weight: 800;
+              font-size: 20px;
+              color: #1a7a45;
+            "
+            id="ppt-tien"
+          ></td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; vertical-align: top; color: #555">
+            Nội dung:
+          </td>
+          <td
+            style="padding: 12px 0; font-weight: 600; line-height: 1.5"
+            id="ppt-nd"
+          ></td>
+        </tr>
+      </table>
+      <div
+        style="margin-top: 50px; display: flex; justify-content: space-between"
+      >
+        <div style="text-align: center; width: 200px">
+          <div style="font-weight: 700; margin-bottom: 70px">
+            Người nộp tiền
+          </div>
+          <div style="font-style: italic; font-size: 12px; color: #888">
+            (Ký và ghi rõ họ tên)
+          </div>
+        </div>
+        <div style="text-align: center; width: 200px">
+          <div style="font-weight: 700; margin-bottom: 70px">
+            Người thu tiền
+          </div>
+          <div style="font-style: italic; font-size: 12px; color: #888">
+            (Ký và ghi rõ họ tên)
+          </div>
+        </div>
       </div>
     </div>
-    <div class="dup-modal-body" id="dup-modal-body"></div>
-    <div class="dup-modal-foot">
-      <button class="btn btn-outline" onclick="closeDupModal()">✕ Hủy bỏ</button>
-      <button class="btn btn-gold" onclick="forceSaveAll()">💾 Vẫn lưu tất cả</button>
-    </div>
-  </div>
-</div>
 
-<div class="topbar">
-  <!-- Hàng 1: Logo + Năm + Tổng CP + Cloud -->
-  <div class="topbar-row1">
-    <!-- Trái: Logo + Year -->
-    <div class="topbar-left">
-      <div class="app-name">🏗️ Chi Phí <span>Công Trình</span></div>
-      <div class="topbar-year-wrap">
-        <div class="year-select-wrap" id="year-select-wrap">
-          <button class="year-select" id="year-select-btn"
-                  onclick="toggleYearDropdown(event)" type="button">Tất cả</button>
-          <div class="year-dropdown" id="year-dropdown">
-            <div class="year-quick-btns">
-              <button type="button" onclick="yearQuickAll()">Tất cả</button>
-              <button type="button" onclick="yearQuickRecent()">2 gần nhất</button>
+    <!-- ── Template Phiếu Lương (ẩn, dùng để chụp ảnh) ── -->
+    <div id="phieu-luong-template">
+      <div class="pl-header">
+        <div class="pl-title">PHIẾU THANH TOÁN LƯƠNG</div>
+        <div class="pl-subtitle" id="pl-ct-name"></div>
+      </div>
+      <div class="pl-meta">
+        <div>Công trình: <b id="pl-ct-label"></b></div>
+        <div>Thời gian: <b id="pl-period"></b></div>
+        <div>Ngày in: <b id="pl-date"></b></div>
+      </div>
+      <table class="pl-table">
+        <thead>
+          <tr>
+            <th style="text-align: left; min-width: 120px">Tên Công Nhân</th>
+            <th>Số Ngày Công</th>
+            <th>Lương / Ngày</th>
+            <th>Phụ Cấp</th>
+            <th>Thành Tiền</th>
+          </tr>
+        </thead>
+        <tbody id="pl-tbody"></tbody>
+        <tfoot>
+          <tr class="pl-total-row">
+            <td colspan="4" style="text-align: right">TỔNG CỘNG</td>
+            <td id="pl-total-cell"></td>
+          </tr>
+        </tfoot>
+      </table>
+      <!-- ── Phần tổng hợp chi phí & công nợ ── -->
+      <div
+        id="pl-summary"
+        style="
+          margin: 10px 0 6px;
+          padding: 13px 16px;
+          border: 1.5px solid #c8870a;
+          border-radius: 6px;
+          background: #fffbf3;
+          font-family: &quot;IBM Plex Sans&quot;, Arial, sans-serif;
+          font-size: 13px;
+          line-height: 1.9;
+        "
+      >
+        <!-- Dòng chi phí -->
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #e0cfa0;
+          "
+        >
+          <span style="color: #555"
+            >Hóa đơn mua lẻ:&nbsp;<strong
+              id="pl-sum-hdml"
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                color: #c0392b;
+                font-size: 14px;
+              "
+            ></strong
+          ></span>
+          <span style="color: #1a6e3a"
+            >Tổng cộng:&nbsp;<strong
+              id="pl-sum-thuclanh"
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                font-size: 16px;
+              "
+            ></strong
+          ></span>
+        </div>
+        <!-- Dòng công nợ -->
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 7px;
+          "
+        >
+          <span style="color: #555"
+            >Trừ nợ ứng:&nbsp;<strong
+              id="pl-sum-tru"
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                color: #c0392b;
+              "
+            ></strong
+          ></span>
+          <span style="color: #555"
+            >Vay mới:&nbsp;<strong
+              id="pl-sum-loan"
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                color: #c8870a;
+              "
+            ></strong
+          ></span>
+          <span style="color: #555"
+            >Tổng nợ còn:&nbsp;<strong
+              id="pl-sum-nocon"
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                font-size: 14px;
+              "
+            ></strong
+          ></span>
+        </div>
+      </div>
+      <div class="pl-footer">
+        <div class="pl-grand-total" id="pl-grand-total"></div>
+        <div class="pl-grand-label">( Bằng chữ — vui lòng ghi tay )</div>
+        <div class="pl-sign">
+          <div class="pl-sign-box">
+            <div class="pl-sign-line">Người nhận tiền</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Template Phiếu Tạm Ứng (ẩn, dùng để chụp ảnh) ── -->
+    <div
+      id="phieu-ung-template"
+      style="
+        display: none;
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 680px;
+        background: #ffffff;
+        padding: 32px 36px;
+        box-sizing: border-box;
+        font-family: &quot;IBM Plex Sans&quot;, Arial, sans-serif;
+        color: #1a1814;
+      "
+    >
+      <div
+        style="
+          text-align: center;
+          margin-bottom: 20px;
+          border-bottom: 2px solid #1a1814;
+          padding-bottom: 16px;
+        "
+      >
+        <div style="font-size: 20px; font-weight: 800; letter-spacing: 1px">
+          PHIẾU TẠM ỨNG TIỀN
+        </div>
+        <div
+          id="pul-ct-name"
+          style="font-size: 13px; color: #555; margin-top: 4px"
+        ></div>
+      </div>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 18px;
+          font-size: 12px;
+          color: #555;
+        "
+      >
+        <div>Công trình: <b id="pul-ct-label"></b></div>
+        <div>Ngày in: <b id="pul-date"></b></div>
+      </div>
+      <table
+        style="
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          font-size: 12px;
+        "
+      >
+        <thead>
+          <tr>
+            <th
+              style="
+                background: #1a1814;
+                color: #fff;
+                padding: 8px 10px;
+                text-align: left;
+                white-space: nowrap;
+              "
+            >
+              Ngày Ứng
+            </th>
+            <th
+              style="
+                background: #1a1814;
+                color: #fff;
+                padding: 8px 10px;
+                text-align: left;
+              "
+            >
+              Người Nhận
+            </th>
+            <th
+              style="
+                background: #1a1814;
+                color: #fff;
+                padding: 8px 10px;
+                text-align: left;
+              "
+            >
+              Nội Dung
+            </th>
+            <th
+              style="
+                background: #1a1814;
+                color: #fff;
+                padding: 8px 10px;
+                text-align: right;
+                white-space: nowrap;
+              "
+            >
+              Số Tiền
+            </th>
+          </tr>
+        </thead>
+        <tbody id="pul-tbody"></tbody>
+        <tfoot>
+          <tr style="background: #f5f0e8">
+            <td
+              colspan="3"
+              style="
+                padding: 9px 10px;
+                text-align: right;
+                font-weight: 700;
+                border-top: 2px solid #1a1814;
+              "
+            >
+              TỔNG CỘNG
+            </td>
+            <td
+              id="pul-total-cell"
+              style="
+                padding: 9px 10px;
+                text-align: right;
+                font-weight: 700;
+                border-top: 2px solid #1a1814;
+              "
+            ></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div
+        style="
+          border-top: 2px solid #1a1814;
+          padding-top: 16px;
+          text-align: center;
+        "
+      >
+        <div
+          id="pul-grand-total"
+          style="
+            font-size: 18px;
+            font-weight: 800;
+            color: #c8870a;
+            letter-spacing: 0.5px;
+          "
+        ></div>
+        <div style="font-size: 11px; color: #888; margin-top: 2px">
+          ( Bằng chữ — vui lòng ghi tay )
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            margin-top: 28px;
+            font-size: 12px;
+            color: #555;
+          "
+        >
+          <div style="text-align: center; min-width: 140px">
+            <div
+              style="
+                border-top: 1px solid #aaa;
+                margin-top: 40px;
+                padding-top: 4px;
+              "
+            >
+              Người lập phiếu
             </div>
-            <div class="year-list" id="year-list"></div>
+          </div>
+          <div style="text-align: center; min-width: 140px">
+            <div
+              style="
+                border-top: 1px solid #aaa;
+                margin-top: 40px;
+                padding-top: 4px;
+              "
+            >
+              Người nhận tiền
+            </div>
           </div>
         </div>
       </div>
-      <!-- Mobile: Tổng CP pill in header -->
-      <div class="top-stat-header-mobile"><span class="top-stat-label">Tổng CP</span><span class="top-stat-val" id="top-total-header">0đ</span></div>
     </div>
 
-    <!-- Giữa: Tổng CP (desktop only) -->
-    <div class="topbar-meta">
-      <div class="top-stat top-stat-desktop"><span class="top-stat-label">Tổng CP</span><span class="top-stat-val" id="top-total">0đ</span></div>
-    </div>
+    <input
+      type="file"
+      id="import-file-input"
+      accept=".xlsx,.xls"
+      style="display: none"
+      onchange="handleImportFile(event)"
+    />
+    <input
+      type="file"
+      id="import-json-input"
+      accept=".json"
+      style="display: none"
+      onchange="importJSON(this.files[0])"
+    />
 
-    <!-- Phải: các nút hành động -->
-    <div class="topbar-controls">
-      <div class="top-stat top-stat-mobile"><span class="top-stat-label">Tổng CP</span><span class="top-stat-val" id="top-total-mobile">0đ</span></div>
-      <button id="user-btn" onclick="toggleUserDropdown(null, event)" class="tb-btn mobile-btn-center" title="Tài khoản">
-        <span class="user-full">👤 <span id="current-user-label">Đăng nhập</span></span>
-        <span class="user-icon" title="Người dùng">👤</span>
-      </button>
-      <button id="sync-btn" onclick="manualSync()" class="tb-btn mobile-btn-right" title="Đồng bộ dữ liệu">☁️</button>
-      <button id="jb-btn" onclick="openBinModal()" class="tb-btn tb-btn-cloud mobile-btn-left">
-        <span class="cloud-full">☁️ Cloud</span>
-        <span class="cloud-icon" title="Cloud">☁️</span>
-      </button>
-    </div>
-  </div>
-  <!-- Hàng 2: Nav tabs — CÔNG TRÌNH là tab mặc định -->
-  <nav class="topbar-nav">
-    <button class="nav-btn active" data-page="congtrinh" onclick="goPage(this,'congtrinh')">🏗️ CÔNG TRÌNH</button>
-    <button class="nav-btn" data-page="nhap" onclick="goPage(this,'nhap')">NHẬP CHI PHÍ</button>
-    <button class="nav-btn" data-page="thongkecphd" onclick="goPage(this,'thongkecphd')">📊 THỐNG KÊ CP/HĐ</button>
-    <button class="nav-btn" data-page="chamcong" onclick="goPage(this,'chamcong')">📅 CHẤM CÔNG</button>
-    <button class="nav-btn" data-page="nhapung" onclick="goPage(this,'nhapung')">💰 TIỀN ỨNG</button>
-    <button class="nav-btn" data-page="thietbi" onclick="goPage(this,'thietbi')">🔧 THEO DÕI TB</button>
-    <button class="nav-btn" data-page="danhmuc" onclick="goPage(this,'danhmuc')">⚙ DANH MỤC</button>
-    <button class="nav-btn" data-page="doanhthu" onclick="goPage(this,'doanhthu')">💵 DOANH THU</button>
-    <button class="nav-btn" data-page="dashboard" onclick="goPage(this,'dashboard')">📊 DASHBOARD</button>
-  </nav>
+    <!-- ── Bin ID Modal ── -->
 
-  <!-- USER DROPDOWN (SaaS Style) -->
-  <div id="user-dropdown" class="user-dropdown hidden">
-    <!-- State 1: Guest (Login Form) -->
-    <div id="user-guest">
-      <div class="ud-title">Đăng nhập hồ sơ</div>
-      <div class="ud-inputs">
-        <input id="login-username" type="text" placeholder="Tên đăng nhập" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
-        <input id="login-password" type="password" placeholder="Mật khẩu" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-        <div id="login-error" class="ud-error"></div>
-        <button class="ud-btn-primary" onclick="doLogin()">Đăng nhập hệ thống</button>
-      </div>
-    </div>
-
-    <!-- State 2: Authenticated -->
-    <div id="user-auth" style="display:none">
-      <!-- VIEW: Main Info -->
-      <div id="ud-main-view">
-        <div class="ud-info">
-          <div class="ud-avatar" id="ud-avatar-circle">👤</div>
-          <div class="ud-details">
-            <strong id="account-current-username"></strong>
-            <small id="account-current-role"></small>
+    <!-- ── Duplicate Invoice Warning Modal ── -->
+    <div class="dup-modal-overlay" id="dup-modal-overlay">
+      <div class="dup-modal">
+        <div class="dup-modal-head">
+          <span class="dup-icon">⚠️</span>
+          <div>
+            <h3>Phát hiện hóa đơn trùng lặp</h3>
+            <div
+              style="font-size: 12px; color: #888; margin-top: 2px"
+              id="dup-modal-subtitle"
+            ></div>
           </div>
         </div>
-        <div class="ud-divider"></div>
-        <div class="ud-actions">
-          <button class="ud-action-btn" onclick="openAccountSettings()">
-            <span>⚙️</span> Cài đặt tài khoản
+        <div class="dup-modal-body" id="dup-modal-body"></div>
+        <div class="dup-modal-foot">
+          <button class="btn btn-outline" onclick="closeDupModal()">
+            ✕ Hủy bỏ
           </button>
-          <button class="ud-action-btn ud-logout" onclick="logout()">
-            <span>🚪</span> Đăng xuất
+          <button class="btn btn-gold" onclick="forceSaveAll()">
+            💾 Vẫn lưu tất cả
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- VIEW: Account Settings (Hidden by default) -->
-      <div id="ud-settings-view" style="display:none">
-        <div class="ud-title">Cài đặt tài khoản</div>
-        <div class="ud-inputs">
-          <div class="ud-field">
-            <label>Username mới</label>
-            <input id="account-new-username" type="text" placeholder="Nhập username mới">
+    <div class="topbar">
+      <!-- Hàng 1: Logo + Năm + Tổng CP + Cloud -->
+      <div class="topbar-row1">
+        <!-- Trái: Logo + Year -->
+        <div class="topbar-left">
+          <!-- ☰ Hamburger mở Sidebar Offcanvas -->
+          <button class="tb-btn"
+                  type="button"
+                  data-bs-toggle="offcanvas"
+                  data-bs-target="#sidebar-nav"
+                  aria-controls="sidebar-nav"
+                  title="Menu điều hướng"
+                  style="font-size:18px;padding:5px 9px;line-height:1">
+            ☰
+          </button>
+          <div class="app-name">🏗️ Chi Phí <span>Công Trình</span></div>
+          <div class="topbar-year-wrap">
+            <div class="year-select-wrap" id="year-select-wrap">
+              <button
+                class="year-select"
+                id="year-select-btn"
+                onclick="toggleYearDropdown(event)"
+                type="button"
+              >
+                Tất cả
+              </button>
+              <div class="year-dropdown" id="year-dropdown">
+                <div class="year-quick-btns">
+                  <button type="button" onclick="yearQuickAll()">Tất cả</button>
+                  <button type="button" onclick="yearQuickRecent()">
+                    2 gần nhất
+                  </button>
+                </div>
+                <div class="year-list" id="year-list"></div>
+              </div>
+            </div>
           </div>
-          <div class="ud-field">
-            <label>Mật khẩu cũ</label>
-            <input id="account-old-password" type="password" placeholder="Mật khẩu hiện tại">
+          <!-- Mobile: Tổng CP pill in header -->
+          <div class="top-stat-header-mobile">
+            <span class="top-stat-label">Tổng CP</span
+            ><span class="top-stat-val" id="top-total-header">0đ</span>
           </div>
-          <div class="ud-field">
-            <label>Mật khẩu mới</label>
-            <input id="account-new-password" type="password" placeholder="Mật khẩu mới (nếu đổi)">
+        </div>
+
+        <!-- Giữa: Tổng CP (desktop only) -->
+        <div class="topbar-meta">
+          <div class="top-stat top-stat-desktop">
+            <span class="top-stat-label">Tổng CP</span
+            ><span class="top-stat-val" id="top-total">0đ</span>
           </div>
-          <div class="ud-field">
-            <label>Xác nhận mật khẩu</label>
-            <input id="account-confirm-password" type="password" placeholder="Nhập lại mật khẩu mới">
+        </div>
+
+        <!-- Phải: các nút hành động -->
+        <div class="topbar-controls">
+          <div class="top-stat top-stat-mobile">
+            <span class="top-stat-label">Tổng CP</span
+            ><span class="top-stat-val" id="top-total-mobile">0đ</span>
           </div>
-          <div id="ud-settings-error" class="ud-error"></div>
-          
-          <div class="ud-settings-actions">
-            <button id="ud-save-btn" class="ud-btn-primary" onclick="saveAccountSettings()">Lưu thay đổi</button>
-            <button class="ud-btn-ghost" onclick="closeAccountSettings()">Hủy</button>
+          <button
+            id="user-btn"
+            onclick="toggleUserDropdown(null, event)"
+            class="tb-btn mobile-btn-center"
+            title="Tài khoản"
+          >
+            <span class="user-full"
+              >👤 <span id="current-user-label">Đăng nhập</span></span
+            >
+            <span class="user-icon" title="Người dùng">👤</span>
+          </button>
+          <button
+            id="sync-btn"
+            onclick="manualSync()"
+            class="tb-btn mobile-btn-right"
+            title="Đồng bộ dữ liệu"
+          >
+            ☁️
+          </button>
+          <button
+            id="jb-btn"
+            onclick="openBinModal()"
+            class="tb-btn tb-btn-cloud mobile-btn-left"
+          >
+            <span class="cloud-full">☁️ Cloud</span>
+            <span class="cloud-icon" title="Cloud">☁️</span>
+          </button>
+        </div>
+      </div>
+      <!-- ── Sidebar Offcanvas Navigation (Bootstrap 5) ─────────── -->
+      <!-- Mặc định ẩn; mở khi bấm nút ☰ trong topbar-row1       -->
+      <div class="offcanvas offcanvas-start"
+           tabindex="-1"
+           id="sidebar-nav"
+           aria-labelledby="sidebar-nav-label"
+           style="width:270px;background:var(--ink);color:#fff">
+        <!-- Header Offcanvas -->
+        <div class="offcanvas-header"
+             style="border-bottom:1px solid rgba(255,255,255,.12);padding:12px 16px">
+          <div class="app-name" id="sidebar-nav-label">
+            🏗️ Chi Phí <span>Công Trình</span>
+          </div>
+          <button type="button"
+                  class="btn-close btn-close-white"
+                  data-bs-dismiss="offcanvas"
+                  aria-label="Đóng menu"></button>
+        </div>
+        <!-- Danh sách tab điều hướng — data-bs-dismiss tự đóng sidebar sau khi chọn -->
+        <div class="offcanvas-body p-0">
+          <nav style="display:flex;flex-direction:column;padding-top:6px">
+            <button class="nav-btn active"
+                    data-page="congtrinh"
+                    onclick="goPage(this,'congtrinh')"
+                    data-bs-dismiss="offcanvas">
+              🏗️ CÔNG TRÌNH
+            </button>
+            <button class="nav-btn"
+                    data-page="nhap"
+                    onclick="goPage(this,'nhap')"
+                    data-bs-dismiss="offcanvas">
+              NHẬP CHI PHÍ
+            </button>
+            <button class="nav-btn"
+                    data-page="thongkecphd"
+                    onclick="goPage(this,'thongkecphd')"
+                    data-bs-dismiss="offcanvas">
+              📊 THỐNG KÊ CP/HĐ
+            </button>
+            <button class="nav-btn"
+                    data-page="chamcong"
+                    onclick="goPage(this,'chamcong')"
+                    data-bs-dismiss="offcanvas">
+              📅 CHẤM CÔNG
+            </button>
+            <button class="nav-btn"
+                    data-page="nhapung"
+                    onclick="goPage(this,'nhapung')"
+                    data-bs-dismiss="offcanvas">
+              💰 TIỀN ỨNG
+            </button>
+            <button class="nav-btn"
+                    data-page="thietbi"
+                    onclick="goPage(this,'thietbi')"
+                    data-bs-dismiss="offcanvas">
+              🔧 THEO DÕI TB
+            </button>
+            <button class="nav-btn"
+                    data-page="danhmuc"
+                    onclick="goPage(this,'danhmuc')"
+                    data-bs-dismiss="offcanvas">
+              ⚙ DANH MỤC
+            </button>
+            <button class="nav-btn"
+                    data-page="doanhthu"
+                    onclick="goPage(this,'doanhthu')"
+                    data-bs-dismiss="offcanvas">
+              💵 DOANH THU
+            </button>
+            <button class="nav-btn"
+                    data-page="dashboard"
+                    onclick="goPage(this,'dashboard')"
+                    data-bs-dismiss="offcanvas">
+              📊 DASHBOARD
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- USER DROPDOWN (SaaS Style) -->
+      <div id="user-dropdown" class="user-dropdown hidden">
+        <!-- State 1: Guest (Login Form) -->
+        <div id="user-guest">
+          <div class="ud-title">Đăng nhập hồ sơ</div>
+          <div class="ud-inputs">
+            <input
+              id="login-username"
+              type="text"
+              placeholder="Tên đăng nhập"
+              autocomplete="username"
+              onkeydown="if (event.key === 'Enter') doLogin();"
+            />
+            <input
+              id="login-password"
+              type="password"
+              placeholder="Mật khẩu"
+              autocomplete="current-password"
+              onkeydown="if (event.key === 'Enter') doLogin();"
+            />
+            <div id="login-error" class="ud-error"></div>
+            <button class="ud-btn-primary" onclick="doLogin()">
+              Đăng nhập hệ thống
+            </button>
+          </div>
+        </div>
+
+        <!-- State 2: Authenticated -->
+        <div id="user-auth" style="display: none">
+          <!-- VIEW: Main Info -->
+          <div id="ud-main-view">
+            <div class="ud-info">
+              <div class="ud-avatar" id="ud-avatar-circle">👤</div>
+              <div class="ud-details">
+                <strong id="account-current-username"></strong>
+                <small id="account-current-role"></small>
+              </div>
+            </div>
+            <div class="ud-divider"></div>
+            <div class="ud-actions">
+              <button class="ud-action-btn" onclick="openAccountSettings()">
+                <span>⚙️</span> Cài đặt tài khoản
+              </button>
+              <button class="ud-action-btn ud-logout" onclick="logout()">
+                <span>🚪</span> Đăng xuất
+              </button>
+            </div>
+          </div>
+
+          <!-- VIEW: Account Settings (Hidden by default) -->
+          <div id="ud-settings-view" style="display: none">
+            <div class="ud-title">Cài đặt tài khoản</div>
+            <div class="ud-inputs">
+              <div class="ud-field">
+                <label>Username mới</label>
+                <input
+                  id="account-new-username"
+                  type="text"
+                  placeholder="Nhập username mới"
+                />
+              </div>
+              <div class="ud-field">
+                <label>Mật khẩu cũ</label>
+                <input
+                  id="account-old-password"
+                  type="password"
+                  placeholder="Mật khẩu hiện tại"
+                />
+              </div>
+              <div class="ud-field">
+                <label>Mật khẩu mới</label>
+                <input
+                  id="account-new-password"
+                  type="password"
+                  placeholder="Mật khẩu mới (nếu đổi)"
+                />
+              </div>
+              <div class="ud-field">
+                <label>Xác nhận mật khẩu</label>
+                <input
+                  id="account-confirm-password"
+                  type="password"
+                  placeholder="Nhập lại mật khẩu mới"
+                />
+              </div>
+              <div id="ud-settings-error" class="ud-error"></div>
+
+              <div class="ud-settings-actions">
+                <button
+                  id="ud-save-btn"
+                  class="ud-btn-primary"
+                  onclick="saveAccountSettings()"
+                >
+                  Lưu thay đổi
+                </button>
+                <button class="ud-btn-ghost" onclick="closeAccountSettings()">
+                  Hủy
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</div>
 
-<div class="content">
+    <div class="content">
+      <!-- PAGE: NHẬP CHI PHÍ (gộp Nhập HĐ + Tất Cả CP) -->
+      <div class="page" id="page-nhap">
+        <!-- ── Nhập HĐ/CP ── -->
+        <div class="sub-page active" id="sub-nhap-hd">
+          <!-- Inner sub-nav: Nhập nhanh vs Hóa đơn chi tiết -->
+          <div class="inner-sub-nav">
+            <button
+              class="inner-sub-btn active"
+              onclick="goInnerSub(this, 'inr-nhap-nhanh')"
+            >
+              ⚡ Nhập nhanh
+            </button>
+            <button
+              class="inner-sub-btn"
+              onclick="goInnerSub(this, 'inr-hd-chitiet')"
+            >
+              📋 Hóa đơn chi tiết
+            </button>
+          </div>
 
-  <!-- PAGE: NHẬP CHI PHÍ (gộp Nhập HĐ + Tất Cả CP) -->
-  <div class="page" id="page-nhap">
+          <!-- ── Inner sub-page 1: Nhập nhanh (giữ nguyên) ── -->
+          <div class="inner-sub-page active" id="inr-nhap-nhanh">
+            <div class="section-header">
+              <div class="section-title">
+                <span class="dot"></span>Nhập Hóa Đơn
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-outline" onclick="clearTable()">
+                  🗑 Xóa bảng
+                </button>
+                <button class="btn btn-outline" onclick="exportEntryCSV()">
+                  ⬇ Xuất CSV
+                </button>
+              </div>
+            </div>
 
-    <!-- ── Nhập HĐ/CP ── -->
-    <div class="sub-page active" id="sub-nhap-hd">
+            <div class="entry-date-bar">
+              <span class="bar-label">Ngày</span>
+              <input
+                type="date"
+                id="entry-date"
+                class="date-input"
+                onchange="renderTodayInvoices()"
+              />
+            </div>
 
-      <!-- Inner sub-nav: Nhập nhanh vs Hóa đơn chi tiết -->
-      <div class="inner-sub-nav">
-        <button class="inner-sub-btn active" onclick="goInnerSub(this,'inr-nhap-nhanh')">⚡ Nhập nhanh</button>
-        <button class="inner-sub-btn" onclick="goInnerSub(this,'inr-hd-chitiet')">📋 Hóa đơn chi tiết</button>
+            <div class="entry-table-wrap">
+              <div class="table-scroll">
+                <table class="entry-table">
+                  <thead>
+                    <tr>
+                      <th class="col-num">#</th>
+                      <th class="col-loai">Loại Chi Phí *</th>
+                      <th class="col-ct">Công Trình *</th>
+                      <th class="col-tien">Số Tiền (đ)</th>
+                      <th class="col-nd">Nội Dung / Ghi Chú</th>
+                      <th class="col-nguoi">Người TH</th>
+                      <th class="col-ncc">Nhà Cung Cấp</th>
+                      <th class="col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="entry-tbody"></tbody>
+                </table>
+              </div>
+              <div class="add-row-bar">
+                <button class="btn btn-outline btn-sm" onclick="addRows(1)">
+                  + 1 dòng
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="addRows(5)">
+                  + 5 dòng
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="addRows(10)">
+                  + 10 dòng
+                </button>
+                <span
+                  style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+                  >Tab để di chuyển giữa các ô</span
+                >
+              </div>
+            </div>
+
+            <div class="save-bar">
+              <div class="save-bar-info">
+                <span>Dòng có dữ liệu: <strong id="row-count">0</strong></span>
+                <span
+                  >Tổng thành tiền:
+                  <span class="hi" id="entry-total">0 đ</span></span
+                >
+              </div>
+              <button
+                id="entry-save-btn"
+                class="btn btn-green"
+                onclick="saveAllRows()"
+              >
+                💾 Lưu Hóa Đơn
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Inner sub-page 2: Hóa đơn chi tiết ── -->
+          <div class="inner-sub-page" id="inr-hd-chitiet">
+            <div class="section-header">
+              <div class="section-title">
+                <span class="dot"></span>Hóa Đơn Chi Tiết
+              </div>
+              <button class="btn btn-outline" onclick="clearDetailForm()">
+                🗑 Xóa form
+              </button>
+            </div>
+
+            <!-- Header: Ngày · Loại CP · Công Trình · NCC · Người TH — 1 hàng ngang, không nhãn -->
+            <div class="detail-inv-header">
+              <input
+                type="date"
+                id="detail-ngay"
+                class="date-input"
+                onchange="renderTodayInvoices()"
+              />
+              <select
+                id="detail-loai"
+                class="bare-select"
+                style="min-width: 180px"
+              ></select>
+              <select
+                id="detail-ct"
+                class="bare-select"
+                style="min-width: 220px; max-width: 100%"
+              ></select>
+              <select
+                id="detail-ncc"
+                class="bare-select"
+                style="min-width: 170px"
+              ></select>
+              <select
+                id="detail-nguoi"
+                class="bare-select"
+                style="min-width: 160px"
+              ></select>
+            </div>
+
+            <!-- Bảng chi tiết hàng hóa -->
+            <div
+              class="entry-table-wrap"
+              style="margin-top: 0; border-radius: 0"
+            >
+              <div class="table-scroll">
+                <table class="entry-table" style="min-width: 820px">
+                  <thead>
+                    <tr>
+                      <th class="col-num">#</th>
+                      <th style="min-width: 200px">TÊN HÀNG HÓA / VẬT TƯ</th>
+                      <th style="width: 72px; text-align: center">ĐVT</th>
+                      <th style="width: 80px; text-align: center">SL</th>
+                      <th style="width: 145px; text-align: right">
+                        ĐƠN GIÁ (đ)
+                      </th>
+                      <th style="width: 120px">CHIẾT KHẤU</th>
+                      <th style="width: 145px; text-align: right">
+                        THÀNH TIỀN (đ)
+                      </th>
+                      <th class="col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="detail-tbody"></tbody>
+                </table>
+              </div>
+              <div class="add-row-bar">
+                <button class="btn btn-outline btn-sm" onclick="addDetailRow()">
+                  + 1 dòng
+                </button>
+                <button
+                  class="btn btn-outline btn-sm"
+                  onclick="for (let i = 0; i < 5; i++) addDetailRow();"
+                >
+                  + 5 dòng
+                </button>
+                <span
+                  style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+                  >CK: nhập % (vd: 5%) hoặc số tiền (vd: 50000)</span
+                >
+              </div>
+            </div>
+
+            <!-- Footer: TC, chiết khấu tổng, tổng thành tiền -->
+            <div class="detail-invoice-footer">
+              <div class="detail-footer-row">
+                <span class="detail-footer-label">Tổng Cộng (TC)</span>
+                <span class="detail-footer-val" id="detail-tc">0</span>
+              </div>
+              <div class="detail-footer-row">
+                <span class="detail-footer-label">Chiết Khấu Tổng</span>
+                <input
+                  class="detail-footer-ck-input"
+                  id="detail-footer-ck"
+                  placeholder="% hoặc số tiền..."
+                  oninput="calcDetailTotals()"
+                />
+              </div>
+              <div class="detail-footer-row detail-footer-total-row">
+                <span class="detail-footer-label">Tổng Thành Tiền</span>
+                <span class="detail-footer-val hi" id="detail-tong">0</span>
+              </div>
+            </div>
+
+            <!-- Nội dung (tự sinh từ tên hàng) -->
+            <div class="detail-nd-bar">
+              <span class="bar-label" style="white-space: nowrap"
+                >Nội Dung</span
+              >
+              <input
+                type="text"
+                id="detail-nd"
+                class="detail-nd-input"
+                placeholder="Tự động từ tên hàng hóa..."
+              />
+            </div>
+
+            <!-- Save bar -->
+            <div class="save-bar" style="margin-top: 12px">
+              <div class="save-bar-info">
+                <span
+                  >Tổng thành tiền:
+                  <span class="hi" id="detail-tong-save">0 đ</span></span
+                >
+              </div>
+              <button
+                class="btn btn-green"
+                id="detail-save-btn"
+                onclick="saveDetailInvoice()"
+              >
+                💾 Lưu Hóa Đơn
+              </button>
+            </div>
+          </div>
+
+          <!-- Hóa đơn đã nhập trong ngày (gộp trong tab Nhập HĐ/CP) -->
+          <div id="today-invoices-wrap" style="margin-top: 20px">
+            <div class="section-header">
+              <div class="section-title" style="font-size: 14px">
+                <span class="dot"></span>Hóa Đơn Đã Nhập Trong Ngày
+                <span
+                  id="today-inv-date"
+                  style="color: var(--gold); font-size: 13px"
+                ></span>
+              </div>
+              <button
+                class="btn btn-outline btn-sm"
+                onclick="renderTodayInvoices()"
+              >
+                ↻ Làm mới
+              </button>
+            </div>
+            <div class="records-wrap">
+              <div style="overflow-x: auto">
+                <table class="records-table" style="min-width: 600px">
+                  <thead>
+                    <tr>
+                      <th>Loại</th>
+                      <th>Công Trình</th>
+                      <th style="text-align: right">Số Tiền</th>
+                      <th>Người TH</th>
+                      <th>Nội Dung</th>
+                      <th>NCC</th>
+                    </tr>
+                  </thead>
+                  <tbody id="today-inv-tbody"></tbody>
+                </table>
+              </div>
+              <div
+                id="today-inv-footer"
+                style="
+                  padding: 8px 16px;
+                  border-top: 1px solid var(--line);
+                  background: #f3f1ec;
+                  font-size: 12px;
+                  color: var(--ink2);
+                  display: flex;
+                  justify-content: space-between;
+                "
+              ></div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- ── Inner sub-page 1: Nhập nhanh (giữ nguyên) ── -->
-      <div class="inner-sub-page active" id="inr-nhap-nhanh">
+      <!-- PAGE: THỐNG KÊ CP/HĐ -->
+      <div class="page" id="page-thongkecphd">
         <div class="section-header">
-          <div class="section-title"><span class="dot"></span>Nhập Hóa Đơn</div>
+          <div class="section-title">
+            <span class="dot"></span>Thống Kê Chi Phí / Hóa Đơn
+          </div>
+          <button
+            class="btn btn-outline"
+            id="btn-export-csv"
+            onclick="exportAllCSV()"
+          >
+            ⬇ Xuất CSV
+          </button>
+        </div>
+        <div class="records-wrap">
+          <div class="records-toolbar">
+            <select
+              class="filter-sel"
+              id="f-view"
+              onchange="switchTatCaView(this.value)"
+            >
+              <option value="active">Tất cả HĐ</option>
+              <option value="trash">🗑 Đã xóa</option>
+            </select>
+            <div class="search-box" id="tc-search-box">
+              <span class="ico">🔍</span>
+              <input
+                type="text"
+                id="search"
+                placeholder="Tìm kiếm..."
+                oninput="filterAndRender()"
+              />
+            </div>
+            <select
+              class="filter-sel"
+              id="f-ct"
+              onchange="
+                buildFilters();
+                filterAndRender();
+              "
+            >
+              <option value="">Tất cả công trình</option>
+            </select>
+            <select class="filter-sel" id="f-loai" onchange="filterAndRender()">
+              <option value="">Tất cả loại</option>
+            </select>
+            <select class="filter-sel" id="f-ncc" onchange="filterAndRender()">
+              <option value="">Tất cả NCC</option>
+            </select>
+            <select
+              class="filter-sel"
+              id="f-month"
+              onchange="filterAndRender()"
+            >
+              <option value="">Tất cả tháng</option>
+            </select>
+          </div>
+          <!-- Danh sách hóa đơn hoạt động -->
+          <div id="active-inv-wrap">
+            <div style="overflow-x: auto">
+              <table class="records-table" id="all-table">
+                <thead>
+                  <tr>
+                    <th>Ngày</th>
+                    <th>Công Trình</th>
+                    <th>Loại Chi Phí</th>
+                    <th class="hide-mobile">Người TH</th>
+                    <th class="hide-mobile">Nhà Cung Cấp</th>
+                    <th>Nội Dung</th>
+                    <th style="text-align: right">Số Tiền</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="all-tbody"></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+          </div>
+          <!-- HĐ/CP đã xóa (ẩn mặc định) -->
+          <div id="inline-trash-wrap" style="display: none">
+            <div
+              style="display: flex; justify-content: flex-end; padding: 8px 0"
+            >
+              <button
+                class="btn btn-outline btn-sm"
+                onclick="trashClearAll()"
+                style="color: var(--red)"
+              >
+                🗑 Xóa vĩnh viễn tất cả
+              </button>
+            </div>
+            <div id="trash-wrap" style="display: none">
+              <div style="overflow-x: auto">
+                <table class="records-table">
+                  <thead>
+                    <tr>
+                      <th>Ngày</th>
+                      <th>Công Trình</th>
+                      <th>Loại</th>
+                      <th>Nội Dung</th>
+                      <th style="text-align: right">Số Tiền</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="trash-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div
+              id="trash-empty"
+              style="
+                text-align: center;
+                padding: 20px;
+                color: var(--ink3);
+                font-size: 13px;
+                background: var(--paper);
+                border: 1px solid var(--line);
+                border-radius: 8px;
+              "
+            >
+              Chưa có hóa đơn nào bị xóa
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: CT -->
+
+      <!-- PAGE: THEO DÕI THIẾT BỊ -->
+      <div class="page" id="page-thietbi">
+        <!-- Bảng 2: Danh sách thiết bị đã lưu -->
+        <div class="section-header">
+          <div class="section-title">
+            <span class="dot"></span>Danh Sách Thiết Bị Tại Công Trình
+          </div>
           <div class="btn-group">
-            <button class="btn btn-outline" onclick="clearTable()">🗑 Xóa bảng</button>
-            <button class="btn btn-outline" onclick="exportEntryCSV()">⬇ Xuất CSV</button>
+            <div class="search-box" style="min-width: 140px">
+              <span class="ico">🔍</span>
+              <input
+                type="text"
+                id="tb-search"
+                placeholder="Tìm thiết bị..."
+                oninput="
+                  tbPage = 1;
+                  tbRenderList();
+                "
+              />
+            </div>
+            <select
+              class="filter-sel"
+              id="tb-filter-ct"
+              onchange="
+                tbPage = 1;
+                tbRenderList();
+              "
+            >
+              <option value="">Tất cả công trình</option>
+            </select>
+            <select
+              class="filter-sel"
+              id="tb-filter-tt"
+              onchange="
+                tbPage = 1;
+                tbRenderList();
+              "
+            >
+              <option value="">Tất cả tình trạng</option>
+              <option value="Đang hoạt động">Đang hoạt động</option>
+              <option value="Cần bảo trì">Cần bảo trì</option>
+              <option value="Cần sửa chữa">Cần sửa chữa</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="tbExportCSV()">
+              ⬇ Xuất CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="records-wrap">
+          <div style="overflow-x: auto">
+            <table class="records-table" id="tb-list-table">
+              <thead>
+                <tr>
+                  <th class="tb-ct-col">Công Trình</th>
+                  <th class="tb-name-col">Tên Thiết Bị</th>
+                  <th style="text-align: center; width: 70px">SL</th>
+                  <th style="width: 130px">Tình Trạng</th>
+                  <th>Ghi Chú</th>
+                  <th style="width: 120px"></th>
+                </tr>
+              </thead>
+              <tbody id="tb-list-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="tb-pagination"></div>
+        </div>
+
+        <!-- Bảng 2b: Kho Tổng Thiết Bị -->
+        <div class="section-header" style="margin-top: 28px">
+          <div class="section-title">
+            <span class="dot"></span>📦 Kho Tổng Thiết Bị
+          </div>
+          <div class="btn-group">
+            <div class="search-box" style="min-width: 140px">
+              <span class="ico">🔍</span>
+              <input
+                type="text"
+                id="kho-search"
+                placeholder="Tìm thiết bị..."
+                oninput="filterKhoTable()"
+              />
+            </div>
+            <select
+              class="filter-sel"
+              id="kho-filter-ten"
+              onchange="
+                khoPage = 1;
+                renderKhoTong();
+              "
+            >
+              <option value="">Tất cả thiết bị</option>
+            </select>
+            <select
+              class="filter-sel"
+              id="kho-filter-tt"
+              onchange="
+                khoPage = 1;
+                renderKhoTong();
+              "
+            >
+              <option value="">Tất cả tình trạng</option>
+              <option value="Đang hoạt động">Đang hoạt động</option>
+              <option value="Cần bảo trì">Cần bảo trì</option>
+              <option value="Cần sửa chữa">Cần sửa chữa</option>
+            </select>
+            <button
+              class="btn btn-outline btn-sm"
+              onclick="
+                khoPage = 1;
+                renderKhoTong();
+              "
+            >
+              ↻ Làm mới
+            </button>
+          </div>
+        </div>
+        <div class="records-wrap">
+          <div style="overflow-x: auto">
+            <table class="records-table" id="kho-list-table">
+              <thead>
+                <tr>
+                  <th class="tb-name-col">Tên Thiết Bị</th>
+                  <th style="text-align: center; width: 70px">SL</th>
+                  <th style="width: 130px">Tình Trạng</th>
+                  <th style="width: 110px">Ghi Chú</th>
+                  <th style="width: 70px">Cập Nhật</th>
+                  <th style="width: 160px"></th>
+                </tr>
+              </thead>
+              <tbody id="kho-list-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="kho-pagination"></div>
+        </div>
+
+        <!-- Bảng 1: Nhập thiết bị -->
+        <div class="section-header" style="margin-top: 28px">
+          <div class="section-title">
+            <span class="dot"></span>Nhập Máy Móc, Thiết Bị, Giàn Giáo
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-outline btn-sm" onclick="tbClearRows()">
+              🗑 Xóa bảng
+            </button>
+            <button
+              id="tb-save-btn"
+              class="btn btn-green btn-sm"
+              onclick="tbSave()"
+            >
+              💾 Lưu thiết bị
+            </button>
+          </div>
+        </div>
+
+        <div id="thietbi-form">
+          <div class="entry-date-bar" style="flex-wrap: wrap; gap: 10px">
+            <span class="bar-label">Công Trình</span>
+            <select
+              id="tb-ct-sel"
+              class="bare-select"
+              style="min-width: 260px; font-size: 13px"
+            >
+              <option value="">-- Chọn công trình --</option>
+            </select>
+          </div>
+
+          <div class="entry-table-wrap">
+            <div class="table-scroll">
+              <table
+                class="entry-table tb-entry-table"
+                style="min-width: 680px"
+              >
+                <thead>
+                  <tr>
+                    <th class="col-num">#</th>
+                    <th class="tb-name-col" style="min-width: 224px">
+                      Tên Máy/TB/GG
+                    </th>
+                    <th style="width: 80px; text-align: center">Số Lượng</th>
+                    <th style="width: 150px">Tình Trạng</th>
+                    <th style="min-width: 140px">Ghi Chú</th>
+                    <th class="col-del"></th>
+                  </tr>
+                </thead>
+                <tbody id="tb-tbody"></tbody>
+              </table>
+            </div>
+            <div class="add-row-bar">
+              <button class="btn btn-outline btn-sm" onclick="tbAddRows(1)">
+                + 1 dòng
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="tbAddRows(5)">
+                + 5 dòng
+              </button>
+              <span
+                style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+                >Mặc định tình trạng: Đang hoạt động</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: DANH MỤC -->
+      <div class="page" id="page-danhmuc">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="dot"></span>Quản Lý Danh Mục
+          </div>
+          <span style="font-size: 12px; color: var(--ink3)"
+            >Nhấn ✏️ hoặc nhấp đúp để sửa tên • Thay đổi sẽ tự cập nhật vào hóa
+            đơn đã lưu</span
+          >
+        </div>
+        <div id="dm-grid" class="settings-grid"></div>
+
+        <!-- ── Panel Tools ── -->
+        <div style="margin-top: 28px">
+          <div class="section-header">
+            <div class="section-title"><span class="dot"></span>🔧 Tools</div>
+            <span
+              style="font-size: 12px; color: var(--ink3)"
+              id="backup-status-label"
+            ></span>
+          </div>
+
+          <div class="records-wrap" style="padding: 16px 20px">
+            <!-- DATA -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--ink2);
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                Data
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  class="btn btn-outline"
+                  onclick="toolExportJSON()"
+                  title="Xuất snapshot toàn bộ hệ thống ra file .json"
+                >
+                  📦 Xuất snapshot hệ thống
+                </button>
+                <button
+                  class="btn btn-outline"
+                  onclick="toolImportJSON()"
+                  title="Khôi phục toàn bộ hệ thống từ file snapshot .json — xóa và ghi đè toàn bộ dữ liệu"
+                >
+                  📥 Import JSON
+                </button>
+              </div>
+            </div>
+
+            <!-- BACKUP -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--ink2);
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                Backup
+              </div>
+              <div
+                style="font-size: 12px; color: var(--ink2); margin-bottom: 6px"
+              >
+                Bản sao lưu tự động (giữ 3 bản gần nhất)
+              </div>
+              <div id="backup-list-wrap">
+                <div
+                  style="color: var(--ink3); font-size: 13px; padding: 8px 0"
+                >
+                  Đang tải...
+                </div>
+              </div>
+            </div>
+
+            <!-- EXCEL -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--ink2);
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                Excel
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  class="btn btn-outline"
+                  onclick="toolImportExcel()"
+                  title="Import dữ liệu từ file Excel (.xlsx/.xls)"
+                >
+                  📥 Import Excel
+                </button>
+                <button
+                  class="btn btn-outline"
+                  onclick="toolExportExcel()"
+                  title="Xuất toàn bộ dữ liệu ra file Excel (.xlsx)"
+                >
+                  📤 Export Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- NGUY HIỂM -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #c0392b;
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                ⚠ Quản Lý Dữ Liệu
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  class="btn"
+                  style="
+                    background: #f8d7da;
+                    color: #721c24;
+                    border: 1px solid #f5c6cb;
+                    font-weight: 600;
+                  "
+                  onclick="toolResetAll()"
+                  title="Xóa TOÀN BỘ dữ liệu — không thể hoàn tác"
+                >
+                  ⚠️ Reset toàn bộ dữ liệu
+                </button>
+              </div>
+            </div>
+
+            <!-- Mô tả -->
+            <div
+              style="
+                padding: 10px 14px;
+                background: var(--bg);
+                border-radius: 6px;
+                border: 1px solid var(--line);
+                font-size: 12px;
+                color: var(--ink3);
+                line-height: 1.7;
+              "
+            >
+              <strong style="color: var(--ink2)">Cách hoạt động:</strong><br />
+              • <b>Xuất snapshot</b>: Tải toàn bộ dữ liệu ra file .json — dùng
+              để chuyển thiết bị hoặc lưu trữ<br />
+              • <b>Import JSON</b>: Khôi phục từ snapshot — xóa toàn bộ dữ liệu
+              hiện tại và ghi đè lên cloud<br />
+              • <b>Data version</b>:
+              <span
+                id="data-version-badge"
+                style="
+                  background: var(--green);
+                  color: #fff;
+                  padding: 1px 7px;
+                  border-radius: 10px;
+                  font-weight: 700;
+                "
+              ></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: TIỀN ỨNG TP/NCC (gộp nhập + tổng) -->
+      <div class="page" id="page-nhapung">
+        <!-- Bảng 1: Nhập tiền ứng -->
+        <div class="section-header">
+          <div class="section-title">
+            <span class="dot"></span>Nhập Tiền Ứng
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-outline" onclick="clearUngTable()">
+              🗑 Xóa bảng
+            </button>
+            <button class="btn btn-outline" onclick="exportUngEntryCSV()">
+              ⬇ Xuất CSV
+            </button>
+            <button
+              class="btn btn-green"
+              id="ung-save-btn"
+              onclick="saveAllUngRows()"
+            >
+              💾 Lưu tất cả
+            </button>
           </div>
         </div>
 
         <div class="entry-date-bar">
           <span class="bar-label">Ngày</span>
-          <input type="date" id="entry-date" class="date-input" onchange="renderTodayInvoices()">
+          <input type="date" id="ung-date" class="date-input" />
         </div>
 
         <div class="entry-table-wrap">
@@ -427,1074 +1919,1615 @@
               <thead>
                 <tr>
                   <th class="col-num">#</th>
-                  <th class="col-loai">Loại Chi Phí *</th>
-                  <th class="col-ct">Công Trình *</th>
-                  <th class="col-tien">Số Tiền (đ)</th>
-                  <th class="col-nd">Nội Dung / Ghi Chú</th>
-                  <th class="col-nguoi">Người TH</th>
-                  <th class="col-ncc">Nhà Cung Cấp</th>
+                  <th style="width: 110px">Đối Tượng</th>
+                  <th style="width: 200px">
+                    Thầu Phụ / Công Nhân
+                    <span style="color: var(--gold)">*</span>
+                  </th>
+                  <th style="width: 220px">Công Trình</th>
+                  <th style="width: 140px">Số Tiền Ứng (đ)</th>
+                  <th style="min-width: 220px">Nội Dung / Ghi Chú</th>
                   <th class="col-del"></th>
                 </tr>
               </thead>
-              <tbody id="entry-tbody"></tbody>
+              <tbody id="ung-tbody"></tbody>
             </table>
           </div>
           <div class="add-row-bar">
-            <button class="btn btn-outline btn-sm" onclick="addRows(1)">+ 1 dòng</button>
-            <button class="btn btn-outline btn-sm" onclick="addRows(5)">+ 5 dòng</button>
-            <button class="btn btn-outline btn-sm" onclick="addRows(10)">+ 10 dòng</button>
-            <span style="font-size:11px;color:var(--ink3);margin-left:8px">Tab để di chuyển giữa các ô</span>
+            <button class="btn btn-outline btn-sm" onclick="addUngRows(1)">
+              + 1 dòng
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="addUngRows(5)">
+              + 5 dòng
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="addUngRows(10)">
+              + 10 dòng
+            </button>
+            <span style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+              >Tab để di chuyển giữa các ô</span
+            >
           </div>
         </div>
 
         <div class="save-bar">
           <div class="save-bar-info">
-            <span>Dòng có dữ liệu: <strong id="row-count">0</strong></span>
-            <span>Tổng thành tiền: <span class="hi" id="entry-total">0 đ</span></span>
+            <span>Dòng có dữ liệu: <strong id="ung-row-count">0</strong></span>
+            <span
+              >Tổng tiền ứng:
+              <span class="hi" id="ung-entry-total">0 đ</span></span
+            >
           </div>
-          <button id="entry-save-btn" class="btn btn-green" onclick="saveAllRows()">💾 Lưu Hóa Đơn</button>
+        </div>
+
+        <!-- Bảng 2: Tổng tiền ứng -->
+        <div style="margin-top: 24px">
+          <div class="section-header">
+            <div class="section-title">
+              <span class="dot"></span>Tổng Tiền Ứng
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center">
+              <button class="btn btn-outline" onclick="exportUngAllCSV()">
+                ⬇ Xuất CSV
+              </button>
+              <button
+                class="btn btn-sm"
+                onclick="exportUngToImage()"
+                style="
+                  background: #2563eb;
+                  color: #fff;
+                  border: none;
+                  font-weight: 700;
+                "
+                title="Tick chọn dòng rồi bấm để xuất phiếu tạm ứng PNG"
+              >
+                📸 Xuất Phiếu Ứng
+              </button>
+            </div>
+          </div>
+          <div class="records-wrap">
+            <div class="records-toolbar">
+              <div class="search-box">
+                <span class="ico">🔍</span>
+                <input
+                  type="text"
+                  id="ung-search"
+                  placeholder="Tìm kiếm..."
+                  oninput="filterAndRenderUng()"
+                />
+              </div>
+              <select
+                class="filter-sel"
+                id="uf-tp"
+                onchange="filterAndRenderUng()"
+              >
+                <option value="">Tất cả TP/NCC</option>
+              </select>
+              <select
+                class="filter-sel"
+                id="uf-ct"
+                onchange="filterAndRenderUng()"
+              >
+                <option value="">Tất cả công trình</option>
+              </select>
+              <select
+                class="filter-sel"
+                id="uf-month"
+                onchange="filterAndRenderUng()"
+              >
+                <option value="">Tất cả tháng</option>
+              </select>
+            </div>
+            <div id="ung-all-sections"></div>
+            <div class="pagination" id="ung-pagination"></div>
+          </div>
         </div>
       </div>
 
-      <!-- ── Inner sub-page 2: Hóa đơn chi tiết ── -->
-      <div class="inner-sub-page" id="inr-hd-chitiet">
+      <!-- PAGE: SỔ CHẤM CÔNG -->
+      <div class="page" id="page-chamcong">
         <div class="section-header">
-          <div class="section-title"><span class="dot"></span>Hóa Đơn Chi Tiết</div>
-          <button class="btn btn-outline" onclick="clearDetailForm()">🗑 Xóa form</button>
-        </div>
-
-        <!-- Header: Ngày · Loại CP · Công Trình · NCC · Người TH — 1 hàng ngang, không nhãn -->
-        <div class="detail-inv-header">
-          <input type="date" id="detail-ngay" class="date-input" onchange="renderTodayInvoices()">
-          <select id="detail-loai" class="bare-select" style="min-width:180px"></select>
-          <select id="detail-ct"   class="bare-select" style="min-width:220px;max-width:100%"></select>
-          <select id="detail-ncc"  class="bare-select" style="min-width:170px"></select>
-          <select id="detail-nguoi" class="bare-select" style="min-width:160px"></select>
-        </div>
-
-        <!-- Bảng chi tiết hàng hóa -->
-        <div class="entry-table-wrap" style="margin-top:0;border-radius:0">
-          <div class="table-scroll">
-            <table class="entry-table" style="min-width:820px">
-              <thead>
-                <tr>
-                  <th class="col-num">#</th>
-                  <th style="min-width:200px">TÊN HÀNG HÓA / VẬT TƯ</th>
-                  <th style="width:72px;text-align:center">ĐVT</th>
-                  <th style="width:80px;text-align:center">SL</th>
-                  <th style="width:145px;text-align:right">ĐƠN GIÁ (đ)</th>
-                  <th style="width:120px">CHIẾT KHẤU</th>
-                  <th style="width:145px;text-align:right">THÀNH TIỀN (đ)</th>
-                  <th class="col-del"></th>
-                </tr>
-              </thead>
-              <tbody id="detail-tbody"></tbody>
-            </table>
-          </div>
-          <div class="add-row-bar">
-            <button class="btn btn-outline btn-sm" onclick="addDetailRow()">+ 1 dòng</button>
-            <button class="btn btn-outline btn-sm" onclick="for(let i=0;i<5;i++)addDetailRow()">+ 5 dòng</button>
-            <span style="font-size:11px;color:var(--ink3);margin-left:8px">CK: nhập % (vd: 5%) hoặc số tiền (vd: 50000)</span>
-          </div>
-        </div>
-
-        <!-- Footer: TC, chiết khấu tổng, tổng thành tiền -->
-        <div class="detail-invoice-footer">
-          <div class="detail-footer-row">
-            <span class="detail-footer-label">Tổng Cộng (TC)</span>
-            <span class="detail-footer-val" id="detail-tc">0</span>
-          </div>
-          <div class="detail-footer-row">
-            <span class="detail-footer-label">Chiết Khấu Tổng</span>
-            <input class="detail-footer-ck-input" id="detail-footer-ck" placeholder="% hoặc số tiền..." oninput="calcDetailTotals()">
-          </div>
-          <div class="detail-footer-row detail-footer-total-row">
-            <span class="detail-footer-label">Tổng Thành Tiền</span>
-            <span class="detail-footer-val hi" id="detail-tong">0</span>
-          </div>
-        </div>
-
-        <!-- Nội dung (tự sinh từ tên hàng) -->
-        <div class="detail-nd-bar">
-          <span class="bar-label" style="white-space:nowrap">Nội Dung</span>
-          <input type="text" id="detail-nd" class="detail-nd-input" placeholder="Tự động từ tên hàng hóa...">
-        </div>
-
-        <!-- Save bar -->
-        <div class="save-bar" style="margin-top:12px">
-          <div class="save-bar-info">
-            <span>Tổng thành tiền: <span class="hi" id="detail-tong-save">0 đ</span></span>
-          </div>
-          <button class="btn btn-green" id="detail-save-btn" onclick="saveDetailInvoice()">💾 Lưu Hóa Đơn</button>
-        </div>
-      </div>
-
-      <!-- Hóa đơn đã nhập trong ngày (gộp trong tab Nhập HĐ/CP) -->
-      <div id="today-invoices-wrap" style="margin-top:20px">
-        <div class="section-header">
-          <div class="section-title" style="font-size:14px"><span class="dot"></span>Hóa Đơn Đã Nhập Trong Ngày <span id="today-inv-date" style="color:var(--gold);font-size:13px"></span></div>
-          <button class="btn btn-outline btn-sm" onclick="renderTodayInvoices()">↻ Làm mới</button>
-        </div>
-        <div class="records-wrap">
-          <div style="overflow-x:auto">
-            <table class="records-table" style="min-width:600px">
-              <thead><tr>
-                <th>Loại</th><th>Công Trình</th>
-                <th style="text-align:right">Số Tiền</th>
-                <th>Người TH</th><th>Nội Dung</th><th>NCC</th>
-              </tr></thead>
-              <tbody id="today-inv-tbody"></tbody>
-            </table>
-          </div>
-          <div id="today-inv-footer" style="padding:8px 16px;border-top:1px solid var(--line);background:#f3f1ec;font-size:12px;color:var(--ink2);display:flex;justify-content:space-between"></div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- PAGE: THỐNG KÊ CP/HĐ -->
-  <div class="page" id="page-thongkecphd">
-    <div class="section-header">
-      <div class="section-title"><span class="dot"></span>Thống Kê Chi Phí / Hóa Đơn</div>
-      <button class="btn btn-outline" id="btn-export-csv" onclick="exportAllCSV()">⬇ Xuất CSV</button>
-    </div>
-    <div class="records-wrap">
-      <div class="records-toolbar">
-        <select class="filter-sel" id="f-view" onchange="switchTatCaView(this.value)">
-          <option value="active">Tất cả HĐ</option>
-          <option value="trash">🗑 Đã xóa</option>
-        </select>
-        <div class="search-box" id="tc-search-box">
-          <span class="ico">🔍</span>
-          <input type="text" id="search" placeholder="Tìm kiếm..." oninput="filterAndRender()">
-        </div>
-        <select class="filter-sel" id="f-ct" onchange="buildFilters();filterAndRender()"><option value="">Tất cả công trình</option></select>
-        <select class="filter-sel" id="f-loai" onchange="filterAndRender()"><option value="">Tất cả loại</option></select>
-        <select class="filter-sel" id="f-ncc" onchange="filterAndRender()"><option value="">Tất cả NCC</option></select>
-        <select class="filter-sel" id="f-month" onchange="filterAndRender()"><option value="">Tất cả tháng</option></select>
-      </div>
-      <!-- Danh sách hóa đơn hoạt động -->
-      <div id="active-inv-wrap">
-        <div style="overflow-x:auto">
-          <table class="records-table" id="all-table">
-            <thead>
-              <tr>
-                <th>Ngày</th><th>Công Trình</th><th>Loại Chi Phí</th>
-                <th class="hide-mobile">Người TH</th><th class="hide-mobile">Nhà Cung Cấp</th><th>Nội Dung</th>
-                <th style="text-align:right">Số Tiền</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="all-tbody"></tbody>
-          </table>
-        </div>
-        <div class="pagination" id="pagination"></div>
-      </div>
-      <!-- HĐ/CP đã xóa (ẩn mặc định) -->
-      <div id="inline-trash-wrap" style="display:none">
-        <div style="display:flex;justify-content:flex-end;padding:8px 0">
-          <button class="btn btn-outline btn-sm" onclick="trashClearAll()" style="color:var(--red)">🗑 Xóa vĩnh viễn tất cả</button>
-        </div>
-        <div id="trash-wrap" style="display:none">
-          <div style="overflow-x:auto">
-            <table class="records-table">
-              <thead><tr>
-                <th>Ngày</th><th>Công Trình</th><th>Loại</th>
-                <th>Nội Dung</th><th style="text-align:right">Số Tiền</th><th></th>
-              </tr></thead>
-              <tbody id="trash-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="trash-empty" style="text-align:center;padding:20px;color:var(--ink3);font-size:13px;background:var(--paper);border:1px solid var(--line);border-radius:8px">
-          Chưa có hóa đơn nào bị xóa
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PAGE: CT -->
-
-  <!-- PAGE: THEO DÕI THIẾT BỊ -->
-  <div class="page" id="page-thietbi">
-
-    <!-- Bảng 2: Danh sách thiết bị đã lưu -->
-    <div class="section-header">
-      <div class="section-title"><span class="dot"></span>Danh Sách Thiết Bị Tại Công Trình</div>
-      <div class="btn-group">
-        <div class="search-box" style="min-width:140px">
-          <span class="ico">🔍</span>
-          <input type="text" id="tb-search" placeholder="Tìm thiết bị..." oninput="tbPage=1;tbRenderList()">
-        </div>
-        <select class="filter-sel" id="tb-filter-ct" onchange="tbPage=1;tbRenderList()"><option value="">Tất cả công trình</option></select>
-        <select class="filter-sel" id="tb-filter-tt" onchange="tbPage=1;tbRenderList()">
-          <option value="">Tất cả tình trạng</option>
-          <option value="Đang hoạt động">Đang hoạt động</option>
-          <option value="Cần bảo trì">Cần bảo trì</option>
-          <option value="Cần sửa chữa">Cần sửa chữa</option>
-        </select>
-        <button class="btn btn-outline btn-sm" onclick="tbExportCSV()">⬇ Xuất CSV</button>
-      </div>
-    </div>
-
-    <div class="records-wrap">
-      <div style="overflow-x:auto">
-        <table class="records-table" id="tb-list-table">
-          <thead>
-            <tr>
-              <th class="tb-ct-col">Công Trình</th>
-              <th class="tb-name-col">Tên Thiết Bị</th>
-              <th style="text-align:center;width:70px">SL</th>
-              <th style="width:130px">Tình Trạng</th>
-              <th>Ghi Chú</th>
-              <th style="width:120px"></th>
-            </tr>
-          </thead>
-          <tbody id="tb-list-tbody"></tbody>
-        </table>
-      </div>
-      <div class="pagination" id="tb-pagination"></div>
-    </div>
-
-    <!-- Bảng 2b: Kho Tổng Thiết Bị -->
-    <div class="section-header" style="margin-top:28px">
-      <div class="section-title"><span class="dot"></span>📦 Kho Tổng Thiết Bị</div>
-            <div class="btn-group">
-        <div class="search-box" style="min-width:140px">
-          <span class="ico">🔍</span>
-          <input type="text" id="kho-search" placeholder="Tìm thiết bị..." oninput="filterKhoTable()">
-        </div>
-        <select class="filter-sel" id="kho-filter-ten" onchange="khoPage=1;renderKhoTong()"><option value="">Tất cả thiết bị</option></select>
-        <select class="filter-sel" id="kho-filter-tt" onchange="khoPage=1;renderKhoTong()">
-          <option value="">Tất cả tình trạng</option>
-          <option value="Đang hoạt động">Đang hoạt động</option>
-          <option value="Cần bảo trì">Cần bảo trì</option>
-          <option value="Cần sửa chữa">Cần sửa chữa</option>
-        </select>
-        <button class="btn btn-outline btn-sm" onclick="khoPage=1;renderKhoTong()">↻ Làm mới</button>
-      </div>
-    </div>
-    <div class="records-wrap">
-      <div style="overflow-x:auto">
-        <table class="records-table" id="kho-list-table">
-          <thead>
-            <tr>
-              <th class="tb-name-col">Tên Thiết Bị</th>
-              <th style="text-align:center;width:70px">SL</th>
-              <th style="width:130px">Tình Trạng</th>
-              <th style="width:110px">Ghi Chú</th>
-              <th style="width:70px">Cập Nhật</th>
-              <th style="width:160px"></th>
-            </tr>
-          </thead>
-          <tbody id="kho-list-tbody"></tbody>
-        </table>
-      </div>
-      <div class="pagination" id="kho-pagination"></div>
-    </div>
-
-    <!-- Bảng 1: Nhập thiết bị -->
-    <div class="section-header" style="margin-top:28px">
-      <div class="section-title"><span class="dot"></span>Nhập Máy Móc, Thiết Bị, Giàn Giáo</div>
-      <div class="btn-group">
-        <button class="btn btn-outline btn-sm" onclick="tbClearRows()">🗑 Xóa bảng</button>
-        <button id="tb-save-btn" class="btn btn-green btn-sm" onclick="tbSave()">💾 Lưu thiết bị</button>
-      </div>
-    </div>
-
-    <div id="thietbi-form">
-    <div class="entry-date-bar" style="flex-wrap:wrap;gap:10px">
-      <span class="bar-label">Công Trình</span>
-      <select id="tb-ct-sel" class="bare-select" style="min-width:260px;font-size:13px">
-        <option value="">-- Chọn công trình --</option>
-      </select>
-    </div>
-
-    <div class="entry-table-wrap">
-      <div class="table-scroll">
-        <table class="entry-table tb-entry-table" style="min-width:680px">
-          <thead>
-            <tr>
-              <th class="col-num">#</th>
-              <th class="tb-name-col" style="min-width:224px">Tên Máy/TB/GG</th>
-              <th style="width:80px;text-align:center">Số Lượng</th>
-              <th style="width:150px">Tình Trạng</th>
-              <th style="min-width:140px">Ghi Chú</th>
-              <th class="col-del"></th>
-            </tr>
-          </thead>
-          <tbody id="tb-tbody"></tbody>
-        </table>
-      </div>
-      <div class="add-row-bar">
-        <button class="btn btn-outline btn-sm" onclick="tbAddRows(1)">+ 1 dòng</button>
-        <button class="btn btn-outline btn-sm" onclick="tbAddRows(5)">+ 5 dòng</button>
-        <span style="font-size:11px;color:var(--ink3);margin-left:8px">Mặc định tình trạng: Đang hoạt động</span>
-      </div>
-    </div>
-    </div>
-
-  </div>
-
-  <!-- PAGE: DANH MỤC -->
-  <div class="page" id="page-danhmuc">
-    <div class="section-header">
-      <div class="section-title"><span class="dot"></span>Quản Lý Danh Mục</div>
-      <span style="font-size:12px;color:var(--ink3)">Nhấn ✏️ hoặc nhấp đúp để sửa tên • Thay đổi sẽ tự cập nhật vào hóa đơn đã lưu</span>
-    </div>
-    <div id="dm-grid" class="settings-grid"></div>
-
-    <!-- ── Panel Tools ── -->
-    <div style="margin-top:28px">
-      <div class="section-header">
-        <div class="section-title"><span class="dot"></span>🔧 Tools</div>
-        <span style="font-size:12px;color:var(--ink3)" id="backup-status-label"></span>
-      </div>
-
-      <div class="records-wrap" style="padding:16px 20px">
-
-        <!-- DATA -->
-        <div style="margin-bottom:20px">
-          <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">Data</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <button class="btn btn-outline" onclick="toolExportJSON()" title="Xuất snapshot toàn bộ hệ thống ra file .json">📦 Xuất snapshot hệ thống</button>
-            <button class="btn btn-outline" onclick="toolImportJSON()" title="Khôi phục toàn bộ hệ thống từ file snapshot .json — xóa và ghi đè toàn bộ dữ liệu">📥 Import JSON</button>
-          </div>
-        </div>
-
-        <!-- BACKUP -->
-        <div style="margin-bottom:20px">
-          <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">Backup</div>
-          <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Bản sao lưu tự động (giữ 3 bản gần nhất)</div>
-          <div id="backup-list-wrap">
-            <div style="color:var(--ink3);font-size:13px;padding:8px 0">Đang tải...</div>
-          </div>
-        </div>
-
-        <!-- EXCEL -->
-        <div style="margin-bottom:20px">
-          <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">Excel</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <button class="btn btn-outline" onclick="toolImportExcel()" title="Import dữ liệu từ file Excel (.xlsx/.xls)">📥 Import Excel</button>
-            <button class="btn btn-outline" onclick="toolExportExcel()" title="Xuất toàn bộ dữ liệu ra file Excel (.xlsx)">📤 Export Excel</button>
-          </div>
-        </div>
-
-        <!-- NGUY HIỂM -->
-        <div style="margin-bottom:20px">
-          <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">⚠ Quản Lý Dữ Liệu</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <button class="btn"
-              style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;font-weight:600"
-              onclick="toolResetAll()"
-              title="Xóa TOÀN BỘ dữ liệu — không thể hoàn tác">
-              ⚠️ Reset toàn bộ dữ liệu
+          <div class="section-title"><span class="dot"></span>Sổ Chấm Công</div>
+          <div class="btn-group">
+            <button class="btn btn-outline btn-sm" onclick="clearCCWeek()">
+              🗑 Xóa bảng
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="exportCCWeekCSV()">
+              ⬇ CSV
+            </button>
+            <button
+              class="btn btn-outline btn-sm"
+              id="cc-copy-btn"
+              onclick="copyCCWeek()"
+              title="Copy toàn bộ CN + ngày công + lương tuần này"
+            >
+              📋 Copy tuần
+            </button>
+            <button
+              class="btn btn-outline btn-sm"
+              id="cc-paste-btn"
+              onclick="pasteCCWeek()"
+              title="Dán toàn bộ CN + ngày công đã copy"
+              style="display: none"
+            >
+              📌 Dán
+            </button>
+            <button
+              id="cc-save-btn"
+              class="btn btn-green btn-sm"
+              onclick="saveCCWeek()"
+            >
+              💾 Lưu tuần này
             </button>
           </div>
         </div>
 
-        <!-- Mô tả -->
-        <div style="padding:10px 14px;background:var(--bg);border-radius:6px;border:1px solid var(--line);font-size:12px;color:var(--ink3);line-height:1.7">
-          <strong style="color:var(--ink2)">Cách hoạt động:</strong><br>
-          • <b>Xuất snapshot</b>: Tải toàn bộ dữ liệu ra file .json — dùng để chuyển thiết bị hoặc lưu trữ<br>
-          • <b>Import JSON</b>: Khôi phục từ snapshot — xóa toàn bộ dữ liệu hiện tại và ghi đè lên cloud<br>
-          • <b>Data version</b>: <span id="data-version-badge" style="background:var(--green);color:#fff;padding:1px 7px;border-radius:10px;font-weight:700"></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PAGE: TIỀN ỨNG TP/NCC (gộp nhập + tổng) -->
-  <div class="page" id="page-nhapung">
-
-    <!-- Bảng 1: Nhập tiền ứng -->
-    <div class="section-header">
-      <div class="section-title"><span class="dot"></span>Nhập Tiền Ứng</div>
-      <div class="btn-group">
-        <button class="btn btn-outline" onclick="clearUngTable()">🗑 Xóa bảng</button>
-        <button class="btn btn-outline" onclick="exportUngEntryCSV()">⬇ Xuất CSV</button>
-        <button class="btn btn-green" id="ung-save-btn" onclick="saveAllUngRows()">💾 Lưu tất cả</button>
-      </div>
-    </div>
-
-    <div class="entry-date-bar">
-      <span class="bar-label">Ngày</span>
-      <input type="date" id="ung-date" class="date-input">
-    </div>
-
-    <div class="entry-table-wrap">
-      <div class="table-scroll">
-        <table class="entry-table">
-          <thead>
-            <tr>
-              <th class="col-num">#</th>
-              <th style="width:110px">Đối Tượng</th>
-              <th style="width:200px">Thầu Phụ / Công Nhân <span style="color:var(--gold)">*</span></th>
-              <th style="width:220px">Công Trình</th>
-              <th style="width:140px">Số Tiền Ứng (đ)</th>
-              <th style="min-width:220px">Nội Dung / Ghi Chú</th>
-              <th class="col-del"></th>
-            </tr>
-          </thead>
-          <tbody id="ung-tbody"></tbody>
-        </table>
-      </div>
-      <div class="add-row-bar">
-        <button class="btn btn-outline btn-sm" onclick="addUngRows(1)">+ 1 dòng</button>
-        <button class="btn btn-outline btn-sm" onclick="addUngRows(5)">+ 5 dòng</button>
-        <button class="btn btn-outline btn-sm" onclick="addUngRows(10)">+ 10 dòng</button>
-        <span style="font-size:11px;color:var(--ink3);margin-left:8px">Tab để di chuyển giữa các ô</span>
-      </div>
-    </div>
-
-    <div class="save-bar">
-      <div class="save-bar-info">
-        <span>Dòng có dữ liệu: <strong id="ung-row-count">0</strong></span>
-        <span>Tổng tiền ứng: <span class="hi" id="ung-entry-total">0 đ</span></span>
-      </div>
-    </div>
-
-    <!-- Bảng 2: Tổng tiền ứng -->
-    <div style="margin-top:24px">
-      <div class="section-header">
-        <div class="section-title"><span class="dot"></span>Tổng Tiền Ứng</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-outline" onclick="exportUngAllCSV()">⬇ Xuất CSV</button>
-          <button class="btn btn-sm" onclick="exportUngToImage()"
-            style="background:#2563eb;color:#fff;border:none;font-weight:700"
-            title="Tick chọn dòng rồi bấm để xuất phiếu tạm ứng PNG">
-            📸 Xuất Phiếu Ứng
+        <!-- Week navigator -->
+        <div
+          class="entry-date-bar"
+          style="gap: 10px; flex-wrap: wrap; align-items: center"
+        >
+          <button class="btn btn-outline btn-sm" onclick="ccPrevWeek()">
+            ← Tuần trước
           </button>
-        </div>
-      </div>
-      <div class="records-wrap">
-        <div class="records-toolbar">
-          <div class="search-box">
-            <span class="ico">🔍</span>
-            <input type="text" id="ung-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUng()">
-          </div>
-          <select class="filter-sel" id="uf-tp" onchange="filterAndRenderUng()"><option value="">Tất cả TP/NCC</option></select>
-          <select class="filter-sel" id="uf-ct" onchange="filterAndRenderUng()"><option value="">Tất cả công trình</option></select>
-          <select class="filter-sel" id="uf-month" onchange="filterAndRenderUng()"><option value="">Tất cả tháng</option></select>
-        </div>
-        <div id="ung-all-sections"></div>
-        <div class="pagination" id="ung-pagination"></div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- PAGE: SỔ CHẤM CÔNG -->
-  <div class="page" id="page-chamcong">
-
-    <div class="section-header">
-      <div class="section-title"><span class="dot"></span>Sổ Chấm Công</div>
-      <div class="btn-group">
-        <button class="btn btn-outline btn-sm" onclick="clearCCWeek()">🗑 Xóa bảng</button>
-        <button class="btn btn-outline btn-sm" onclick="exportCCWeekCSV()">⬇ CSV</button>
-        <button class="btn btn-outline btn-sm" id="cc-copy-btn" onclick="copyCCWeek()" title="Copy toàn bộ CN + ngày công + lương tuần này">📋 Copy tuần</button>
-        <button class="btn btn-outline btn-sm" id="cc-paste-btn" onclick="pasteCCWeek()" title="Dán toàn bộ CN + ngày công đã copy" style="display:none">📌 Dán</button>
-        <button id="cc-save-btn" class="btn btn-green btn-sm" onclick="saveCCWeek()">💾 Lưu tuần này</button>
-      </div>
-    </div>
-
-    <!-- Week navigator -->
-    <div class="entry-date-bar" style="gap:10px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-outline btn-sm" onclick="ccPrevWeek()">← Tuần trước</button>
-      <span id="cc-week-label" style="font-size:13px;font-weight:700;min-width:200px;text-align:center;color:var(--gold)"></span>
-      <button class="btn btn-outline btn-sm" onclick="ccNextWeek()">Tuần sau →</button>
-      <div style="width:1px;height:24px;background:var(--line2)"></div>
-      <span class="bar-label">Từ ngày</span>
-      <input type="date" id="cc-from" class="date-input" onchange="onCCFromChange()">
-      <span class="bar-label">–</span>
-      <input type="date" id="cc-to" class="date-input" readonly style="background:#f0ede8;cursor:default;color:var(--ink3)">
-      <div style="width:1px;height:24px;background:var(--line2)"></div>
-      <span class="bar-label">Công trình</span>
-      <select id="cc-ct-sel" class="bare-select" style="min-width:240px;font-size:12px" onchange="onCCCtSelChange()">
-        <option value="">-- Chọn công trình --</option>
-      </select>
-    </div>
-
-    <!-- Attendance table -->
-    <div class="entry-table-wrap">
-      <div class="table-scroll">
-        <table class="entry-table cc-grid-table" style="min-width:1220px">
-          <thead><tr id="cc-thead-row"></tr></thead>
-          <tbody id="cc-tbody"></tbody>
-        </table>
-      </div>
-      <div class="add-row-bar">
-        <button class="btn btn-outline btn-sm" onclick="addCCWorker()">+ Thêm công nhân</button>
-        <span style="font-size:11px;color:var(--ink3);margin-left:8px">
-          <strong>1</strong> = 1 công &nbsp;·&nbsp; <strong>0.5</strong> = nửa công &nbsp;·&nbsp; để trống = nghỉ
-        </span>
-      </div>
-    </div>
-
-    <!-- Summary bar (no duplicate save button) -->
-    <div class="save-bar">
-      <div class="save-bar-info">
-        <span>Tổng công: <strong id="cc-sum-tc">0</strong></span>
-        <span>Tổng lương: <span class="hi" id="cc-sum-luong">0 đ</span></span>
-        <span>Tổng cộng tuần: <span class="hi" style="color:var(--gold)" id="cc-sum-tongcong">0 đ</span></span>
-      </div>
-    </div>
-
-    <!-- Bảng tổng lương & công nợ tuần (render động bởi renderCCSalaryTable) -->
-
-
-    <!-- Tổng Lương Tuần (theo tên CN) — đưa lên TRÊN lịch sử -->
-    <div style="margin-top:20px">
-      <div class="section-header">
-        <div class="section-title" style="font-size:14px"><span class="dot"></span>Tổng Lương Tuần (theo Công Nhân)</div>
-        <div class="btn-group">
-          <select class="filter-sel" id="cc-tlt-ct" onchange="ccTltPage=1;renderCCTLT()"><option value="">Tất cả CT</option></select>
-          <select class="filter-sel" id="cc-tlt-week" onchange="ccTltPage=1;renderCCTLT()"><option value="">Tất cả tuần</option></select>
-          <button class="btn btn-outline btn-sm" onclick="exportCCTLTCSV()">⬇ Xuất CSV</button>
-          <button class="btn btn-sm" onclick="xuatPhieuLuong()"
-            style="background:#2563eb;color:#fff;border:none;font-weight:700"
-            title="Tick chọn công nhân trong bảng rồi bấm để xuất phiếu lương PNG">
-            📸 Xuất Phiếu Lương
+          <span
+            id="cc-week-label"
+            style="
+              font-size: 13px;
+              font-weight: 700;
+              min-width: 200px;
+              text-align: center;
+              color: var(--gold);
+            "
+          ></span>
+          <button class="btn btn-outline btn-sm" onclick="ccNextWeek()">
+            Tuần sau →
           </button>
-        </div>
-      </div>
-      <div class="records-wrap">
-        <div id="cc-tlt-table-wrap" style="overflow-x:auto">
-          <table class="records-table">
-            <thead><tr>
-              <th style="width:32px;text-align:center">
-                <input type="checkbox" id="cc-tlt-chk-all" title="Chọn tất cả"
-                  onchange="document.querySelectorAll('.cc-tlt-chk').forEach(x=>x.checked=this.checked)">
-              </th>
-              <th>Tuần</th><th>Tên CN</th><th style="text-align:center;width:36px">T/P</th>
-              <th style="text-align:center">CN</th><th style="text-align:center">T2</th>
-              <th style="text-align:center">T3</th><th style="text-align:center">T4</th>
-              <th style="text-align:center">T5</th><th style="text-align:center">T6</th>
-              <th style="text-align:center">T7</th>
-              <th style="text-align:center">TC</th>
-              <th style="text-align:right">TC Lương</th>
-              <th style="text-align:right">Lương TB/Ngày</th>
-              <th style="text-align:right;color:var(--red)">Trừ</th>
-              <th style="text-align:right">Thực Lãnh</th>
-              <th>Công Trình</th>
-            </tr></thead>
-            <tbody id="cc-tlt-tbody"></tbody>
-          </table>
-        </div>
-        <div id="cc-tlt-cards" style="display:none;padding:4px"></div>
-        <div class="pagination" id="cc-tlt-pagination"></div>
-      </div>
-    </div>
-
-    <!-- Lịch sử chấm công TUẦN -->
-    <div style="margin-top:20px">
-      <div class="section-header">
-        <div class="section-title" style="font-size:14px"><span class="dot"></span>Lịch Sử Chấm Công Tuần</div>
-        <div class="btn-group">
-          <div class="search-box" style="min-width:140px">
-            <span class="ico">🔍</span>
-            <input type="text" id="cc-hist-search" placeholder="Tìm tên CN..." oninput="ccHistPage=1;renderCCHistory()">
-          </div>
-          <select class="filter-sel" id="cc-hist-ct" onchange="ccHistPage=1;renderCCHistory()"><option value="">Tất cả CT</option></select>
-          <select class="filter-sel" id="cc-hist-week" onchange="ccHistPage=1;renderCCHistory()"><option value="">Tất cả tuần</option></select>
-          <button class="btn btn-outline btn-sm" onclick="exportCCHistCSV()">⬇ Xuất CSV</button>
-        </div>
-      </div>
-      <div class="records-wrap">
-        <div style="overflow-x:auto">
-          <table class="records-table">
-            <thead><tr>
-              <th>Tuần</th><th>Công Trình</th>
-              <th style="text-align:center">CN</th><th style="text-align:center">T2</th>
-              <th style="text-align:center">T3</th><th style="text-align:center">T4</th>
-              <th style="text-align:center">T5</th><th style="text-align:center">T6</th>
-              <th style="text-align:center">T7</th>
-              <th style="text-align:center">TC</th>
-              <th style="text-align:right">Lương/Ngày</th>
-              <th style="text-align:right">Tổng Lương</th>
-              <th style="text-align:right">Phụ Cấp</th>
-              <th style="text-align:right">HĐ Mua Lẻ</th>
-              <th>Nội Dung</th>
-              <th style="text-align:right">Tổng Cộng</th>
-              <th></th>
-            </tr></thead>
-            <tbody id="cc-hist-tbody"></tbody>
-          </table>
-        </div>
-        <div class="pagination" id="cc-hist-pagination"></div>
-      </div>
-    </div>
-
-  </div>
-
-
-  <!-- PAGE: DASHBOARD -->
-  <div class="page" id="page-dashboard">
-    <div class="section-header">
-      <div class="section-title"><span class="dot"></span>📊 Dashboard Tổng Quan</div>
-      <button class="btn btn-outline btn-sm" onclick="renderDashboard()">↻ Làm mới</button>
-    </div>
-
-    <!-- Hàng 1: KPI cards -->
-    <div id="db-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px"></div>
-
-    <!-- Hàng 2: Biểu đồ cột tháng + Pie tỷ trọng -->
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;margin-bottom:22px" id="db-charts-row">
-      <div class="records-wrap" style="padding:18px 20px">
-        <div id="db-bar-title" style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px">Chi Phí Theo Tháng</div>
-        <div id="db-bar-chart" style="width:100%;overflow-x:auto"></div>
-      </div>
-      <div class="records-wrap" style="padding:18px 20px">
-        <div id="db-pie-title" style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px">Tỷ Trọng Chi Phí</div>
-        <div id="db-pie-chart" style="display:flex;flex-direction:column;align-items:center"></div>
-      </div>
-    </div>
-
-    <!-- Tầng 2: Chi tiết theo Công Trình -->
-    <div class="section-header" style="margin-bottom:14px">
-      <div class="section-title"><span class="dot"></span>🔍 Chi Tiết Theo Công Trình</div>
-      <select class="filter-sel" id="db-filter-ct"
-              onchange="selectedCT=this.value;renderDashboard()"
-              style="font-size:12px;min-width:160px">
-        <option value="">-- Tất cả công trình --</option>
-      </select>
-    </div>
-
-    <!-- Hàng 3: Top 5 + Tiền Ứng -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="records-wrap" style="padding:18px 20px">
-        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px">🏆 Top 5 Chi Phí Lớn Nhất</div>
-        <div id="db-top5"></div>
-      </div>
-      <div class="records-wrap" style="padding:18px 20px">
-        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px">💰 Tổng Tiền Ứng Theo Công Trình</div>
-        <div id="db-ung-ct"></div>
-      </div>
-    </div>
-
-    <!-- Hàng 3b: Thiết Bị -->
-    <div class="records-wrap" style="padding:18px 20px;margin-bottom:22px">
-      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px">🔧 Thiết Bị Theo Công Trình</div>
-      <div id="db-tb-ct"></div>
-    </div>
-
-    <!-- Hàng 5: Chi tiết từng Công Trình (từ tab Tổng CP CT) -->
-    <div>
-      <div class="section-header" style="margin-bottom:14px">
-        <div class="section-title"><span class="dot"></span>🏗️ Chi Tiết Từng Công Trình</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;color:var(--ink3)">Sắp xếp:</span>
-          <select class="filter-sel" id="ct-sort" onchange="renderCtPage()" style="font-size:12px">
-            <option value="value">Theo giá trị (cao → thấp)</option>
-            <option value="name">Theo tên (A → Z)</option>
+          <div style="width: 1px; height: 24px; background: var(--line2)"></div>
+          <span class="bar-label">Từ ngày</span>
+          <input
+            type="date"
+            id="cc-from"
+            class="date-input"
+            onchange="onCCFromChange()"
+          />
+          <span class="bar-label">–</span>
+          <input
+            type="date"
+            id="cc-to"
+            class="date-input"
+            readonly
+            style="background: #f0ede8; cursor: default; color: var(--ink3)"
+          />
+          <div style="width: 1px; height: 24px; background: var(--line2)"></div>
+          <span class="bar-label">Công trình</span>
+          <select
+            id="cc-ct-sel"
+            class="bare-select"
+            style="min-width: 240px; font-size: 12px"
+            onchange="onCCCtSelChange()"
+          >
+            <option value="">-- Chọn công trình --</option>
           </select>
         </div>
-      </div>
-      <div id="ct-grid" class="ct-summary-grid"></div>
-    </div>
-  </div>
 
-  <!-- PAGE: DOANH THU & CÔNG NỢ -->
-  <div class="page" id="page-doanhthu">
+        <!-- Attendance table -->
+        <div class="entry-table-wrap">
+          <div class="table-scroll">
+            <table class="entry-table cc-grid-table" style="min-width: 1220px">
+              <thead>
+                <tr id="cc-thead-row"></tr>
+              </thead>
+              <tbody id="cc-tbody"></tbody>
+            </table>
+          </div>
+          <div class="add-row-bar">
+            <button class="btn btn-outline btn-sm" onclick="addCCWorker()">
+              + Thêm công nhân
+            </button>
+            <span style="font-size: 11px; color: var(--ink3); margin-left: 8px">
+              <strong>1</strong> = 1 công &nbsp;·&nbsp; <strong>0.5</strong> =
+              nửa công &nbsp;·&nbsp; để trống = nghỉ
+            </span>
+          </div>
+        </div>
 
-    <!-- Sub-nav -->
-    <div class="sub-nav">
-      <button class="sub-nav-btn active" id="dt-sub-khaibao-btn" onclick="dtGoSub(this,'dt-sub-khaibao')">📋 KHAI BÁO</button>
-      <button class="sub-nav-btn" id="dt-sub-thongke-btn" onclick="dtGoSub(this,'dt-sub-thongke')">📊 THỐNG KÊ</button>
-    </div>
+        <!-- Summary bar (no duplicate save button) -->
+        <div class="save-bar">
+          <div class="save-bar-info">
+            <span>Tổng công: <strong id="cc-sum-tc">0</strong></span>
+            <span
+              >Tổng lương: <span class="hi" id="cc-sum-luong">0 đ</span></span
+            >
+            <span
+              >Tổng cộng tuần:
+              <span class="hi" style="color: var(--gold)" id="cc-sum-tongcong"
+                >0 đ</span
+              ></span
+            >
+          </div>
+        </div>
 
-    <!-- ── SUB TAB 1: KHAI BÁO ─────────────────────────────── -->
-    <div class="sub-page active" id="dt-sub-khaibao">
+        <!-- Bảng tổng lương & công nợ tuần (render động bởi renderCCSalaryTable) -->
 
-      <!-- PHẦN 1: HỢP ĐỒNG CHÍNH -->
-      <div class="section-header">
-        <div class="section-title"><span class="dot"></span>📋 Khai Báo Hợp Đồng Chính</div>
-        <div class="btn-group">
-          <span id="hdc-tong-label" style="font-size:12px;color:var(--ink3)"></span>
-          <button class="btn btn-gold" id="hdc-save-btn" onclick="saveHopDongChinh()">💾 Lưu</button>
+        <!-- Tổng Lương Tuần (theo tên CN) — đưa lên TRÊN lịch sử -->
+        <div style="margin-top: 20px">
+          <div class="section-header">
+            <div class="section-title" style="font-size: 14px">
+              <span class="dot"></span>Tổng Lương Tuần (theo Công Nhân)
+            </div>
+            <div class="btn-group">
+              <select
+                class="filter-sel"
+                id="cc-tlt-ct"
+                onchange="
+                  ccTltPage = 1;
+                  renderCCTLT();
+                "
+              >
+                <option value="">Tất cả CT</option>
+              </select>
+              <select
+                class="filter-sel"
+                id="cc-tlt-week"
+                onchange="
+                  ccTltPage = 1;
+                  renderCCTLT();
+                "
+              >
+                <option value="">Tất cả tuần</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="exportCCTLTCSV()">
+                ⬇ Xuất CSV
+              </button>
+              <button
+                class="btn btn-sm"
+                onclick="xuatPhieuLuong()"
+                style="
+                  background: #2563eb;
+                  color: #fff;
+                  border: none;
+                  font-weight: 700;
+                "
+                title="Tick chọn công nhân trong bảng rồi bấm để xuất phiếu lương PNG"
+              >
+                📸 Xuất Phiếu Lương
+              </button>
+            </div>
+          </div>
+          <div class="records-wrap">
+            <div id="cc-tlt-table-wrap" style="overflow-x: auto">
+              <table class="records-table">
+                <thead>
+                  <tr>
+                    <th style="width: 32px; text-align: center">
+                      <input
+                        type="checkbox"
+                        id="cc-tlt-chk-all"
+                        title="Chọn tất cả"
+                        onchange="
+                          document
+                            .querySelectorAll('.cc-tlt-chk')
+                            .forEach((x) => (x.checked = this.checked))
+                        "
+                      />
+                    </th>
+                    <th>Tuần</th>
+                    <th>Tên CN</th>
+                    <th style="text-align: center; width: 36px">T/P</th>
+                    <th style="text-align: center">CN</th>
+                    <th style="text-align: center">T2</th>
+                    <th style="text-align: center">T3</th>
+                    <th style="text-align: center">T4</th>
+                    <th style="text-align: center">T5</th>
+                    <th style="text-align: center">T6</th>
+                    <th style="text-align: center">T7</th>
+                    <th style="text-align: center">TC</th>
+                    <th style="text-align: right">TC Lương</th>
+                    <th style="text-align: right">Lương TB/Ngày</th>
+                    <th style="text-align: right; color: var(--red)">Trừ</th>
+                    <th style="text-align: right">Thực Lãnh</th>
+                    <th>Công Trình</th>
+                  </tr>
+                </thead>
+                <tbody id="cc-tlt-tbody"></tbody>
+              </table>
+            </div>
+            <div id="cc-tlt-cards" style="display: none; padding: 4px"></div>
+            <div class="pagination" id="cc-tlt-pagination"></div>
+          </div>
+        </div>
+
+        <!-- Lịch sử chấm công TUẦN -->
+        <div style="margin-top: 20px">
+          <div class="section-header">
+            <div class="section-title" style="font-size: 14px">
+              <span class="dot"></span>Lịch Sử Chấm Công Tuần
+            </div>
+            <div class="btn-group">
+              <div class="search-box" style="min-width: 140px">
+                <span class="ico">🔍</span>
+                <input
+                  type="text"
+                  id="cc-hist-search"
+                  placeholder="Tìm tên CN..."
+                  oninput="
+                    ccHistPage = 1;
+                    renderCCHistory();
+                  "
+                />
+              </div>
+              <select
+                class="filter-sel"
+                id="cc-hist-ct"
+                onchange="
+                  ccHistPage = 1;
+                  renderCCHistory();
+                "
+              >
+                <option value="">Tất cả CT</option>
+              </select>
+              <select
+                class="filter-sel"
+                id="cc-hist-week"
+                onchange="
+                  ccHistPage = 1;
+                  renderCCHistory();
+                "
+              >
+                <option value="">Tất cả tuần</option>
+              </select>
+              <button
+                class="btn btn-outline btn-sm"
+                onclick="exportCCHistCSV()"
+              >
+                ⬇ Xuất CSV
+              </button>
+            </div>
+          </div>
+          <div class="records-wrap">
+            <div style="overflow-x: auto">
+              <table class="records-table">
+                <thead>
+                  <tr>
+                    <th>Tuần</th>
+                    <th>Công Trình</th>
+                    <th style="text-align: center">CN</th>
+                    <th style="text-align: center">T2</th>
+                    <th style="text-align: center">T3</th>
+                    <th style="text-align: center">T4</th>
+                    <th style="text-align: center">T5</th>
+                    <th style="text-align: center">T6</th>
+                    <th style="text-align: center">T7</th>
+                    <th style="text-align: center">TC</th>
+                    <th style="text-align: right">Lương/Ngày</th>
+                    <th style="text-align: right">Tổng Lương</th>
+                    <th style="text-align: right">Phụ Cấp</th>
+                    <th style="text-align: right">HĐ Mua Lẻ</th>
+                    <th>Nội Dung</th>
+                    <th style="text-align: right">Tổng Cộng</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="cc-hist-tbody"></tbody>
+              </table>
+            </div>
+            <div class="pagination" id="cc-hist-pagination"></div>
+          </div>
         </div>
       </div>
-      <div class="dt-section">
-        <div class="dt-form-grid">
-          <div class="dt-field">
-            <label>Ngày</label>
-            <input type="date" id="hdc-ngay">
+
+      <!-- PAGE: DASHBOARD -->
+      <div class="page" id="page-dashboard">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="dot"></span>📊 Dashboard Tổng Quan
           </div>
-          <div class="dt-field">
-            <label>Tên Công Trình *</label>
-            <select id="hdc-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:7px;font-size:13px;background:var(--paper);color:var(--ink)">
-              <option value="">-- Chọn công trình --</option>
+          <button class="btn btn-outline btn-sm" onclick="renderDashboard()">
+            ↻ Làm mới
+          </button>
+        </div>
+
+        <!-- Hàng 1: KPI cards -->
+        <div
+          id="db-kpi-row"
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 22px;
+          "
+        ></div>
+
+        <!-- Hàng 2: Biểu đồ cột tháng/tuần (65%) + Pie tỷ trọng (35%) -->
+        <div
+          style="
+            display: grid;
+            grid-template-columns: 65fr 35fr;
+            gap: 16px;
+            margin-bottom: 22px;
+          "
+          id="db-charts-row"
+        >
+          <div class="records-wrap" style="padding: 18px 20px">
+            <div
+              id="db-bar-title"
+              style="
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--ink);
+                margin-bottom: 14px;
+              "
+            >
+              Chi Phí Theo Tháng
+            </div>
+            <div id="db-bar-chart" style="width: 100%; overflow-x: auto"></div>
+          </div>
+          <div class="records-wrap" style="padding: 18px 20px">
+            <div
+              id="db-pie-title"
+              style="
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--ink);
+                margin-bottom: 14px;
+              "
+            >
+              Tỷ Trọng Chi Phí
+            </div>
+            <div
+              id="db-pie-chart"
+              style="display: flex; flex-direction: column; align-items: center"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Heatmap: CP theo CT × Tuần (chỉ hiện ở chế độ 1 năm) -->
+        <div id="db-heatmap" style="margin-bottom: 22px"></div>
+
+        <!-- Tầng 2: Chi tiết theo Công Trình -->
+        <div class="section-header" style="margin-bottom: 14px">
+          <div class="section-title">
+            <span class="dot"></span>🔍 Chi Tiết Theo Công Trình
+          </div>
+          <select
+            class="filter-sel"
+            id="db-filter-ct"
+            onchange="
+              selectedCT = this.value;
+              renderDashboard();
+            "
+            style="font-size: 12px; min-width: 160px"
+          >
+            <option value="">-- Tất cả công trình --</option>
+          </select>
+        </div>
+
+        <!-- Hàng 3: Top 5 + Tiền Ứng -->
+        <div
+          style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+          "
+        >
+          <div class="records-wrap" style="padding: 18px 20px">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--ink);
+                margin-bottom: 14px;
+              "
+            >
+              🏆 Top 5 Chi Phí Lớn Nhất
+            </div>
+            <div id="db-top5"></div>
+          </div>
+          <div class="records-wrap" style="padding: 18px 20px">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--ink);
+                margin-bottom: 14px;
+              "
+            >
+              💰 Tổng Tiền Ứng Theo Công Trình
+            </div>
+            <div id="db-ung-ct"></div>
+          </div>
+        </div>
+
+        <!-- Hàng 3b: Thiết Bị -->
+        <div
+          class="records-wrap"
+          style="padding: 18px 20px; margin-bottom: 22px"
+        >
+          <div
+            style="
+              font-size: 13px;
+              font-weight: 700;
+              color: var(--ink);
+              margin-bottom: 14px;
+            "
+          >
+            🔧 Thiết Bị Theo Công Trình
+          </div>
+          <div id="db-tb-ct"></div>
+        </div>
+
+        <!-- Hàng 5: Chi tiết từng Công Trình (từ tab Tổng CP CT) -->
+        <div>
+          <div class="section-header" style="margin-bottom: 14px">
+            <div class="section-title">
+              <span class="dot"></span>🏗️ Chi Tiết Từng Công Trình
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="font-size: 12px; color: var(--ink3)">Sắp xếp:</span>
+              <select
+                class="filter-sel"
+                id="ct-sort"
+                onchange="renderCtPage()"
+                style="font-size: 12px"
+              >
+                <option value="value">Theo giá trị (cao → thấp)</option>
+                <option value="name">Theo tên (A → Z)</option>
+              </select>
+            </div>
+          </div>
+          <div id="ct-grid" class="ct-summary-grid"></div>
+        </div>
+      </div>
+
+      <!-- PAGE: DOANH THU & CÔNG NỢ -->
+      <div class="page" id="page-doanhthu">
+        <!-- Sub-nav -->
+        <div class="sub-nav">
+          <button
+            class="sub-nav-btn active"
+            id="dt-sub-khaibao-btn"
+            onclick="dtGoSub(this, 'dt-sub-khaibao')"
+          >
+            📋 KHAI BÁO
+          </button>
+          <button
+            class="sub-nav-btn"
+            id="dt-sub-thongke-btn"
+            onclick="dtGoSub(this, 'dt-sub-thongke')"
+          >
+            📊 THỐNG KÊ
+          </button>
+        </div>
+
+        <!-- ── SUB TAB 1: KHAI BÁO ─────────────────────────────── -->
+        <div class="sub-page active" id="dt-sub-khaibao">
+          <!-- PHẦN 1: HỢP ĐỒNG CHÍNH -->
+          <div class="section-header">
+            <div class="section-title">
+              <span class="dot"></span>📋 Khai Báo Hợp Đồng Chính
+            </div>
+            <div class="btn-group">
+              <span
+                id="hdc-tong-label"
+                style="font-size: 12px; color: var(--ink3)"
+              ></span>
+              <button
+                class="btn btn-gold"
+                id="hdc-save-btn"
+                onclick="saveHopDongChinh()"
+              >
+                💾 Lưu
+              </button>
+            </div>
+          </div>
+          <div class="dt-section">
+            <div class="dt-form-grid">
+              <div class="dt-field">
+                <label>Ngày</label>
+                <input type="date" id="hdc-ngay" />
+              </div>
+              <div class="dt-field">
+                <label>Tên Công Trình *</label>
+                <select
+                  id="hdc-ct-input"
+                  style="
+                    width: 100%;
+                    padding: 8px 10px;
+                    border: 1.5px solid var(--line2);
+                    border-radius: 7px;
+                    font-size: 13px;
+                    background: var(--paper);
+                    color: var(--ink);
+                  "
+                >
+                  <option value="">-- Chọn công trình --</option>
+                </select>
+              </div>
+              <div class="dt-field">
+                <label>Người TH</label>
+                <select
+                  id="hdc-nguoi"
+                  style="
+                    width: 100%;
+                    padding: 8px 10px;
+                    border: 1.5px solid var(--line2);
+                    border-radius: 7px;
+                    font-size: 13px;
+                    background: var(--paper);
+                    color: var(--ink);
+                  "
+                >
+                  <option value="">-- Chọn --</option>
+                </select>
+              </div>
+              <div class="dt-field">
+                <label>Giá Trị HĐ Chính (đ)</label>
+                <input
+                  type="text"
+                  id="hdc-giatri"
+                  placeholder="0"
+                  oninput="
+                    fmtInputMoney(this);
+                    hdcUpdateTotal();
+                  "
+                />
+              </div>
+              <div class="dt-field">
+                <label>Giá Trị HĐ Phụ (đ)</label>
+                <input
+                  type="text"
+                  id="hdc-giatriphu"
+                  placeholder="0"
+                  oninput="
+                    fmtInputMoney(this);
+                    hdcUpdateTotal();
+                  "
+                />
+              </div>
+              <div class="dt-field">
+                <label>Phát Sinh Thêm (đ)</label>
+                <input
+                  type="text"
+                  id="hdc-phatsinh"
+                  placeholder="0"
+                  oninput="
+                    fmtInputMoney(this);
+                    hdcUpdateTotal();
+                  "
+                />
+              </div>
+            </div>
+            <input type="hidden" id="hdc-edit-id" />
+          </div>
+
+          <!-- PHẦN 2: GHI NHẬN THU TIỀN -->
+          <div class="section-header" style="margin-top: 8px">
+            <div class="section-title">
+              <span class="dot"></span>💰 Ghi Nhận Thu Tiền
+            </div>
+            <div class="btn-group">
+              <button
+                class="btn btn-outline btn-sm"
+                id="thu-cancel-btn"
+                style="display: none"
+                onclick="_thuCancelEdit()"
+              >
+                ✕ Hủy
+              </button>
+              <button
+                class="btn btn-gold"
+                id="thu-save-btn"
+                onclick="saveThuRecord()"
+              >
+                + Ghi nhận Thu
+              </button>
+            </div>
+          </div>
+          <div class="dt-section">
+            <div class="dt-form-grid">
+              <div class="dt-field">
+                <label>Ngày Thu *</label>
+                <input type="date" id="thu-ngay" />
+              </div>
+              <div class="dt-field">
+                <label>Công Trình *</label>
+                <select
+                  id="thu-ct-input"
+                  style="
+                    width: 100%;
+                    padding: 8px 10px;
+                    border: 1.5px solid var(--line2);
+                    border-radius: 7px;
+                    font-size: 13px;
+                    background: var(--paper);
+                    color: var(--ink);
+                  "
+                >
+                  <option value="">-- Chọn công trình --</option>
+                </select>
+              </div>
+              <div class="dt-field">
+                <label>Người TH</label>
+                <select
+                  id="thu-nguoi"
+                  style="
+                    width: 100%;
+                    padding: 8px 10px;
+                    border: 1.5px solid var(--line2);
+                    border-radius: 7px;
+                    font-size: 13px;
+                    background: var(--paper);
+                    color: var(--ink);
+                  "
+                >
+                  <option value="">-- Chọn --</option>
+                </select>
+              </div>
+              <div class="dt-field">
+                <label>Số Tiền Thu (đ) *</label>
+                <input
+                  type="text"
+                  id="thu-tien"
+                  placeholder="0"
+                  oninput="fmtInputMoney(this)"
+                />
+              </div>
+              <div class="dt-field">
+                <label>Nội Dung / Đợt</label>
+                <input
+                  type="text"
+                  id="thu-nd"
+                  placeholder="VD: Đợt 1, Nghiệm thu móng..."
+                />
+              </div>
+            </div>
+            <input type="hidden" id="thu-edit-id" />
+          </div>
+
+          <!-- PHẦN 3: HỢP ĐỒNG THẦU PHỤ -->
+          <div class="section-header" style="margin-top: 8px">
+            <div class="section-title">
+              <span class="dot"></span>🤝 Khai Báo Hợp Đồng Thầu Phụ
+            </div>
+            <div class="btn-group">
+              <span
+                id="hdtp-tong-label"
+                style="font-size: 12px; color: var(--ink3)"
+              ></span>
+              <button
+                class="btn btn-gold"
+                id="hdtp-save-btn"
+                onclick="saveHopDongThauPhu()"
+              >
+                💾 Lưu
+              </button>
+            </div>
+          </div>
+          <div class="dt-section">
+            <div class="dt-form-grid">
+              <div class="dt-field">
+                <label>Ngày *</label>
+                <input type="date" id="hdtp-ngay" />
+              </div>
+              <div class="dt-field">
+                <label>Tên Công Trình *</label>
+                <select
+                  id="hdtp-ct-input"
+                  style="
+                    width: 100%;
+                    padding: 8px 10px;
+                    border: 1.5px solid var(--line2);
+                    border-radius: 7px;
+                    font-size: 13px;
+                    background: var(--paper);
+                    color: var(--ink);
+                  "
+                >
+                  <option value="">-- Chọn công trình --</option>
+                </select>
+              </div>
+              <div class="dt-field">
+                <label>Tên Thầu Phụ *</label>
+                <select
+                  id="hdtp-thauphu"
+                  style="
+                    width: 100%;
+                    padding: 8px 10px;
+                    border: 1.5px solid var(--line2);
+                    border-radius: 7px;
+                    font-size: 13px;
+                    background: var(--paper);
+                    color: var(--ink);
+                  "
+                >
+                  <option value="">-- Chọn thầu phụ --</option>
+                </select>
+              </div>
+              <div class="dt-field">
+                <label>Giá Trị HĐ Thầu Phụ (đ)</label>
+                <input
+                  type="text"
+                  id="hdtp-giatri"
+                  placeholder="0"
+                  oninput="
+                    fmtInputMoney(this);
+                    hdtpUpdateTotal();
+                  "
+                />
+              </div>
+              <div class="dt-field">
+                <label>Phát Sinh Thêm (đ)</label>
+                <input
+                  type="text"
+                  id="hdtp-phatsinh"
+                  placeholder="0"
+                  oninput="
+                    fmtInputMoney(this);
+                    hdtpUpdateTotal();
+                  "
+                />
+              </div>
+              <div class="dt-field">
+                <label>Nội Dung</label>
+                <input
+                  type="text"
+                  id="hdtp-nd"
+                  placeholder="VD: Ép cọc, Móng, Thô..."
+                />
+              </div>
+            </div>
+            <input type="hidden" id="hdtp-edit-id" />
+          </div>
+        </div>
+        <!-- /dt-sub-khaibao -->
+
+        <!-- ── SUB TAB 2: THỐNG KÊ ─────────────────────────────── -->
+        <div class="sub-page" id="dt-sub-thongke">
+          <!-- Filter CT -->
+          <div
+            style="
+              margin-bottom: 16px;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              flex-wrap: wrap;
+            "
+          >
+            <label style="font-size: 12px; font-weight: 600; color: var(--ink3)"
+              >Lọc Công Trình:</label
+            >
+            <select
+              id="dt-ct-filter-sel"
+              class="filter-sel"
+              style="min-width: 220px; max-width: 340px"
+              onchange="dtSetCtFilter(this.value)"
+            >
+              <option value="">-- Tất cả công trình --</option>
             </select>
           </div>
-          <div class="dt-field">
-            <label>Người TH</label>
-            <select id="hdc-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:7px;font-size:13px;background:var(--paper);color:var(--ink)">
-              <option value="">-- Chọn --</option>
-            </select>
+
+          <!-- BẢNG 1: Hợp đồng chính -->
+          <div class="section-header">
+            <div class="section-title">
+              <span class="dot"></span>📋 Hợp Đồng Chính Công Ty
+            </div>
+            <button
+              class="btn btn-sm"
+              onclick="exportHdcToImage()"
+              style="
+                background: #2563eb;
+                color: #fff;
+                border: none;
+                font-weight: 700;
+                padding: 6px 12px;
+                margin-left: 10px;
+              "
+              title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG"
+            >
+              📤 Xuất phiếu HĐ Chính
+            </button>
           </div>
-          <div class="dt-field">
-            <label>Giá Trị HĐ Chính (đ)</label>
-            <input type="text" id="hdc-giatri" placeholder="0"
-                   oninput="fmtInputMoney(this);hdcUpdateTotal()">
+          <div class="records-wrap" style="margin-bottom: 24px">
+            <div style="overflow-x: auto">
+              <table class="thu-table">
+                <thead>
+                  <tr
+                    style="
+                      font-size: 11px;
+                      color: var(--ink3);
+                      border-bottom: 2px solid var(--line);
+                    "
+                  >
+                    <th style="padding: 8px 6px; text-align: center">
+                      <input
+                        type="checkbox"
+                        onchange="
+                          document
+                            .querySelectorAll('.hdc-row-chk')
+                            .forEach((c) => (c.checked = this.checked))
+                        "
+                      />
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                        white-space: nowrap;
+                      "
+                    >
+                      Ngày
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 12px;
+                        font-weight: 700;
+                      "
+                    >
+                      Công Trình
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      HĐ Chính
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      HĐ Phụ
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Phát Sinh
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Tổng HĐ
+                    </th>
+                    <th style="padding: 8px 6px"></th>
+                    <th style="padding: 8px 6px"></th>
+                  </tr>
+                </thead>
+                <tbody id="hdc-tbody"></tbody>
+              </table>
+            </div>
+            <div
+              id="hdc-empty"
+              style="
+                text-align: center;
+                padding: 32px;
+                color: var(--ink3);
+                font-size: 13px;
+                display: none;
+              "
+            >
+              Chưa có hợp đồng nào
+            </div>
+            <div
+              id="hdc-pagination"
+              style="
+                padding: 8px 16px;
+                border-top: 1px solid var(--line);
+                display: flex;
+                gap: 5px;
+                justify-content: center;
+                flex-wrap: wrap;
+                min-height: 1px;
+              "
+            ></div>
           </div>
-          <div class="dt-field">
-            <label>Giá Trị HĐ Phụ (đ)</label>
-            <input type="text" id="hdc-giatriphu" placeholder="0"
-                   oninput="fmtInputMoney(this);hdcUpdateTotal()">
+
+          <!-- BẢNG 2: Hợp đồng thầu phụ -->
+          <div class="section-header">
+            <div class="section-title">
+              <span class="dot"></span>🤝 Hợp Đồng Thầu Phụ
+            </div>
+            <button
+              class="btn btn-sm"
+              onclick="exportHdtpToImage()"
+              style="
+                background: #2563eb;
+                color: #fff;
+                border: none;
+                font-weight: 700;
+                padding: 6px 12px;
+                margin-left: 10px;
+              "
+              title="Chọn các HĐ thầu phụ rồi bấm để xuất phiếu PNG"
+            >
+              📤 Xuất phiếu HĐ TP
+            </button>
           </div>
-          <div class="dt-field">
-            <label>Phát Sinh Thêm (đ)</label>
-            <input type="text" id="hdc-phatsinh" placeholder="0"
-                   oninput="fmtInputMoney(this);hdcUpdateTotal()">
+          <div class="records-wrap" style="margin-bottom: 24px">
+            <div style="overflow-x: auto">
+              <table class="thu-table">
+                <thead>
+                  <tr
+                    style="
+                      font-size: 11px;
+                      color: var(--ink3);
+                      border-bottom: 2px solid var(--line);
+                    "
+                  >
+                    <th style="padding: 8px 6px; text-align: center">
+                      <input
+                        type="checkbox"
+                        onchange="
+                          document
+                            .querySelectorAll('.hdtp-row-chk')
+                            .forEach((c) => (c.checked = this.checked))
+                        "
+                      />
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                        white-space: nowrap;
+                      "
+                    >
+                      Ngày
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 12px;
+                        font-weight: 700;
+                      "
+                    >
+                      Công Trình
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Thầu Phụ
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Nội Dung
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Giá Trị HĐ
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Phát Sinh
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Tổng
+                    </th>
+                    <th style="padding: 8px 6px"></th>
+                    <th style="padding: 8px 6px"></th>
+                  </tr>
+                </thead>
+                <tbody id="hdtp-tbody"></tbody>
+              </table>
+            </div>
+            <div
+              id="hdtp-empty"
+              style="
+                text-align: center;
+                padding: 32px;
+                color: var(--ink3);
+                font-size: 13px;
+                display: none;
+              "
+            >
+              Chưa có hợp đồng thầu phụ
+            </div>
+            <div
+              id="hdtp-pagination"
+              style="
+                padding: 8px 16px;
+                border-top: 1px solid var(--line);
+                display: flex;
+                gap: 5px;
+                justify-content: center;
+                flex-wrap: wrap;
+                min-height: 1px;
+              "
+            ></div>
+          </div>
+
+          <!-- BẢNG 3: Lịch sử thu tiền -->
+          <div class="section-header">
+            <div class="section-title">
+              <span class="dot"></span>💰 Lịch Sử Thu Tiền
+              <span
+                id="thu-count-badge"
+                style="
+                  font-size: 12px;
+                  font-weight: 400;
+                  color: var(--ink3);
+                  margin-left: 4px;
+                "
+              ></span>
+            </div>
+            <button
+              class="btn btn-sm"
+              onclick="exportThuToImage()"
+              style="
+                background: #2563eb;
+                color: #fff;
+                border: none;
+                font-weight: 700;
+                padding: 6px 12px;
+                margin-left: 10px;
+              "
+              title="Chọn các lần thu tiền rồi bấm để xuất phiếu PNG"
+            >
+              📤 Xuất phiếu thu
+            </button>
+          </div>
+          <div class="records-wrap" style="margin-bottom: 24px">
+            <div style="overflow-x: auto">
+              <table class="thu-table">
+                <thead>
+                  <tr
+                    style="
+                      font-size: 11px;
+                      color: var(--ink3);
+                      border-bottom: 2px solid var(--line);
+                    "
+                  >
+                    <th style="padding: 8px 6px; text-align: center">
+                      <input
+                        type="checkbox"
+                        onchange="
+                          document
+                            .querySelectorAll('.thu-row-chk')
+                            .forEach((c) => (c.checked = this.checked))
+                        "
+                      />
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 12px;
+                        font-weight: 700;
+                      "
+                    >
+                      Ngày
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Công Trình
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Số Tiền
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Người TH
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Nội Dung
+                    </th>
+                    <th style="padding: 8px 6px"></th>
+                    <th style="padding: 8px 6px"></th>
+                  </tr>
+                </thead>
+                <tbody id="thu-tbody"></tbody>
+              </table>
+            </div>
+            <div
+              id="thu-empty"
+              style="
+                text-align: center;
+                padding: 32px;
+                color: var(--ink3);
+                font-size: 13px;
+                display: none;
+              "
+            >
+              Chưa có lịch sử thu tiền
+            </div>
+            <div
+              id="thu-pagination"
+              style="
+                padding: 8px 16px;
+                border-top: 1px solid var(--line);
+                display: flex;
+                gap: 5px;
+                justify-content: center;
+                flex-wrap: wrap;
+                min-height: 1px;
+              "
+            ></div>
+          </div>
+
+          <!-- BẢNG 4: Công Nợ Thầu Phụ -->
+          <div class="section-header">
+            <div class="section-title">
+              <span class="dot"></span>🔴 Công Nợ Thầu Phụ
+            </div>
+          </div>
+          <div class="records-wrap" style="margin-bottom: 24px">
+            <div style="overflow-x: auto">
+              <table class="thu-table">
+                <thead>
+                  <tr
+                    style="
+                      font-size: 11px;
+                      color: var(--ink3);
+                      border-bottom: 2px solid var(--line);
+                    "
+                  >
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 12px;
+                        font-weight: 700;
+                      "
+                    >
+                      Thầu Phụ
+                    </th>
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Công Trình
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Tổng Đã Ứng
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Tổng HĐ TP
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 8px 10px;
+                        font-weight: 700;
+                      "
+                    >
+                      Còn Phải TT
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="congno-tbody"></tbody>
+              </table>
+            </div>
+            <div
+              id="congno-empty"
+              style="
+                text-align: center;
+                padding: 32px;
+                color: var(--ink3);
+                font-size: 13px;
+                display: none;
+              "
+            >
+              Chưa có dữ liệu công nợ thầu phụ
+            </div>
           </div>
         </div>
-        <input type="hidden" id="hdc-edit-id">
+        <!-- /dt-sub-thongke -->
       </div>
 
-      <!-- PHẦN 2: GHI NHẬN THU TIỀN -->
-      <div class="section-header" style="margin-top:8px">
-        <div class="section-title"><span class="dot"></span>💰 Ghi Nhận Thu Tiền</div>
-        <div class="btn-group">
-          <button class="btn btn-outline btn-sm" id="thu-cancel-btn"
-                  style="display:none" onclick="_thuCancelEdit()">✕ Hủy</button>
-          <button class="btn btn-gold" id="thu-save-btn"
-                  onclick="saveThuRecord()">+ Ghi nhận Thu</button>
-        </div>
+      <!-- ── PAGE: CÔNG TRÌNH ──────────────────────────────────────── -->
+      <div class="page active" id="page-congtrinh">
+        <div id="ct-overview-wrap"></div>
       </div>
-      <div class="dt-section">
-        <div class="dt-form-grid">
-          <div class="dt-field">
-            <label>Ngày Thu *</label>
-            <input type="date" id="thu-ngay">
-          </div>
-          <div class="dt-field">
-            <label>Công Trình *</label>
-            <select id="thu-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:7px;font-size:13px;background:var(--paper);color:var(--ink)">
-              <option value="">-- Chọn công trình --</option>
-            </select>
-          </div>
-          <div class="dt-field">
-            <label>Người TH</label>
-            <select id="thu-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:7px;font-size:13px;background:var(--paper);color:var(--ink)">
-              <option value="">-- Chọn --</option>
-            </select>
-          </div>
-          <div class="dt-field">
-            <label>Số Tiền Thu (đ) *</label>
-            <input type="text" id="thu-tien" placeholder="0" oninput="fmtInputMoney(this)">
-          </div>
-          <div class="dt-field">
-            <label>Nội Dung / Đợt</label>
-            <input type="text" id="thu-nd" placeholder="VD: Đợt 1, Nghiệm thu móng...">
-          </div>
-        </div>
-        <input type="hidden" id="thu-edit-id">
-      </div>
-
-      <!-- PHẦN 3: HỢP ĐỒNG THẦU PHỤ -->
-      <div class="section-header" style="margin-top:8px">
-        <div class="section-title"><span class="dot"></span>🤝 Khai Báo Hợp Đồng Thầu Phụ</div>
-        <div class="btn-group">
-          <span id="hdtp-tong-label" style="font-size:12px;color:var(--ink3)"></span>
-          <button class="btn btn-gold" id="hdtp-save-btn" onclick="saveHopDongThauPhu()">💾 Lưu</button>
-        </div>
-      </div>
-      <div class="dt-section">
-        <div class="dt-form-grid">
-          <div class="dt-field">
-            <label>Ngày *</label>
-            <input type="date" id="hdtp-ngay">
-          </div>
-          <div class="dt-field">
-            <label>Tên Công Trình *</label>
-            <select id="hdtp-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:7px;font-size:13px;background:var(--paper);color:var(--ink)">
-              <option value="">-- Chọn công trình --</option>
-            </select>
-          </div>
-          <div class="dt-field">
-            <label>Tên Thầu Phụ *</label>
-            <select id="hdtp-thauphu" style="width:100%;padding:8px 10px;border:1.5px solid var(--line2);border-radius:7px;font-size:13px;background:var(--paper);color:var(--ink)">
-              <option value="">-- Chọn thầu phụ --</option>
-            </select>
-          </div>
-          <div class="dt-field">
-            <label>Giá Trị HĐ Thầu Phụ (đ)</label>
-            <input type="text" id="hdtp-giatri" placeholder="0"
-                   oninput="fmtInputMoney(this);hdtpUpdateTotal()">
-          </div>
-          <div class="dt-field">
-            <label>Phát Sinh Thêm (đ)</label>
-            <input type="text" id="hdtp-phatsinh" placeholder="0"
-                   oninput="fmtInputMoney(this);hdtpUpdateTotal()">
-          </div>
-          <div class="dt-field">
-            <label>Nội Dung</label>
-            <input type="text" id="hdtp-nd" placeholder="VD: Ép cọc, Móng, Thô...">
-          </div>
-        </div>
-        <input type="hidden" id="hdtp-edit-id">
-      </div>
-
-    </div><!-- /dt-sub-khaibao -->
-
-    <!-- ── SUB TAB 2: THỐNG KÊ ─────────────────────────────── -->
-    <div class="sub-page" id="dt-sub-thongke">
-
-      <!-- Filter CT -->
-      <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <label style="font-size:12px;font-weight:600;color:var(--ink3)">Lọc Công Trình:</label>
-        <select id="dt-ct-filter-sel" class="filter-sel" style="min-width:220px;max-width:340px"
-          onchange="dtSetCtFilter(this.value)">
-          <option value="">-- Tất cả công trình --</option>
-        </select>
-      </div>
-
-      <!-- BẢNG 1: Hợp đồng chính -->
-      <div class="section-header">
-        <div class="section-title"><span class="dot"></span>📋 Hợp Đồng Chính Công Ty</div>
-        <button class="btn btn-sm" onclick="exportHdcToImage()"
-          style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px"
-          title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG">
-          📤 Xuất phiếu HĐ Chính
-        </button>
-      </div>
-      <div class="records-wrap" style="margin-bottom:24px">
-        <div style="overflow-x:auto">
-          <table class="thu-table">
-            <thead>
-              <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
-                <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"></th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
-                <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Chính</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Phụ</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Phát Sinh</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ</th>
-                <th style="padding:8px 6px"></th>
-                <th style="padding:8px 6px"></th>
-              </tr>
-            </thead>
-            <tbody id="hdc-tbody"></tbody>
-          </table>
-        </div>
-        <div id="hdc-empty" style="text-align:center;padding:32px;color:var(--ink3);font-size:13px;display:none">Chưa có hợp đồng nào</div>
-        <div id="hdc-pagination" style="padding:8px 16px;border-top:1px solid var(--line);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
-      </div>
-
-      <!-- BẢNG 2: Hợp đồng thầu phụ -->
-      <div class="section-header">
-        <div class="section-title"><span class="dot"></span>🤝 Hợp Đồng Thầu Phụ</div>
-        <button class="btn btn-sm" onclick="exportHdtpToImage()"
-          style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px"
-          title="Chọn các HĐ thầu phụ rồi bấm để xuất phiếu PNG">
-          📤 Xuất phiếu HĐ TP
-        </button>
-      </div>
-      <div class="records-wrap" style="margin-bottom:24px">
-        <div style="overflow-x:auto">
-          <table class="thu-table">
-            <thead>
-              <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
-                <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdtp-row-chk').forEach(c=>c.checked=this.checked)"></th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
-                <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700">Thầu Phụ</th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Giá Trị HĐ</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Phát Sinh</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng</th>
-                <th style="padding:8px 6px"></th>
-                <th style="padding:8px 6px"></th>
-              </tr>
-            </thead>
-            <tbody id="hdtp-tbody"></tbody>
-          </table>
-        </div>
-        <div id="hdtp-empty" style="text-align:center;padding:32px;color:var(--ink3);font-size:13px;display:none">Chưa có hợp đồng thầu phụ</div>
-        <div id="hdtp-pagination" style="padding:8px 16px;border-top:1px solid var(--line);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
-      </div>
-
-      <!-- BẢNG 3: Lịch sử thu tiền -->
-      <div class="section-header">
-        <div class="section-title">
-          <span class="dot"></span>💰 Lịch Sử Thu Tiền
-          <span id="thu-count-badge" style="font-size:12px;font-weight:400;color:var(--ink3);margin-left:4px"></span>
-        </div>
-        <button class="btn btn-sm" onclick="exportThuToImage()"
-          style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px"
-          title="Chọn các lần thu tiền rồi bấm để xuất phiếu PNG">
-          📤 Xuất phiếu thu
-        </button>
-      </div>
-      <div class="records-wrap" style="margin-bottom:24px">
-        <div style="overflow-x:auto">
-          <table class="thu-table">
-            <thead>
-              <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
-                <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.thu-row-chk').forEach(c=>c.checked=this.checked)"></th>
-                <th style="text-align:left;padding:8px 12px;font-weight:700">Ngày</th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700">Người TH</th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                <th style="padding:8px 6px"></th>
-                <th style="padding:8px 6px"></th>
-              </tr>
-            </thead>
-            <tbody id="thu-tbody"></tbody>
-          </table>
-        </div>
-        <div id="thu-empty" style="text-align:center;padding:32px;color:var(--ink3);font-size:13px;display:none">Chưa có lịch sử thu tiền</div>
-        <div id="thu-pagination" style="padding:8px 16px;border-top:1px solid var(--line);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
-      </div>
-
-      <!-- BẢNG 4: Công Nợ Thầu Phụ -->
-      <div class="section-header">
-        <div class="section-title"><span class="dot"></span>🔴 Công Nợ Thầu Phụ</div>
-      </div>
-      <div class="records-wrap" style="margin-bottom:24px">
-        <div style="overflow-x:auto">
-          <table class="thu-table">
-            <thead>
-              <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
-                <th style="text-align:left;padding:8px 12px;font-weight:700">Thầu Phụ</th>
-                <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng Đã Ứng</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ TP</th>
-                <th style="text-align:right;padding:8px 10px;font-weight:700">Còn Phải TT</th>
-              </tr>
-            </thead>
-            <tbody id="congno-tbody"></tbody>
-          </table>
-        </div>
-        <div id="congno-empty" style="text-align:center;padding:32px;color:var(--ink3);font-size:13px;display:none">Chưa có dữ liệu công nợ thầu phụ</div>
-      </div>
-
-    </div><!-- /dt-sub-thongke -->
-
-  </div>
-
-  <!-- ── PAGE: CÔNG TRÌNH ──────────────────────────────────────── -->
-  <div class="page active" id="page-congtrinh">
-    <div id="ct-overview-wrap"></div>
-  </div>
-
-</div><!-- /content -->
-
-
-<div class="overlay" id="ct-modal">
-  <div class="modal">
-    <div class="modal-head">
-      <h3 id="modal-title">Chi tiết</h3>
-      <button class="close-btn" onclick="closeModal()">✕</button>
     </div>
-    <div class="modal-body" id="modal-body"></div>
-  </div>
-</div>
+    <!-- /content -->
 
-
-
-<div class="toast" id="toast"></div>
-
-<script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
-<script src="js/core/core.storage.js"></script>
-<script src="js/core/core.state-backup.js"></script>
-<script src="js/core/core.cloud-cats-ui.js"></script>
-<script src="js/modules/projects/projects.model.js"></script>
-<script src="js/modules/projects/projects.migration-selects.js"></script>
-<script src="js/modules/projects/projects.ui.js"></script>
-<script src="js/legacy/tienich.js"></script>
-<script src="js/modules/hoadon/hoadon.quick-entry.js"></script>
-<script src="js/modules/hoadon/hoadon.sheet-grid.js"></script>
-<script src="js/modules/hoadon/hoadon.detail-entry.js"></script>
-<script src="js/modules/hoadon/hoadon.list-trash.js"></script>
-<script src="js/modules/danhmuc/danhmuc.categories.js"></script>
-<script src="js/modules/tienung/tienung.core.js"></script>
-<script src="js/modules/tienung/tienung.entry.js"></script>
-<script src="js/modules/tienung/tienung.history.js"></script>
-<script src="js/modules/danhmuc/danhmuc.tools.js"></script>
-<script src="js/modules/nhapxuat/nhapxuat.parsers.js"></script>
-<script src="js/modules/nhapxuat/nhapxuat.import.js"></script>
-<script src="js/modules/nhapxuat/nhapxuat.export.js"></script>
-<script src="js/legacy/datatools.js"></script>
-<script src="js/modules/chamcong/chamcong.core.js"></script>
-<script src="js/modules/chamcong/chamcong.week-form.js"></script>
-<script src="js/modules/chamcong/chamcong.history-reports.js"></script>
-<script src="js/legacy/thietbi.js"></script>
-<script src="js/modules/doanhthu/doanhthu.core.js"></script>
-<script src="js/modules/doanhthu/doanhthu.forms.js"></script>
-<script src="js/modules/doanhthu/doanhthu.reports-export.js"></script>
-<script src="js/sync/sync.js"></script>
-<script src="js/app/auth.js"></script>
-<script src="js/app/main.js"></script>
-
-
-<!-- ══ NUMPAD OVERLAY ══════════════════════════════════════════ -->
-<div id="numpad-overlay" onclick="if(event.target===this)closeNumpad()">
-  <div id="numpad-box" onclick="event.stopPropagation()">
-    <div id="numpad-display">
-      <div id="numpad-label">Nhập số tiền</div>
-      <div id="numpad-value"><span id="numpad-text">0</span><span class="np-cursor"></span></div>
-    </div>
-    <button id="numpad-save-btn" onclick="numpadDone()">Lưu</button>
-    <div id="numpad-shortcuts">
-      <button class="np-shortcut orig-shortcuts" onclick="numpadShortcut(100000)">+100K</button>
-      <button class="np-shortcut" onclick="numpadShortcut(200000)">+200K</button>
-      <button class="np-shortcut" onclick="numpadShortcut(500000)">+500K</button>
-      <button class="np-shortcut" onclick="numpadShortcut(1000000)">+1Tr</button>
-      <button class="np-shortcut" onclick="numpadShortcut(2000000)">+2Tr</button>
-      <button class="np-shortcut" onclick="numpadShortcut(5000000)">+5Tr</button>
-      <button class="np-shortcut" onclick="numpadShortcut(10000000)">+10Tr</button>
+    <div class="overlay" id="ct-modal">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="modal-title">Chi tiết</h3>
+          <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+      </div>
     </div>
 
-    <div id="numpad-keys">
-      <button class="np-key clear" onclick="numpadKey('C')">C</button>
-      <button class="np-key op" onclick="numpadKey('÷')">÷</button>
-      <button class="np-key op" onclick="numpadKey('×')">×</button>
-      <button class="np-key del" onclick="numpadKey('⌫')">⌫</button>
+    <div class="toast" id="toast"></div>
 
-      <button class="np-key digit" onclick="numpadKey('7')">7</button>
-      <button class="np-key digit" onclick="numpadKey('8')">8</button>
-      <button class="np-key digit" onclick="numpadKey('9')">9</button>
-      <button class="np-key op" onclick="numpadKey('−')">−</button>
+    <script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
+    <script src="js/core/core.storage.js"></script>
+    <script src="js/core/core.state-backup.js"></script>
+    <script src="js/core/core.cloud-cats-ui.js"></script>
+    <script src="js/modules/projects/projects.model.js"></script>
+    <script src="js/modules/projects/projects.migration-selects.js"></script>
+    <script src="js/modules/projects/projects.ui.js"></script>
+    <script src="js/legacy/tienich.js"></script>
+    <script src="js/modules/hoadon/hoadon.quick-entry.js"></script>
+    <script src="js/modules/hoadon/hoadon.sheet-grid.js"></script>
+    <script src="js/modules/hoadon/hoadon.detail-entry.js"></script>
+    <script src="js/modules/hoadon/hoadon.list-trash.js"></script>
+    <script src="js/modules/danhmuc/danhmuc.categories.js"></script>
+    <script src="js/modules/tienung/tienung.core.js"></script>
+    <script src="js/modules/tienung/tienung.entry.js"></script>
+    <script src="js/modules/tienung/tienung.history.js"></script>
+    <script src="js/modules/danhmuc/danhmuc.tools.js"></script>
+    <script src="js/modules/nhapxuat/nhapxuat.parsers.js"></script>
+    <script src="js/modules/nhapxuat/nhapxuat.import.js"></script>
+    <script src="js/modules/nhapxuat/nhapxuat.export.js"></script>
+    <script src="js/legacy/datatools.js"></script>
+    <script src="js/modules/chamcong/chamcong.core.js"></script>
+    <script src="js/modules/chamcong/chamcong.week-form.js"></script>
+    <script src="js/modules/chamcong/chamcong.history-reports.js"></script>
+    <script src="js/legacy/thietbi.js"></script>
+    <script src="js/modules/doanhthu/doanhthu.core.js"></script>
+    <script src="js/modules/doanhthu/doanhthu.forms.js"></script>
+    <script src="js/modules/doanhthu/doanhthu.reports-export.js"></script>
+    <script src="js/sync/sync.js"></script>
+    <script src="js/app/auth.js"></script>
+    <script src="js/app/main.js"></script>
 
-      <button class="np-key digit" onclick="numpadKey('4')">4</button>
-      <button class="np-key digit" onclick="numpadKey('5')">5</button>
-      <button class="np-key digit" onclick="numpadKey('6')">6</button>
-      <button class="np-key op" onclick="numpadKey('+')">+</button>
+    <!-- ══ NUMPAD OVERLAY ══════════════════════════════════════════ -->
+    <div
+      id="numpad-overlay"
+      onclick="if (event.target === this) closeNumpad();"
+    >
+      <div id="numpad-box" onclick="event.stopPropagation()">
+        <div id="numpad-display">
+          <div id="numpad-label">Nhập số tiền</div>
+          <div id="numpad-value">
+            <span id="numpad-text">0</span><span class="np-cursor"></span>
+          </div>
+        </div>
+        <button id="numpad-save-btn" onclick="numpadDone()">Lưu</button>
+        <div id="numpad-shortcuts">
+          <button
+            class="np-shortcut orig-shortcuts"
+            onclick="numpadShortcut(100000)"
+          >
+            +100K
+          </button>
+          <button class="np-shortcut" onclick="numpadShortcut(200000)">
+            +200K
+          </button>
+          <button class="np-shortcut" onclick="numpadShortcut(500000)">
+            +500K
+          </button>
+          <button class="np-shortcut" onclick="numpadShortcut(1000000)">
+            +1Tr
+          </button>
+          <button class="np-shortcut" onclick="numpadShortcut(2000000)">
+            +2Tr
+          </button>
+          <button class="np-shortcut" onclick="numpadShortcut(5000000)">
+            +5Tr
+          </button>
+          <button class="np-shortcut" onclick="numpadShortcut(10000000)">
+            +10Tr
+          </button>
+        </div>
 
-      <button class="np-key digit" onclick="numpadKey('1')">1</button>
-      <button class="np-key digit" onclick="numpadKey('2')">2</button>
-      <button class="np-key digit" onclick="numpadKey('3')">3</button>
-      <button class="np-key done" onclick="numpadDone()" style="grid-row:span 2">✓</button>
+        <div id="numpad-keys">
+          <button class="np-key clear" onclick="numpadKey('C')">C</button>
+          <button class="np-key op" onclick="numpadKey('÷')">÷</button>
+          <button class="np-key op" onclick="numpadKey('×')">×</button>
+          <button class="np-key del" onclick="numpadKey('⌫')">⌫</button>
 
-      <button class="np-key digit" onclick="numpadKey('0')">0</button>
-      <button class="np-key zero3" onclick="numpadKey('000')">000</button>
-      <button class="np-key digit" onclick="numpadKey('.')">.</button>
+          <button class="np-key digit" onclick="numpadKey('7')">7</button>
+          <button class="np-key digit" onclick="numpadKey('8')">8</button>
+          <button class="np-key digit" onclick="numpadKey('9')">9</button>
+          <button class="np-key op" onclick="numpadKey('−')">−</button>
+
+          <button class="np-key digit" onclick="numpadKey('4')">4</button>
+          <button class="np-key digit" onclick="numpadKey('5')">5</button>
+          <button class="np-key digit" onclick="numpadKey('6')">6</button>
+          <button class="np-key op" onclick="numpadKey('+')">+</button>
+
+          <button class="np-key digit" onclick="numpadKey('1')">1</button>
+          <button class="np-key digit" onclick="numpadKey('2')">2</button>
+          <button class="np-key digit" onclick="numpadKey('3')">3</button>
+          <button
+            class="np-key done"
+            onclick="numpadDone()"
+            style="grid-row: span 2"
+          >
+            ✓
+          </button>
+
+          <button class="np-key digit" onclick="numpadKey('0')">0</button>
+          <button class="np-key zero3" onclick="numpadKey('000')">000</button>
+          <button class="np-key digit" onclick="numpadKey('.')">.</button>
+        </div>
+
+        <!-- Bàn phím riêng cho ô Ngày Công: chỉ số + dấu chấm, nhỏ gọn -->
+        <div
+          id="numpad-day-keys"
+          style="
+            display: none;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            padding: 0 2px;
+          "
+        >
+          <button
+            class="np-key digit"
+            onclick="numpadKey('7')"
+            style="height: 52px; font-size: 22px"
+          >
+            7
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('8')"
+            style="height: 52px; font-size: 22px"
+          >
+            8
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('9')"
+            style="height: 52px; font-size: 22px"
+          >
+            9
+          </button>
+          <button
+            class="np-key del"
+            onclick="numpadKey('⌫')"
+            style="height: 52px; font-size: 20px"
+          >
+            ⌫
+          </button>
+
+          <button
+            class="np-key digit"
+            onclick="numpadKey('4')"
+            style="height: 52px; font-size: 22px"
+          >
+            4
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('5')"
+            style="height: 52px; font-size: 22px"
+          >
+            5
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('6')"
+            style="height: 52px; font-size: 22px"
+          >
+            6
+          </button>
+          <button
+            class="np-key clear"
+            onclick="numpadKey('C')"
+            style="height: 52px; font-size: 16px"
+          >
+            C
+          </button>
+
+          <button
+            class="np-key digit"
+            onclick="numpadKey('1')"
+            style="height: 52px; font-size: 22px"
+          >
+            1
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('2')"
+            style="height: 52px; font-size: 22px"
+          >
+            2
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('3')"
+            style="height: 52px; font-size: 22px"
+          >
+            3
+          </button>
+          <button
+            class="np-key done"
+            onclick="numpadDone()"
+            style="height: 52px; font-size: 22px; grid-row: span 2"
+          >
+            ✓
+          </button>
+
+          <button
+            class="np-key digit"
+            onclick="numpadKey('0')"
+            style="height: 52px; font-size: 22px; grid-column: span 2"
+          >
+            0
+          </button>
+          <button
+            class="np-key digit"
+            onclick="numpadKey('.')"
+            style="height: 52px; font-size: 22px"
+          >
+            .
+          </button>
+        </div>
+      </div>
     </div>
-
-    <!-- Bàn phím riêng cho ô Ngày Công: chỉ số + dấu chấm, nhỏ gọn -->
-    <div id="numpad-day-keys" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 2px">
-      <button class="np-key digit" onclick="numpadKey('7')" style="height:52px;font-size:22px">7</button>
-      <button class="np-key digit" onclick="numpadKey('8')" style="height:52px;font-size:22px">8</button>
-      <button class="np-key digit" onclick="numpadKey('9')" style="height:52px;font-size:22px">9</button>
-      <button class="np-key del"   onclick="numpadKey('⌫')" style="height:52px;font-size:20px">⌫</button>
-
-      <button class="np-key digit" onclick="numpadKey('4')" style="height:52px;font-size:22px">4</button>
-      <button class="np-key digit" onclick="numpadKey('5')" style="height:52px;font-size:22px">5</button>
-      <button class="np-key digit" onclick="numpadKey('6')" style="height:52px;font-size:22px">6</button>
-      <button class="np-key clear" onclick="numpadKey('C')"  style="height:52px;font-size:16px">C</button>
-
-      <button class="np-key digit" onclick="numpadKey('1')" style="height:52px;font-size:22px">1</button>
-      <button class="np-key digit" onclick="numpadKey('2')" style="height:52px;font-size:22px">2</button>
-      <button class="np-key digit" onclick="numpadKey('3')" style="height:52px;font-size:22px">3</button>
-      <button class="np-key done"  onclick="numpadDone()"   style="height:52px;font-size:22px;grid-row:span 2">✓</button>
-
-      <button class="np-key digit" onclick="numpadKey('0')" style="height:52px;font-size:22px;grid-column:span 2">0</button>
-      <button class="np-key digit" onclick="numpadKey('.')" style="height:52px;font-size:22px">.</button>
-    </div>
-  </div>
-</div>
-</body>
+    <!-- Bootstrap 5 JS Bundle (đã gộp Popper.js — cần thiết cho Offcanvas) -->
+    <!-- Đặt cuối body để không chặn render nội dung trang -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
 </html>

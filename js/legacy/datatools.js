@@ -300,6 +300,16 @@ var selectedCT = '';
 var selectedDashboardWeekKey = '';
 var _dashLastYr = -1; // theo dõi năm lần render trước để reset tuần
 
+// ── Bộ lọc time-frame cho biểu đồ tuần ──────────────────────
+// 'all' = toàn bộ năm | '12' = 12 tuần | '8' = 8 tuần | '4' = 4 tuần
+// Mặc định '8': cột rộng, dễ nhìn cho màn hình thông thường
+var _dbWeekFilter        = '8';
+
+// Cache dữ liệu weekly để filter/select tuần không cần chạy lại full renderDashboard
+var _dbLastWeeklyYr      = 0;
+var _dbLastWeeklyInvData = null;
+var _dbLastWeeklyUngData = null;
+
 // ══════════════════════════════════════════════════════════════
 // [MODULE: DASHBOARD] — KPI · Bar chart · Pie · Top5 · By CT
 // Tìm nhanh: Ctrl+F → "MODULE: DASHBOARD"
@@ -315,10 +325,11 @@ function renderDashboard() {
 
   _dbPopulateCTFilter();
 
-  // Reset tuần đang chọn khi đổi chế độ năm hoặc đổi sang năm khác
+  // Reset trạng thái khi đổi chế độ năm hoặc đổi sang năm khác
   const modeKey = isSingleYear ? yr : 0;
   if (modeKey !== _dashLastYr) {
     selectedDashboardWeekKey = '';
+    _dbWeekFilter = 'all'; // về "Toàn bộ năm" khi đổi năm
     _dashLastYr = modeKey;
   }
 
@@ -357,9 +368,16 @@ function renderDashboard() {
     // ── CHẾ ĐỘ 1 NĂM: biểu đồ theo tuần ──────────────────────
     if (barTitle) barTitle.textContent = 'Chi Phí Theo Tuần';
     if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
+
+    // Cache data để filter/select tuần không cần chạy lại renderDashboard
+    _dbLastWeeklyYr      = yr;
+    _dbLastWeeklyInvData = dataYear;
+    _dbLastWeeklyUngData = ungAllYear;
+
     _dbKPIWeekly(yr, dataYear, ungAllYear, thauPhuTotal);
     _dbBarChartWeekly(yr, dataYear, ungAllYear);
     _dbPieChartWeekly(dataYear, ungAllYear);
+    _dbRenderHeatmap(yr, dataYear, ungAllYear);
   } else {
     // ── CHẾ ĐỘ NHIỀU NĂM / TẤT CẢ: biểu đồ theo tháng ───────
     if (barTitle) barTitle.textContent = 'Chi Phí Theo Tháng';
@@ -367,6 +385,9 @@ function renderDashboard() {
     _dbKPI(dataYear, yr, thauPhuTotal);
     _dbBarChart(dataYear);
     _dbPieChart(dataYear);
+    // Ẩn heatmap ở chế độ nhiều năm
+    const hmEl = document.getElementById('db-heatmap');
+    if (hmEl) hmEl.innerHTML = '';
   }
 
   // Phần chi tiết theo CT — luôn hiển thị
@@ -545,11 +566,12 @@ function _dbGetWeeksInYear(yr) {
 }
 
 // Tính chi phí theo tuần từ hóa đơn + tiền ứng
-// Trả về { [sunISO]: { inv, ungTP, ungNCC, total } }
+// Trả về { [sunISO]: { inv, ungTP, ungNCC, total, byCT:{[ctName]:number} } }
+// byCT: breakdown theo công trình từ hóa đơn (dùng cho tooltip + heatmap)
 function _dbCalcWeeklyData(invoiceData, ungData) {
   const result = {};
   function ensure(k) {
-    if (!result[k]) result[k] = { inv: 0, ungTP: 0, ungNCC: 0, total: 0 };
+    if (!result[k]) result[k] = { inv: 0, ungTP: 0, ungNCC: 0, total: 0, byCT: {} };
     return result[k];
   }
   invoiceData.forEach(i => {
@@ -558,6 +580,9 @@ function _dbCalcWeeklyData(invoiceData, ungData) {
     if (!amt) return;
     const w = ensure(snapToSunday(i.ngay));
     w.inv += amt; w.total += amt;
+    // Track per-CT cho tooltip & heatmap
+    const ct = resolveProjectName(i) || '(Không rõ)';
+    w.byCT[ct] = (w.byCT[ct] || 0) + amt;
   });
   ungData.forEach(r => {
     if (!r.ngay || (r.loai !== 'thauphu' && r.loai !== 'nhacungcap')) return;
@@ -630,83 +655,200 @@ function _dbKPIWeekly(yr, invoiceData, ungData, thauPhuTotal) {
 }
 
 // ── Biểu đồ cột chồng theo tuần (SVG) ────────────────────────
+// Hỗ trợ bộ lọc thời gian: 'all' | '12' | '8' | '4'
+// Nhãn trục X: "Tuần N" thay vì ngày/tháng
+// Tooltip: hiện top-3 CT chi nhiều nhất tuần đó
+// Section tóm tắt 4 tuần gần nhất (card lớn, chữ 24px)
 function _dbBarChartWeekly(yr, invoiceData, ungData) {
   const C_INV = '#f0a500'; // amber — Hóa đơn / CP-HĐ
   const C_TP  = '#8B4513'; // nâu   — Ứng thầu phụ
   const C_NCC = '#8e9ca6'; // xám   — Ứng nhà cung cấp
 
-  const weeks      = _dbGetWeeksInYear(yr);
+  const allWeeks   = _dbGetWeeksInYear(yr);
   const weeklyData = _dbCalcWeeklyData(invoiceData, ungData);
-  const vals       = weeks.map(w => weeklyData[w.key] || { inv:0, ungTP:0, ungNCC:0, total:0 });
-  const maxVal     = Math.max(...vals.map(v => v.total), 1);
 
-  const H    = 150;
-  const colW = 22;
-  const gap  = 3;
-  const svgW = weeks.length * (colW + gap);
+  // Tính index tuần hiện tại trong mảng allWeeks
+  const today      = new Date();
+  const todayISO   = isoFromParts(today.getFullYear(), today.getMonth()+1, today.getDate());
+  const currSunKey = snapToSunday(todayISO);
+  const currWkIdx  = allWeeks.findIndex(w => w.key === currSunKey);
+  // endIdx = tuần hiện tại nếu có, fallback = cuối mảng
+  const endIdx     = currWkIdx >= 0 ? currWkIdx : allWeeks.length - 1;
 
-  const bars = weeks.map((w, i) => {
-    const v    = vals[i];
-    const cx   = i * (colW + gap);
-    const isSel = w.key === selectedDashboardWeekKey;
-    // Nhãn: mỗi 2 tuần để cân bằng giữa dễ đọc và không chồng chéo
-    const lbl  = (i % 2 === 0) ? viShort(w.sun) : '';
-    const lblColor = isSel ? '#e67e22' : 'var(--ink3)';
+  // Áp dụng bộ lọc thời gian
+  let startIdx = 0;
+  if (_dbWeekFilter === '4')  startIdx = Math.max(0, endIdx - 3);
+  if (_dbWeekFilter === '8')  startIdx = Math.max(0, endIdx - 7);
+  if (_dbWeekFilter === '12') startIdx = Math.max(0, endIdx - 11);
+
+  // Dải tuần sẽ hiển thị + index tuyệt đối (để tính số tuần trong năm)
+  const dispWeeks   = allWeeks.slice(startIdx, endIdx + 1);
+  const dispIndices = dispWeeks.map((_, i) => startIdx + i);
+  const dispVals    = dispWeeks.map(w => weeklyData[w.key] || { inv:0, ungTP:0, ungNCC:0, total:0, byCT:{} });
+  const maxVal      = Math.max(...dispVals.map(v => v.total), 1);
+  const n           = dispWeeks.length;
+
+  // colW/gap thích nghi theo số cột
+  const colW = n <= 4 ? 52 : n <= 8 ? 46 : n <= 12 ? 34 : 22;
+  const gap  = n <= 4 ? 8  : n <= 8 ? 6  : n <= 12 ? 5  : 3;
+  const H    = 160;
+  const svgW = n * (colW + gap);
+
+  // Nhãn: mỗi 1 tuần (<=8), mỗi 2 tuần (>8)
+  const lblStep = n <= 8 ? 1 : 2;
+
+  const bars = dispWeeks.map((w, i) => {
+    const v      = dispVals[i];
+    const absIdx = dispIndices[i];
+    const wkNum  = absIdx + 1;          // số tuần 1-based trong năm
+    const cx     = i * (colW + gap);
+    const isSel  = w.key === selectedDashboardWeekKey;
+    const lbl    = (i % lblStep === 0) ? `T${wkNum}` : '';
+    const lblColor   = isSel ? '#e67e22' : '#333';
+    const lblWeight  = isSel ? '700' : '600';
+
+    // Top-3 CT cho footer tooltip
+    const top3Lines = Object.entries(v.byCT || {})
+      .sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([ct, amt]) => `  • ${ct.slice(0,22)}: ${amt>=1e6?Math.round(amt/1e6)+'tr':fmtM(amt)}`)
+      .join('\n');
 
     if (!v.total) {
       return `<g onclick="_dbSelectWeek('${w.key}')" style="cursor:pointer">
         <rect x="${cx}" y="${H-2}" width="${colW}" height="2" rx="1" fill="var(--line)" opacity=".3">
-          <title>Tuần CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}: không có phát sinh</title>
+          <title>Tuần ${wkNum} (CN ${viShort(w.sun)} – T7 ${viShort(w.sat)})\nKhông có phát sinh</title>
         </rect>
-        <text x="${cx+colW/2}" y="${H+20}" text-anchor="middle" font-size="7.5" fill="${lblColor}">${lbl}</text>
+        <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="${lblColor}" font-weight="${lblWeight}">${lbl}</text>
       </g>`;
     }
 
-    // Minimum 4px để cột nhỏ (vài triệu giữa các cột trăm triệu) vẫn thấy được
+    // MIN_H = 4px: cột vài triệu vẫn thấy bên cạnh cột vài trăm triệu
     const MIN_H = 4;
     const hInv = v.inv    > 0 ? Math.max(MIN_H, Math.round((v.inv    / maxVal) * H)) : 0;
     const hTP  = v.ungTP  > 0 ? Math.max(MIN_H, Math.round((v.ungTP  / maxVal) * H)) : 0;
     const hNCC = v.ungNCC > 0 ? Math.max(MIN_H, Math.round((v.ungNCC / maxVal) * H)) : 0;
-    // Sắp xếp chồng từ dưới lên: NCC → TP → INV
+    // Chồng từ dưới lên: NCC → TP → INV
     const yNCC = H - hNCC;
     const yTP  = yNCC - hTP;
     const yInv = yTP  - hInv;
     const hTot = hInv + hTP + hNCC || 2;
     const yTop = H - hTot;
 
-    const titleTxt = `Tuần CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}\nHóa đơn: ${fmtM(v.inv)}\nỨng TP: ${fmtM(v.ungTP)}\nỨng NCC: ${fmtM(v.ungNCC)}\nTổng: ${fmtM(v.total)}`;
-    const amt = v.total>=1e9 ? (v.total/1e9).toFixed(1)+'tỷ' : v.total>=1e6 ? Math.round(v.total/1e6)+'tr' : '';
-    const selStroke = isSel ? `stroke="#e67e22" stroke-width="1.5"` : 'stroke="none"';
+    const titleTxt = [
+      `Tuần ${wkNum}: CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}`,
+      `─────────────────────`,
+      `Hóa đơn : ${fmtM(v.inv)}`,
+      `Ứng TP  : ${fmtM(v.ungTP)}`,
+      `Ứng NCC : ${fmtM(v.ungNCC)}`,
+      `Tổng    : ${fmtM(v.total)}`,
+      top3Lines ? `\nTop CT:\n${top3Lines}` : ''
+    ].filter(Boolean).join('\n');
+
+    const amt       = v.total>=1e9?(v.total/1e9).toFixed(1)+'tỷ':v.total>=1e6?Math.round(v.total/1e6)+'tr':'';
+    const selStroke = isSel ? `stroke="#e67e22" stroke-width="2"` : 'stroke="none"';
+    const selBg     = isSel ? `<rect x="${cx-1}" y="0" width="${colW+2}" height="${H}" fill="#e67e2215" rx="2"/>` : '';
 
     return `<g onclick="_dbSelectWeek('${w.key}')" style="cursor:pointer">
+      ${selBg}
       ${hNCC>0 ? `<rect x="${cx}" y="${yNCC}" width="${colW}" height="${hNCC}" fill="${C_NCC}" opacity=".85"/>` : ''}
       ${hTP >0 ? `<rect x="${cx}" y="${yTP}"  width="${colW}" height="${hTP}"  fill="${C_TP}"  opacity=".85"/>` : ''}
       ${hInv>0 ? `<rect x="${cx}" y="${yInv}" width="${colW}" height="${hInv}" fill="${C_INV}" opacity=".85"/>` : ''}
       <rect x="${cx}" y="${yTop}" width="${colW}" height="${hTot}" fill="transparent" ${selStroke} rx="2">
         <title>${titleTxt}</title>
       </rect>
-      ${amt && hTot>16 ? `<text x="${cx+colW/2}" y="${yTop-3}" text-anchor="middle" font-size="7.5" fill="var(--ink2)">${amt}</text>` : ''}
-      <text x="${cx+colW/2}" y="${H+20}" text-anchor="middle" font-size="7.5" fill="${lblColor}">${lbl}</text>
+      ${amt && hTot>18 ? `<text x="${cx+colW/2}" y="${yTop-5}" text-anchor="middle" font-size="13" fill="#222" font-weight="700">${amt}</text>` : ''}
+      <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="${lblColor}" font-weight="${lblWeight}">${lbl}</text>
     </g>`;
   }).join('');
 
+  // ── 4-tuần tóm tắt (cards lớn, chữ dễ đọc cho màn hình GĐ) ──
+  const last4Start = Math.max(0, endIdx - 3);
+  const last4Weeks = allWeeks.slice(last4Start, endIdx + 1);
+  const summaryCards = last4Weeks.map((w, i) => {
+    const absIdx = last4Start + i;
+    const wkNum  = absIdx + 1;
+    const v      = weeklyData[w.key] || { inv:0, ungTP:0, ungNCC:0, total:0 };
+    const isCurr = w.key === currSunKey;
+    const totalFmt = v.total >= 1e9
+      ? (v.total/1e9).toFixed(2) + ' tỷ'
+      : v.total >= 1e6
+        ? Math.round(v.total/1e6) + ' tr'
+        : fmtM(v.total);
+    const border = isCurr ? '2px solid #f0a500' : '1px solid var(--line)';
+    const headBg = isCurr ? '#fff8e7' : 'var(--bg2)';
+    return `<div style="flex:1;min-width:140px;border:${border};border-radius:10px;overflow:hidden;box-shadow:0 1px 4px #0001">
+      <div style="background:${headBg};padding:7px 12px 5px;border-bottom:1px solid var(--line)">
+        <div style="font-size:13px;font-weight:700;color:#444">Tuần ${wkNum}${isCurr?' <span style="color:#f0a500;font-size:11px">▶ Hiện tại</span>':''}</div>
+        <div style="font-size:11px;color:#666">CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}</div>
+      </div>
+      <div style="padding:10px 12px">
+        <div style="font-size:24px;font-weight:800;color:#222;line-height:1.1;margin-bottom:6px">${totalFmt}</div>
+        <div style="font-size:11px;color:#555;line-height:1.8">
+          ${v.inv    > 0 ? `<span style="display:inline-block;width:8px;height:8px;background:${C_INV};border-radius:2px;margin-right:3px;vertical-align:middle"></span>HĐ: ${Math.round(v.inv/1e6)}tr<br>` : ''}
+          ${v.ungTP  > 0 ? `<span style="display:inline-block;width:8px;height:8px;background:${C_TP};border-radius:2px;margin-right:3px;vertical-align:middle"></span>TP: ${Math.round(v.ungTP/1e6)}tr<br>` : ''}
+          ${v.ungNCC > 0 ? `<span style="display:inline-block;width:8px;height:8px;background:${C_NCC};border-radius:2px;margin-right:3px;vertical-align:middle"></span>NCC: ${Math.round(v.ungNCC/1e6)}tr` : ''}
+          ${v.total === 0 ? '<span style="color:#aaa">Chưa có phát sinh</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Filter buttons — trạng thái active highlight bằng màu gold
+  const filterBtns = [
+    { f:'all', label:'Toàn bộ năm'      },
+    { f:'12',  label:'12 tuần gần nhất' },
+    { f:'8',   label:'8 tuần gần nhất'  },
+    { f:'4',   label:'4 tuần gần nhất'  },
+  ].map(({ f, label }) => {
+    const active = _dbWeekFilter === f;
+    return `<button onclick="_dbSetWeekFilter('${f}')"
+      style="padding:4px 13px;border-radius:12px;font-size:12px;cursor:pointer;
+             border:1px solid ${active ? 'var(--gold)' : 'var(--line)'};
+             background:${active ? 'var(--gold)' : 'transparent'};
+             color:${active ? '#fff' : '#333'};font-weight:${active?'700':'400'}">${label}</button>`;
+  }).join('');
+
   const selNote = selectedDashboardWeekKey
-    ? `<span style="color:#e67e22;font-weight:700">📌 Tuần ${weekLabel(selectedDashboardWeekKey)} — click lại để bỏ chọn</span>`
+    ? `<span style="color:#e67e22;font-weight:700;font-size:12px;margin-left:auto">
+         📌 T${allWeeks.findIndex(w=>w.key===selectedDashboardWeekKey)+1}
+         (${weekLabel(selectedDashboardWeekKey)}) — click lại để bỏ
+       </span>`
     : '';
 
   document.getElementById('db-bar-chart').innerHTML =
-    `<div style="overflow-x:auto">
-       <svg viewBox="0 -10 ${svgW} ${H+30}" width="${svgW}" style="min-height:${H+30}px;display:block">
+    `<div style="margin-bottom:16px">
+       <div style="font-size:13px;font-weight:700;color:#444;margin-bottom:10px;letter-spacing:.3px">
+         📋 Tóm tắt 4 tuần gần nhất
+       </div>
+       <div style="display:flex;gap:10px;flex-wrap:wrap">
+         ${summaryCards}
+       </div>
+     </div>
+     <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+       ${filterBtns}${selNote}
+     </div>
+     <div style="overflow-x:auto">
+       <svg viewBox="0 -10 ${svgW} ${H+34}" width="${svgW}" style="min-height:${H+34}px;display:block">
          ${bars}
          <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
        </svg>
      </div>
-     <div style="display:flex;gap:14px;font-size:11px;margin-top:8px;flex-wrap:wrap;color:var(--ink2)">
-       <span><span style="display:inline-block;width:10px;height:10px;background:${C_INV};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
-       <span><span style="display:inline-block;width:10px;height:10px;background:${C_TP};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng thầu phụ</span>
-       <span><span style="display:inline-block;width:10px;height:10px;background:${C_NCC};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng NCC</span>
-       ${selNote}
+     <div style="display:flex;gap:14px;font-size:12px;margin-top:10px;flex-wrap:wrap;color:#444">
+       <span><span style="display:inline-block;width:11px;height:11px;background:${C_INV};border-radius:2px;margin-right:5px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
+       <span><span style="display:inline-block;width:11px;height:11px;background:${C_TP};border-radius:2px;margin-right:5px;vertical-align:middle"></span>Ứng thầu phụ</span>
+       <span><span style="display:inline-block;width:11px;height:11px;background:${C_NCC};border-radius:2px;margin-right:5px;vertical-align:middle"></span>Ứng NCC</span>
      </div>`;
+}
+
+// ── Handler bộ lọc thời gian (gọi từ onclick filter buttons) ──
+function _dbSetWeekFilter(f) {
+  _dbWeekFilter = f;
+  selectedDashboardWeekKey = ''; // reset tuần đang chọn khi đổi filter
+  if (_dbLastWeeklyInvData && _dbLastWeeklyYr) {
+    _dbBarChartWeekly(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
+    _dbRenderHeatmap(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
+    _dbPieChartWeekly(_dbLastWeeklyInvData, _dbLastWeeklyUngData); // reset về tổng quan
+  }
 }
 
 // ── Pie Chart tỷ trọng (chế độ tuần) ─────────────────────────
@@ -786,14 +928,127 @@ function _dbPieChartWeekly(invoiceData, ungData) {
 // ── Chọn/bỏ chọn tuần (click cột tuần) ───────────────────────
 function _dbSelectWeek(weekKey) {
   selectedDashboardWeekKey = (selectedDashboardWeekKey === weekKey) ? '' : weekKey;
-  const ay = typeof activeYears !== 'undefined' ? activeYears : new Set();
-  if (ay.size !== 1) return;
-  const yr      = [...ay][0];
-  const invData = getInvoicesCached().filter(i => inActiveYear(i.ngay));
-  const ungData = (typeof ungRecords !== 'undefined' ? ungRecords : [])
-    .filter(r => !r.deletedAt && inActiveYear(r.ngay));
-  _dbBarChartWeekly(yr, invData, ungData);
-  _dbPieChartWeekly(invData, ungData);
+  // Dùng cached data — không cần chạy lại full renderDashboard
+  if (!_dbLastWeeklyInvData || !_dbLastWeeklyYr) return;
+  _dbBarChartWeekly(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
+  _dbPieChartWeekly(_dbLastWeeklyInvData, _dbLastWeeklyUngData);
+}
+
+// ══════════════════════════════════════════════════════════════
+// HEATMAP: Chi phí theo Công Trình × Tuần
+// Rows = top-15 CT theo tổng chi, Cols = tuần theo filter hiện tại
+// Màu ô: trắng (0) → vàng nhạt → cam → cam đậm (max)
+// ══════════════════════════════════════════════════════════════
+function _dbRenderHeatmap(yr, invoiceData, ungData) {
+  const wrap = document.getElementById('db-heatmap');
+  if (!wrap) return;
+
+  const allWeeks   = _dbGetWeeksInYear(yr);
+  const weeklyData = _dbCalcWeeklyData(invoiceData, ungData);
+
+  // Lấy dải tuần theo filter hiện tại (đồng bộ với bar chart)
+  const today      = new Date();
+  const todayISO   = isoFromParts(today.getFullYear(), today.getMonth()+1, today.getDate());
+  const currSunKey = snapToSunday(todayISO);
+  const currWkIdx  = allWeeks.findIndex(w => w.key === currSunKey);
+  const endIdx     = currWkIdx >= 0 ? currWkIdx : allWeeks.length - 1;
+  let startIdx = 0;
+  if (_dbWeekFilter === '4')  startIdx = Math.max(0, endIdx - 3);
+  if (_dbWeekFilter === '12') startIdx = Math.max(0, endIdx - 11);
+
+  const dispWeeks   = allWeeks.slice(startIdx, endIdx + 1);
+  const dispIndices = dispWeeks.map((_, i) => startIdx + i);
+
+  // Thu thập CT có phát sinh trong dải tuần hiển thị
+  const ctTotals = {};
+  dispWeeks.forEach(w => {
+    Object.entries(weeklyData[w.key]?.byCT || {}).forEach(([ct, amt]) => {
+      ctTotals[ct] = (ctTotals[ct] || 0) + amt;
+    });
+  });
+
+  const topCT = Object.entries(ctTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([ct]) => ct);
+
+  if (!topCT.length) { wrap.innerHTML = ''; return; }
+
+  // Max value toàn bảng để scale màu
+  let maxCell = 0;
+  topCT.forEach(ct => {
+    dispWeeks.forEach(w => {
+      const v = weeklyData[w.key]?.byCT?.[ct] || 0;
+      if (v > maxCell) maxCell = v;
+    });
+  });
+
+  // Header tuần: T1, T2, ...
+  const hdrCells = dispWeeks.map((w, i) => {
+    const wkNum = dispIndices[i] + 1;
+    return `<th title="CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}">T${wkNum}</th>`;
+  }).join('');
+
+  // Rows CT
+  const rows = topCT.map(ct => {
+    const cells = dispWeeks.map((w, i) => {
+      const wkNum = dispIndices[i] + 1;
+      const val   = weeklyData[w.key]?.byCT?.[ct] || 0;
+      const bg    = _dbHeatmapColor(val, maxCell);
+      const txt   = val >= 1e6 ? Math.round(val/1e6)+'tr' : val > 0 ? fmtS(val) : '';
+      return `<td style="background:${bg}" title="${x(ct)} – T${wkNum}: ${fmtM(val)}">${txt}</td>`;
+    }).join('');
+    const rowTotal = dispWeeks.reduce((s, w) => s + (weeklyData[w.key]?.byCT?.[ct] || 0), 0);
+    return `<tr>
+      <td class="db-hm-ct" title="${x(ct)}">${x(ct.length > 24 ? ct.slice(0,24)+'…' : ct)}</td>
+      ${cells}
+      <td class="db-hm-total">${fmtS(rowTotal)}</td>
+    </tr>`;
+  }).join('');
+
+  // Footer tổng theo tuần
+  const footCells = dispWeeks.map(w => {
+    const total = topCT.reduce((s, ct) => s + (weeklyData[w.key]?.byCT?.[ct] || 0), 0);
+    return `<td class="db-hm-foot">${total >= 1e6 ? Math.round(total/1e6)+'tr' : ''}</td>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="section-header" style="margin-bottom:12px">
+      <div class="section-title"><span class="dot"></span>🗓️ Bảng Nhiệt Chi Phí: Công Trình × Tuần</div>
+      <span style="font-size:11px;color:var(--ink3)">Top 15 CT · ${dispWeeks.length} tuần · hover để xem chi tiết</span>
+    </div>
+    <div class="records-wrap" style="padding:14px 16px">
+      <div class="db-heatmap-wrap">
+        <table class="db-heatmap-table">
+          <thead>
+            <tr>
+              <th class="db-hm-ct" style="text-align:left;min-width:130px">Công Trình</th>
+              ${hdrCells}
+              <th style="min-width:52px">Tổng</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td class="db-hm-ct" style="color:var(--ink3);font-weight:700">Tổng tuần</td>
+              ${footCells}
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+// Trả về màu CSS tương ứng giá trị: trắng → vàng nhạt → cam → cam đậm
+function _dbHeatmapColor(val, maxVal) {
+  if (!val || !maxVal) return 'transparent';
+  const r = val / maxVal; // 0..1
+  if (r < 0.10) return '#fffbf0';
+  if (r < 0.25) return '#fff0b3';
+  if (r < 0.45) return '#ffd154';
+  if (r < 0.70) return '#f0a500';
+  return '#c97000';
 }
 
 // ── Top 5 hóa đơn lớn nhất ────────────────────────────────────
