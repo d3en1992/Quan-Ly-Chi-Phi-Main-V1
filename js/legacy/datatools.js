@@ -377,17 +377,12 @@ function renderDashboard() {
     _dbKPIWeekly(yr, dataYear, ungAllYear, thauPhuTotal);
     _dbBarChartWeekly(yr, dataYear, ungAllYear);
     _dbPieChartWeekly(dataYear, ungAllYear);
-    _dbRenderHeatmap(yr, dataYear, ungAllYear);
   } else {
     // ── CHẾ ĐỘ NHIỀU NĂM / TẤT CẢ: biểu đồ theo tháng ───────
     if (barTitle) barTitle.textContent = 'Chi Phí Theo Tháng';
-    if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
     _dbKPI(dataYear, yr, thauPhuTotal);
     _dbBarChart(dataYear);
     _dbPieChart(dataYear);
-    // Ẩn heatmap ở chế độ nhiều năm
-    const hmEl = document.getElementById('db-heatmap');
-    if (hmEl) hmEl.innerHTML = '';
   }
 
   // Phần chi tiết theo CT — luôn hiển thị
@@ -776,17 +771,18 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
         : fmtM(v.total);
     const border = isCurr ? '2px solid #f0a500' : '1px solid var(--line)';
     const headBg = isCurr ? '#fff8e7' : 'var(--bg2)';
-    return `<div style="flex:1;min-width:140px;border:${border};border-radius:10px;overflow:hidden;box-shadow:0 1px 4px #0001">
-      <div style="background:${headBg};padding:7px 12px 5px;border-bottom:1px solid var(--line)">
-        <div style="font-size:13px;font-weight:700;color:#444">Tuần ${wkNum}${isCurr?' <span style="color:#f0a500;font-size:11px">▶ Hiện tại</span>':''}</div>
-        <div style="font-size:11px;color:#666">CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}</div>
+    // Font giảm ~20%: 13→11px, 11→9px, 24→19px
+    return `<div style="border:${border};border-radius:10px;overflow:hidden;box-shadow:0 1px 4px #0001">
+      <div style="background:${headBg};padding:6px 10px 4px;border-bottom:1px solid var(--line)">
+        <div style="font-size:11px;font-weight:700;color:#444">Tuần ${wkNum}${isCurr?' <span style="color:#f0a500;font-size:9px">▶ Hiện tại</span>':''}</div>
+        <div style="font-size:9px;color:#666">CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}</div>
       </div>
-      <div style="padding:10px 12px">
-        <div style="font-size:24px;font-weight:800;color:#222;line-height:1.1;margin-bottom:6px">${totalFmt}</div>
-        <div style="font-size:11px;color:#555;line-height:1.8">
-          ${v.inv    > 0 ? `<span style="display:inline-block;width:8px;height:8px;background:${C_INV};border-radius:2px;margin-right:3px;vertical-align:middle"></span>HĐ: ${Math.round(v.inv/1e6)}tr<br>` : ''}
-          ${v.ungTP  > 0 ? `<span style="display:inline-block;width:8px;height:8px;background:${C_TP};border-radius:2px;margin-right:3px;vertical-align:middle"></span>TP: ${Math.round(v.ungTP/1e6)}tr<br>` : ''}
-          ${v.ungNCC > 0 ? `<span style="display:inline-block;width:8px;height:8px;background:${C_NCC};border-radius:2px;margin-right:3px;vertical-align:middle"></span>NCC: ${Math.round(v.ungNCC/1e6)}tr` : ''}
+      <div style="padding:8px 10px">
+        <div style="font-size:19px;font-weight:800;color:#222;line-height:1.1;margin-bottom:5px">${totalFmt}</div>
+        <div style="font-size:9px;color:#555;line-height:1.8">
+          ${v.inv    > 0 ? `<span style="display:inline-block;width:7px;height:7px;background:${C_INV};border-radius:2px;margin-right:3px;vertical-align:middle"></span>HĐ: ${Math.round(v.inv/1e6)}tr<br>` : ''}
+          ${v.ungTP  > 0 ? `<span style="display:inline-block;width:7px;height:7px;background:${C_TP};border-radius:2px;margin-right:3px;vertical-align:middle"></span>TP: ${Math.round(v.ungTP/1e6)}tr<br>` : ''}
+          ${v.ungNCC > 0 ? `<span style="display:inline-block;width:7px;height:7px;background:${C_NCC};border-radius:2px;margin-right:3px;vertical-align:middle"></span>NCC: ${Math.round(v.ungNCC/1e6)}tr` : ''}
           ${v.total === 0 ? '<span style="color:#aaa">Chưa có phát sinh</span>' : ''}
         </div>
       </div>
@@ -802,41 +798,51 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
   ].map(({ f, label }) => {
     const active = _dbWeekFilter === f;
     return `<button onclick="_dbSetWeekFilter('${f}')"
-      style="padding:4px 13px;border-radius:12px;font-size:12px;cursor:pointer;
+      style="padding:3px 11px;border-radius:12px;font-size:10px;cursor:pointer;
              border:1px solid ${active ? 'var(--gold)' : 'var(--line)'};
              background:${active ? 'var(--gold)' : 'transparent'};
              color:${active ? '#fff' : '#333'};font-weight:${active?'700':'400'}">${label}</button>`;
   }).join('');
 
   const selNote = selectedDashboardWeekKey
-    ? `<span style="color:#e67e22;font-weight:700;font-size:12px;margin-left:auto">
+    ? `<span style="color:#e67e22;font-weight:700;font-size:10px;margin-left:auto">
          📌 T${allWeeks.findIndex(w=>w.key===selectedDashboardWeekKey)+1}
          (${weekLabel(selectedDashboardWeekKey)}) — click lại để bỏ
        </span>`
     : '';
 
+  // Layout: biểu đồ (flex:2, ~2/3) | tóm tắt 4 tuần (flex:1, ~1/3)
   document.getElementById('db-bar-chart').innerHTML =
-    `<div style="margin-bottom:16px">
-       <div style="font-size:13px;font-weight:700;color:#444;margin-bottom:10px;letter-spacing:.3px">
-         📋 Tóm tắt 4 tuần gần nhất
+    `<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+
+       <!-- CỘT TRÁI: bộ lọc + biểu đồ SVG + chú thích (chiếm ~2/3) -->
+       <div style="flex:2;min-width:260px;overflow:hidden">
+         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+           ${filterBtns}${selNote}
+         </div>
+         <div style="overflow-x:auto">
+           <svg viewBox="0 -10 ${svgW} ${H+34}" width="${svgW}" style="min-height:${H+34}px;display:block">
+             ${bars}
+             <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
+           </svg>
+         </div>
+         <div style="display:flex;gap:12px;font-size:10px;margin-top:8px;flex-wrap:wrap;color:#444">
+           <span><span style="display:inline-block;width:10px;height:10px;background:${C_INV};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
+           <span><span style="display:inline-block;width:10px;height:10px;background:${C_TP};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng thầu phụ</span>
+           <span><span style="display:inline-block;width:10px;height:10px;background:${C_NCC};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng NCC</span>
+         </div>
        </div>
-       <div style="display:flex;gap:10px;flex-wrap:wrap">
-         ${summaryCards}
+
+       <!-- CỘT PHẢI: tóm tắt 4 tuần gần nhất (chiếm ~1/3) -->
+       <div style="flex:1;min-width:160px">
+         <div style="font-size:11px;font-weight:700;color:#444;margin-bottom:8px;letter-spacing:.3px">
+           📋 Tóm tắt 4 tuần gần nhất
+         </div>
+         <div style="display:flex;flex-direction:column;gap:8px">
+           ${summaryCards}
+         </div>
        </div>
-     </div>
-     <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-       ${filterBtns}${selNote}
-     </div>
-     <div style="overflow-x:auto">
-       <svg viewBox="0 -10 ${svgW} ${H+34}" width="${svgW}" style="min-height:${H+34}px;display:block">
-         ${bars}
-         <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
-       </svg>
-     </div>
-     <div style="display:flex;gap:14px;font-size:12px;margin-top:10px;flex-wrap:wrap;color:#444">
-       <span><span style="display:inline-block;width:11px;height:11px;background:${C_INV};border-radius:2px;margin-right:5px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
-       <span><span style="display:inline-block;width:11px;height:11px;background:${C_TP};border-radius:2px;margin-right:5px;vertical-align:middle"></span>Ứng thầu phụ</span>
-       <span><span style="display:inline-block;width:11px;height:11px;background:${C_NCC};border-radius:2px;margin-right:5px;vertical-align:middle"></span>Ứng NCC</span>
+
      </div>`;
 }
 
@@ -846,7 +852,6 @@ function _dbSetWeekFilter(f) {
   selectedDashboardWeekKey = ''; // reset tuần đang chọn khi đổi filter
   if (_dbLastWeeklyInvData && _dbLastWeeklyYr) {
     _dbBarChartWeekly(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
-    _dbRenderHeatmap(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
     _dbPieChartWeekly(_dbLastWeeklyInvData, _dbLastWeeklyUngData); // reset về tổng quan
   }
 }
@@ -934,122 +939,6 @@ function _dbSelectWeek(weekKey) {
   _dbPieChartWeekly(_dbLastWeeklyInvData, _dbLastWeeklyUngData);
 }
 
-// ══════════════════════════════════════════════════════════════
-// HEATMAP: Chi phí theo Công Trình × Tuần
-// Rows = top-15 CT theo tổng chi, Cols = tuần theo filter hiện tại
-// Màu ô: trắng (0) → vàng nhạt → cam → cam đậm (max)
-// ══════════════════════════════════════════════════════════════
-function _dbRenderHeatmap(yr, invoiceData, ungData) {
-  const wrap = document.getElementById('db-heatmap');
-  if (!wrap) return;
-
-  const allWeeks   = _dbGetWeeksInYear(yr);
-  const weeklyData = _dbCalcWeeklyData(invoiceData, ungData);
-
-  // Lấy dải tuần theo filter hiện tại (đồng bộ với bar chart)
-  const today      = new Date();
-  const todayISO   = isoFromParts(today.getFullYear(), today.getMonth()+1, today.getDate());
-  const currSunKey = snapToSunday(todayISO);
-  const currWkIdx  = allWeeks.findIndex(w => w.key === currSunKey);
-  const endIdx     = currWkIdx >= 0 ? currWkIdx : allWeeks.length - 1;
-  let startIdx = 0;
-  if (_dbWeekFilter === '4')  startIdx = Math.max(0, endIdx - 3);
-  if (_dbWeekFilter === '12') startIdx = Math.max(0, endIdx - 11);
-
-  const dispWeeks   = allWeeks.slice(startIdx, endIdx + 1);
-  const dispIndices = dispWeeks.map((_, i) => startIdx + i);
-
-  // Thu thập CT có phát sinh trong dải tuần hiển thị
-  const ctTotals = {};
-  dispWeeks.forEach(w => {
-    Object.entries(weeklyData[w.key]?.byCT || {}).forEach(([ct, amt]) => {
-      ctTotals[ct] = (ctTotals[ct] || 0) + amt;
-    });
-  });
-
-  const topCT = Object.entries(ctTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([ct]) => ct);
-
-  if (!topCT.length) { wrap.innerHTML = ''; return; }
-
-  // Max value toàn bảng để scale màu
-  let maxCell = 0;
-  topCT.forEach(ct => {
-    dispWeeks.forEach(w => {
-      const v = weeklyData[w.key]?.byCT?.[ct] || 0;
-      if (v > maxCell) maxCell = v;
-    });
-  });
-
-  // Header tuần: T1, T2, ...
-  const hdrCells = dispWeeks.map((w, i) => {
-    const wkNum = dispIndices[i] + 1;
-    return `<th title="CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}">T${wkNum}</th>`;
-  }).join('');
-
-  // Rows CT
-  const rows = topCT.map(ct => {
-    const cells = dispWeeks.map((w, i) => {
-      const wkNum = dispIndices[i] + 1;
-      const val   = weeklyData[w.key]?.byCT?.[ct] || 0;
-      const bg    = _dbHeatmapColor(val, maxCell);
-      const txt   = val >= 1e6 ? Math.round(val/1e6)+'tr' : val > 0 ? fmtS(val) : '';
-      return `<td style="background:${bg}" title="${x(ct)} – T${wkNum}: ${fmtM(val)}">${txt}</td>`;
-    }).join('');
-    const rowTotal = dispWeeks.reduce((s, w) => s + (weeklyData[w.key]?.byCT?.[ct] || 0), 0);
-    return `<tr>
-      <td class="db-hm-ct" title="${x(ct)}">${x(ct.length > 24 ? ct.slice(0,24)+'…' : ct)}</td>
-      ${cells}
-      <td class="db-hm-total">${fmtS(rowTotal)}</td>
-    </tr>`;
-  }).join('');
-
-  // Footer tổng theo tuần
-  const footCells = dispWeeks.map(w => {
-    const total = topCT.reduce((s, ct) => s + (weeklyData[w.key]?.byCT?.[ct] || 0), 0);
-    return `<td class="db-hm-foot">${total >= 1e6 ? Math.round(total/1e6)+'tr' : ''}</td>`;
-  }).join('');
-
-  wrap.innerHTML = `
-    <div class="section-header" style="margin-bottom:12px">
-      <div class="section-title"><span class="dot"></span>🗓️ Bảng Nhiệt Chi Phí: Công Trình × Tuần</div>
-      <span style="font-size:11px;color:var(--ink3)">Top 15 CT · ${dispWeeks.length} tuần · hover để xem chi tiết</span>
-    </div>
-    <div class="records-wrap" style="padding:14px 16px">
-      <div class="db-heatmap-wrap">
-        <table class="db-heatmap-table">
-          <thead>
-            <tr>
-              <th class="db-hm-ct" style="text-align:left;min-width:130px">Công Trình</th>
-              ${hdrCells}
-              <th style="min-width:52px">Tổng</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-          <tfoot>
-            <tr>
-              <td class="db-hm-ct" style="color:var(--ink3);font-weight:700">Tổng tuần</td>
-              ${footCells}
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>`;
-}
-
-// Trả về màu CSS tương ứng giá trị: trắng → vàng nhạt → cam → cam đậm
-function _dbHeatmapColor(val, maxVal) {
-  if (!val || !maxVal) return 'transparent';
-  const r = val / maxVal; // 0..1
-  if (r < 0.10) return '#fffbf0';
-  if (r < 0.25) return '#fff0b3';
-  if (r < 0.45) return '#ffd154';
-  if (r < 0.70) return '#f0a500';
-  return '#c97000';
-}
 
 // ── Top 5 hóa đơn lớn nhất ────────────────────────────────────
 function _dbTop5(data) {

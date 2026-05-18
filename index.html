@@ -933,7 +933,7 @@
                     data-page="nhap"
                     onclick="goPage(this,'nhap')"
                     data-bs-dismiss="offcanvas">
-              NHẬP CHI PHÍ
+              💰 NHẬP CHI PHÍ
             </button>
             <button class="nav-btn"
                     data-page="thongkecphd"
@@ -2338,51 +2338,21 @@
           "
         ></div>
 
-        <!-- Hàng 2: Biểu đồ cột tháng/tuần (65%) + Pie tỷ trọng (35%) -->
-        <div
-          style="
-            display: grid;
-            grid-template-columns: 65fr 35fr;
-            gap: 16px;
-            margin-bottom: 22px;
-          "
-          id="db-charts-row"
-        >
+        <!-- Hàng 2: Biểu đồ cột tháng/tuần (full width — Pie tỷ trọng đã ẩn) -->
+        <div id="db-charts-row" style="margin-bottom: 22px;">
           <div class="records-wrap" style="padding: 18px 20px">
             <div
               id="db-bar-title"
-              style="
-                font-size: 13px;
-                font-weight: 700;
-                color: var(--ink);
-                margin-bottom: 14px;
-              "
+              style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px;"
             >
               Chi Phí Theo Tháng
             </div>
             <div id="db-bar-chart" style="width: 100%; overflow-x: auto"></div>
           </div>
-          <div class="records-wrap" style="padding: 18px 20px">
-            <div
-              id="db-pie-title"
-              style="
-                font-size: 13px;
-                font-weight: 700;
-                color: var(--ink);
-                margin-bottom: 14px;
-              "
-            >
-              Tỷ Trọng Chi Phí
-            </div>
-            <div
-              id="db-pie-chart"
-              style="display: flex; flex-direction: column; align-items: center"
-            ></div>
-          </div>
         </div>
-
-        <!-- Heatmap: CP theo CT × Tuần (chỉ hiện ở chế độ 1 năm) -->
-        <div id="db-heatmap" style="margin-bottom: 22px"></div>
+        <!-- #db-pie-chart & #db-pie-title: ẩn khỏi giao diện nhưng giữ lại để JS không lỗi -->
+        <div id="db-pie-title" style="display:none"></div>
+        <div id="db-pie-chart" style="display:none"></div>
 
         <!-- Tầng 2: Chi tiết theo Công Trình -->
         <div class="section-header" style="margin-bottom: 14px">

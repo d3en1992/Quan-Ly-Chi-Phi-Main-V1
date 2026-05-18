@@ -387,9 +387,18 @@ select.cell-input {
 .settings-add input:focus { border-color: var(--gold); background: var(--paper); }
 
 /* Modal */
-.overlay { position: fixed; inset: 0; background: rgba(26,24,20,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(2px); }
+/* z-index 1060: trên Bootstrap offcanvas (1045) và topbar (1030) */
+.overlay { position: fixed; inset: 0; background: rgba(26,24,20,0.5); z-index: 1060; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(2px); }
 .overlay.open { opacity: 1; pointer-events: all; }
-.modal { background: var(--paper); border-radius: 12px; width: 100%; max-width: 900px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); transform: scale(0.97) translateY(8px); transition: transform 0.2s; }
+/* Bootstrap 5 đặt position:fixed;top:0;left:0;height:100% lên .modal — phá vỡ căn giữa flexbox.
+   Ghi đè với .overlay .modal (specificity cao hơn) + !important để chắc chắn thắng Bootstrap. */
+.overlay .modal {
+  position: relative !important;
+  top: auto !important; left: auto !important;
+  height: auto !important; z-index: auto !important;
+  overflow-x: hidden !important; overflow-y: hidden !important;
+}
+.modal { background: var(--paper); border-radius: 12px; width: 100%; max-width: 900px; max-height: 85vh; overflow: hidden; display: flex !important; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); transform: scale(0.97) translateY(8px); transition: transform 0.2s; }
 .overlay.open .modal { transform: scale(1) translateY(0); }
 .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; background: #f3f1ec; }
 .modal-head h3 { font-size: 15px; font-weight: 700; }
@@ -990,67 +999,7 @@ body.auth-guest #jb-btn {
                 color:var(--ink); white-space:nowrap; }
 .db-empty     { text-align:center; padding:32px 0; color:var(--ink3); font-size:13px; }
 
-/* ── Dashboard Heatmap (CP theo CT × Tuần) ──────────────────── */
-.db-heatmap-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.db-heatmap-table {
-  border-collapse: collapse;
-  font-size: 11px;
-  white-space: nowrap;
-  width: 100%;
-}
-.db-heatmap-table th {
-  background: var(--bg2, #f5f5f5);
-  color: var(--ink3);
-  font-weight: 600;
-  padding: 5px 7px;
-  border: 1px solid var(--line);
-  text-align: center;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-.db-heatmap-table td {
-  padding: 4px 7px;
-  border: 1px solid var(--line);
-  text-align: right;
-  min-width: 44px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  color: var(--ink);
-  cursor: default;
-}
-/* Cột đầu: tên CT — sticky khi scroll ngang */
-.db-hm-ct {
-  text-align: left !important;
-  font-family: inherit;
-  font-size: 11px !important;
-  font-weight: 600;
-  color: var(--ink) !important;
-  position: sticky;
-  left: 0;
-  background: var(--paper, #fff);
-  z-index: 1;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border-right: 2px solid var(--line) !important;
-}
-/* Cột tổng cuối hàng */
-.db-hm-total {
-  font-weight: 700;
-  color: var(--gold) !important;
-  border-left: 2px solid var(--line) !important;
-}
-/* Dòng footer tổng theo tuần */
-.db-hm-foot { font-weight: 700; color: var(--ink2); }
-.db-heatmap-table tfoot tr { border-top: 2px solid var(--line); }
-.db-heatmap-table tfoot td { background: var(--bg2, #f5f5f5); }
-
 @media (max-width:768px) {
-  #db-charts-row { grid-template-columns:1fr !important; }
   #db-kpi-row    { grid-template-columns:1fr 1fr !important; }
   .db-kpi-val    { font-size:17px; }
 }
