@@ -739,7 +739,8 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       top3Lines ? `\nTop CT:\n${top3Lines}` : ''
     ].filter(Boolean).join('\n');
 
-    const amt       = v.total>=1e9?(v.total/1e9).toFixed(1)+'tỷ':v.total>=1e6?Math.round(v.total/1e6)+'tr':'';
+    // Bỏ hậu tố "tr" — chỉ hiển thị số; giảm font 20%: 13→10px
+    const amt       = v.total>=1e9?(v.total/1e9).toFixed(1)+'tỷ':v.total>=1e6?String(Math.round(v.total/1e6)):'';
     const selStroke = isSel ? `stroke="#e67e22" stroke-width="2"` : 'stroke="none"';
     const selBg     = isSel ? `<rect x="${cx-1}" y="0" width="${colW+2}" height="${H}" fill="#e67e2215" rx="2"/>` : '';
 
@@ -751,45 +752,114 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       <rect x="${cx}" y="${yTop}" width="${colW}" height="${hTot}" fill="transparent" ${selStroke} rx="2">
         <title>${titleTxt}</title>
       </rect>
-      ${amt && hTot>18 ? `<text x="${cx+colW/2}" y="${yTop-5}" text-anchor="middle" font-size="13" fill="#222" font-weight="700">${amt}</text>` : ''}
+      ${amt && hTot>18 ? `<text x="${cx+colW/2}" y="${yTop-5}" text-anchor="middle" font-size="10" fill="#222" font-weight="700">${amt}</text>` : ''}
       <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="${lblColor}" font-weight="${lblWeight}">${lbl}</text>
     </g>`;
   }).join('');
 
-  // ── 4-tuần tóm tắt (cards lớn, chữ dễ đọc cho màn hình GĐ) ──
-  const last4Start = Math.max(0, endIdx - 3);
-  const last4Weeks = allWeeks.slice(last4Start, endIdx + 1);
-  const summaryCards = last4Weeks.map((w, i) => {
-    const absIdx = last4Start + i;
-    const wkNum  = absIdx + 1;
-    const v      = weeklyData[w.key] || { inv:0, ungTP:0, ungNCC:0, total:0 };
-    const isCurr = w.key === currSunKey;
-    const totalFmt = v.total >= 1e9
-      ? (v.total/1e9).toFixed(2) + ' tỷ'
-      : v.total >= 1e6
-        ? Math.round(v.total/1e6) + ' tr'
-        : fmtM(v.total);
-    const border = isCurr ? '2px solid #f0a500' : '1px solid var(--line)';
-    const headBg = isCurr ? '#fff8e7' : 'var(--bg2)';
-    // Font giảm ~20%: 13→11px, 11→9px, 24→19px
-    return `<div style="border:${border};border-radius:10px;overflow:hidden;box-shadow:0 1px 4px #0001">
-      <div style="background:${headBg};padding:6px 10px 4px;border-bottom:1px solid var(--line)">
-        <div style="font-size:11px;font-weight:700;color:#444">Tuần ${wkNum}${isCurr?' <span style="color:#f0a500;font-size:9px">▶ Hiện tại</span>':''}</div>
-        <div style="font-size:9px;color:#666">CN ${viShort(w.sun)} – T7 ${viShort(w.sat)}</div>
-      </div>
-      <div style="padding:8px 10px">
-        <div style="font-size:19px;font-weight:800;color:#222;line-height:1.1;margin-bottom:5px">${totalFmt}</div>
-        <div style="font-size:9px;color:#555;line-height:1.8">
-          ${v.inv    > 0 ? `<span style="display:inline-block;width:7px;height:7px;background:${C_INV};border-radius:2px;margin-right:3px;vertical-align:middle"></span>HĐ: ${Math.round(v.inv/1e6)}tr<br>` : ''}
-          ${v.ungTP  > 0 ? `<span style="display:inline-block;width:7px;height:7px;background:${C_TP};border-radius:2px;margin-right:3px;vertical-align:middle"></span>TP: ${Math.round(v.ungTP/1e6)}tr<br>` : ''}
-          ${v.ungNCC > 0 ? `<span style="display:inline-block;width:7px;height:7px;background:${C_NCC};border-radius:2px;margin-right:3px;vertical-align:middle"></span>NCC: ${Math.round(v.ungNCC/1e6)}tr` : ''}
-          ${v.total === 0 ? '<span style="color:#aaa">Chưa có phát sinh</span>' : ''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+  // ── Chi tiết tuần được chọn (hiển thị bên dưới biểu đồ khi click cột) ───
+  const weekDetailHtml = (() => {
+    if (!selectedDashboardWeekKey) {
+      return `<div style="margin-top:14px;padding:14px 0;text-align:center;
+                          color:var(--ink3);font-size:11px;letter-spacing:.2px">
+                ↑ Click vào một cột để xem chi tiết chi phí trong tuần đó
+              </div>`;
+    }
 
-  // Filter buttons — trạng thái active highlight bằng màu gold
+    const sun    = selectedDashboardWeekKey;
+    const sat    = ccSaturdayISO(sun);
+    const wkNum  = allWeeks.findIndex(w => w.key === sun) + 1;
+
+    // Gom chi phí theo CT từ invoiceData + ungData trong [sun, sat]
+    const ctMap = {};
+    const ensure = nm => { if (!ctMap[nm]) ctMap[nm] = {inv:0, ungTP:0, ungNCC:0}; return ctMap[nm]; };
+
+    invoiceData
+      .filter(i => i.ngay >= sun && i.ngay <= sat)
+      .forEach(i => { ensure(resolveProjectName(i) || '(Không rõ CT)').inv += (i.thanhtien || i.tien || 0); });
+
+    ungData
+      .filter(r => r.ngay >= sun && r.ngay <= sat)
+      .forEach(r => {
+        const ct = resolveProjectName(r) || '(Không rõ CT)';
+        if (r.loai === 'thauphu')    ensure(ct).ungTP  += (r.tien || 0);
+        if (r.loai === 'nhacungcap') ensure(ct).ungNCC += (r.tien || 0);
+      });
+
+    const entries = Object.entries(ctMap)
+      .map(([nm, v]) => ({ nm, ...v, total: v.inv + v.ungTP + v.ungNCC }))
+      .filter(e => e.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    if (!entries.length) {
+      return `<div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;
+                          padding:16px;text-align:center;color:var(--ink3);font-size:11px">
+                Tuần ${wkNum} (CN ${viShort(sun)} – T7 ${viShort(sat)}) không có phát sinh
+              </div>`;
+    }
+
+    const grandTotal = entries.reduce((s, e) => s + e.total, 0);
+    const rowHtml = entries.map((e, idx) => `
+      <tr style="border-bottom:1px solid var(--line)"
+          onmouseover="this.style.background='#fffcf3'"
+          onmouseout="this.style.background=''">
+        <td style="padding:5px 8px;color:var(--ink3);font-size:11px;text-align:center;white-space:nowrap">${idx + 1}</td>
+        <td style="padding:5px 10px;font-size:12px;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(e.nm)}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_INV}">${e.inv    > 0 ? fmtM(e.inv)    : '<span style="color:var(--line2)">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_TP}">${e.ungTP  > 0 ? fmtM(e.ungTP)  : '<span style="color:var(--line2)">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_NCC}">${e.ungNCC > 0 ? fmtM(e.ungNCC) : '<span style="color:var(--line2)">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--gold)">${fmtM(e.total)}</td>
+      </tr>`).join('');
+
+    return `
+      <div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="background:#f3f1ec;padding:8px 14px;display:flex;align-items:center;
+                    justify-content:space-between;border-bottom:1px solid var(--line)">
+          <span style="font-size:12px;font-weight:700;color:var(--ink)">
+            📅 Chi tiết Tuần ${wkNum}
+            <span style="font-size:10px;font-weight:400;color:var(--ink2);margin-left:8px">
+              CN ${viShort(sun)} – T7 ${viShort(sat)}
+            </span>
+          </span>
+          <button onclick="_dbSelectWeek('${sun}')"
+                  style="background:none;border:none;cursor:pointer;color:var(--ink3);
+                         font-size:15px;padding:2px 7px;border-radius:4px;line-height:1;
+                         transition:background .15s"
+                  onmouseover="this.style.background='var(--line)'"
+                  onmouseout="this.style.background='none'"
+                  title="Đóng chi tiết">✕</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:440px">
+            <thead>
+              <tr style="background:#f9f8f5;font-size:10px;font-weight:700;
+                         color:var(--ink2);text-transform:uppercase;letter-spacing:.5px">
+                <th style="padding:5px 8px;text-align:center;width:32px">#</th>
+                <th style="padding:5px 10px;text-align:left">Công trình</th>
+                <th style="padding:5px 10px;text-align:right;color:${C_INV}">Hóa đơn</th>
+                <th style="padding:5px 10px;text-align:right;color:${C_TP}">Ứng TP</th>
+                <th style="padding:5px 10px;text-align:right;color:${C_NCC}">Ứng NCC</th>
+                <th style="padding:5px 10px;text-align:right;color:var(--gold)">Tổng</th>
+              </tr>
+            </thead>
+            <tbody>${rowHtml}</tbody>
+            <tfoot>
+              <tr style="background:#fffbef;border-top:2px solid var(--line2)">
+                <td colspan="5" style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--ink2)">
+                  Tổng cộng — ${entries.length} công trình
+                </td>
+                <td style="padding:7px 10px;text-align:right;font-size:13px;font-weight:800;
+                           color:var(--gold);font-family:'IBM Plex Mono',monospace">
+                  ${fmtM(grandTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>`;
+  })();
+
+  // ── Filter buttons ─────────────────────────────────────────────
   const filterBtns = [
     { f:'all', label:'Toàn bộ năm'      },
     { f:'12',  label:'12 tuần gần nhất' },
@@ -811,39 +881,24 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
        </span>`
     : '';
 
-  // Layout: biểu đồ (flex:2, ~2/3) | tóm tắt 4 tuần (flex:1, ~1/3)
+  // ── Render: filter + biểu đồ SVG (full-width) + legend + chi tiết tuần ──
+  // viewBox y bắt đầu tại -22 để nhãn trên đỉnh cột không bị cắt
   document.getElementById('db-bar-chart').innerHTML =
-    `<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-
-       <!-- CỘT TRÁI: bộ lọc + biểu đồ SVG + chú thích (chiếm ~2/3) -->
-       <div style="flex:2;min-width:260px;overflow:hidden">
-         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-           ${filterBtns}${selNote}
-         </div>
-         <div style="overflow-x:auto">
-           <svg viewBox="0 -10 ${svgW} ${H+34}" width="${svgW}" style="min-height:${H+34}px;display:block">
-             ${bars}
-             <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
-           </svg>
-         </div>
-         <div style="display:flex;gap:12px;font-size:10px;margin-top:8px;flex-wrap:wrap;color:#444">
-           <span><span style="display:inline-block;width:10px;height:10px;background:${C_INV};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
-           <span><span style="display:inline-block;width:10px;height:10px;background:${C_TP};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng thầu phụ</span>
-           <span><span style="display:inline-block;width:10px;height:10px;background:${C_NCC};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng NCC</span>
-         </div>
-       </div>
-
-       <!-- CỘT PHẢI: tóm tắt 4 tuần gần nhất (chiếm ~1/3) -->
-       <div style="flex:1;min-width:160px">
-         <div style="font-size:11px;font-weight:700;color:#444;margin-bottom:8px;letter-spacing:.3px">
-           📋 Tóm tắt 4 tuần gần nhất
-         </div>
-         <div style="display:flex;flex-direction:column;gap:8px">
-           ${summaryCards}
-         </div>
-       </div>
-
-     </div>`;
+    `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+       ${filterBtns}${selNote}
+     </div>
+     <div style="overflow-x:auto">
+       <svg viewBox="0 -22 ${svgW} ${H+44}" width="${svgW}" style="min-height:${H+44}px;display:block">
+         ${bars}
+         <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
+       </svg>
+     </div>
+     <div style="display:flex;gap:12px;font-size:10px;margin-top:8px;flex-wrap:wrap;color:#444">
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_INV};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_TP};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng thầu phụ</span>
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_NCC};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng NCC</span>
+     </div>
+     ${weekDetailHtml}`;
 }
 
 // ── Handler bộ lọc thời gian (gọi từ onclick filter buttons) ──
