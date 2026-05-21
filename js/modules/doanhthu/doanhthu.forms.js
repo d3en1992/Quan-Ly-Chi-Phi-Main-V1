@@ -203,18 +203,18 @@ function renderHdcTable(page) {
     const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
-      <td style="white-space:nowrap;color:var(--ink3);font-size:12px">${fmtISODate(hd.ngay)}</td>
+      <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(ctName)}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${hd.phatSinh ? fmtS(hd.phatSinh) : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold);white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${hd.phatSinh ? fmtS(hd.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
       <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline btn-sm" style="color:var(--blue)" title="Sửa"
+        <button class="btn btn-outline-secondary btn-sm text-primary" title="Sửa"
           onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}">✏️</button>
       </td>
       <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline btn-sm" style="color:var(--red)" title="Xóa"
+        <button class="btn btn-outline-secondary btn-sm text-danger" title="Xóa"
           onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}">✕</button>
       </td>
     </tr>`;
@@ -389,17 +389,17 @@ function renderThuTable(page) {
   tbody.innerHTML = slice.map(r => `
     <tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="thu-row-chk" data-id="${r.id}"></td>
-      <td style="white-space:nowrap;color:var(--ink3);font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td> <!-- Sprint8 -->
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--green);white-space:nowrap">${fmtM(r.tien)}</td>
-      <td style="color:var(--ink2)">${x(r.nguoi || '—')}</td>
-      <td style="color:var(--ink3);font-size:12px">${x(r.nd || '—')}</td>
+      <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
+      <td class="text-secondary">${x(r.nguoi || '—')}</td>
+      <td class="text-body-secondary" style="font-size:12px">${x(r.nd || '—')}</td>
       <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline btn-sm" style="color:var(--blue)" title="Sửa"
+        <button class="btn btn-outline-secondary btn-sm text-primary" title="Sửa"
           onclick="editThuRecord('${r.id}')">✏️</button>
       </td>
       <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline btn-sm" style="color:var(--red);padding:2px 8px" title="Xóa"
+        <button class="btn btn-outline-secondary btn-sm text-danger" style="padding:2px 8px" title="Xóa"
           onclick="delThuRecord('${r.id}')">✕</button>
       </td>
     </tr>`).join('');
@@ -577,19 +577,19 @@ function renderHdtpTable(page) {
     const tong = (r.giaTri || 0) + (r.phatSinh || 0);
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdtp-row-chk" data-id="${r.id}"></td>
-      <td style="white-space:nowrap;color:var(--ink3);font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td> <!-- Sprint8 -->
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td style="white-space:nowrap">${x(r.thauphu)}</td>
-      <td style="color:var(--ink3);font-size:12px;min-width:90px">${x(r.nd || '—')}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${r.giaTri ? fmtS(r.giaTri) : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${r.phatSinh ? fmtS(r.phatSinh) : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold);white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
+      <td class="text-secondary" style="font-size:12px;min-width:90px">${x(r.nd || '—')}</td> <!-- Sprint8 -->
+      <td class="text-end font-monospace" style="white-space:nowrap">${r.giaTri ? fmtS(r.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${r.phatSinh ? fmtS(r.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
       <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline btn-sm" style="color:var(--blue)" title="Sửa"
+        <button class="btn btn-outline-secondary btn-sm text-primary" title="Sửa"
           onclick="editHopDongThauPhu('${r.id}')">✏️</button>
       </td>
       <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline btn-sm" style="color:var(--red)" title="Xóa"
+        <button class="btn btn-outline-secondary btn-sm text-danger" title="Xóa"
           onclick="delHopDongThauPhu('${r.id}')">✕</button>
       </td>
     </tr>`;

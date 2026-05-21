@@ -182,7 +182,7 @@ function parseMoney(raw) {
 }
 
 function x(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function toast(msg,type='') { const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(type?type:''); t.classList.add('show'); clearTimeout(t._to); t._to=setTimeout(()=>t.classList.remove('show'),2800); }
+function toast(msg,type='') { const t=document.getElementById('toast'); t.textContent=msg; t.className='app-toast '+(type?type:''); t.classList.add('show'); clearTimeout(t._to); t._to=setTimeout(()=>t.classList.remove('show'),2800); }
 
 function inActiveYear(dateStr) {
   if (!dateStr) return false;

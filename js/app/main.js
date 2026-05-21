@@ -124,7 +124,7 @@ function goPage(btn, id) {
 // Sub-tab navigation bên trong page-nhap
 function goSubPage(btn, id) {
   document.querySelectorAll('#page-nhap .sub-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('#page-nhap .sub-nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#page-nhap .nav-link').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
   if (id === 'sub-hom-nay') { renderTodayInvoices(); }

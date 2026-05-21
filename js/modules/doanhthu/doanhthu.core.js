@@ -75,10 +75,10 @@ function _initDoanhThuAddons() {
     const formGrid = giaTriField.parentElement;
     formGrid.insertAdjacentHTML('afterend', `
       <div style="margin-top: 10px; grid-column: 1 / -1;">
-        <button type="button" class="btn btn-outline btn-sm" id="${prefix}-btn-chitiet" onclick="window.toggle${prefix}ChiTiet()">📊 Khối lượng chi tiết</button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="copyKLCT(this)">📋 Copy</button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="pasteKLCT(this)">📥 Paste</button>
-        <div id="${prefix}-chitiet-wrap" style="display:none; margin-top: 10px; border: 1px solid var(--line); padding: 10px; border-radius: 6px; background: var(--bg)">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="${prefix}-btn-chitiet" onclick="window.toggle${prefix}ChiTiet()">📊 Khối lượng chi tiết</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyKLCT(this)">📋 Copy</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="pasteKLCT(this)">📥 Paste</button>
+        <div id="${prefix}-chitiet-wrap" style="display:none; margin-top: 10px; border: 1px solid var(--bs-border-color); padding: 10px; border-radius: 6px; background: var(--bs-tertiary-bg)"> <!-- Sprint8 -->
           <div style="overflow-x:auto;">
             <table class="entry-table" style="width:100%; min-width: 500px;">
               <thead>
@@ -95,19 +95,19 @@ function _initDoanhThuAddons() {
             </table>
           </div>
           <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center">
-            <button type="button" class="btn btn-outline btn-sm" onclick="window.add${prefix}ChiTietRow()">+ Thêm dòng</button>
-            <div style="font-weight:bold; font-size:13px"><span style="color:var(--ink3)">Tổng chi tiết: </span><span id="${prefix}-chitiet-tong" style="color:var(--gold)">0</span></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.add${prefix}ChiTietRow()">+ Thêm dòng</button>
+            <div style="font-weight:bold; font-size:13px"><span class="text-body-secondary">Tổng chi tiết: </span><span id="${prefix}-chitiet-tong" class="text-warning">0</span></div>
           </div>
         </div>
       </div>
     `);
 
     giaTriInput.setAttribute('readonly', 'true');
-    giaTriInput.style.background = 'var(--paper)';
+    giaTriInput.style.background = 'var(--bs-tertiary-bg)'; /* Sprint8 */
     giaTriInput.style.pointerEvents = 'none';
 
     const label = giaTriField.querySelector('label');
-    if (label) label.innerHTML += ' <i style="font-weight:normal;color:var(--ink3)">(Tự động)</i>';
+    if (label) label.innerHTML += ' <i class="text-secondary" style="font-weight:normal">(Tự động)</i>'; /* Sprint8 */
   });
 }
 
@@ -162,8 +162,8 @@ function bindItemsToTable(prefix, getItemsArr) {
         <td><input type="text" class="bare-input" style="width:100%;text-align:center" placeholder="m2, m3, cái..." value="${x(it.donVi || '')}" oninput="updateItem('${prefix}', ${i}, 'donVi', this.value)"></td> <!-- [ADDED] column donVi -->
         <td><input type="number" class="bare-input" style="width:100%;text-align:center" value="${it.sl!=null ? it.sl : 1}" oninput="updateItem('${prefix}', ${i}, 'sl', this.value)"></td>
         <td><input type="text" class="bare-input" style="width:100%;text-align:right" value="${it.donGia ? parseInt(it.donGia).toLocaleString('vi-VN') : ''}" oninput="fmtInputMoney(this); updateItem('${prefix}', ${i}, 'donGia', this.dataset.raw||0)" data-raw="${it.donGia||0}"></td>
-        <td class="row-total" style="text-align:right; font-weight:bold; color:var(--gold)">${total ? total.toLocaleString('vi-VN') : '0'}</td>
-        <td style="text-align:center"><button type="button" class="btn btn-outline btn-sm" style="color:var(--red);border:none;padding:2px 6px" onclick="removeItem('${prefix}', ${i})">✕</button></td>
+        <td class="row-total text-end fw-bold text-warning">${total ? total.toLocaleString('vi-VN') : '0'}</td>
+        <td style="text-align:center"><button type="button" class="btn btn-outline-secondary btn-sm text-danger" style="border:none;padding:2px 6px" onclick="removeItem('${prefix}', ${i})">✕</button></td>
       </tr>`;
     }).join('');
     updateGlobalTotals(prefix, arr);
@@ -324,21 +324,21 @@ function _dtInYear(ngay) {
 function _dtPaginationHtml(total, curPage, onClickFn) {
   const pages = Math.ceil(total / DT_PG);
   if (pages <= 1) return '';
-  const btns = [];
+  const items = [];
   if (curPage > 0)
-    btns.push(`<button class="sub-nav-btn" onclick="${onClickFn}(${curPage - 1})">‹</button>`);
+    items.push(`<li class="page-item"><button class="page-link" onclick="${onClickFn}(${curPage - 1})">‹</button></li>`);
   for (let i = 0; i < pages; i++) {
-    btns.push(`<button class="sub-nav-btn ${i === curPage ? 'active' : ''}" onclick="${onClickFn}(${i})">${i + 1}</button>`);
+    items.push(`<li class="page-item ${i === curPage ? 'active' : ''}"><button class="page-link" onclick="${onClickFn}(${i})">${i + 1}</button></li>`);
   }
   if (curPage < pages - 1)
-    btns.push(`<button class="sub-nav-btn" onclick="${onClickFn}(${curPage + 1})">›</button>`);
-  return btns.join('');
+    items.push(`<li class="page-item"><button class="page-link" onclick="${onClickFn}(${curPage + 1})">›</button></li>`);
+  return `<ul class="pagination pagination-sm mb-0">${items.join('')}</ul>`;
 }
 
 // ── Sub-tab navigation trong page-doanhthu ────────────────────
 function dtGoSub(btn, id) {
   document.querySelectorAll('#page-doanhthu .sub-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('#page-doanhthu .sub-nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
   if (id === 'dt-sub-thongke') {
@@ -359,13 +359,13 @@ function dtGoSub(btn, id) {
 // Đảm bảo sub-tab Công Nợ tồn tại (button + page) và di chuyển bảng cũ sang đó
 function dtEnsureCongNoSubtab() {
   const page = document.getElementById('page-doanhthu');
-  const subNav = page ? page.querySelector('.sub-nav') : null;
+  const subNav = document.getElementById('dt-sub-nav');
   if (!page || !subNav) return;
 
   // Tạo nút sub-tab nếu chưa có
   if (!document.getElementById('dt-sub-congno-btn')) {
     const btn = document.createElement('button');
-    btn.className = 'sub-nav-btn';
+    btn.className = 'nav-link';
     btn.id = 'dt-sub-congno-btn';
     btn.innerHTML = '💳 CÔNG NỢ';
     btn.setAttribute('onclick', "dtGoSub(this,'dt-sub-congno')");
@@ -389,8 +389,8 @@ function dtEnsureCongNoSubtab() {
     filterRow.id = 'dt-cn-filter-row';
     filterRow.style = 'margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
     filterRow.innerHTML = `
-      <label style="font-size:12px;font-weight:600;color:var(--ink3)">Lọc Công Trình:</label>
-      <select id="dt-cn-ct-filter-sel" class="filter-sel" style="min-width:220px;max-width:340px"
+      <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label> <!-- Sprint8 -->
+      <select id="dt-cn-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px"
         onchange="dtSetCtFilter(this.value)">
         <option value="">-- Tất cả công trình --</option>
       </select>`;
@@ -409,17 +409,17 @@ function dtEnsureCongNoSubtab() {
   // Thêm bảng Công Nợ Nhà Cung Cấp (nếu chưa có)
   if (!document.getElementById('congno-ncc-tbody')) {
     const header = document.createElement('div');
-    header.className = 'section-header';
-    header.innerHTML = `<div class="section-title"><span class="dot"></span>🟠 Công Nợ Nhà Cung Cấp</div>`;
+    header.className = 'section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
+    header.innerHTML = `<div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>🟠 Công Nợ Nhà Cung Cấp</div>`;
 
     const wrap = document.createElement('div');
-    wrap.className = 'records-wrap';
+    wrap.className = 'records-wrap card shadow-sm overflow-hidden';
     wrap.style = 'margin-bottom:24px';
     wrap.innerHTML = `
       <div style="overflow-x:auto">
-        <table class="thu-table">
+        <table class="table table-sm table-hover align-middle mb-0">
           <thead>
-            <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
+            <tr class="text-secondary" style="font-size:11px;border-bottom:2px solid var(--bs-border-color)"> <!-- Sprint8 -->
               <th style="text-align:left;padding:8px 12px;font-weight:700">Nhà Cung Cấp</th>
               <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
               <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng Đã Ứng</th>
@@ -430,7 +430,7 @@ function dtEnsureCongNoSubtab() {
           <tbody id="congno-ncc-tbody"></tbody>
         </table>
       </div>
-      <div id="congno-ncc-empty" style="text-align:center;padding:32px;color:var(--ink3);font-size:13px;display:none">Chưa có dữ liệu công nợ nhà cung cấp</div>
+      <div id="congno-ncc-empty" class="text-secondary" style="text-align:center;padding:32px;font-size:13px;display:none">Chưa có dữ liệu công nợ nhà cung cấp</div> <!-- Sprint8 -->
     `;
 
     cnPage.appendChild(header);

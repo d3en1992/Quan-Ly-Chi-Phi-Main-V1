@@ -97,31 +97,31 @@ function renderTable() {
     const rowClass = src === 'quick' ? 'inv-row-quick' : src === 'detail' ? 'inv-row-detail' : '';
     const actionBtn = isManual
       ? `<span style="white-space:nowrap;display:inline-flex;gap:3px">
-          <button class="btn btn-outline btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn">✏️</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn">✕</button>
         </span>`
       : isCC
-        ? `<button class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 7px" onclick="editCCInvoice('${inv.ccKey||inv.id}')" title="Chỉnh sửa tại tab Chấm Công">↩ CC</button>`
-        : `<span style="color:var(--ink3);font-size:11px;padding:0 6px">—</span>`;
+        ? `<button class="btn btn-outline-secondary btn-sm" style="font-size:10px;padding:3px 7px" onclick="editCCInvoice('${inv.ccKey||inv.id}')" title="Chỉnh sửa tại tab Chấm Công">↩ CC</button>`
+        : `<span class="text-body-secondary" style="font-size:11px;padding:0 6px">—</span>`;
     const displayDate = fmtISODate(inv.ngay);
     return `<tr class="${rowClass}">
-    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink2)">${displayDate}</td>
+    <td class="font-monospace text-secondary" style="font-size:11px">${displayDate}</td>
     <td style="font-weight:600;font-size:12px;max-width:220px">${x(resolveProjectName(inv))}</td>
     <td><span class="tag tag-gold">${x(inv.loai)}</span></td>
-    <td class="hide-mobile" style="color:var(--ink2)">${x(inv.nguoi||'—')}</td>
-    <td class="hide-mobile" style="color:var(--ink2)">${x(inv.ncc||'—')}</td>
-    <td style="color:var(--ink2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${x(inv.nd||'—')}</td>
-    <td class="amount-td" title="Đơn giá: ${numFmt(inv.tien||0)}${inv.sl&&inv.sl!==1?' × '+inv.sl:''}">${numFmt(inv.thanhtien||inv.tien||0)}</td>
+    <td class="hide-mobile text-secondary">${x(inv.nguoi||'—')}</td> <!-- Sprint8 -->
+    <td class="hide-mobile text-secondary">${x(inv.ncc||'—')}</td> <!-- Sprint8 -->
+    <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${x(inv.nd||'—')}</td> <!-- Sprint8 -->
+    <td class="text-end font-monospace fw-semibold text-success" title="Đơn giá: ${numFmt(inv.tien||0)}${inv.sl&&inv.sl!==1?' × '+inv.sl:''}">${numFmt(inv.thanhtien||inv.tien||0)}</td>
     <td style="white-space:nowrap">${actionBtn}</td>
   </tr>`;}).join('');
 
   const tp=Math.ceil(filteredInvs.length/PG);
-  let pag=`<span>${filteredInvs.length} hóa đơn · Tổng: <strong style="color:var(--gold);font-family:'IBM Plex Mono',monospace">${fmtS(sumTT)}</strong></span>`;
+  let pag=`<span>${filteredInvs.length} hóa đơn · Tổng: <strong class="text-warning font-monospace">${fmtS(sumTT)}</strong></span>`;
   if(tp>1) {
-    pag+='<div class="page-btns">';
-    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<button class="page-btn ${p===curPage?'active':''}" onclick="goTo(${p})">${p}</button>`;
-    if(tp>10) pag+=`<span style="padding:4px 6px;color:var(--ink3)">...${tp}</span>`;
-    pag+='</div>';
+    pag+='<ul class="pagination pagination-sm mb-0">';
+    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===curPage?'active':''}"><button class="page-link" onclick="goTo(${p})">${p}</button></li>`;
+    if(tp>10) pag+=`<li class="page-item disabled"><span class="page-link">...${tp}</span></li>`;
+    pag+='</ul>';
   }
   document.getElementById('pagination').innerHTML=pag;
 }
@@ -193,14 +193,14 @@ function openEntryEdit(inv) {
   const navBtn = document.querySelector('.nav-btn[data-page="nhap"]');
   if (navBtn) goPage(navBtn, 'nhap');
   // 2. Chuyển về sub-tab sub-nhap-hd
-  const subBtn = document.querySelector('.sub-nav-btn[onclick*="sub-nhap-hd"]');
+  const subBtn = document.querySelector('.nav-link[onclick*="sub-nhap-hd"]');
   if (subBtn && !subBtn.classList.contains('active')) {
     goSubPage(subBtn, 'sub-nhap-hd');
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
   setTimeout(() => {
     // 3. Chuyển về inner tab Nhập nhanh
-    const innerBtn = document.querySelector('.inner-sub-btn[onclick*="inr-nhap-nhanh"]');
+    const innerBtn = document.querySelector('.nav-link[onclick*="inr-nhap-nhanh"]');
     if (innerBtn) goInnerSub(innerBtn, 'inr-nhap-nhanh');
     // 4. Nạp dữ liệu vào form
     document.getElementById('entry-date').value = inv.ngay || today();
@@ -305,13 +305,13 @@ function renderTrash() {
   }
   wrap.style.display=''; empty.style.display='none';
   tbody.innerHTML=trash.slice(0,100).map(inv=>`<tr>
-    <td style="font-size:11px;color:var(--ink2);white-space:nowrap;font-family:'IBM Plex Mono',monospace">${inv.ngay||''}</td>
+    <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${inv.ngay||''}</td>
     <td style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.congtrinh||'—')}</td>
     <td><span class="tag tag-gold">${x(inv.loai||'—')}</span></td>
-    <td style="color:var(--ink2);font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--green)">${numFmt(inv.tien||0)}</td>
+    <td class="text-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
+    <td class="text-end font-monospace fw-semibold text-success">${numFmt(inv.tien||0)}</td>
     <td style="white-space:nowrap;display:flex;gap:4px;padding:5px 4px">
-      <button class="btn btn-outline btn-sm" onclick="trashRestore('${inv.id}')" title="Khôi phục">↩ Khôi phục</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="trashRestore('${inv.id}')" title="Khôi phục">↩ Khôi phục</button>
       <button class="btn btn-danger btn-sm" onclick="trashDeletePermanent('${inv.id}')" title="Xóa vĩnh viễn">✕</button>
     </td>
   </tr>`).join('');
@@ -351,15 +351,15 @@ function renderTodayInvoices() {
     return `<tr>
       <td><span class="tag tag-gold">${x(inv.loai||'—')}</span></td>
       <td style="font-size:12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.congtrinh||'—')}</td>
-      <td style="text-align:right;${mono};font-weight:700;color:var(--green)">${inv.tien?numFmt(inv.tien):'—'}</td>
-      <td style="color:var(--ink2);font-size:11px">${x(inv.nguoi||'—')}</td>
-      <td style="color:var(--ink2);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
-      <td style="color:var(--ink2);font-size:11px;white-space:nowrap">${x(inv.ncc||'—')}</td>
+      <td class="text-end font-monospace fw-bold text-success">${inv.tien?numFmt(inv.tien):'—'}</td>
+      <td class="text-secondary" style="font-size:11px">${x(inv.nguoi||'—')}</td>
+      <td class="text-secondary" style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
+      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(inv.ncc||'—')}</td>
     </tr>`;
   }).join('');
 
   const total = todayInvs.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
-  if(footer) footer.innerHTML = `<span>${todayInvs.length} hóa đơn</span><span>Tổng: <strong style="color:var(--gold);${mono}">${fmtS(total)}</strong></span>`;
+  if(footer) footer.innerHTML = `<span>${todayInvs.length} hóa đơn</span><span>Tổng: <strong class="text-warning font-monospace">${fmtS(total)}</strong></span>`;
 }
 
 /** Cập nhật tất cả dropdown CT trong tab Hóa Đơn (nhập nhanh + chi tiết) ngay lập tức. */

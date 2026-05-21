@@ -645,7 +645,7 @@ function applyRoleUI() {
   _setRoleDisabled(
     '#sub-nhap-hd input, #sub-nhap-hd select, #sub-nhap-hd textarea, #sub-nhap-hd button',
     lock,
-    el => el.classList.contains('inner-sub-btn') || el.classList.contains('sub-nav-btn')
+    el => el.classList.contains('nav-link') || el.classList.contains('sub-nav-btn')
   );
   _setRoleDisabled(
     '#page-chamcong > .section-header:first-of-type button, #page-chamcong > .entry-date-bar input, #page-chamcong > .entry-date-bar select, #page-chamcong > .entry-date-bar button, #page-chamcong > .entry-table-wrap .add-row-bar button, #cc-tbody input, #cc-tbody button, #cc-tbody select, #cc-tbody textarea',

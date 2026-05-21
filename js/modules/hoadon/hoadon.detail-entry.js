@@ -7,7 +7,7 @@
 
 function goInnerSub(btn, id) {
   document.querySelectorAll('#sub-nhap-hd .inner-sub-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('#sub-nhap-hd .inner-sub-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#sub-nhap-hd .nav-link').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
   if(id === 'inr-hd-chitiet') {
@@ -370,7 +370,7 @@ function openDetailEdit(inv) {
   window.scrollTo({top:0, behavior:'smooth'});
   // Dùng một setTimeout duy nhất — loại bỏ double-timeout gây race condition trên mobile
   setTimeout(() => {
-    const innerBtn = document.querySelector('.inner-sub-btn[onclick*="inr-hd-chitiet"]');
+    const innerBtn = document.querySelector('.nav-link[onclick*="inr-hd-chitiet"]');
     if(innerBtn) goInnerSub(innerBtn, 'inr-hd-chitiet');
 
     // Set ngày TRƯỚC renderTodayInvoices (goInnerSub gọi renderTodayInvoices nên ngày phải có sẵn)

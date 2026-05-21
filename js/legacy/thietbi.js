@@ -11,10 +11,10 @@ const TB_TEN_MAY = [
 ];
 const TB_KHO_TONG = 'KHO TỔNG';
 const TB_STATUS_STYLE = {
-  'Đang hoạt động': 'background:#e6f4ec;color:#1a7a45;',
-  'Cần bảo trì':  'background:#fef3dc;color:#c8870a;',
-  'Cần sửa chữa':   'background:#fdecea;color:#c0392b;'
-};
+  'Đang hoạt động': 'background:var(--bs-success-subtle);color:var(--bs-success);',
+  'Cần bảo trì':  'background:var(--bs-warning-subtle);color:var(--bs-warning);',
+  'Cần sửa chữa':   'background:var(--bs-danger-subtle);color:var(--bs-danger);'
+}; /* Sprint8 */
 
 let tbData = load('tb_v1', []);
 
@@ -378,27 +378,26 @@ function tbRenderList() {
     return `<tr data-tbid="${r.id}">
       <td class="tb-ct-col" title="${x(ctDisplay)}">${x(ctDisplay)}</td>
       <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(r.ten)}</span></td>
-      <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;color:var(--gold)">${r.soluong||0}</td>
+      <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td>
         <select onchange="tbUpdateField('${r.id}','tinhtrang',this.value)"
-          class="tb-status" style="cursor:pointer;border:1px solid var(--line2);${ttStyle}">
+          class="tb-status" style="cursor:pointer;border:1px solid var(--bs-border-color);${ttStyle}"> <!-- Sprint8 -->
           ${ttOpts}
         </select>
       </td>
-      <td style="color:var(--ink2);font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
+      <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
       <td style="padding:6px 4px">
-        <button class="btn btn-sm" onclick="tbLuanChuyen('${r.id}')"
-          style="background:#2563eb;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap">↩ Luân chuyển</button>
+        <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button>
       </td>
-    </tr>`;
+    </tr>`; /* Sprint8 */
   }).join('');
 
   const tp = Math.ceil(filtered.length/TB_PG);
   let pag = `<span>${filtered.length} thiết bị</span>`;
   if (tp>1) {
-    pag += '<div class="page-btns">';
-    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<button class="page-btn ${p===tbPage?'active':''}" onclick="tbGoTo(${p})">${p}</button>`;
-    pag += '</div>';
+    pag += '<ul class="pagination pagination-sm mb-0">';
+    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===tbPage?'active':''}"><button class="page-link" onclick="tbGoTo(${p})">${p}</button></li>`;
+    pag += '</ul>';
   }
   document.getElementById('tb-pagination').innerHTML = pag;
 }
@@ -473,7 +472,7 @@ function tbLuanChuyen(id) {
         <select id="tb-ei-ct" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none">
           <option value="">-- Chọn --</option>${ctOpts}</select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Số Lượng chuyển <span style="font-weight:400;color:var(--ink3)">(tối đa ${r.soluong||0})</span></label>
+        <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Số Lượng chuyển <span class="text-secondary" style="font-weight:400">(tối đa ${r.soluong||0})</span></label>
           <input id="tb-ei-sl" type="number" class="np-num-input" min="1" max="${r.soluong||0}" value="${r.soluong||0}" inputmode="decimal"
             style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none"></div>
         <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Tình Trạng</label>
@@ -615,13 +614,12 @@ function renderKhoTong() {
     const ttStyle = TB_STATUS_STYLE[r.tinhtrang] || '';
     return `<tr data-tbid="${r.id}">
       <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(r.ten)}</span></td>
-      <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;color:var(--gold)">${r.soluong||0}</td>
+      <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
-      <td style="color:var(--ink2);font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
-      <td style="font-size:10px;color:var(--ink3);white-space:nowrap">${r.ngay||''}</td>
+      <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
+      <td class="text-secondary" style="font-size:10px;white-space:nowrap">${r.ngay||''}</td>
       <td style="padding:6px 4px;display:flex;gap:4px;flex-wrap:nowrap">
-        <button class="btn btn-sm" onclick="tbLuanChuyen('${r.id}')"
-          style="background:#2563eb;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap">↩ Luân chuyển</button>
+        <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button> <!-- Sprint8 -->
         <button class="btn btn-danger btn-sm" onclick="tbDeleteRow('${r.id}')">✕</button>
       </td>
     </tr>`;
@@ -630,9 +628,9 @@ function renderKhoTong() {
   const tp = Math.ceil(filtered.length/KHO_PG);
   let pag = `<span>${filtered.length} thiết bị</span>`;
   if (tp>1) {
-    pag += '<div class="page-btns">';
-    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<button class="page-btn ${p===khoPage?'active':''}" onclick="khoGoTo(${p})">${p}</button>`;
-    pag += '</div>';
+    pag += '<ul class="pagination pagination-sm mb-0">';
+    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===khoPage?'active':''}"><button class="page-link" onclick="khoGoTo(${p})">${p}</button></li>`;
+    pag += '</ul>';
   }
   document.getElementById('kho-pagination').innerHTML = pag;
 }
@@ -667,8 +665,8 @@ function tbRenderThongKeVon() {
 
   tbody.innerHTML = items.map(item => `<tr>
     <td style="font-weight:600">${x(item.ct)}</td>
-    <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:15px;color:var(--gold)">${item.total}</td>
-    <td style="text-align:center;color:var(--ink3);font-size:13px">${item.types.size} loại</td>
+    <td class="text-warning text-center font-monospace fw-bold" style="font-size:15px">${item.total}</td>
+    <td class="text-secondary text-center" style="font-size:13px">${item.types.size} loại</td> <!-- Sprint8 -->
   </tr>`).join('');
 
   if (pgEl) pgEl.innerHTML = `<span>${items.length} công trình</span>`;

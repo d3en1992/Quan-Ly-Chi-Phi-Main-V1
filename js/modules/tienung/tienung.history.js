@@ -50,20 +50,20 @@ function _ungSectionHTML(pagedRecs, allRecs, title, accentColor, curPage, pgSize
   if (tp > 1) {
     const btns = [];
     for (let p = 1; p <= Math.min(tp, 10); p++) {
-      btns.push(`<button class="page-btn ${p===curPage?'active':''}" onclick="${gotoFn}(${p})">${p}</button>`);
+      btns.push(`<li class="page-item ${p===curPage?'active':''}"><button class="page-link" onclick="${gotoFn}(${p})">${p}</button></li>`);
     }
-    pagHtml = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);background:#f3f1ec;font-size:12px;color:var(--ink2)">
+    pagHtml = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);font-size:12px" class="text-secondary">
       <span>${allRecs.length} dòng · <span style="${mono};font-weight:700;color:${accentColor}">${fmtS(sumSec)}</span></span>
-      <div class="page-btns">${btns.join('')}</div>
-    </div>`;
+      <ul class="pagination pagination-sm mb-0">${btns.join('')}</ul>
+    </div>`; /* Sprint8 */
   }
   return `<div style="margin-bottom:18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:var(--bg);border-radius:6px;margin-bottom:8px;border-left:3px solid ${accentColor}">
-      <span style="font-weight:700;font-size:12px;color:var(--ink2)">${title}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:var(--bs-tertiary-bg);border-radius:6px;margin-bottom:8px;border-left:3px solid ${accentColor}">
+      <span class="text-secondary fw-bold" style="font-size:12px">${title}</span>
       <span style="${mono};font-size:12px;font-weight:700;color:${accentColor}">${fmtS(sumSec)}</span>
-    </div>
+    </div> <!-- Sprint8 -->
     <div style="overflow-x:auto">
-      <table class="records-table">
+      <table class="table table-sm table-hover align-middle mb-0 w-100">
         <thead><tr>
           <th style="width:32px;text-align:center">
             <input type="checkbox" class="ung-section-chk-all" title="Chọn tất cả"
@@ -76,13 +76,13 @@ function _ungSectionHTML(pagedRecs, allRecs, title, accentColor, curPage, pgSize
           <td style="text-align:center;padding:4px">
             <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer">
           </td>
-          <td style="${mono};font-size:11px;color:var(--ink2)">${fmtISODate(r.ngay)}</td>
+          <td class="text-secondary font-monospace" style="font-size:11px">${fmtISODate(r.ngay)}</td> <!-- Sprint8 -->
           <td style="font-weight:600;font-size:12px">${x(r.tp)}</td>
-          <td style="color:var(--ink2)">${x(resolveProjectName(r)||'—')}</td>
-          <td style="color:var(--ink2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
-          <td class="amount-td" style="color:var(--blue)">${numFmt(r.tien||0)}</td>
+          <td class="text-secondary">${x(resolveProjectName(r)||'—')}</td> <!-- Sprint8 -->
+          <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td> <!-- Sprint8 -->
+          <td class="text-end font-monospace fw-semibold text-primary">${numFmt(r.tien||0)}</td>
           <td style="white-space:nowrap;display:flex;gap:4px;justify-content:flex-end">
-            <button class="btn btn-outline btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
             <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')">✕</button>
           </td>
         </tr>`).join('')}</tbody>
@@ -99,7 +99,7 @@ function renderUngTable() {
   const sumTien = sumBy(filteredUng, 'tien');
 
   if (!allTp.length && !allNcc.length) {
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink3);font-size:14px">Không có dữ liệu tiền ứng nào</div>`;
+    container.innerHTML = `<div class="text-secondary" style="text-align:center;padding:40px;font-size:14px">Không có dữ liệu tiền ứng nào</div>`; /* Sprint8 */
     document.getElementById('ung-pagination').innerHTML = ''; return;
   }
 
@@ -112,7 +112,7 @@ function renderUngTable() {
 
   const mono = "font-family:'IBM Plex Mono',monospace";
   document.getElementById('ung-pagination').innerHTML =
-    `<span>${filteredUng.length} bản ghi · Tổng tiền ứng: <strong style="color:var(--blue);${mono}">${fmtS(sumTien)}</strong></span>`;
+    `<span>${filteredUng.length} bản ghi · Tổng tiền ứng: <strong class="text-primary font-monospace">${fmtS(sumTien)}</strong></span>`; /* Sprint8 */
 }
 
 function goUngTpTo(p) { ungTpPage=p; renderUngTable(); }

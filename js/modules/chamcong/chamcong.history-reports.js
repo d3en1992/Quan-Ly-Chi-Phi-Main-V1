@@ -119,29 +119,29 @@ function renderCCHistory(){
   const paged=rows.slice(start,start+CC_PG_HIST);
 
   tbody.innerHTML=paged.map(r=>`<tr>
-    <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink2);white-space:nowrap">${viShort(r.fromDate)}<br><span style="color:var(--ink3)">${viShort(r.toDate)}</span></td>
+    <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${viShort(r.fromDate)}<br><span class="text-secondary">${viShort(r.toDate)}</span></td> <!-- Sprint8 -->
     <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.ct||'—')}</td>
-    ${r.d.map(v=>`<td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;${v===1?'color:var(--green)':v>0?'color:var(--blue)':'color:var(--line2)'}">${v||'·'}</td>`).join('')}
-    <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold)">${r.tc}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink2)">${r.avgLuong?numFmt(r.avgLuong):'—'}</td>
-    <td class="amount-td">${r.tl?numFmt(r.tl):'—'}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--blue)">${r.pc?numFmt(r.pc):'—'}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2)">${r.hd?numFmt(r.hd):'—'}</td>
-    <td style="color:var(--ink2);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd||'—')}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;color:var(--gold)">${r.tongcong?numFmt(r.tongcong):'—'}</td>
+    ${r.d.map(v=>`<td class="${v===1?'text-success':v>0?'text-primary':'text-body-secondary'}" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px">${v||'·'}</td>`).join('')}
+    <td class="text-warning" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${r.tc}</td>
+    <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px">${r.avgLuong?numFmt(r.avgLuong):'—'}</td>
+    <td class="text-end font-monospace fw-semibold text-success">${r.tl?numFmt(r.tl):'—'}</td>
+    <td class="text-primary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${r.pc?numFmt(r.pc):'—'}</td>
+    <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${r.hd?numFmt(r.hd):'—'}</td>
+    <td class="text-secondary" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd||'—')}</td>
+    <td class="text-warning" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px">${r.tongcong?numFmt(r.tongcong):'—'}</td>
     <td>
-      <button class="btn btn-outline btn-sm" onclick="loadCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Tải tuần này" style="min-width:44px;min-height:36px;padding:6px 10px">↩ Tải</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Tải tuần này" style="min-width:44px;min-height:36px;padding:6px 10px">↩ Tải</button>
       <button class="btn btn-danger btn-sm" onclick="delCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Xóa tuần" style="min-width:44px;min-height:36px;padding:6px 10px">✕ Xóa</button>
     </td>
   </tr>`).join('');
 
   const tp=Math.ceil(rows.length/CC_PG_HIST);
-  let pag=`<span>${rows.length} dòng · Tổng lương: <strong style="color:var(--green);font-family:'IBM Plex Mono',monospace">${fmtS(totalTL)}</strong> · Tổng cộng: <strong style="color:var(--gold);font-family:'IBM Plex Mono',monospace">${fmtS(totalTC2)}</strong></span>`;
+  let pag=`<span>${rows.length} dòng · Tổng lương: <strong class="text-success font-monospace">${fmtS(totalTL)}</strong> · Tổng cộng: <strong class="text-warning font-monospace">${fmtS(totalTC2)}</strong></span>`;
   if(tp>1){
-    pag+='<div class="page-btns">';
-    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<button class="page-btn ${p===ccHistPage?'active':''}" onclick="ccHistGoTo(${p})">${p}</button>`;
-    if(tp>10) pag+=`<span style="padding:4px 6px;color:var(--ink3)">...${tp}</span>`;
-    pag+='</div>';
+    pag+='<ul class="pagination pagination-sm mb-0">';
+    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===ccHistPage?'active':''}"><button class="page-link" onclick="ccHistGoTo(${p})">${p}</button></li>`;
+    if(tp>10) pag+=`<li class="page-item disabled"><span class="page-link">...${tp}</span></li>`;
+    pag+='</ul>';
   }
   document.getElementById('cc-hist-pagination').innerHTML=pag;
   renderCCTLT();
@@ -201,7 +201,7 @@ function renderCCTLT(){
   const isMobile=window.innerWidth<768;
 
   if(!rows.length){
-    if(isMobile){ tableWrap.style.display='none'; cardsEl.style.display='block'; cardsEl.innerHTML='<p style="text-align:center;color:var(--ink3);padding:20px">Chưa có dữ liệu</p>'; }
+    if(isMobile){ tableWrap.style.display='none'; cardsEl.style.display='block'; cardsEl.innerHTML='<p class="text-secondary" style="text-align:center;padding:20px">Chưa có dữ liệu</p>'; } /* Sprint8 */
     else{ tableWrap.style.display=''; cardsEl.style.display='none'; tbody.innerHTML=`<tr class="empty-row"><td colspan="17">Chưa có dữ liệu</td></tr>`; }
     document.getElementById('cc-tlt-pagination').innerHTML=''; return;
   }
@@ -222,7 +222,7 @@ function renderCCTLT(){
       const ctsHtml=r.cts.length?`<div class="tlt-card-cts">${r.cts.map(c=>x(c)).join(' · ')}</div>`:'';
       const periodHtml=fWk?`${viShort(r.fromDate)} – ${viShort(r.toDate)}`:'Tổng nhiều tuần';
       const noCon_=_calcDebtBefore(r.name, r.fromDate);
-      return `<div class="tlt-card"
+      return `<div class="tlt-card card shadow-sm"
         data-name="${x(r.name)}" data-from="${r.fromDate}" data-to="${r.toDate}"
         data-tc="${r.tc}" data-tl="${r.tl}" data-pc="${r.pc}" data-hdml="${r.hdml}"
         data-loan="${r.loan}" data-tru="${r.tru}" data-no-con="${noCon_}"
@@ -257,26 +257,26 @@ function renderCCTLT(){
         data-loan="${r.loan}" data-tru="${r.tru}" data-no-con="${noCon_}"
         data-cts="${r.cts.join('|')}">
         <td style="text-align:center;padding:4px"><input type="checkbox" class="cc-tlt-chk" style="width:15px;height:15px;cursor:pointer"></td>
-        <td style="${mono};font-size:10px;color:var(--ink2);white-space:nowrap">${fWk?viShort(r.fromDate):'Tổng'}<br><span style="color:var(--ink3)">${fWk?viShort(r.toDate):r.tc+' công'}</span></td>
+        <td class="text-secondary" style="${mono};font-size:10px;white-space:nowrap">${fWk?viShort(r.fromDate):'Tổng'}<br><span class="text-body-secondary">${fWk?viShort(r.toDate):r.tc+' công'}</span></td>
         <td style="font-weight:700;font-size:13px">${x(r.name||'—')}</td>
-        <td style="text-align:center;font-size:12px;font-weight:700;color:var(--ink2)">${cnRoles[r.name]||'—'}</td>
-        ${r.d.map(v=>`<td style="text-align:center;${mono};font-weight:600;font-size:12px;${v===1?'color:var(--green)':v>0?'color:var(--blue)':'color:var(--line2)'}">${v||'·'}</td>`).join('')}
-        <td style="text-align:center;${mono};font-weight:700;color:var(--gold)">${r.tc}</td>
-        <td style="text-align:right;${mono};font-weight:700;font-size:13px;color:var(--green)">${tcLuong?numFmt(tcLuong):'—'}</td>
-        <td style="text-align:right;${mono};font-size:12px;color:var(--ink2)">${luongTB?numFmt(luongTB):'—'}</td>
-        <td style="text-align:right;${mono};font-size:12px;color:var(--red)">${r.tru?numFmt(r.tru):'—'}</td>
-        <td style="text-align:right;${mono};font-weight:700;color:var(--green);background:#f1f8f4">${thucLanh_>0?numFmt(thucLanh_):thucLanh_<0?'('+numFmt(-thucLanh_)+')':'—'}</td>
-        <td class="project-col" style="font-size:11px;color:var(--ink2)">${ctDisplay_}</td>
+        <td class="text-secondary" style="text-align:center;font-size:12px;font-weight:700">${cnRoles[r.name]||'—'}</td>
+        ${r.d.map(v=>`<td class="${v===1?'text-success':v>0?'text-primary':'text-body-secondary'}" style="text-align:center;${mono};font-weight:600;font-size:12px">${v||'·'}</td>`).join('')}
+        <td class="text-warning" style="text-align:center;${mono};font-weight:700">${r.tc}</td>
+        <td class="text-success" style="text-align:right;${mono};font-weight:700;font-size:13px">${tcLuong?numFmt(tcLuong):'—'}</td>
+        <td class="text-secondary" style="text-align:right;${mono};font-size:12px">${luongTB?numFmt(luongTB):'—'}</td>
+        <td class="text-danger" style="text-align:right;${mono};font-size:12px">${r.tru?numFmt(r.tru):'—'}</td>
+        <td class="text-success fw-bold" style="text-align:right;${mono};background:#f1f8f4">${thucLanh_>0?numFmt(thucLanh_):thucLanh_<0?'('+numFmt(-thucLanh_)+')':'—'}</td>
+        <td class="project-col text-secondary" style="font-size:11px">${ctDisplay_}</td>
       </tr>`;
     }).join('');
   }
 
   const tp=Math.ceil(rows.length/CC_PG_TLT);
-  let pag=`<span>${rows.length} công nhân · Tổng TC Lương: <strong style="color:var(--green);${mono}">${fmtS(grandTCLuong)}</strong></span><span id="cc-tlt-selected-sum" style="margin-left:14px;color:var(--gold);font-weight:700;${mono}"></span>`;
+  let pag=`<span>${rows.length} công nhân · Tổng TC Lương: <strong class="text-success font-monospace">${fmtS(grandTCLuong)}</strong></span><span id="cc-tlt-selected-sum" class="text-warning fw-bold font-monospace" style="margin-left:14px"></span>`;
   if(tp>1){
-    pag+='<div class="page-btns">';
-    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<button class="page-btn ${p===ccTltPage?'active':''}" onclick="ccTltGoTo(${p})">${p}</button>`;
-    pag+='</div>';
+    pag+='<ul class="pagination pagination-sm mb-0">';
+    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===ccTltPage?'active':''}"><button class="page-link" onclick="ccTltGoTo(${p})">${p}</button></li>`;
+    pag+='</ul>';
   }
   document.getElementById('cc-tlt-pagination').innerHTML=pag;
 }

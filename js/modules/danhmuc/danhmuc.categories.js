@@ -18,17 +18,17 @@ function renderCtPage() {
   const entries=Object.entries(map).sort((a,b)=>
     sortBy==='name' ? a[0].localeCompare(b[0],'vi') : b[1].total-a[1].total
   );
-  if(!entries.length){grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--ink3);font-size:14px">Chưa có dữ liệu</div>`;return;}
+  if(!entries.length){grid.innerHTML=`<div class="text-secondary" style="grid-column:1/-1;text-align:center;padding:60px;font-size:14px">Chưa có dữ liệu</div>`;return;} /* Sprint8 */
   grid.innerHTML=entries.map(([ct,d])=>{
     const rows=Object.entries(d.byLoai).sort((a,b)=>b[1]-a[1]);
-    return `<div class="ct-card" onclick="showCtModal(${JSON.stringify(ct)})">
+    return `<div class="ct-card card shadow-sm overflow-hidden" onclick="showCtModal(${JSON.stringify(ct)})">
       <div class="ct-card-head">
         <div><div class="ct-card-name">${x(ct)}</div><div class="ct-card-count">${d.count} hóa đơn</div></div>
         <div class="ct-card-total">${fmtS(d.total)}</div>
       </div>
       <div class="ct-card-body">
         ${rows.slice(0,6).map(([l,v])=>`<div class="ct-loai-row"><span class="ct-loai-name">${x(l)}</span><span class="ct-loai-val">${fmtS(v)}</span></div>`).join('')}
-        ${rows.length>6?`<div style="font-size:11px;color:var(--ink3);text-align:right;padding-top:6px">+${rows.length-6} loại khác...</div>`:''}
+        ${rows.length>6?`<div class="text-secondary" style="font-size:11px;text-align:right;padding-top:6px">+${rows.length-6} loại khác...</div>`:''} <!-- Sprint8 -->
       </div>
     </div>`;
   }).join('');
@@ -41,23 +41,23 @@ function showCtModal(ctName) {
   invs.forEach(inv=>{ if(!byLoai[inv.loai])byLoai[inv.loai]=[]; byLoai[inv.loai].push(inv); });
   const total=invs.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
   let html=`<div style="display:flex;gap:12px;margin-bottom:18px">
-    <div style="flex:1;background:var(--bg);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng HĐ</div><div style="font-size:22px;font-weight:700">${invs.length}</div></div>
-    <div style="flex:2;background:var(--green-bg);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Chi Phí</div><div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--green)">${fmtM(total)}</div></div>
+    <div style="flex:1;background:var(--bs-tertiary-bg);border-radius:8px;padding:12px"><div class="text-body-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng HĐ</div><div style="font-size:22px;font-weight:700">${invs.length}</div></div>
+    <div style="flex:2;background:var(--bs-success-subtle);border-radius:8px;padding:12px"><div class="text-body-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Chi Phí</div><div class="text-success" style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace">${fmtM(total)}</div></div> <!-- Sprint8 -->
   </div>`;
   Object.entries(byLoai).forEach(([loai,invList])=>{
     const lt=invList.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
     html+=`<div style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:var(--gold-bg);border-radius:6px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:var(--bs-warning-subtle);border-radius:6px;margin-bottom:6px"> <!-- Sprint8 -->
         <span class="tag tag-gold">${x(loai)}</span>
-        <span style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold)">${fmtM(lt)}</span>
+        <span class="text-warning fw-bold font-monospace">${fmtM(lt)}</span>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr>${['Ngày','Người TH','Nội Dung','Thành Tiền'].map((h,i)=>`<th style="padding:5px 8px;background:#f3f1ec;font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;text-align:${i===3?'right':'left'}">${h}</th>`).join('')}</tr></thead>
-        <tbody>${invList.map(i=>`<tr style="border-bottom:1px solid var(--line)">
-          <td style="padding:6px 8px;font-family:'IBM Plex Mono',monospace;color:var(--ink2)">${i.ngay}</td>
-          <td style="padding:6px 8px;color:var(--ink2)">${x(i.nguoi||'—')}</td>
-          <td style="padding:6px 8px;color:var(--ink2)">${x(i.nd||'—')}</td>
-          <td style="padding:6px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--green)">${numFmt(i.thanhtien||i.tien||0)}</td>
+        <thead><tr>${['Ngày','Người TH','Nội Dung','Thành Tiền'].map((h,i)=>`<th class="text-secondary" style="padding:5px 8px;background:var(--bs-tertiary-bg);font-size:10px;font-weight:700;text-transform:uppercase;text-align:${i===3?'right':'left'}">${h}</th>`).join('')}</tr></thead> <!-- Sprint8 -->
+        <tbody>${invList.map(i=>`<tr style="border-bottom:1px solid var(--bs-border-color)"> <!-- Sprint8 -->
+          <td class="text-secondary font-monospace" style="padding:6px 8px">${i.ngay}</td>
+          <td class="text-secondary" style="padding:6px 8px">${x(i.nguoi||'—')}</td>
+          <td class="text-secondary" style="padding:6px 8px">${x(i.nd||'—')}</td>
+          <td class="text-success text-end font-monospace fw-semibold" style="padding:6px 8px">${numFmt(i.thanhtien||i.tien||0)}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>`;
@@ -350,12 +350,12 @@ function renderSettings() {
       .sort((a, b) => (a.item || '').localeCompare(b.item || '', 'vi'));
     const countLabel = `${filtered.length}`;
     const card=document.createElement('div');
-    card.className='settings-card';
+    card.className='settings-card card shadow-sm overflow-hidden';
     card.innerHTML=`
       <div class="settings-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div class="settings-card-title">${cfg.title} <span style="font-size:11px;font-weight:400;color:var(--ink3)">(${countLabel})</span></div>
+        <div class="settings-card-title">${cfg.title} <span class="text-secondary" style="font-size:11px;font-weight:400">(${countLabel})</span></div> <!-- Sprint8 -->
         <input type="search" id="dm-search-${cfg.id}" placeholder="🔍 Tìm..." autocomplete="off"
-          style="flex:0 0 auto;width:140px;padding:4px 8px;border:1.5px solid var(--line2);border-radius:6px;font-family:inherit;font-size:12px;background:var(--paper);color:var(--ink);outline:none"
+          style="flex:0 0 auto;width:140px;padding:4px 8px;border:1.5px solid var(--bs-border-color-translucent);border-radius:6px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none" <!-- Sprint8 -->
           oninput="_dmFilterCard('${cfg.id}')">
       </div>
       <div class="settings-list" id="sl-${cfg.id}">
@@ -368,7 +368,7 @@ function renderSettings() {
       </div>
       <div class="settings-add">
         <input type="text" id="sa-${cfg.id}" placeholder="Thêm mới..." onkeydown="if(event.key==='Enter')addItem('${cfg.id}')">
-        <button class="btn btn-gold btn-sm" onclick="addItem('${cfg.id}')">+ Thêm</button>
+        <button class="btn btn-warning btn-sm" onclick="addItem('${cfg.id}')">+ Thêm</button>
       </div>`;
     grid.appendChild(card);
   });
@@ -393,17 +393,17 @@ function renderCTItem(item, idx) {
   const inUse = isItemInUse('congTrinh', item);
   const yr = cats.congTrinhYears && cats.congTrinhYears[item];
   const yrBadge = yr
-    ? `<span style="font-size:10px;color:#1565c0;padding:1px 5px;background:rgba(21,101,192,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">${yr}</span>`
+    ? `<span class="text-primary" style="font-size:10px;padding:1px 5px;background:rgba(21,101,192,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">${yr}</span>`
     : '';
   return `<div class="settings-item" id="si-congTrinh-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-congTrinh-${idx}" ondblclick="startEdit('congTrinh',${idx})">${x(item)}</span>
     ${yrBadge}
-    ${inUse?`<span title="Đang được sử dụng" style="font-size:10px;color:#1a7a45;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">✓ đang dùng</span>`:''}
     <input class="s-edit-input" id="se-congTrinh-${idx}" value="${x(item)}"
       onblur="finishEdit('congTrinh',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congTrinh',${idx});if(event.key==='Escape')cancelEdit('congTrinh',${idx})">
-    <button class="btn btn-outline btn-sm btn-icon" onclick="startEdit('congTrinh',${idx})" title="Sửa tên">✏️</button>
-    <button class="btn ${inUse?'btn-outline':'btn-danger'} btn-sm btn-icon" onclick="delItem('congTrinh',${idx})"
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congTrinh',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congTrinh',${idx})"
       title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
 }
@@ -412,12 +412,12 @@ function renderItem(catId,item,idx) {
   const inUse = isItemInUse(catId, item);
   return `<div class="settings-item" id="si-${catId}-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-${catId}-${idx}" ondblclick="startEdit('${catId}',${idx})">${x(item)}</span>
-    ${inUse?`<span title="Đang được sử dụng" style="font-size:10px;color:#1a7a45;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px">✓ đang dùng</span>`:''}
     <input class="s-edit-input" id="se-${catId}-${idx}" value="${x(item)}"
       onblur="finishEdit('${catId}',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('${catId}',${idx});if(event.key==='Escape')cancelEdit('${catId}',${idx})">
-    <button class="btn btn-outline btn-sm btn-icon" onclick="startEdit('${catId}',${idx})" title="Sửa tên">✏️</button>
-    <button class="btn ${inUse?'btn-outline':'btn-danger'} btn-sm btn-icon" onclick="delItem('${catId}',${idx})"
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('${catId}',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('${catId}',${idx})"
       title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
 }
@@ -429,20 +429,20 @@ function renderCNItem(name, idx) {
   const inUse = ccData.some(w => !w.deletedAt && w.workers && w.workers.some(wk => wk.name === name));
   return `<div class="settings-item" id="si-congNhan-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-congNhan-${idx}" ondblclick="startEdit('congNhan',${idx})">${x(name)}</span>
-    ${inUse?`<span title="Đang được sử dụng" style="font-size:10px;color:#1a7a45;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px">✓ đang dùng</span>`:''}
     <input class="s-edit-input" id="se-congNhan-${idx}" value="${x(name)}"
       onblur="finishEdit('congNhan',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congNhan',${idx});if(event.key==='Escape')cancelEdit('congNhan',${idx})">
     <select onchange="updateCNRole(${idx},this.value)"
-      style="margin:0 4px;padding:2px 6px;border:1px solid var(--line2);border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;min-width:44px"
+      style="margin:0 4px;padding:2px 6px;border:1px solid var(--bs-border-color-translucent);border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;min-width:44px" /* Sprint8 */
       title="Vai trò (C=Cái, T=Thợ, P=Phụ)">
       <option value="" ${!role?'selected':''}>—</option>
       <option value="C" ${role==='C'?'selected':''}>C</option>
       <option value="T" ${role==='T'?'selected':''}>T</option>
       <option value="P" ${role==='P'?'selected':''}>P</option>
     </select>
-    <button class="btn btn-outline btn-sm btn-icon" onclick="startEdit('congNhan',${idx})" title="Sửa tên">✏️</button>
-    <button class="btn ${inUse?'btn-outline':'btn-danger'} btn-sm btn-icon" onclick="delItem('congNhan',${idx})"
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congNhan',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congNhan',${idx})"
       title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
 }
@@ -462,12 +462,12 @@ function renderTbTenItem(item, idx) {
   const inUse = typeof tbData !== 'undefined' && tbData.some(t => t.ten === item);
   return `<div class="settings-item" id="si-tbTen-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-tbTen-${idx}" ondblclick="startEdit('tbTen',${idx})">${x(item)}</span>
-    ${inUse?`<span title="Đang được sử dụng" style="font-size:10px;color:#1a7a45;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">✓ đang dùng</span>`:''}
     <input class="s-edit-input" id="se-tbTen-${idx}" value="${x(item)}"
       onblur="finishEdit('tbTen',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('tbTen',${idx});if(event.key==='Escape')cancelEdit('tbTen',${idx})">
-    <button class="btn btn-outline btn-sm btn-icon" onclick="startEdit('tbTen',${idx})" title="Sửa tên">✏️</button>
-    <button class="btn ${inUse?'btn-outline':'btn-danger'} btn-sm btn-icon" onclick="delItem('tbTen',${idx})"
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('tbTen',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('tbTen',${idx})"
       title="${inUse?'Thiết bị đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
 }

@@ -25,27 +25,27 @@ function _showDeleteConfirm(title, bodyHtml, onConfirm) {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;'
     + 'display:flex;align-items:center;justify-content:center;padding:16px';
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:10px;padding:24px;max-width:420px;width:100%;
-                box-shadow:0 8px 32px rgba(0,0,0,.28);font-family:inherit">
-      <div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">${title}</div>
-      <div style="font-size:13px;color:#333;line-height:1.65;margin-bottom:16px">${bodyHtml}</div>
+    <div style="background:var(--bs-body-bg);border-radius:10px;padding:24px;max-width:420px;width:100%;
+                box-shadow:0 8px 32px rgba(0,0,0,.28);font-family:inherit"> <!-- Sprint8 -->
+      <div style="font-size:15px;font-weight:700;color:var(--bs-danger);margin-bottom:10px">${title}</div>
+      <div style="font-size:13px;color:var(--bs-body-color);line-height:1.65;margin-bottom:16px">${bodyHtml}</div>
       <div style="margin-bottom:16px">
-        <label style="font-size:12px;color:#555;display:block;margin-bottom:6px">
+        <label style="font-size:12px;color:var(--bs-secondary-color);display:block;margin-bottom:6px">
           Gõ <strong>DELETE</strong> để xác nhận:
         </label>
         <input id="_del-inp" type="text" autocomplete="off" placeholder="DELETE"
-          style="width:100%;box-sizing:border-box;padding:8px 12px;border:2px solid #e74c3c;
-                 border-radius:6px;font-size:14px;font-family:monospace;letter-spacing:2px;outline:none">
+          style="width:100%;box-sizing:border-box;padding:8px 12px;border:2px solid var(--bs-danger);
+                 border-radius:6px;font-size:14px;font-family:monospace;letter-spacing:2px;outline:none;background:var(--bs-body-bg);color:var(--bs-body-color)">
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button id="_del-cancel" style="padding:8px 18px;border:1px solid #ccc;border-radius:6px;
-          background:#f5f5f5;cursor:pointer;font-size:13px">Huỷ</button>
+        <button id="_del-cancel" style="padding:8px 18px;border:1px solid var(--bs-border-color);border-radius:6px;
+          background:var(--bs-tertiary-bg);color:var(--bs-body-color);cursor:pointer;font-size:13px">Huỷ</button>
         <button id="_del-ok" style="padding:8px 18px;border:none;border-radius:6px;
-          background:#e74c3c;color:#fff;cursor:pointer;font-size:13px;font-weight:700;opacity:.45" disabled>
+          background:var(--bs-danger);color:#fff;cursor:pointer;font-size:13px;font-weight:700;opacity:.45" disabled>
           Xoá
         </button>
       </div>
-    </div>`;
+    </div>`; /* Sprint8 */
   document.body.appendChild(overlay);
 
   const inp    = overlay.querySelector('#_del-inp');
@@ -419,7 +419,7 @@ function _dbKPI(data, yr, thauPhuTotal) {
   ];
 
   document.getElementById('db-kpi-row').innerHTML = cards.map(k =>
-    `<div class="db-kpi-card ${k.cls}">
+    `<div class="db-kpi-card card shadow-sm ${k.cls}">
        <div class="db-kpi-label">${k.label}</div>
        <div class="db-kpi-val">${k.val}</div>
        <div class="db-kpi-sub">${k.sub}</div>
@@ -472,13 +472,13 @@ function _dbBarChart(data) {
     return `
       <g>
         <rect x="${cx}" y="${y}" width="${colW}" height="${Math.max(h, 2)}"
-              rx="3" fill="${v ? 'var(--gold)' : 'var(--line)'}" opacity="${v ? '.85' : '.35'}">
+              rx="3" fill="${v ? 'var(--bs-warning)' : 'var(--bs-border-color)'}" opacity="${v ? '.85' : '.35'}">
           <title>T${i+1}: ${fmtM(v)}</title>
         </rect>
         <text x="${cx + colW/2}" y="${y - 4}" text-anchor="middle"
-              font-size="9" fill="var(--ink2)">${h > 14 ? amt : ''}</text>
+              font-size="9" fill="var(--bs-secondary-color)">${h > 14 ? amt : ''}</text>
         <text x="${cx + colW/2}" y="${H + 14}" text-anchor="middle"
-              font-size="9" fill="var(--ink3)">T${i+1}</text>
+              font-size="9" fill="var(--bs-secondary-color)">T${i+1}</text>
       </g>`;
   }).join('');
 
@@ -486,7 +486,7 @@ function _dbBarChart(data) {
     `<svg viewBox="0 -10 ${svgW} ${H + 28}" width="100%" class="db-pie-svg"
           style="min-width:${Math.min(svgW,300)}px;max-width:100%">
        ${bars}
-       <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
+       <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--bs-border-color)" stroke-width="1"/>
      </svg>`;
 }
 
@@ -526,7 +526,7 @@ function _dbPieChart(data) {
   const legend = entries.map(e =>
     `<div class="db-legend-row">
        <div class="db-legend-dot" style="background:${e.color}"></div>
-       <span style="flex:1;color:var(--ink2)">${e.name}</span>
+       <span style="flex:1;color:var(--bs-secondary-color)">${e.name}</span>
        <span class="db-legend-pct" style="color:${e.color}">${Math.round(e.pct*100)}%</span>
      </div>`
   ).join('');
@@ -641,7 +641,7 @@ function _dbKPIWeekly(yr, invoiceData, ungData, thauPhuTotal) {
   ];
 
   document.getElementById('db-kpi-row').innerHTML = cards.map(k =>
-    `<div class="db-kpi-card ${k.cls}">
+    `<div class="db-kpi-card card shadow-sm ${k.cls}">
        <div class="db-kpi-label">${k.label}</div>
        <div class="db-kpi-val">${k.val}</div>
        <div class="db-kpi-sub">${k.sub}</div>
@@ -710,7 +710,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
 
     if (!v.total) {
       return `<g onclick="_dbSelectWeek('${w.key}')" style="cursor:pointer">
-        <rect x="${cx}" y="${H-2}" width="${colW}" height="2" rx="1" fill="var(--line)" opacity=".3">
+        <rect x="${cx}" y="${H-2}" width="${colW}" height="2" rx="1" fill="var(--bs-border-color)" opacity=".3">
           <title>Tuần ${wkNum} (CN ${viShort(w.sun)} – T7 ${viShort(w.sat)})\nKhông có phát sinh</title>
         </rect>
         <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="${lblColor}" font-weight="${lblWeight}">${lbl}</text>
@@ -761,7 +761,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
   const weekDetailHtml = (() => {
     if (!selectedDashboardWeekKey) {
       return `<div style="margin-top:14px;padding:14px 0;text-align:center;
-                          color:var(--ink3);font-size:11px;letter-spacing:.2px">
+                          color:var(--bs-secondary-color);font-size:11px;letter-spacing:.2px">
                 ↑ Click vào một cột để xem chi tiết chi phí trong tuần đó
               </div>`;
     }
@@ -792,40 +792,40 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       .sort((a, b) => b.total - a.total);
 
     if (!entries.length) {
-      return `<div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;
-                          padding:16px;text-align:center;color:var(--ink3);font-size:11px">
+      return `<div style="margin-top:14px;border:1px solid var(--bs-border-color);border-radius:8px;
+                          padding:16px;text-align:center;color:var(--bs-secondary-color);font-size:11px">
                 Tuần ${wkNum} (CN ${viShort(sun)} – T7 ${viShort(sat)}) không có phát sinh
               </div>`;
     }
 
     const grandTotal = entries.reduce((s, e) => s + e.total, 0);
     const rowHtml = entries.map((e, idx) => `
-      <tr style="border-bottom:1px solid var(--line)"
+      <tr style="border-bottom:1px solid var(--bs-border-color)"
           onmouseover="this.style.background='#fffcf3'"
           onmouseout="this.style.background=''">
-        <td style="padding:5px 8px;color:var(--ink3);font-size:11px;text-align:center;white-space:nowrap">${idx + 1}</td>
+        <td style="padding:5px 8px;color:var(--bs-secondary-color);font-size:11px;text-align:center;white-space:nowrap">${idx + 1}</td>
         <td style="padding:5px 10px;font-size:12px;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(e.nm)}</td>
-        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_INV}">${e.inv    > 0 ? fmtM(e.inv)    : '<span style="color:var(--line2)">—</span>'}</td>
-        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_TP}">${e.ungTP  > 0 ? fmtM(e.ungTP)  : '<span style="color:var(--line2)">—</span>'}</td>
-        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_NCC}">${e.ungNCC > 0 ? fmtM(e.ungNCC) : '<span style="color:var(--line2)">—</span>'}</td>
-        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--gold)">${fmtM(e.total)}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_INV}">${e.inv    > 0 ? fmtM(e.inv)    : '<span style="color:var(--bs-border-color)">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_TP}">${e.ungTP  > 0 ? fmtM(e.ungTP)  : '<span style="color:var(--bs-border-color)">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${C_NCC}">${e.ungNCC > 0 ? fmtM(e.ungNCC) : '<span style="color:var(--bs-border-color)">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--bs-warning)">${fmtM(e.total)}</td>
       </tr>`).join('');
 
     return `
-      <div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+      <div style="margin-top:14px;border:1px solid var(--bs-border-color);border-radius:8px;overflow:hidden">
         <div style="background:#f3f1ec;padding:8px 14px;display:flex;align-items:center;
-                    justify-content:space-between;border-bottom:1px solid var(--line)">
-          <span style="font-size:12px;font-weight:700;color:var(--ink)">
+                    justify-content:space-between;border-bottom:1px solid var(--bs-border-color)">
+          <span style="font-size:12px;font-weight:700;color:var(--bs-body-color)">
             📅 Chi tiết Tuần ${wkNum}
-            <span style="font-size:10px;font-weight:400;color:var(--ink2);margin-left:8px">
+            <span style="font-size:10px;font-weight:400;color:var(--bs-secondary-color);margin-left:8px">
               CN ${viShort(sun)} – T7 ${viShort(sat)}
             </span>
           </span>
           <button onclick="_dbSelectWeek('${sun}')"
-                  style="background:none;border:none;cursor:pointer;color:var(--ink3);
+                  style="background:none;border:none;cursor:pointer;color:var(--bs-secondary-color);
                          font-size:15px;padding:2px 7px;border-radius:4px;line-height:1;
                          transition:background .15s"
-                  onmouseover="this.style.background='var(--line)'"
+                  onmouseover="this.style.background='var(--bs-border-color)'"
                   onmouseout="this.style.background='none'"
                   title="Đóng chi tiết">✕</button>
         </div>
@@ -833,23 +833,23 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
           <table style="width:100%;border-collapse:collapse;min-width:440px">
             <thead>
               <tr style="background:#f9f8f5;font-size:10px;font-weight:700;
-                         color:var(--ink2);text-transform:uppercase;letter-spacing:.5px">
+                         color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.5px">
                 <th style="padding:5px 8px;text-align:center;width:32px">#</th>
                 <th style="padding:5px 10px;text-align:left">Công trình</th>
                 <th style="padding:5px 10px;text-align:right;color:${C_INV}">Hóa đơn</th>
                 <th style="padding:5px 10px;text-align:right;color:${C_TP}">Ứng TP</th>
                 <th style="padding:5px 10px;text-align:right;color:${C_NCC}">Ứng NCC</th>
-                <th style="padding:5px 10px;text-align:right;color:var(--gold)">Tổng</th>
+                <th style="padding:5px 10px;text-align:right;color:var(--bs-warning)">Tổng</th>
               </tr>
             </thead>
             <tbody>${rowHtml}</tbody>
             <tfoot>
-              <tr style="background:#fffbef;border-top:2px solid var(--line2)">
-                <td colspan="5" style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--ink2)">
+              <tr style="background:#fffbef;border-top:2px solid var(--bs-border-color)">
+                <td colspan="5" style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--bs-secondary-color)">
                   Tổng cộng — ${entries.length} công trình
                 </td>
                 <td style="padding:7px 10px;text-align:right;font-size:13px;font-weight:800;
-                           color:var(--gold);font-family:'IBM Plex Mono',monospace">
+                           color:var(--bs-warning);font-family:'IBM Plex Mono',monospace">
                   ${fmtM(grandTotal)}
                 </td>
               </tr>
@@ -869,8 +869,8 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
     const active = _dbWeekFilter === f;
     return `<button onclick="_dbSetWeekFilter('${f}')"
       style="padding:3px 11px;border-radius:12px;font-size:10px;cursor:pointer;
-             border:1px solid ${active ? 'var(--gold)' : 'var(--line)'};
-             background:${active ? 'var(--gold)' : 'transparent'};
+             border:1px solid ${active ? 'var(--bs-warning)' : 'var(--bs-border-color)'};
+             background:${active ? 'var(--bs-warning)' : 'transparent'};
              color:${active ? '#fff' : '#333'};font-weight:${active?'700':'400'}">${label}</button>`;
   }).join('');
 
@@ -890,7 +890,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
      <div style="overflow-x:auto">
        <svg viewBox="0 -22 ${svgW} ${H+44}" width="${svgW}" style="min-height:${H+44}px;display:block">
          ${bars}
-         <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--line)" stroke-width="1"/>
+         <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--bs-border-color)" stroke-width="1"/>
        </svg>
      </div>
      <div style="display:flex;gap:12px;font-size:10px;margin-top:8px;flex-wrap:wrap;color:#444">
@@ -975,7 +975,7 @@ function _dbPieChartWeekly(invoiceData, ungData) {
   const legend = entries.map(e =>
     `<div class="db-legend-row">
        <div class="db-legend-dot" style="background:${e.color}"></div>
-       <span style="flex:1;color:var(--ink2)">${e.name}</span>
+       <span style="flex:1;color:var(--bs-secondary-color)">${e.name}</span>
        <span class="db-legend-pct" style="color:${e.color}">${Math.round(e.val/total*100)}%</span>
      </div>`
   ).join('');
@@ -1008,10 +1008,10 @@ function _dbTop5(data) {
     return `<div class="db-rank-row">
       <div class="db-rank-num ${i===0?'top1':''}">${i===0?'🥇':i+1}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        <div style="font-weight:600;color:var(--bs-body-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${inv.nd || inv.loai || '—'}
         </div>
-        <div style="font-size:10px;color:var(--ink3)">${inv.ngay} · ${resolveProjectName(inv)||'—'}</div>
+        <div style="font-size:10px;color:var(--bs-secondary-color)">${inv.ngay} · ${resolveProjectName(inv)||'—'}</div>
         <div class="db-rank-bar-bg" style="margin-top:4px">
           <div class="db-rank-bar-fill" style="width:${pct}%"></div>
         </div>
@@ -1036,10 +1036,10 @@ function _dbByCT(data) {
     return `<div class="db-rank-row">
       <div class="db-rank-num ${i===0?'top1':''}">${i+1}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+        <div style="font-weight:600;color:var(--bs-body-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
              title="${ct}">${ct}</div>
         <div class="db-rank-bar-bg" style="margin-top:4px">
-          <div class="db-rank-bar-fill" style="width:${pct}%;background:${i===0?'var(--green)':'var(--gold)'}"></div>
+          <div class="db-rank-bar-fill" style="width:${pct}%;background:${i===0?'var(--bs-success)':'var(--bs-warning)'}"></div>
         </div>
       </div>
       <div class="db-rank-amt">${fmtM(amt)}</div>
@@ -1076,7 +1076,7 @@ function _dbUngByCT() {
       return `<div class="db-rank-row">
         <div class="db-rank-num ${i===0?'top1':''}">${i+1}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+          <div style="font-weight:600;color:var(--bs-body-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
                title="${x(ct)}">${x(ct)}</div>
           <div class="db-rank-bar-bg" style="margin-top:4px">
             <div class="db-rank-bar-fill" style="width:${pct}%;background:#4a90d9"></div>
@@ -1088,17 +1088,17 @@ function _dbUngByCT() {
   } else {
     const rows = [...filtered]
       .sort((a,b) => b.ngay.localeCompare(a.ngay))
-      .map(r => `<tr style="border-bottom:1px solid var(--line)">
-        <td style="padding:7px 8px;white-space:nowrap;color:var(--ink3);font-size:12px">${r.ngay}</td>
+      .map(r => `<tr style="border-bottom:1px solid var(--bs-border-color)">
+        <td style="padding:7px 8px;white-space:nowrap;color:var(--bs-secondary-color);font-size:12px">${r.ngay}</td>
         <td style="padding:7px 8px;font-weight:600">${x(r.tp)||'—'}</td>
-        <td style="padding:7px 8px;color:var(--ink2);font-size:12px">${x(r.nd)||'—'}</td>
+        <td style="padding:7px 8px;color:var(--bs-secondary-color);font-size:12px">${x(r.nd)||'—'}</td>
         <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;color:#4a90d9;white-space:nowrap">${fmtM(r.tien||0)}</td>
       </tr>`).join('');
     const total = sumBy(filtered, 'tien');
     wrap.innerHTML = `<div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
+          <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
             <th style="text-align:left;padding:6px 8px;font-weight:600">Ngày</th>
             <th style="text-align:left;padding:6px 8px;font-weight:600">Thầu Phụ / NCC</th>
             <th style="text-align:left;padding:6px 8px;font-weight:600">Nội Dung</th>
@@ -1107,8 +1107,8 @@ function _dbUngByCT() {
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
-          <tr style="font-weight:700;border-top:2px solid var(--line)">
-            <td colspan="3" style="padding:7px 8px;color:var(--ink3)">Tổng cộng (${filtered.length} lần)</td>
+          <tr style="font-weight:700;border-top:2px solid var(--bs-border-color)">
+            <td colspan="3" style="padding:7px 8px;color:var(--bs-secondary-color)">Tổng cộng (${filtered.length} lần)</td>
             <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:#4a90d9">${fmtM(total)}</td>
           </tr>
         </tfoot>
@@ -1140,13 +1140,13 @@ function _dbTBByCT() {
     const khoSC = khoTB.filter(t=>t.tinhtrang==='Cần sửa chữa').reduce((s,t)=>s+(t.soluong||0),0);
 
     const khoRow = khoTotal > 0
-      ? `<div style="padding:10px 0;border-bottom:2px solid var(--gold);margin-bottom:4px">
-          <div style="font-weight:800;color:var(--gold);margin-bottom:6px;font-size:13px">🏪 KHO TỔNG</div>
+      ? `<div style="padding:10px 0;border-bottom:2px solid var(--bs-warning);margin-bottom:4px">
+          <div style="font-weight:800;color:var(--bs-warning);margin-bottom:6px;font-size:13px">🏪 KHO TỔNG</div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
-            <span style="color:var(--ink3)">Tổng: <b style="color:var(--ink);font-size:14px">${khoTotal}</b></span>
-            <span style="color:var(--green)">Đang hoạt động: <b>${khoHd}</b></span>
-            <span style="color:var(--gold)">Cần bảo trì: <b>${khoLau}</b></span>
-            <span style="color:var(--red)">Cần sửa chữa: <b>${khoSC}</b></span>
+            <span style="color:var(--bs-secondary-color)">Tổng: <b style="color:var(--bs-body-color);font-size:14px">${khoTotal}</b></span>
+            <span style="color:var(--bs-success)">Đang hoạt động: <b>${khoHd}</b></span>
+            <span style="color:var(--bs-warning)">Cần bảo trì: <b>${khoLau}</b></span>
+            <span style="color:var(--bs-danger)">Cần sửa chữa: <b>${khoSC}</b></span>
           </div>
         </div>`
       : '';
@@ -1164,13 +1164,13 @@ function _dbTBByCT() {
 
     const sorted = Object.entries(byCT).sort((a,b) => a[0].localeCompare(b[0],'vi'));
     const ctRows = sorted.map(([ct, s]) =>
-      `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
-        <div style="font-weight:700;color:var(--ink);margin-bottom:6px">${x(ct)}</div>
+      `<div style="padding:10px 0;border-bottom:1px solid var(--bs-border-color)">
+        <div style="font-weight:700;color:var(--bs-body-color);margin-bottom:6px">${x(ct)}</div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
-          <span style="color:var(--ink3)">Tổng: <b style="color:var(--ink)">${s.total}</b></span>
-          <span style="color:var(--green)">Đang hoạt động: <b>${s.dangHD}</b></span>
-          <span style="color:var(--gold)">Cần bảo trì: <b>${s.hdLau}</b></span>
-          <span style="color:var(--red)">Cần sửa chữa: <b>${s.canSC}</b></span>
+          <span style="color:var(--bs-secondary-color)">Tổng: <b style="color:var(--bs-body-color)">${s.total}</b></span>
+          <span style="color:var(--bs-success)">Đang hoạt động: <b>${s.dangHD}</b></span>
+          <span style="color:var(--bs-warning)">Cần bảo trì: <b>${s.hdLau}</b></span>
+          <span style="color:var(--bs-danger)">Cần sửa chữa: <b>${s.canSC}</b></span>
         </div>
       </div>`
     ).join('');
@@ -1187,22 +1187,22 @@ function _dbTBByCT() {
     }
 
     const rows = filtered.map(t => {
-      const ttColor = t.tinhtrang === 'Đang hoạt động' ? 'var(--green)'
-                    : t.tinhtrang === 'Cần bảo trì'  ? 'var(--gold)'
-                    : t.tinhtrang === 'Cần sửa chữa'   ? 'var(--red)'
-                    : 'var(--ink3)';
-      return `<tr style="border-bottom:1px solid var(--line)">
+      const ttColor = t.tinhtrang === 'Đang hoạt động' ? 'var(--bs-success)'
+                    : t.tinhtrang === 'Cần bảo trì'  ? 'var(--bs-warning)'
+                    : t.tinhtrang === 'Cần sửa chữa'   ? 'var(--bs-danger)'
+                    : 'var(--bs-secondary-color)';
+      return `<tr style="border-bottom:1px solid var(--bs-border-color)">
         <td style="padding:7px 8px;font-weight:600">${x(t.ten)}</td>
-        <td style="padding:7px 8px;text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--gold)">${t.soluong||0}</td>
+        <td style="padding:7px 8px;text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--bs-warning)">${t.soluong||0}</td>
         <td style="padding:7px 8px;color:${ttColor}">${x(t.tinhtrang)||'—'}</td>
-        <td style="padding:7px 8px;color:var(--ink3);font-size:12px">${x(t.ct)||'—'}</td>
+        <td style="padding:7px 8px;color:var(--bs-secondary-color);font-size:12px">${x(t.ct)||'—'}</td>
       </tr>`;
     }).join('');
 
     wrap.innerHTML = `<div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="font-size:11px;color:var(--ink3);border-bottom:2px solid var(--line)">
+          <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
             <th style="text-align:left;padding:6px 8px;font-weight:600">Tên Thiết Bị</th>
             <th style="text-align:center;padding:6px 8px;font-weight:600">SL</th>
             <th style="text-align:left;padding:6px 8px;font-weight:600">Tình Trạng</th>

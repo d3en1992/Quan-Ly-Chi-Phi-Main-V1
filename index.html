@@ -805,10 +805,10 @@
         </div>
         <div class="dup-modal-body" id="dup-modal-body"></div>
         <div class="dup-modal-foot">
-          <button class="btn btn-outline" onclick="closeDupModal()">
+          <button class="btn btn-outline-secondary" onclick="closeDupModal()">
             ✕ Hủy bỏ
           </button>
-          <button class="btn btn-gold" onclick="forceSaveAll()">
+          <button class="btn btn-warning" onclick="forceSaveAll()">
             💾 Vẫn lưu tất cả
           </button>
         </div>
@@ -908,7 +908,7 @@
            tabindex="-1"
            id="sidebar-nav"
            aria-labelledby="sidebar-nav-label"
-           style="width:230px;background:var(--ink);color:#fff">
+           style="width:230px;background:var(--bs-body-color);color:#fff"> <!-- Sprint8 -->
         <!-- Header Offcanvas -->
         <div class="offcanvas-header"
              style="border-bottom:1px solid rgba(255,255,255,.12);padding:12px 16px">
@@ -1092,15 +1092,15 @@
         <!-- ── Nhập HĐ/CP ── -->
         <div class="sub-page active" id="sub-nhap-hd">
           <!-- Inner sub-nav: Nhập nhanh vs Hóa đơn chi tiết -->
-          <div class="inner-sub-nav">
+          <div class="nav nav-pills gap-2 mb-3 flex-wrap">
             <button
-              class="inner-sub-btn active"
+              class="nav-link active"
               onclick="goInnerSub(this, 'inr-nhap-nhanh')"
             >
               ⚡ Nhập nhanh
             </button>
             <button
-              class="inner-sub-btn"
+              class="nav-link"
               onclick="goInnerSub(this, 'inr-hd-chitiet')"
             >
               📋 Hóa đơn chi tiết
@@ -1109,15 +1109,15 @@
 
           <!-- ── Inner sub-page 1: Nhập nhanh (giữ nguyên) ── -->
           <div class="inner-sub-page active" id="inr-nhap-nhanh">
-            <div class="section-header">
-              <div class="section-title">
+            <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
                 <span class="dot"></span>Nhập Hóa Đơn
               </div>
-              <div class="btn-group">
-                <button class="btn btn-outline" onclick="clearTable()">
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <button class="btn btn-outline-secondary" onclick="clearTable()">
                   🗑 Xóa bảng
                 </button>
-                <button class="btn btn-outline" onclick="exportEntryCSV()">
+                <button class="btn btn-outline-secondary" onclick="exportEntryCSV()">
                   ⬇ Xuất CSV
                 </button>
               </div>
@@ -1128,7 +1128,7 @@
               <input
                 type="date"
                 id="entry-date"
-                class="date-input"
+                class="form-control form-control-sm w-auto"
                 onchange="renderTodayInvoices()"
               />
             </div>
@@ -1151,25 +1151,25 @@
                   <tbody id="entry-tbody"></tbody>
                 </table>
               </div>
-              <div class="add-row-bar">
-                <button class="btn btn-outline btn-sm" onclick="addRows(1)">
+              <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addRows(1)">
                   + 1 dòng
                 </button>
-                <button class="btn btn-outline btn-sm" onclick="addRows(5)">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addRows(5)">
                   + 5 dòng
                 </button>
-                <button class="btn btn-outline btn-sm" onclick="addRows(10)">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addRows(10)">
                   + 10 dòng
                 </button>
                 <span
-                  style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+                  class="text-secondary" style="font-size: 11px; margin-left: 8px" <!-- Sprint8 -->
                   >Tab để di chuyển giữa các ô</span
                 >
               </div>
             </div>
 
-            <div class="save-bar">
-              <div class="save-bar-info">
+            <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
+              <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
                 <span>Dòng có dữ liệu: <strong id="row-count">0</strong></span>
                 <span
                   >Tổng thành tiền:
@@ -1178,7 +1178,7 @@
               </div>
               <button
                 id="entry-save-btn"
-                class="btn btn-green"
+                class="btn btn-success"
                 onclick="saveAllRows()"
               >
                 💾 Lưu Hóa Đơn
@@ -1188,11 +1188,11 @@
 
           <!-- ── Inner sub-page 2: Hóa đơn chi tiết ── -->
           <div class="inner-sub-page" id="inr-hd-chitiet">
-            <div class="section-header">
-              <div class="section-title">
+            <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
                 <span class="dot"></span>Hóa Đơn Chi Tiết
               </div>
-              <button class="btn btn-outline" onclick="clearDetailForm()">
+              <button class="btn btn-outline-secondary" onclick="clearDetailForm()">
                 🗑 Xóa form
               </button>
             </div>
@@ -1202,27 +1202,27 @@
               <input
                 type="date"
                 id="detail-ngay"
-                class="date-input"
+                class="form-control form-control-sm w-auto"
                 onchange="renderTodayInvoices()"
               />
               <select
                 id="detail-loai"
-                class="bare-select"
+                class="form-select form-select-sm w-auto"
                 style="min-width: 180px"
               ></select>
               <select
                 id="detail-ct"
-                class="bare-select"
+                class="form-select form-select-sm w-auto"
                 style="min-width: 220px; max-width: 100%"
               ></select>
               <select
                 id="detail-ncc"
-                class="bare-select"
+                class="form-select form-select-sm w-auto"
                 style="min-width: 170px"
               ></select>
               <select
                 id="detail-nguoi"
-                class="bare-select"
+                class="form-select form-select-sm w-auto"
                 style="min-width: 160px"
               ></select>
             </div>
@@ -1253,18 +1253,18 @@
                   <tbody id="detail-tbody"></tbody>
                 </table>
               </div>
-              <div class="add-row-bar">
-                <button class="btn btn-outline btn-sm" onclick="addDetailRow()">
+              <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addDetailRow()">
                   + 1 dòng
                 </button>
                 <button
-                  class="btn btn-outline btn-sm"
+                  class="btn btn-outline-secondary btn-sm"
                   onclick="for (let i = 0; i < 5; i++) addDetailRow();"
                 >
                   + 5 dòng
                 </button>
                 <span
-                  style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+                  class="text-secondary" style="font-size: 11px; margin-left: 8px" <!-- Sprint8 -->
                   >CK: nhập % (vd: 5%) hoặc số tiền (vd: 50000)</span
                 >
               </div>
@@ -1279,7 +1279,8 @@
               <div class="detail-footer-row">
                 <span class="detail-footer-label">Chiết Khấu Tổng</span>
                 <input
-                  class="detail-footer-ck-input"
+                  class="form-control form-control-sm text-end"
+                  style="width:140px"
                   id="detail-footer-ck"
                   placeholder="% hoặc số tiền..."
                   oninput="calcDetailTotals()"
@@ -1299,21 +1300,21 @@
               <input
                 type="text"
                 id="detail-nd"
-                class="detail-nd-input"
+                class="form-control form-control-sm"
                 placeholder="Tự động từ tên hàng hóa..."
               />
             </div>
 
             <!-- Save bar -->
-            <div class="save-bar" style="margin-top: 12px">
-              <div class="save-bar-info">
+            <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4" style="margin-top: 12px">
+              <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
                 <span
                   >Tổng thành tiền:
                   <span class="hi" id="detail-tong-save">0 đ</span></span
                 >
               </div>
               <button
-                class="btn btn-green"
+                class="btn btn-success"
                 id="detail-save-btn"
                 onclick="saveDetailInvoice()"
               >
@@ -1324,25 +1325,25 @@
 
           <!-- Hóa đơn đã nhập trong ngày (gộp trong tab Nhập HĐ/CP) -->
           <div id="today-invoices-wrap" style="margin-top: 20px">
-            <div class="section-header">
-              <div class="section-title" style="font-size: 14px">
+            <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
                 <span class="dot"></span>Hóa Đơn Đã Nhập Trong Ngày
                 <span
                   id="today-inv-date"
-                  style="color: var(--gold); font-size: 13px"
+                  class="text-warning" style="font-size: 13px" <!-- Sprint8 -->
                 ></span>
               </div>
               <button
-                class="btn btn-outline btn-sm"
+                class="btn btn-outline-secondary btn-sm"
                 onclick="renderTodayInvoices()"
               >
                 ↻ Làm mới
               </button>
             </div>
-            <div class="records-wrap">
+            <div class="records-wrap card shadow-sm overflow-hidden">
               <div style="overflow-x: auto">
-                <table class="records-table" style="min-width: 600px">
-                  <thead>
+                <table class="table table-sm table-hover align-middle mb-0" style="min-width: 600px">
+                  <thead class="table-light">
                     <tr>
                       <th>Loại</th>
                       <th>Công Trình</th>
@@ -1359,10 +1360,10 @@
                 id="today-inv-footer"
                 style="
                   padding: 8px 16px;
-                  border-top: 1px solid var(--line);
-                  background: #f3f1ec;
+                  border-top: 1px solid var(--bs-border-color);
+                  background: var(--bs-tertiary-bg);
                   font-size: 12px;
-                  color: var(--ink2);
+                  color: var(--bs-secondary-color); <!-- Sprint8 -->
                   display: flex;
                   justify-content: space-between;
                 "
@@ -1374,22 +1375,22 @@
 
       <!-- PAGE: THỐNG KÊ CP/HĐ -->
       <div class="page" id="page-thongkecphd">
-        <div class="section-header">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>Thống Kê Chi Phí / Hóa Đơn
           </div>
           <button
-            class="btn btn-outline"
+            class="btn btn-outline-secondary"
             id="btn-export-csv"
             onclick="exportAllCSV()"
           >
             ⬇ Xuất CSV
           </button>
         </div>
-        <div class="records-wrap">
-          <div class="records-toolbar">
+        <div class="records-wrap card shadow-sm overflow-hidden">
+          <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="f-view"
               onchange="switchTatCaView(this.value)"
             >
@@ -1406,7 +1407,7 @@
               />
             </div>
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="f-ct"
               onchange="
                 buildFilters();
@@ -1415,14 +1416,14 @@
             >
               <option value="">Tất cả công trình</option>
             </select>
-            <select class="filter-sel" id="f-loai" onchange="filterAndRender()">
+            <select class="form-select form-select-sm w-auto" id="f-loai" onchange="filterAndRender()">
               <option value="">Tất cả loại</option>
             </select>
-            <select class="filter-sel" id="f-ncc" onchange="filterAndRender()">
+            <select class="form-select form-select-sm w-auto" id="f-ncc" onchange="filterAndRender()">
               <option value="">Tất cả NCC</option>
             </select>
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="f-month"
               onchange="filterAndRender()"
             >
@@ -1432,8 +1433,8 @@
           <!-- Danh sách hóa đơn hoạt động -->
           <div id="active-inv-wrap">
             <div style="overflow-x: auto">
-              <table class="records-table" id="all-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0" id="all-table">
+                <thead class="table-light">
                   <tr>
                     <th>Ngày</th>
                     <th>Công Trình</th>
@@ -1448,7 +1449,7 @@
                 <tbody id="all-tbody"></tbody>
               </table>
             </div>
-            <div class="pagination" id="pagination"></div>
+            <div class="app-pagination" id="pagination"></div>
           </div>
           <!-- HĐ/CP đã xóa (ẩn mặc định) -->
           <div id="inline-trash-wrap" style="display: none">
@@ -1456,17 +1457,16 @@
               style="display: flex; justify-content: flex-end; padding: 8px 0"
             >
               <button
-                class="btn btn-outline btn-sm"
-                onclick="trashClearAll()"
-                style="color: var(--red)"
+                class="btn btn-outline-secondary btn-sm text-danger"
+                onclick="trashClearAll()" <!-- Sprint8 -->
               >
                 🗑 Xóa vĩnh viễn tất cả
               </button>
             </div>
             <div id="trash-wrap" style="display: none">
               <div style="overflow-x: auto">
-                <table class="records-table">
-                  <thead>
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light">
                     <tr>
                       <th>Ngày</th>
                       <th>Công Trình</th>
@@ -1485,11 +1485,11 @@
               style="
                 text-align: center;
                 padding: 20px;
-                color: var(--ink3);
+                color: var(--bs-secondary-color);
                 font-size: 13px;
-                background: var(--paper);
-                border: 1px solid var(--line);
-                border-radius: 8px;
+                background: var(--bs-body-bg);
+                border: 1px solid var(--bs-border-color);
+                border-radius: 8px; <!-- Sprint8 -->
               "
             >
               Chưa có hóa đơn nào bị xóa
@@ -1503,11 +1503,11 @@
       <!-- PAGE: THEO DÕI THIẾT BỊ -->
       <div class="page" id="page-thietbi">
         <!-- Bảng 2: Danh sách thiết bị đã lưu -->
-        <div class="section-header">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>Danh Sách Thiết Bị Tại Công Trình
           </div>
-          <div class="btn-group">
+          <div class="d-flex gap-2 flex-wrap align-items-center">
             <div class="search-box" style="min-width: 140px">
               <span class="ico">🔍</span>
               <input
@@ -1521,7 +1521,7 @@
               />
             </div>
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="tb-filter-ct"
               onchange="
                 tbPage = 1;
@@ -1531,7 +1531,7 @@
               <option value="">Tất cả công trình</option>
             </select>
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="tb-filter-tt"
               onchange="
                 tbPage = 1;
@@ -1543,16 +1543,16 @@
               <option value="Cần bảo trì">Cần bảo trì</option>
               <option value="Cần sửa chữa">Cần sửa chữa</option>
             </select>
-            <button class="btn btn-outline btn-sm" onclick="tbExportCSV()">
+            <button class="btn btn-outline-secondary btn-sm" onclick="tbExportCSV()">
               ⬇ Xuất CSV
             </button>
           </div>
         </div>
 
-        <div class="records-wrap">
+        <div class="records-wrap card shadow-sm overflow-hidden">
           <div style="overflow-x: auto">
-            <table class="records-table" id="tb-list-table">
-              <thead>
+            <table class="table table-sm table-hover align-middle mb-0" id="tb-list-table">
+              <thead class="table-light">
                 <tr>
                   <th class="tb-ct-col">Công Trình</th>
                   <th class="tb-name-col">Tên Thiết Bị</th>
@@ -1565,15 +1565,15 @@
               <tbody id="tb-list-tbody"></tbody>
             </table>
           </div>
-          <div class="pagination" id="tb-pagination"></div>
+          <div class="app-pagination" id="tb-pagination"></div>
         </div>
 
         <!-- Bảng 2b: Kho Tổng Thiết Bị -->
-        <div class="section-header" style="margin-top: 28px">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>📦 Kho Tổng Thiết Bị
           </div>
-          <div class="btn-group">
+          <div class="d-flex gap-2 flex-wrap align-items-center">
             <div class="search-box" style="min-width: 140px">
               <span class="ico">🔍</span>
               <input
@@ -1584,7 +1584,7 @@
               />
             </div>
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="kho-filter-ten"
               onchange="
                 khoPage = 1;
@@ -1594,7 +1594,7 @@
               <option value="">Tất cả thiết bị</option>
             </select>
             <select
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               id="kho-filter-tt"
               onchange="
                 khoPage = 1;
@@ -1607,7 +1607,7 @@
               <option value="Cần sửa chữa">Cần sửa chữa</option>
             </select>
             <button
-              class="btn btn-outline btn-sm"
+              class="btn btn-outline-secondary btn-sm"
               onclick="
                 khoPage = 1;
                 renderKhoTong();
@@ -1617,10 +1617,10 @@
             </button>
           </div>
         </div>
-        <div class="records-wrap">
+        <div class="records-wrap card shadow-sm overflow-hidden">
           <div style="overflow-x: auto">
-            <table class="records-table" id="kho-list-table">
-              <thead>
+            <table class="table table-sm table-hover align-middle mb-0" id="kho-list-table">
+              <thead class="table-light">
                 <tr>
                   <th class="tb-name-col">Tên Thiết Bị</th>
                   <th style="text-align: center; width: 70px">SL</th>
@@ -1633,21 +1633,21 @@
               <tbody id="kho-list-tbody"></tbody>
             </table>
           </div>
-          <div class="pagination" id="kho-pagination"></div>
+          <div class="app-pagination" id="kho-pagination"></div>
         </div>
 
         <!-- Bảng 1: Nhập thiết bị -->
-        <div class="section-header" style="margin-top: 28px">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>Nhập Máy Móc, Thiết Bị, Giàn Giáo
           </div>
-          <div class="btn-group">
-            <button class="btn btn-outline btn-sm" onclick="tbClearRows()">
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" onclick="tbClearRows()">
               🗑 Xóa bảng
             </button>
             <button
               id="tb-save-btn"
-              class="btn btn-green btn-sm"
+              class="btn btn-success btn-sm"
               onclick="tbSave()"
             >
               💾 Lưu thiết bị
@@ -1660,7 +1660,7 @@
             <span class="bar-label">Công Trình</span>
             <select
               id="tb-ct-sel"
-              class="bare-select"
+              class="form-select form-select-sm w-auto"
               style="min-width: 260px; font-size: 13px"
             >
               <option value="">-- Chọn công trình --</option>
@@ -1688,15 +1688,15 @@
                 <tbody id="tb-tbody"></tbody>
               </table>
             </div>
-            <div class="add-row-bar">
-              <button class="btn btn-outline btn-sm" onclick="tbAddRows(1)">
+            <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+              <button class="btn btn-outline-secondary btn-sm" onclick="tbAddRows(1)">
                 + 1 dòng
               </button>
-              <button class="btn btn-outline btn-sm" onclick="tbAddRows(5)">
+              <button class="btn btn-outline-secondary btn-sm" onclick="tbAddRows(5)">
                 + 5 dòng
               </button>
               <span
-                style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+                class="text-secondary" style="font-size: 11px; margin-left: 8px" <!-- Sprint8 -->
                 >Mặc định tình trạng: Đang hoạt động</span
               >
             </div>
@@ -1706,11 +1706,11 @@
 
       <!-- PAGE: DANH MỤC -->
       <div class="page" id="page-danhmuc">
-        <div class="section-header">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>Quản Lý Danh Mục
           </div>
-          <span style="font-size: 12px; color: var(--ink3)"
+          <span class="text-secondary" style="font-size: 12px" <!-- Sprint8 -->
             >Nhấn ✏️ hoặc nhấp đúp để sửa tên • Thay đổi sẽ tự cập nhật vào hóa
             đơn đã lưu</span
           >
@@ -1719,39 +1719,39 @@
 
         <!-- ── Panel Tools ── -->
         <div style="margin-top: 28px">
-          <div class="section-header">
-            <div class="section-title"><span class="dot"></span>🔧 Tools</div>
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>🔧 Tools</div>
             <span
-              style="font-size: 12px; color: var(--ink3)"
+              class="text-secondary" style="font-size: 12px" <!-- Sprint8 -->
               id="backup-status-label"
             ></span>
           </div>
 
-          <div class="records-wrap" style="padding: 16px 20px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 16px 20px">
             <!-- DATA -->
             <div style="margin-bottom: 20px">
               <div
                 style="
                   font-size: 11px;
                   font-weight: 700;
-                  color: var(--ink2);
+                  color: var(--bs-secondary-color);
                   margin-bottom: 8px;
                   text-transform: uppercase;
-                  letter-spacing: 0.8px;
+                  letter-spacing: 0.8px; <!-- Sprint8 -->
                 "
               >
                 Data
               </div>
               <div style="display: flex; flex-wrap: wrap; gap: 8px">
                 <button
-                  class="btn btn-outline"
+                  class="btn btn-outline-secondary"
                   onclick="toolExportJSON()"
                   title="Xuất snapshot toàn bộ hệ thống ra file .json"
                 >
                   📦 Xuất snapshot hệ thống
                 </button>
                 <button
-                  class="btn btn-outline"
+                  class="btn btn-outline-secondary"
                   onclick="toolImportJSON()"
                   title="Khôi phục toàn bộ hệ thống từ file snapshot .json — xóa và ghi đè toàn bộ dữ liệu"
                 >
@@ -1766,22 +1766,22 @@
                 style="
                   font-size: 11px;
                   font-weight: 700;
-                  color: var(--ink2);
+                  color: var(--bs-secondary-color);
                   margin-bottom: 8px;
                   text-transform: uppercase;
-                  letter-spacing: 0.8px;
+                  letter-spacing: 0.8px; <!-- Sprint8 -->
                 "
               >
                 Backup
               </div>
               <div
-                style="font-size: 12px; color: var(--ink2); margin-bottom: 6px"
+                class="text-secondary" style="font-size: 12px; margin-bottom: 6px" <!-- Sprint8 -->
               >
                 Bản sao lưu tự động (giữ 3 bản gần nhất)
               </div>
               <div id="backup-list-wrap">
                 <div
-                  style="color: var(--ink3); font-size: 13px; padding: 8px 0"
+                  class="text-secondary" style="font-size: 13px; padding: 8px 0" <!-- Sprint8 -->
                 >
                   Đang tải...
                 </div>
@@ -1794,24 +1794,24 @@
                 style="
                   font-size: 11px;
                   font-weight: 700;
-                  color: var(--ink2);
+                  color: var(--bs-secondary-color);
                   margin-bottom: 8px;
                   text-transform: uppercase;
-                  letter-spacing: 0.8px;
+                  letter-spacing: 0.8px; <!-- Sprint8 -->
                 "
               >
                 Excel
               </div>
               <div style="display: flex; flex-wrap: wrap; gap: 8px">
                 <button
-                  class="btn btn-outline"
+                  class="btn btn-outline-secondary"
                   onclick="toolImportExcel()"
                   title="Import dữ liệu từ file Excel (.xlsx/.xls)"
                 >
                   📥 Import Excel
                 </button>
                 <button
-                  class="btn btn-outline"
+                  class="btn btn-outline-secondary"
                   onclick="toolExportExcel()"
                   title="Xuất toàn bộ dữ liệu ra file Excel (.xlsx)"
                 >
@@ -1826,10 +1826,10 @@
                 style="
                   font-size: 11px;
                   font-weight: 700;
-                  color: #c0392b;
+                  color: var(--bs-danger);
                   margin-bottom: 8px;
                   text-transform: uppercase;
-                  letter-spacing: 0.8px;
+                  letter-spacing: 0.8px; <!-- Sprint8 -->
                 "
               >
                 ⚠ Quản Lý Dữ Liệu
@@ -1855,15 +1855,15 @@
             <div
               style="
                 padding: 10px 14px;
-                background: var(--bg);
+                background: var(--bs-tertiary-bg);
                 border-radius: 6px;
-                border: 1px solid var(--line);
+                border: 1px solid var(--bs-border-color);
                 font-size: 12px;
-                color: var(--ink3);
-                line-height: 1.7;
+                color: var(--bs-secondary-color);
+                line-height: 1.7; <!-- Sprint8 -->
               "
             >
-              <strong style="color: var(--ink2)">Cách hoạt động:</strong><br />
+              <strong class="text-secondary">Cách hoạt động:</strong> <!-- Sprint8 --><br />
               • <b>Xuất snapshot</b>: Tải toàn bộ dữ liệu ra file .json — dùng
               để chuyển thiết bị hoặc lưu trữ<br />
               • <b>Import JSON</b>: Khôi phục từ snapshot — xóa toàn bộ dữ liệu
@@ -1872,11 +1872,11 @@
               <span
                 id="data-version-badge"
                 style="
-                  background: var(--green);
+                  background: var(--bs-success);
                   color: #fff;
                   padding: 1px 7px;
                   border-radius: 10px;
-                  font-weight: 700;
+                  font-weight: 700; <!-- Sprint8 -->
                 "
               ></span>
             </div>
@@ -1887,19 +1887,19 @@
       <!-- PAGE: TIỀN ỨNG TP/NCC (gộp nhập + tổng) -->
       <div class="page" id="page-nhapung">
         <!-- Bảng 1: Nhập tiền ứng -->
-        <div class="section-header">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>Nhập Tiền Ứng
           </div>
-          <div class="btn-group">
-            <button class="btn btn-outline" onclick="clearUngTable()">
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <button class="btn btn-outline-secondary" onclick="clearUngTable()">
               🗑 Xóa bảng
             </button>
-            <button class="btn btn-outline" onclick="exportUngEntryCSV()">
+            <button class="btn btn-outline-secondary" onclick="exportUngEntryCSV()">
               ⬇ Xuất CSV
             </button>
             <button
-              class="btn btn-green"
+              class="btn btn-success"
               id="ung-save-btn"
               onclick="saveAllUngRows()"
             >
@@ -1910,7 +1910,7 @@
 
         <div class="entry-date-bar">
           <span class="bar-label">Ngày</span>
-          <input type="date" id="ung-date" class="date-input" />
+          <input type="date" id="ung-date" class="form-control form-control-sm w-auto" />
         </div>
 
         <div class="entry-table-wrap">
@@ -1922,7 +1922,7 @@
                   <th style="width: 110px">Đối Tượng</th>
                   <th style="width: 200px">
                     Thầu Phụ / Công Nhân
-                    <span style="color: var(--gold)">*</span>
+                    <span class="text-warning">*</span>
                   </th>
                   <th style="width: 220px">Công Trình</th>
                   <th style="width: 140px">Số Tiền Ứng (đ)</th>
@@ -1933,24 +1933,24 @@
               <tbody id="ung-tbody"></tbody>
             </table>
           </div>
-          <div class="add-row-bar">
-            <button class="btn btn-outline btn-sm" onclick="addUngRows(1)">
+          <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(1)">
               + 1 dòng
             </button>
-            <button class="btn btn-outline btn-sm" onclick="addUngRows(5)">
+            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(5)">
               + 5 dòng
             </button>
-            <button class="btn btn-outline btn-sm" onclick="addUngRows(10)">
+            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(10)">
               + 10 dòng
             </button>
-            <span style="font-size: 11px; color: var(--ink3); margin-left: 8px"
+            <span class="text-secondary" style="font-size: 11px; margin-left: 8px" <!-- Sprint8 -->
               >Tab để di chuyển giữa các ô</span
             >
           </div>
         </div>
 
-        <div class="save-bar">
-          <div class="save-bar-info">
+        <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
+          <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
             <span>Dòng có dữ liệu: <strong id="ung-row-count">0</strong></span>
             <span
               >Tổng tiền ứng:
@@ -1961,12 +1961,12 @@
 
         <!-- Bảng 2: Tổng tiền ứng -->
         <div style="margin-top: 24px">
-          <div class="section-header">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>Tổng Tiền Ứng
             </div>
             <div style="display: flex; gap: 8px; align-items: center">
-              <button class="btn btn-outline" onclick="exportUngAllCSV()">
+              <button class="btn btn-outline-secondary" onclick="exportUngAllCSV()">
                 ⬇ Xuất CSV
               </button>
               <button
@@ -1984,8 +1984,8 @@
               </button>
             </div>
           </div>
-          <div class="records-wrap">
-            <div class="records-toolbar">
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
               <div class="search-box">
                 <span class="ico">🔍</span>
                 <input
@@ -1996,21 +1996,21 @@
                 />
               </div>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="uf-tp"
                 onchange="filterAndRenderUng()"
               >
                 <option value="">Tất cả TP/NCC</option>
               </select>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="uf-ct"
                 onchange="filterAndRenderUng()"
               >
                 <option value="">Tất cả công trình</option>
               </select>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="uf-month"
                 onchange="filterAndRenderUng()"
               >
@@ -2018,24 +2018,24 @@
               </select>
             </div>
             <div id="ung-all-sections"></div>
-            <div class="pagination" id="ung-pagination"></div>
+            <div class="app-pagination" id="ung-pagination"></div>
           </div>
         </div>
       </div>
 
       <!-- PAGE: SỔ CHẤM CÔNG -->
       <div class="page" id="page-chamcong">
-        <div class="section-header">
-          <div class="section-title"><span class="dot"></span>Sổ Chấm Công</div>
-          <div class="btn-group">
-            <button class="btn btn-outline btn-sm" onclick="clearCCWeek()">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Sổ Chấm Công</div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearCCWeek()">
               🗑 Xóa bảng
             </button>
-            <button class="btn btn-outline btn-sm" onclick="exportCCWeekCSV()">
+            <button class="btn btn-outline-secondary btn-sm" onclick="exportCCWeekCSV()">
               ⬇ CSV
             </button>
             <button
-              class="btn btn-outline btn-sm"
+              class="btn btn-outline-secondary btn-sm"
               id="cc-copy-btn"
               onclick="copyCCWeek()"
               title="Copy toàn bộ CN + ngày công + lương tuần này"
@@ -2043,7 +2043,7 @@
               📋 Copy tuần
             </button>
             <button
-              class="btn btn-outline btn-sm"
+              class="btn btn-outline-secondary btn-sm"
               id="cc-paste-btn"
               onclick="pasteCCWeek()"
               title="Dán toàn bộ CN + ngày công đã copy"
@@ -2053,7 +2053,7 @@
             </button>
             <button
               id="cc-save-btn"
-              class="btn btn-green btn-sm"
+              class="btn btn-success btn-sm"
               onclick="saveCCWeek()"
             >
               💾 Lưu tuần này
@@ -2066,7 +2066,7 @@
           class="entry-date-bar"
           style="gap: 10px; flex-wrap: wrap; align-items: center"
         >
-          <button class="btn btn-outline btn-sm" onclick="ccPrevWeek()">
+          <button class="btn btn-outline-secondary btn-sm" onclick="ccPrevWeek()">
             ← Tuần trước
           </button>
           <span
@@ -2076,33 +2076,33 @@
               font-weight: 700;
               min-width: 200px;
               text-align: center;
-              color: var(--gold);
+              color: var(--bs-warning); <!-- Sprint8 -->
             "
           ></span>
-          <button class="btn btn-outline btn-sm" onclick="ccNextWeek()">
+          <button class="btn btn-outline-secondary btn-sm" onclick="ccNextWeek()">
             Tuần sau →
           </button>
-          <div style="width: 1px; height: 24px; background: var(--line2)"></div>
+          <div style="width: 1px; height: 24px; background: var(--bs-border-color)" <!-- Sprint8 -->></div>
           <span class="bar-label">Từ ngày</span>
           <input
             type="date"
             id="cc-from"
-            class="date-input"
+            class="form-control form-control-sm w-auto"
             onchange="onCCFromChange()"
           />
           <span class="bar-label">–</span>
           <input
             type="date"
             id="cc-to"
-            class="date-input"
+            class="form-control form-control-sm w-auto"
             readonly
-            style="background: #f0ede8; cursor: default; color: var(--ink3)"
+            class="text-secondary" style="background: var(--bs-tertiary-bg); cursor: default" <!-- Sprint8 -->
           />
-          <div style="width: 1px; height: 24px; background: var(--line2)"></div>
+          <div style="width: 1px; height: 24px; background: var(--bs-border-color)" <!-- Sprint8 -->></div>
           <span class="bar-label">Công trình</span>
           <select
             id="cc-ct-sel"
-            class="bare-select"
+            class="form-select form-select-sm w-auto"
             style="min-width: 240px; font-size: 12px"
             onchange="onCCCtSelChange()"
           >
@@ -2120,11 +2120,11 @@
               <tbody id="cc-tbody"></tbody>
             </table>
           </div>
-          <div class="add-row-bar">
-            <button class="btn btn-outline btn-sm" onclick="addCCWorker()">
+          <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+            <button class="btn btn-outline-secondary btn-sm" onclick="addCCWorker()">
               + Thêm công nhân
             </button>
-            <span style="font-size: 11px; color: var(--ink3); margin-left: 8px">
+            <span class="text-secondary" style="font-size: 11px; margin-left: 8px" <!-- Sprint8 -->>
               <strong>1</strong> = 1 công &nbsp;·&nbsp; <strong>0.5</strong> =
               nửa công &nbsp;·&nbsp; để trống = nghỉ
             </span>
@@ -2132,15 +2132,15 @@
         </div>
 
         <!-- Summary bar (no duplicate save button) -->
-        <div class="save-bar">
-          <div class="save-bar-info">
+        <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
+          <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
             <span>Tổng công: <strong id="cc-sum-tc">0</strong></span>
             <span
               >Tổng lương: <span class="hi" id="cc-sum-luong">0 đ</span></span
             >
             <span
               >Tổng cộng tuần:
-              <span class="hi" style="color: var(--gold)" id="cc-sum-tongcong"
+              <span class="hi text-warning" id="cc-sum-tongcong" <!-- Sprint8 -->
                 >0 đ</span
               ></span
             >
@@ -2151,13 +2151,13 @@
 
         <!-- Tổng Lương Tuần (theo tên CN) — đưa lên TRÊN lịch sử -->
         <div style="margin-top: 20px">
-          <div class="section-header">
-            <div class="section-title" style="font-size: 14px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
               <span class="dot"></span>Tổng Lương Tuần (theo Công Nhân)
             </div>
-            <div class="btn-group">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="cc-tlt-ct"
                 onchange="
                   ccTltPage = 1;
@@ -2167,7 +2167,7 @@
                 <option value="">Tất cả CT</option>
               </select>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="cc-tlt-week"
                 onchange="
                   ccTltPage = 1;
@@ -2176,7 +2176,7 @@
               >
                 <option value="">Tất cả tuần</option>
               </select>
-              <button class="btn btn-outline btn-sm" onclick="exportCCTLTCSV()">
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportCCTLTCSV()">
                 ⬇ Xuất CSV
               </button>
               <button
@@ -2194,10 +2194,10 @@
               </button>
             </div>
           </div>
-          <div class="records-wrap">
+          <div class="records-wrap card shadow-sm overflow-hidden">
             <div id="cc-tlt-table-wrap" style="overflow-x: auto">
-              <table class="records-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
                   <tr>
                     <th style="width: 32px; text-align: center">
                       <input
@@ -2224,7 +2224,7 @@
                     <th style="text-align: center">TC</th>
                     <th style="text-align: right">TC Lương</th>
                     <th style="text-align: right">Lương TB/Ngày</th>
-                    <th style="text-align: right; color: var(--red)">Trừ</th>
+                    <th class="text-danger" style="text-align: right">Trừ</th> <!-- Sprint8 -->
                     <th style="text-align: right">Thực Lãnh</th>
                     <th>Công Trình</th>
                   </tr>
@@ -2233,17 +2233,17 @@
               </table>
             </div>
             <div id="cc-tlt-cards" style="display: none; padding: 4px"></div>
-            <div class="pagination" id="cc-tlt-pagination"></div>
+            <div class="app-pagination" id="cc-tlt-pagination"></div>
           </div>
         </div>
 
         <!-- Lịch sử chấm công TUẦN -->
         <div style="margin-top: 20px">
-          <div class="section-header">
-            <div class="section-title" style="font-size: 14px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
               <span class="dot"></span>Lịch Sử Chấm Công Tuần
             </div>
-            <div class="btn-group">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
               <div class="search-box" style="min-width: 140px">
                 <span class="ico">🔍</span>
                 <input
@@ -2257,7 +2257,7 @@
                 />
               </div>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="cc-hist-ct"
                 onchange="
                   ccHistPage = 1;
@@ -2267,7 +2267,7 @@
                 <option value="">Tất cả CT</option>
               </select>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="cc-hist-week"
                 onchange="
                   ccHistPage = 1;
@@ -2277,17 +2277,17 @@
                 <option value="">Tất cả tuần</option>
               </select>
               <button
-                class="btn btn-outline btn-sm"
+                class="btn btn-outline-secondary btn-sm"
                 onclick="exportCCHistCSV()"
               >
                 ⬇ Xuất CSV
               </button>
             </div>
           </div>
-          <div class="records-wrap">
+          <div class="records-wrap card shadow-sm overflow-hidden">
             <div style="overflow-x: auto">
-              <table class="records-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
                   <tr>
                     <th>Tuần</th>
                     <th>Công Trình</th>
@@ -2311,18 +2311,18 @@
                 <tbody id="cc-hist-tbody"></tbody>
               </table>
             </div>
-            <div class="pagination" id="cc-hist-pagination"></div>
+            <div class="app-pagination" id="cc-hist-pagination"></div>
           </div>
         </div>
       </div>
 
       <!-- PAGE: DASHBOARD -->
       <div class="page" id="page-dashboard">
-        <div class="section-header">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>📊 Dashboard Tổng Quan
           </div>
-          <button class="btn btn-outline btn-sm" onclick="renderDashboard()">
+          <button class="btn btn-outline-secondary btn-sm" onclick="renderDashboard()">
             ↻ Làm mới
           </button>
         </div>
@@ -2340,10 +2340,10 @@
 
         <!-- Hàng 2: Biểu đồ cột tháng/tuần (full width — Pie tỷ trọng đã ẩn) -->
         <div id="db-charts-row" style="margin-bottom: 22px;">
-          <div class="records-wrap" style="padding: 18px 20px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
             <div
               id="db-bar-title"
-              style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px;"
+              style="font-size: 13px; font-weight: 700; color: var(--bs-body-color); /* Sprint8 */ margin-bottom: 14px;"
             >
               Chi Phí Theo Tháng
             </div>
@@ -2355,12 +2355,12 @@
         <div id="db-pie-chart" style="display:none"></div>
 
         <!-- Tầng 2: Chi tiết theo Công Trình -->
-        <div class="section-header" style="margin-bottom: 14px">
-          <div class="section-title">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-bottom: 14px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span>🔍 Chi Tiết Theo Công Trình
           </div>
           <select
-            class="filter-sel"
+            class="form-select form-select-sm w-auto"
             id="db-filter-ct"
             onchange="
               selectedCT = this.value;
@@ -2381,12 +2381,12 @@
             margin-bottom: 16px;
           "
         >
-          <div class="records-wrap" style="padding: 18px 20px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
             <div
               style="
                 font-size: 13px;
                 font-weight: 700;
-                color: var(--ink);
+                color: var(--bs-body-color); /* Sprint8 */
                 margin-bottom: 14px;
               "
             >
@@ -2394,12 +2394,12 @@
             </div>
             <div id="db-top5"></div>
           </div>
-          <div class="records-wrap" style="padding: 18px 20px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
             <div
               style="
                 font-size: 13px;
                 font-weight: 700;
-                color: var(--ink);
+                color: var(--bs-body-color); /* Sprint8 */
                 margin-bottom: 14px;
               "
             >
@@ -2411,14 +2411,14 @@
 
         <!-- Hàng 3b: Thiết Bị -->
         <div
-          class="records-wrap"
+          class="records-wrap card shadow-sm overflow-hidden"
           style="padding: 18px 20px; margin-bottom: 22px"
         >
           <div
             style="
               font-size: 13px;
               font-weight: 700;
-              color: var(--ink);
+              color: var(--bs-body-color); /* Sprint8 */
               margin-bottom: 14px;
             "
           >
@@ -2429,14 +2429,14 @@
 
         <!-- Hàng 5: Chi tiết từng Công Trình (từ tab Tổng CP CT) -->
         <div>
-          <div class="section-header" style="margin-bottom: 14px">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-bottom: 14px">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>🏗️ Chi Tiết Từng Công Trình
             </div>
             <div style="display: flex; align-items: center; gap: 8px">
-              <span style="font-size: 12px; color: var(--ink3)">Sắp xếp:</span>
+              <span class="text-secondary" style="font-size: 12px" <!-- Sprint8 -->>Sắp xếp:</span>
               <select
-                class="filter-sel"
+                class="form-select form-select-sm w-auto"
                 id="ct-sort"
                 onchange="renderCtPage()"
                 style="font-size: 12px"
@@ -2453,16 +2453,16 @@
       <!-- PAGE: DOANH THU & CÔNG NỢ -->
       <div class="page" id="page-doanhthu">
         <!-- Sub-nav -->
-        <div class="sub-nav">
+        <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="dt-sub-nav">
           <button
-            class="sub-nav-btn active"
+            class="nav-link active"
             id="dt-sub-khaibao-btn"
             onclick="dtGoSub(this, 'dt-sub-khaibao')"
           >
             📋 KHAI BÁO
           </button>
           <button
-            class="sub-nav-btn"
+            class="nav-link"
             id="dt-sub-thongke-btn"
             onclick="dtGoSub(this, 'dt-sub-thongke')"
           >
@@ -2473,17 +2473,17 @@
         <!-- ── SUB TAB 1: KHAI BÁO ─────────────────────────────── -->
         <div class="sub-page active" id="dt-sub-khaibao">
           <!-- PHẦN 1: HỢP ĐỒNG CHÍNH -->
-          <div class="section-header">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>📋 Khai Báo Hợp Đồng Chính
             </div>
-            <div class="btn-group">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
               <span
                 id="hdc-tong-label"
-                style="font-size: 12px; color: var(--ink3)"
+                class="text-secondary" style="font-size: 12px" <!-- Sprint8 -->
               ></span>
               <button
-                class="btn btn-gold"
+                class="btn btn-warning"
                 id="hdc-save-btn"
                 onclick="saveHopDongChinh()"
               >
@@ -2504,11 +2504,11 @@
                   style="
                     width: 100%;
                     padding: 8px 10px;
-                    border: 1.5px solid var(--line2);
+                    border: 1.5px solid var(--bs-border-color);
                     border-radius: 7px;
                     font-size: 13px;
-                    background: var(--paper);
-                    color: var(--ink);
+                    background: var(--bs-body-bg);
+                    color: var(--bs-body-color); /* Sprint8 */
                   "
                 >
                   <option value="">-- Chọn công trình --</option>
@@ -2521,11 +2521,11 @@
                   style="
                     width: 100%;
                     padding: 8px 10px;
-                    border: 1.5px solid var(--line2);
+                    border: 1.5px solid var(--bs-border-color);
                     border-radius: 7px;
                     font-size: 13px;
-                    background: var(--paper);
-                    color: var(--ink);
+                    background: var(--bs-body-bg);
+                    color: var(--bs-body-color); /* Sprint8 */
                   "
                 >
                   <option value="">-- Chọn --</option>
@@ -2572,13 +2572,13 @@
           </div>
 
           <!-- PHẦN 2: GHI NHẬN THU TIỀN -->
-          <div class="section-header" style="margin-top: 8px">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 8px">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>💰 Ghi Nhận Thu Tiền
             </div>
-            <div class="btn-group">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
               <button
-                class="btn btn-outline btn-sm"
+                class="btn btn-outline-secondary btn-sm"
                 id="thu-cancel-btn"
                 style="display: none"
                 onclick="_thuCancelEdit()"
@@ -2586,7 +2586,7 @@
                 ✕ Hủy
               </button>
               <button
-                class="btn btn-gold"
+                class="btn btn-warning"
                 id="thu-save-btn"
                 onclick="saveThuRecord()"
               >
@@ -2607,11 +2607,11 @@
                   style="
                     width: 100%;
                     padding: 8px 10px;
-                    border: 1.5px solid var(--line2);
+                    border: 1.5px solid var(--bs-border-color);
                     border-radius: 7px;
                     font-size: 13px;
-                    background: var(--paper);
-                    color: var(--ink);
+                    background: var(--bs-body-bg);
+                    color: var(--bs-body-color); /* Sprint8 */
                   "
                 >
                   <option value="">-- Chọn công trình --</option>
@@ -2624,11 +2624,11 @@
                   style="
                     width: 100%;
                     padding: 8px 10px;
-                    border: 1.5px solid var(--line2);
+                    border: 1.5px solid var(--bs-border-color);
                     border-radius: 7px;
                     font-size: 13px;
-                    background: var(--paper);
-                    color: var(--ink);
+                    background: var(--bs-body-bg);
+                    color: var(--bs-body-color); /* Sprint8 */
                   "
                 >
                   <option value="">-- Chọn --</option>
@@ -2656,17 +2656,17 @@
           </div>
 
           <!-- PHẦN 3: HỢP ĐỒNG THẦU PHỤ -->
-          <div class="section-header" style="margin-top: 8px">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 8px">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>🤝 Khai Báo Hợp Đồng Thầu Phụ
             </div>
-            <div class="btn-group">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
               <span
                 id="hdtp-tong-label"
-                style="font-size: 12px; color: var(--ink3)"
+                class="text-secondary" style="font-size: 12px" <!-- Sprint8 -->
               ></span>
               <button
-                class="btn btn-gold"
+                class="btn btn-warning"
                 id="hdtp-save-btn"
                 onclick="saveHopDongThauPhu()"
               >
@@ -2687,11 +2687,11 @@
                   style="
                     width: 100%;
                     padding: 8px 10px;
-                    border: 1.5px solid var(--line2);
+                    border: 1.5px solid var(--bs-border-color);
                     border-radius: 7px;
                     font-size: 13px;
-                    background: var(--paper);
-                    color: var(--ink);
+                    background: var(--bs-body-bg);
+                    color: var(--bs-body-color); /* Sprint8 */
                   "
                 >
                   <option value="">-- Chọn công trình --</option>
@@ -2704,11 +2704,11 @@
                   style="
                     width: 100%;
                     padding: 8px 10px;
-                    border: 1.5px solid var(--line2);
+                    border: 1.5px solid var(--bs-border-color);
                     border-radius: 7px;
                     font-size: 13px;
-                    background: var(--paper);
-                    color: var(--ink);
+                    background: var(--bs-body-bg);
+                    color: var(--bs-body-color); /* Sprint8 */
                   "
                 >
                   <option value="">-- Chọn thầu phụ --</option>
@@ -2764,12 +2764,12 @@
               flex-wrap: wrap;
             "
           >
-            <label style="font-size: 12px; font-weight: 600; color: var(--ink3)"
+            <label class="text-secondary" style="font-size: 12px; font-weight: 600" <!-- Sprint8 -->
               >Lọc Công Trình:</label
             >
             <select
               id="dt-ct-filter-sel"
-              class="filter-sel"
+              class="form-select form-select-sm w-auto"
               style="min-width: 220px; max-width: 340px"
               onchange="dtSetCtFilter(this.value)"
             >
@@ -2778,8 +2778,8 @@
           </div>
 
           <!-- BẢNG 1: Hợp đồng chính -->
-          <div class="section-header">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>📋 Hợp Đồng Chính Công Ty
             </div>
             <button
@@ -2798,15 +2798,15 @@
               📤 Xuất phiếu HĐ Chính
             </button>
           </div>
-          <div class="records-wrap" style="margin-bottom: 24px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom: 24px">
             <div style="overflow-x: auto">
-              <table class="thu-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
                   <tr
                     style="
                       font-size: 11px;
-                      color: var(--ink3);
-                      border-bottom: 2px solid var(--line);
+                      color: var(--bs-secondary-color);
+                      border-bottom: 2px solid var(--bs-border-color); <!-- Sprint8 -->
                     "
                   >
                     <th style="padding: 8px 6px; text-align: center">
@@ -2886,7 +2886,7 @@
               style="
                 text-align: center;
                 padding: 32px;
-                color: var(--ink3);
+                color: var(--bs-secondary-color); <!-- Sprint8 -->
                 font-size: 13px;
                 display: none;
               "
@@ -2897,7 +2897,7 @@
               id="hdc-pagination"
               style="
                 padding: 8px 16px;
-                border-top: 1px solid var(--line);
+                border-top: 1px solid var(--bs-border-color); <!-- Sprint8 -->
                 display: flex;
                 gap: 5px;
                 justify-content: center;
@@ -2908,8 +2908,8 @@
           </div>
 
           <!-- BẢNG 2: Hợp đồng thầu phụ -->
-          <div class="section-header">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>🤝 Hợp Đồng Thầu Phụ
             </div>
             <button
@@ -2928,15 +2928,15 @@
               📤 Xuất phiếu HĐ TP
             </button>
           </div>
-          <div class="records-wrap" style="margin-bottom: 24px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom: 24px">
             <div style="overflow-x: auto">
-              <table class="thu-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
                   <tr
                     style="
                       font-size: 11px;
-                      color: var(--ink3);
-                      border-bottom: 2px solid var(--line);
+                      color: var(--bs-secondary-color);
+                      border-bottom: 2px solid var(--bs-border-color); <!-- Sprint8 -->
                     "
                   >
                     <th style="padding: 8px 6px; text-align: center">
@@ -3025,7 +3025,7 @@
               style="
                 text-align: center;
                 padding: 32px;
-                color: var(--ink3);
+                color: var(--bs-secondary-color); <!-- Sprint8 -->
                 font-size: 13px;
                 display: none;
               "
@@ -3036,7 +3036,7 @@
               id="hdtp-pagination"
               style="
                 padding: 8px 16px;
-                border-top: 1px solid var(--line);
+                border-top: 1px solid var(--bs-border-color); <!-- Sprint8 -->
                 display: flex;
                 gap: 5px;
                 justify-content: center;
@@ -3047,15 +3047,15 @@
           </div>
 
           <!-- BẢNG 3: Lịch sử thu tiền -->
-          <div class="section-header">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>💰 Lịch Sử Thu Tiền
               <span
                 id="thu-count-badge"
                 style="
                   font-size: 12px;
                   font-weight: 400;
-                  color: var(--ink3);
+                  color: var(--bs-secondary-color); <!-- Sprint8 -->
                   margin-left: 4px;
                 "
               ></span>
@@ -3076,15 +3076,15 @@
               📤 Xuất phiếu thu
             </button>
           </div>
-          <div class="records-wrap" style="margin-bottom: 24px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom: 24px">
             <div style="overflow-x: auto">
-              <table class="thu-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
                   <tr
                     style="
                       font-size: 11px;
-                      color: var(--ink3);
-                      border-bottom: 2px solid var(--line);
+                      color: var(--bs-secondary-color);
+                      border-bottom: 2px solid var(--bs-border-color); <!-- Sprint8 -->
                     "
                   >
                     <th style="padding: 8px 6px; text-align: center">
@@ -3154,7 +3154,7 @@
               style="
                 text-align: center;
                 padding: 32px;
-                color: var(--ink3);
+                color: var(--bs-secondary-color); <!-- Sprint8 -->
                 font-size: 13px;
                 display: none;
               "
@@ -3165,7 +3165,7 @@
               id="thu-pagination"
               style="
                 padding: 8px 16px;
-                border-top: 1px solid var(--line);
+                border-top: 1px solid var(--bs-border-color); <!-- Sprint8 -->
                 display: flex;
                 gap: 5px;
                 justify-content: center;
@@ -3176,20 +3176,20 @@
           </div>
 
           <!-- BẢNG 4: Công Nợ Thầu Phụ -->
-          <div class="section-header">
-            <div class="section-title">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>🔴 Công Nợ Thầu Phụ
             </div>
           </div>
-          <div class="records-wrap" style="margin-bottom: 24px">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom: 24px">
             <div style="overflow-x: auto">
-              <table class="thu-table">
-                <thead>
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
                   <tr
                     style="
                       font-size: 11px;
-                      color: var(--ink3);
-                      border-bottom: 2px solid var(--line);
+                      color: var(--bs-secondary-color);
+                      border-bottom: 2px solid var(--bs-border-color); <!-- Sprint8 -->
                     "
                   >
                     <th
@@ -3247,7 +3247,7 @@
               style="
                 text-align: center;
                 padding: 32px;
-                color: var(--ink3);
+                color: var(--bs-secondary-color); <!-- Sprint8 -->
                 font-size: 13px;
                 display: none;
               "
@@ -3267,16 +3267,16 @@
     <!-- /content -->
 
     <div class="overlay" id="ct-modal">
-      <div class="modal">
-        <div class="modal-head">
+      <div class="app-modal">
+        <div class="app-modal-head">
           <h3 id="modal-title">Chi tiết</h3>
           <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
-        <div class="modal-body" id="modal-body"></div>
+        <div class="app-modal-body" id="modal-body"></div>
       </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <div class="app-toast" id="toast"></div>
 
     <script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
     <script src="js/core/core.storage.js"></script>

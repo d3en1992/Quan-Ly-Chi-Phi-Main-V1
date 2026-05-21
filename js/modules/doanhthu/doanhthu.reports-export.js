@@ -62,33 +62,33 @@ function _renderCongNoTable(rows, tbody, empty) {
     totHD     += row.tongHD || 0;
     totConlai += conlai;
     const overdrawn    = (row.tongUng || 0) > (row.tongHD || 0) && (row.tongHD || 0) > 0;
-    const conlaiStyle  = overdrawn
-      ? 'color:var(--red);font-weight:700'
-      : (conlai === 0 ? 'color:var(--ink3)' : '');
+    const conlaiClass  = overdrawn
+      ? 'text-danger fw-bold'
+      : (conlai === 0 ? 'text-secondary' : ''); /* Sprint8 */
     const countLabel   = row.count > 0
-      ? `<span style="color:var(--ink3);font-size:11px;margin-left:3px">(${row.count})</span>`
+      ? `<span class="text-secondary" style="font-size:11px;margin-left:3px">(${row.count})</span>`
       : '';
     return `<tr>
       <td style="font-weight:600;white-space:nowrap">${x(row.name)}</td>
       <td style="white-space:nowrap">${x(row.congtrinh || '—')}</td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">
-        ${row.tongUng ? fmtS(row.tongUng) : '<span style="color:var(--ink3)">—</span>'}${countLabel}
+      <td class="text-end font-monospace" style="white-space:nowrap">
+        ${row.tongUng ? fmtS(row.tongUng) : '<span class="text-secondary">—</span>'}${countLabel}
       </td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">
-        ${row.tongHD ? fmtS(row.tongHD) : '<span style="color:var(--ink3)">—</span>'}
+      <td class="text-end font-monospace" style="white-space:nowrap">
+        ${row.tongHD ? fmtS(row.tongHD) : '<span class="text-secondary">—</span>'}
       </td>
-      <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap;${conlaiStyle}">
+      <td class="text-end font-monospace ${conlaiClass}" style="white-space:nowrap">
         ${fmtS(conlai)}
       </td>
     </tr>`;
   }).join('');
 
-  const footerConlaiStyle = totUng > totHD && totHD > 0 ? 'color:var(--red)' : '';
-  const footerRow = `<tr style="border-top:2px solid var(--line);font-weight:700;background:var(--panel)">
-    <td colspan="2" style="padding:8px 12px;color:var(--ink2)">Tổng cộng</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap;padding:8px 10px">${fmtS(totUng)}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap;padding:8px 10px">${fmtS(totHD)}</td>
-    <td style="text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap;padding:8px 10px;${footerConlaiStyle}">${fmtS(totConlai)}</td>
+  const footerConlaiClass = totUng > totHD && totHD > 0 ? 'text-danger' : ''; /* Sprint8 */
+  const footerRow = `<tr style="border-top:2px solid var(--bs-border-color);font-weight:700;background:var(--bs-tertiary-bg)">
+    <td colspan="2" class="text-secondary" style="padding:8px 12px">Tổng cộng</td>
+    <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px">${fmtS(totUng)}</td>
+    <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px">${fmtS(totHD)}</td>
+    <td class="text-end font-monospace ${footerConlaiClass}" style="white-space:nowrap;padding:8px 10px">${fmtS(totConlai)}</td>
   </tr>`;
 
   tbody.innerHTML = dataRows + footerRow;
@@ -255,12 +255,12 @@ function renderLaiLo() {
 
     return `<tr>
       <td>${x(ct)}</td>
-      <td>${giaTri    ? fmtS(giaTri)    : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td>${giaTriphu ? fmtS(giaTriphu) : '<span style="color:var(--ink3)">—</span>'}</td>
-      <td>${phatSinh  ? fmtS(phatSinh)  : '<span style="color:var(--ink3)">—</span>'}</td>
+      <td>${giaTri    ? fmtS(giaTri)    : '<span class="text-secondary">—</span>'}</td>
+      <td>${giaTriphu ? fmtS(giaTriphu) : '<span class="text-secondary">—</span>'}</td>
+      <td>${phatSinh  ? fmtS(phatSinh)  : '<span class="text-secondary">—</span>'}</td>
       <td style="font-weight:600">${tongDTct ? fmtS(tongDTct) : '—'}</td>
-      <td style="color:var(--red)">${fmtS(chi)}</td>
-      <td style="color:var(--green)">${thu ? fmtS(thu) : '—'}</td>
+      <td class="text-danger">${fmtS(chi)}</td>
+      <td class="text-success">${thu ? fmtS(thu) : '—'}</td> <!-- Sprint8 -->
       <td>${tongDTct ? fmtS(conPhaiThu) : '—'}</td>
       <td class="${llClass}">${tongDTct ? llPrefix + fmtS(laiLo) : '—'}</td>
     </tr>`;
@@ -271,7 +271,7 @@ function renderLaiLo() {
 
   wrap.innerHTML = `
     <div style="overflow-x:auto">
-      <table class="ll-table">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th style="text-align:left;min-width:140px">Công Trình</th>
@@ -293,8 +293,8 @@ function renderLaiLo() {
             <td>${fmtS(tongHDPhu)}</td>
             <td>${fmtS(tongPS)}</td>
             <td style="font-weight:700">${fmtS(tongDT)}</td>
-            <td style="color:var(--red);font-weight:700">${fmtS(tongChi_)}</td>
-            <td style="color:var(--green);font-weight:700">${fmtS(tongThu)}</td>
+            <td class="text-danger fw-bold">${fmtS(tongChi_)}</td>
+            <td class="text-success fw-bold">${fmtS(tongThu)}</td> <!-- Sprint8 -->
             <td>${fmtS(tongDT - tongThu)}</td>
             <td class="${tongLLClass}">${tongDT ? (tongLaiLo >= 0 ? '+' : '') + fmtS(tongLaiLo) : '—'}</td>
           </tr>
@@ -332,7 +332,7 @@ function initDoanhThu() {
   const cnBtn  = document.getElementById('dt-sub-congno-btn');
   const cnPage = document.getElementById('dt-sub-congno');
   document.querySelectorAll('#page-doanhthu .sub-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('#page-doanhthu .sub-nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
   if (kbBtn && kbPage) { kbPage.classList.add('active'); kbBtn.classList.add('active'); }
   if (tkPage) tkPage.classList.remove('active');
   if (tkBtn) tkBtn.classList.remove('active');

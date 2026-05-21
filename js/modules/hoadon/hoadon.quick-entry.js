@@ -314,7 +314,7 @@ function _showDupModal(dupRows, allRows) {
       </div>
       <div class="dup-item-row">
         <span class="dup-item-label">Số tiền</span>
-        <span class="dup-item-val" style="color:var(--red);font-family:'IBM Plex Mono',monospace">
+        <span class="dup-item-val text-danger font-monospace"> <!-- Sprint8 -->
           ${numFmtLocal(d.newRow.payload.tien)}
         </span>
       </div>

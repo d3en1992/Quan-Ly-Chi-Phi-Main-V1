@@ -421,7 +421,7 @@ async function renderBackupList() {
   const statusLabel = document.getElementById('backup-status-label');
   const list = await _getBackupStore();
   if (!list.length) {
-    wrap.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:8px 0">Chưa có bản sao lưu nào. App sẽ tự động tạo sau 1 phút.</div>';
+    wrap.innerHTML = '<div class="text-secondary" style="font-size:13px;padding:8px 0">Chưa có bản sao lưu nào. App sẽ tự động tạo sau 1 phút.</div>'; /* Sprint8 */
     if (statusLabel) statusLabel.textContent = '';
     return;
   }
@@ -439,14 +439,14 @@ async function renderBackupList() {
     const counts = c.inv + ' HĐ · ' + c.ung + ' tiền ứng · ' + c.cc + ' tuần CC · ' + c.tb + ' TB';
     const isNewest = i === 0;
     return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
-              background:${isNewest ? 'var(--paper)' : 'transparent'};
-              border-radius:8px;border:1px solid ${isNewest ? 'var(--line2)' : 'transparent'};
-              margin-bottom:6px;flex-wrap:wrap">
+              background:${isNewest ? 'var(--bs-body-bg)' : 'transparent'};
+              border-radius:8px;border:1px solid ${isNewest ? 'var(--bs-border-color-translucent)' : 'transparent'};
+              margin-bottom:6px;flex-wrap:wrap"> <!-- Sprint8 -->
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--ink)">${label}</div>
-        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${time} &nbsp;·&nbsp; ${counts}</div>
+        <div style="font-size:13px;font-weight:600">${label}</div> <!-- Sprint8 -->
+        <div class="text-secondary" style="font-size:11px;margin-top:2px">${time} &nbsp;·&nbsp; ${counts}</div> <!-- Sprint8 -->
       </div>
-      <button class="btn btn-outline btn-sm" onclick="restoreFromBackup(${i})" title="Khôi phục bản này">
+      <button class="btn btn-outline-secondary btn-sm" onclick="restoreFromBackup(${i})" title="Khôi phục bản này">
         ↩ Khôi phục
       </button>
     </div>`;

@@ -9,7 +9,11 @@
       "mcp__Claude_in_Chrome__tabs_context_mcp",
       "mcp__Claude_in_Chrome__navigate",
       "mcp__Claude_in_Chrome__computer",
-      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\legacy\\\\datatools.js\")"
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\legacy\\\\datatools.js\")",
+      "Bash(rg --count \"var\\\\\\(--gold\\\\\\)|var\\\\\\(--green\\\\\\)|var\\\\\\(--red\\\\\\)|var\\\\\\(--blue\\\\\\)|var\\\\\\(--paper\\\\\\)|var\\\\\\(--bg\\\\\\)|var\\\\\\(--ink2\\\\\\)|var\\\\\\(--ink3\\\\\\)|var\\\\\\(--line\\\\b|var\\\\\\(--line2\\\\\\)|var\\\\\\(--ink\\\\b|#1a1814|#c8870a|#1a7a45|#c0392b|#2563eb|#f3f1ec|#f5f4f0|#1e5cb3\" --include=\"*.js\" --include=\"*.css\" --include=\"*.html\")",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(rg \"var\\\\\\(--gold\\\\\\)|var\\\\\\(--green\\\\\\)|var\\\\\\(--red\\\\\\)|var\\\\\\(--blue\\\\\\)|var\\\\\\(--paper\\\\\\)|var\\\\\\(--bg\\\\\\)|var\\\\\\(--ink\\\\b|var\\\\\\(--ink2\\\\\\)|var\\\\\\(--ink3\\\\\\)|var\\\\\\(--line\\\\b|var\\\\\\(--line2\\\\\\)|#[0-9a-fA-F]{3,6}\" --include=\"*.js\" --include=\"*.css\" --include=\"*.html\" -n --no-heading)",
+      "Bash(grep -v \"^assets\\\\\\\\\\\\\\\\css\\\\\\\\\\\\\\\\style.css\")"
     ]
   }
 }
