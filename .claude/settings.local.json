@@ -13,7 +13,15 @@
       "Bash(rg --count \"var\\\\\\(--gold\\\\\\)|var\\\\\\(--green\\\\\\)|var\\\\\\(--red\\\\\\)|var\\\\\\(--blue\\\\\\)|var\\\\\\(--paper\\\\\\)|var\\\\\\(--bg\\\\\\)|var\\\\\\(--ink2\\\\\\)|var\\\\\\(--ink3\\\\\\)|var\\\\\\(--line\\\\b|var\\\\\\(--line2\\\\\\)|var\\\\\\(--ink\\\\b|#1a1814|#c8870a|#1a7a45|#c0392b|#2563eb|#f3f1ec|#f5f4f0|#1e5cb3\" --include=\"*.js\" --include=\"*.css\" --include=\"*.html\")",
       "Bash(sort -t: -k2 -rn)",
       "Bash(rg \"var\\\\\\(--gold\\\\\\)|var\\\\\\(--green\\\\\\)|var\\\\\\(--red\\\\\\)|var\\\\\\(--blue\\\\\\)|var\\\\\\(--paper\\\\\\)|var\\\\\\(--bg\\\\\\)|var\\\\\\(--ink\\\\b|var\\\\\\(--ink2\\\\\\)|var\\\\\\(--ink3\\\\\\)|var\\\\\\(--line\\\\b|var\\\\\\(--line2\\\\\\)|#[0-9a-fA-F]{3,6}\" --include=\"*.js\" --include=\"*.css\" --include=\"*.html\" -n --no-heading)",
-      "Bash(grep -v \"^assets\\\\\\\\\\\\\\\\css\\\\\\\\\\\\\\\\style.css\")"
+      "Bash(grep -v \"^assets\\\\\\\\\\\\\\\\css\\\\\\\\\\\\\\\\style.css\")",
+      "Bash(python3)",
+      "Bash(python3 css_cleanup.py)",
+      "Bash(python3 -c ' *)",
+      "Bash(del css_cleanup.py)",
+      "Bash(rm -f css_cleanup.py)",
+      "Bash(node --check js/modules/danhmuc/danhmuc.categories.js)",
+      "Bash(node --check js/modules/doanhthu/doanhthu.forms.js)",
+      "Bash(node --check js/modules/doanhthu/doanhthu.core.js)"
     ]
   }
 }

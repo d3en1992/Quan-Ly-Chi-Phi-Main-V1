@@ -55,13 +55,13 @@ function _ungSectionHTML(pagedRecs, allRecs, title, accentColor, curPage, pgSize
     pagHtml = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);font-size:12px" class="text-secondary">
       <span>${allRecs.length} dòng · <span style="${mono};font-weight:700;color:${accentColor}">${fmtS(sumSec)}</span></span>
       <ul class="pagination pagination-sm mb-0">${btns.join('')}</ul>
-    </div>`; /* Sprint8 */
+    </div>`;
   }
   return `<div style="margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:var(--bs-tertiary-bg);border-radius:6px;margin-bottom:8px;border-left:3px solid ${accentColor}">
       <span class="text-secondary fw-bold" style="font-size:12px">${title}</span>
       <span style="${mono};font-size:12px;font-weight:700;color:${accentColor}">${fmtS(sumSec)}</span>
-    </div> <!-- Sprint8 -->
+    </div>
     <div style="overflow-x:auto">
       <table class="table table-sm table-hover align-middle mb-0 w-100">
         <thead><tr>
@@ -76,10 +76,10 @@ function _ungSectionHTML(pagedRecs, allRecs, title, accentColor, curPage, pgSize
           <td style="text-align:center;padding:4px">
             <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer">
           </td>
-          <td class="text-secondary font-monospace" style="font-size:11px">${fmtISODate(r.ngay)}</td> <!-- Sprint8 -->
+          <td class="text-secondary font-monospace" style="font-size:11px">${fmtISODate(r.ngay)}</td>
           <td style="font-weight:600;font-size:12px">${x(r.tp)}</td>
-          <td class="text-secondary">${x(resolveProjectName(r)||'—')}</td> <!-- Sprint8 -->
-          <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td> <!-- Sprint8 -->
+          <td class="text-secondary">${x(resolveProjectName(r)||'—')}</td>
+          <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
           <td class="text-end font-monospace fw-semibold text-primary">${numFmt(r.tien||0)}</td>
           <td style="white-space:nowrap;display:flex;gap:4px;justify-content:flex-end">
             <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
@@ -99,7 +99,7 @@ function renderUngTable() {
   const sumTien = sumBy(filteredUng, 'tien');
 
   if (!allTp.length && !allNcc.length) {
-    container.innerHTML = `<div class="text-secondary" style="text-align:center;padding:40px;font-size:14px">Không có dữ liệu tiền ứng nào</div>`; /* Sprint8 */
+    container.innerHTML = `<div class="text-secondary" style="text-align:center;padding:40px;font-size:14px">Không có dữ liệu tiền ứng nào</div>`;
     document.getElementById('ung-pagination').innerHTML = ''; return;
   }
 
@@ -112,7 +112,7 @@ function renderUngTable() {
 
   const mono = "font-family:'IBM Plex Mono',monospace";
   document.getElementById('ung-pagination').innerHTML =
-    `<span>${filteredUng.length} bản ghi · Tổng tiền ứng: <strong class="text-primary font-monospace">${fmtS(sumTien)}</strong></span>`; /* Sprint8 */
+    `<span>${filteredUng.length} bản ghi · Tổng tiền ứng: <strong class="text-primary font-monospace">${fmtS(sumTien)}</strong></span>`;
 }
 
 function goUngTpTo(p) { ungTpPage=p; renderUngTable(); }

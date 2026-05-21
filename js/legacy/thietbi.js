@@ -14,7 +14,7 @@ const TB_STATUS_STYLE = {
   'Đang hoạt động': 'background:var(--bs-success-subtle);color:var(--bs-success);',
   'Cần bảo trì':  'background:var(--bs-warning-subtle);color:var(--bs-warning);',
   'Cần sửa chữa':   'background:var(--bs-danger-subtle);color:var(--bs-danger);'
-}; /* Sprint8 */
+};
 
 let tbData = load('tb_v1', []);
 
@@ -381,7 +381,7 @@ function tbRenderList() {
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td>
         <select onchange="tbUpdateField('${r.id}','tinhtrang',this.value)"
-          class="tb-status" style="cursor:pointer;border:1px solid var(--bs-border-color);${ttStyle}"> <!-- Sprint8 -->
+          class="tb-status" style="cursor:pointer;border:1px solid var(--bs-border-color);${ttStyle}">
           ${ttOpts}
         </select>
       </td>
@@ -389,7 +389,7 @@ function tbRenderList() {
       <td style="padding:6px 4px">
         <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button>
       </td>
-    </tr>`; /* Sprint8 */
+    </tr>`;
   }).join('');
 
   const tp = Math.ceil(filtered.length/TB_PG);
@@ -619,7 +619,7 @@ function renderKhoTong() {
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:10px;white-space:nowrap">${r.ngay||''}</td>
       <td style="padding:6px 4px;display:flex;gap:4px;flex-wrap:nowrap">
-        <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button> <!-- Sprint8 -->
+        <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button>
         <button class="btn btn-danger btn-sm" onclick="tbDeleteRow('${r.id}')">✕</button>
       </td>
     </tr>`;
@@ -666,7 +666,7 @@ function tbRenderThongKeVon() {
   tbody.innerHTML = items.map(item => `<tr>
     <td style="font-weight:600">${x(item.ct)}</td>
     <td class="text-warning text-center font-monospace fw-bold" style="font-size:15px">${item.total}</td>
-    <td class="text-secondary text-center" style="font-size:13px">${item.types.size} loại</td> <!-- Sprint8 -->
+    <td class="text-secondary text-center" style="font-size:13px">${item.types.size} loại</td>
   </tr>`).join('');
 
   if (pgEl) pgEl.innerHTML = `<span>${items.length} công trình</span>`;

@@ -119,7 +119,7 @@ function renderCCHistory(){
   const paged=rows.slice(start,start+CC_PG_HIST);
 
   tbody.innerHTML=paged.map(r=>`<tr>
-    <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${viShort(r.fromDate)}<br><span class="text-secondary">${viShort(r.toDate)}</span></td> <!-- Sprint8 -->
+    <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${viShort(r.fromDate)}<br><span class="text-secondary">${viShort(r.toDate)}</span></td>
     <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.ct||'—')}</td>
     ${r.d.map(v=>`<td class="${v===1?'text-success':v>0?'text-primary':'text-body-secondary'}" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px">${v||'·'}</td>`).join('')}
     <td class="text-warning" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${r.tc}</td>
@@ -201,7 +201,7 @@ function renderCCTLT(){
   const isMobile=window.innerWidth<768;
 
   if(!rows.length){
-    if(isMobile){ tableWrap.style.display='none'; cardsEl.style.display='block'; cardsEl.innerHTML='<p class="text-secondary" style="text-align:center;padding:20px">Chưa có dữ liệu</p>'; } /* Sprint8 */
+    if(isMobile){ tableWrap.style.display='none'; cardsEl.style.display='block'; cardsEl.innerHTML='<p class="text-secondary" style="text-align:center;padding:20px">Chưa có dữ liệu</p>'; }
     else{ tableWrap.style.display=''; cardsEl.style.display='none'; tbody.innerHTML=`<tr class="empty-row"><td colspan="17">Chưa có dữ liệu</td></tr>`; }
     document.getElementById('cc-tlt-pagination').innerHTML=''; return;
   }

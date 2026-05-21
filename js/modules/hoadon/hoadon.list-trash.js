@@ -108,9 +108,9 @@ function renderTable() {
     <td class="font-monospace text-secondary" style="font-size:11px">${displayDate}</td>
     <td style="font-weight:600;font-size:12px;max-width:220px">${x(resolveProjectName(inv))}</td>
     <td><span class="tag tag-gold">${x(inv.loai)}</span></td>
-    <td class="hide-mobile text-secondary">${x(inv.nguoi||'—')}</td> <!-- Sprint8 -->
-    <td class="hide-mobile text-secondary">${x(inv.ncc||'—')}</td> <!-- Sprint8 -->
-    <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${x(inv.nd||'—')}</td> <!-- Sprint8 -->
+    <td class="hide-mobile text-secondary">${x(inv.nguoi||'—')}</td>
+    <td class="hide-mobile text-secondary">${x(inv.ncc||'—')}</td>
+    <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${x(inv.nd||'—')}</td>
     <td class="text-end font-monospace fw-semibold text-success" title="Đơn giá: ${numFmt(inv.tien||0)}${inv.sl&&inv.sl!==1?' × '+inv.sl:''}">${numFmt(inv.thanhtien||inv.tien||0)}</td>
     <td style="white-space:nowrap">${actionBtn}</td>
   </tr>`;}).join('');

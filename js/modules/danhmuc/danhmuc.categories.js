@@ -18,7 +18,7 @@ function renderCtPage() {
   const entries=Object.entries(map).sort((a,b)=>
     sortBy==='name' ? a[0].localeCompare(b[0],'vi') : b[1].total-a[1].total
   );
-  if(!entries.length){grid.innerHTML=`<div class="text-secondary" style="grid-column:1/-1;text-align:center;padding:60px;font-size:14px">Chưa có dữ liệu</div>`;return;} /* Sprint8 */
+  if(!entries.length){grid.innerHTML=`<div class="text-secondary" style="grid-column:1/-1;text-align:center;padding:60px;font-size:14px">Chưa có dữ liệu</div>`;return;}
   grid.innerHTML=entries.map(([ct,d])=>{
     const rows=Object.entries(d.byLoai).sort((a,b)=>b[1]-a[1]);
     return `<div class="ct-card card shadow-sm overflow-hidden" onclick="showCtModal(${JSON.stringify(ct)})">
@@ -28,7 +28,7 @@ function renderCtPage() {
       </div>
       <div class="ct-card-body">
         ${rows.slice(0,6).map(([l,v])=>`<div class="ct-loai-row"><span class="ct-loai-name">${x(l)}</span><span class="ct-loai-val">${fmtS(v)}</span></div>`).join('')}
-        ${rows.length>6?`<div class="text-secondary" style="font-size:11px;text-align:right;padding-top:6px">+${rows.length-6} loại khác...</div>`:''} <!-- Sprint8 -->
+        ${rows.length>6?`<div class="text-secondary" style="font-size:11px;text-align:right;padding-top:6px">+${rows.length-6} loại khác...</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -42,18 +42,18 @@ function showCtModal(ctName) {
   const total=invs.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
   let html=`<div style="display:flex;gap:12px;margin-bottom:18px">
     <div style="flex:1;background:var(--bs-tertiary-bg);border-radius:8px;padding:12px"><div class="text-body-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng HĐ</div><div style="font-size:22px;font-weight:700">${invs.length}</div></div>
-    <div style="flex:2;background:var(--bs-success-subtle);border-radius:8px;padding:12px"><div class="text-body-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Chi Phí</div><div class="text-success" style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace">${fmtM(total)}</div></div> <!-- Sprint8 -->
+    <div style="flex:2;background:var(--bs-success-subtle);border-radius:8px;padding:12px"><div class="text-body-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Chi Phí</div><div class="text-success" style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace">${fmtM(total)}</div></div>
   </div>`;
   Object.entries(byLoai).forEach(([loai,invList])=>{
     const lt=invList.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
     html+=`<div style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:var(--bs-warning-subtle);border-radius:6px;margin-bottom:6px"> <!-- Sprint8 -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:var(--bs-warning-subtle);border-radius:6px;margin-bottom:6px">
         <span class="tag tag-gold">${x(loai)}</span>
         <span class="text-warning fw-bold font-monospace">${fmtM(lt)}</span>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr>${['Ngày','Người TH','Nội Dung','Thành Tiền'].map((h,i)=>`<th class="text-secondary" style="padding:5px 8px;background:var(--bs-tertiary-bg);font-size:10px;font-weight:700;text-transform:uppercase;text-align:${i===3?'right':'left'}">${h}</th>`).join('')}</tr></thead> <!-- Sprint8 -->
-        <tbody>${invList.map(i=>`<tr style="border-bottom:1px solid var(--bs-border-color)"> <!-- Sprint8 -->
+        <thead><tr>${['Ngày','Người TH','Nội Dung','Thành Tiền'].map((h,i)=>`<th class="text-secondary" style="padding:5px 8px;background:var(--bs-tertiary-bg);font-size:10px;font-weight:700;text-transform:uppercase;text-align:${i===3?'right':'left'}">${h}</th>`).join('')}</tr></thead>
+        <tbody>${invList.map(i=>`<tr style="border-bottom:1px solid var(--bs-border-color)">
           <td class="text-secondary font-monospace" style="padding:6px 8px">${i.ngay}</td>
           <td class="text-secondary" style="padding:6px 8px">${x(i.nguoi||'—')}</td>
           <td class="text-secondary" style="padding:6px 8px">${x(i.nd||'—')}</td>
@@ -353,9 +353,9 @@ function renderSettings() {
     card.className='settings-card card shadow-sm overflow-hidden';
     card.innerHTML=`
       <div class="settings-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div class="settings-card-title">${cfg.title} <span class="text-secondary" style="font-size:11px;font-weight:400">(${countLabel})</span></div> <!-- Sprint8 -->
+        <div class="settings-card-title">${cfg.title} <span class="text-secondary" style="font-size:11px;font-weight:400">(${countLabel})</span></div>
         <input type="search" id="dm-search-${cfg.id}" placeholder="🔍 Tìm..." autocomplete="off"
-          style="flex:0 0 auto;width:140px;padding:4px 8px;border:1.5px solid var(--bs-border-color-translucent);border-radius:6px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none" <!-- Sprint8 -->
+          style="flex:0 0 auto;width:140px;padding:4px 8px;border:1.5px solid var(--bs-border-color-translucent);border-radius:6px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none"
           oninput="_dmFilterCard('${cfg.id}')">
       </div>
       <div class="settings-list" id="sl-${cfg.id}">
@@ -434,7 +434,7 @@ function renderCNItem(name, idx) {
       onblur="finishEdit('congNhan',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congNhan',${idx});if(event.key==='Escape')cancelEdit('congNhan',${idx})">
     <select onchange="updateCNRole(${idx},this.value)"
-      style="margin:0 4px;padding:2px 6px;border:1px solid var(--bs-border-color-translucent);border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;min-width:44px" /* Sprint8 */
+      style="margin:0 4px;padding:2px 6px;border:1px solid var(--bs-border-color-translucent);border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;min-width:44px"
       title="Vai trò (C=Cái, T=Thợ, P=Phụ)">
       <option value="" ${!role?'selected':''}>—</option>
       <option value="C" ${role==='C'?'selected':''}>C</option>

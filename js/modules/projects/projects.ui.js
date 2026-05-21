@@ -6,7 +6,7 @@
 const _fmtProjDate = (iso) => fmtISODate(iso);
 
 // Metadata hiển thị cho từng trạng thái
-const _PT_STATUS_META = { /* Sprint8 */
+const _PT_STATUS_META = {
   planning:  { label: 'Chuẩn bị thi công', color: 'var(--bs-primary)',   bg: 'rgba(var(--bs-primary-rgb),.1)' },
   active:    { label: 'Đang thi công',      color: 'var(--bs-success)',   bg: 'rgba(var(--bs-success-rgb),.1)' },
   completed: { label: 'Hoàn thành',         color: 'var(--bs-warning)',   bg: 'rgba(var(--bs-warning-rgb),.1)' },
@@ -125,7 +125,7 @@ function _ptDuration(p) {
 
 // ── Badge trạng thái ───────────────────────────────────────────────
 function _ptStatusBadge(status) {
-  const m = _PT_STATUS_META[status] || { label: status, color: 'var(--bs-secondary)', bg: 'rgba(var(--bs-secondary-rgb),.1)' }; /* Sprint8 */
+  const m = _PT_STATUS_META[status] || { label: status, color: 'var(--bs-secondary)', bg: 'rgba(var(--bs-secondary-rgb),.1)' };
   return `<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:${m.bg};color:${m.color};white-space:nowrap">${m.label}</span>`;
 }
 
@@ -134,7 +134,7 @@ function _ptStatBox(label, value, color, bg) {
   return `<div style="background:${bg};border-radius:10px;padding:14px 16px">
     <div style="font-size:10px;color:var(--bs-secondary-color);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">${label}</div>
     <div style="font-size:26px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace">${value}</div>
-  </div>`; /* Sprint8 */
+  </div>`;
 }
 
 // ── Tính số ngày thi công (trả về số) ──────────────────────────────
@@ -199,7 +199,7 @@ function renderCTOverview() {
   }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
 
   const totalLL = totalThu - totalCost;
-  const llClr   = totalLL > 0 ? 'var(--bs-success)' : totalLL < 0 ? 'var(--bs-danger)' : 'var(--bs-secondary-color)'; /* Sprint8 */
+  const llClr   = totalLL > 0 ? 'var(--bs-success)' : totalLL < 0 ? 'var(--bs-danger)' : 'var(--bs-secondary-color)';
   const llPfx   = totalLL > 0 ? '+' : '';
 
   // ── Helpers nội bộ ─────────────────────────────────────────────────
@@ -207,17 +207,17 @@ function renderCTOverview() {
     `<div style="background:${bg};border-radius:10px;padding:12px 14px;flex:1;min-width:90px;text-align:center">
        <div style="font-size:10px;color:${color};font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;opacity:.8">${lbl}</div>
        <div style="font-size:26px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace">${val}</div>
-     </div>`; /* Sprint8 — color param now uses BS vars from call site */
+     </div>`;
 
   const kpiMoney = (lbl, val, color, bg) =>
     `<div style="background:${bg};border-radius:10px;padding:12px 16px;flex:1;min-width:130px">
        <div style="font-size:10px;color:var(--bs-secondary-color);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${lbl}</div>
        <div style="font-size:18px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace;line-height:1.2">${val}</div>
        <div style="font-size:10px;color:var(--bs-secondary-color);margin-top:2px">${x(yearLabel)}</div>
-     </div>`; /* Sprint8 */
+     </div>`;
 
-  const selS = 'padding:7px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none'; /* Sprint8 */
-  const inpS = 'flex:1;min-width:160px;padding:8px 12px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-family:inherit;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none'; /* Sprint8 */
+  const selS = 'padding:7px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none';
+  const inpS = 'flex:1;min-width:160px;padding:8px 12px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-family:inherit;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none';
 
   wrap.innerHTML = `
     <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px">
@@ -227,7 +227,7 @@ function renderCTOverview() {
 
     <!-- KPI 1: Số lượng theo trạng thái -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <div style="background:var(--bs-tertiary-bg);border-radius:10px;padding:12px 14px;flex:1;min-width:90px;text-align:center"> <!-- Sprint8 -->
+      <div style="background:var(--bs-tertiary-bg);border-radius:10px;padding:12px 14px;flex:1;min-width:90px;text-align:center">
         <div style="font-size:10px;color:var(--bs-body-color);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;opacity:.8">Tổng</div>
         <div style="font-family:'IBM Plex Mono',monospace;white-space:nowrap">
           <span id="ct-kpi-total" style="font-size:26px;font-weight:700;color:var(--bs-body-color)">${yearProjects.length}</span>
@@ -237,7 +237,7 @@ function renderCTOverview() {
       ${kpiCount('Chuẩn bị',  counts.planning,  'var(--bs-primary)',   'rgba(var(--bs-primary-rgb),.1)')}
       ${kpiCount('Thi công',  counts.active,    'var(--bs-success)',   'rgba(var(--bs-success-rgb),.1)')}
       ${kpiCount('Hoàn thành',counts.completed, 'var(--bs-warning)',   'rgba(var(--bs-warning-rgb),.1)')}
-      ${kpiCount('Quyết toán',counts.closed,    'var(--bs-secondary)', 'rgba(var(--bs-secondary-rgb),.1)')} <!-- Sprint8 -->
+      ${kpiCount('Quyết toán',counts.closed,    'var(--bs-secondary)', 'rgba(var(--bs-secondary-rgb),.1)')}
     </div>
 
     <!-- KPI 2: Tài chính tổng -->
@@ -246,7 +246,7 @@ function renderCTOverview() {
       ${!isKetoan() ? kpiMoney('Tổng Đã Thu',   fmtM(totalThu),  'var(--bs-success)', 'rgba(var(--bs-success-rgb),.07)') : ''} <!-- [ROLE KETOAN HIDE] -->
       ${!isKetoan() ? kpiMoney('Lãi / Lỗ',
           (totalThu || totalCost) ? llPfx + fmtM(totalLL) : '—',
-          llClr, 'rgba(0,0,0,.03)') : ''} <!-- [ROLE KETOAN HIDE] Sprint8 -->
+          llClr, 'rgba(0,0,0,.03)') : ''}
     </div>
 
     <!-- Filter bar -->
@@ -333,7 +333,7 @@ function _ctRenderGrid() {
     if (kpiSplitEl) kpiSplitEl.textContent = `(${ctCount}/${noCostList.length - ctCount})`;
 
     if (!noCostList.length) {
-      gridWrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 0;font-size:14px" /* Sprint8 */>
+      gridWrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 0;font-size:14px">
         Không có công trình nào thiếu chi phí.
       </div>`;
       return;
@@ -344,7 +344,7 @@ function _ctRenderGrid() {
       ${noCostList.map(p => {
         const dim     = p.status === 'closed' ? 'opacity:.72;' : '';
         const _pt     = _projTypeByName(p.name);
-        const typeTag = (_pt !== 'OTHER') ? `<span class="text-secondary" style="font-size:10px;margin-left:4px">[${_pt}]</span>` /* Sprint8 */ : '';
+        const typeTag = (_pt !== 'OTHER') ? `<span class="text-secondary" style="font-size:10px;margin-left:4px">[${_pt}]</span>` : '';
         return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
           <div class="ct-card-head" style="align-items:flex-start">
             <div style="flex:1;min-width:0">
@@ -354,7 +354,7 @@ function _ctRenderGrid() {
                 <span class="ghost">Chưa phát sinh</span>
               </div>
             </div>
-            <div class="ct-card-total text-secondary" style="margin-left:8px">—</div> <!-- Sprint8 -->
+            <div class="ct-card-total text-secondary" style="margin-left:8px">—</div>
           </div>
         </div>`;
       }).join('')}
@@ -421,7 +421,7 @@ function _ctRenderGrid() {
   if (kpiSplitEl) kpiSplitEl.textContent = `(${ctCount}/${withData.length - ctCount})`;
 
   if (!withData.length) {
-    gridWrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 0;font-size:14px" /* Sprint8 */>
+    gridWrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 0;font-size:14px">
       Không tìm thấy công trình nào.
       ${!_ctSearch && !_ctFStatus && !_ctFType
         ? `<button class="btn btn-outline-secondary btn-sm" onclick="openCTCreateModal()" style="margin-left:8px">+ Thêm ngay</button>`
@@ -432,11 +432,11 @@ function _ctRenderGrid() {
 
   // COMPANY card — luôn đứng đầu, không có nút xóa/sửa
   const companyCosts = _ctGetCostsFromMap(PROJECT_COMPANY, invMap);
-  const companyCard = `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('COMPANY')" style="cursor:pointer;border:2px solid var(--bs-border-color)"> <!-- Sprint8 -->
+  const companyCard = `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('COMPANY')" style="cursor:pointer;border:2px solid var(--bs-border-color)">
     <div class="ct-card-head" style="align-items:flex-start">
       <div style="flex:1;min-width:0">
         <div class="ct-card-name" style="margin-bottom:5px">🏢 ${x(PROJECT_COMPANY.name)}</div>
-        <div style="margin-bottom:4px"><span class="text-primary fw-bold" style="font-size:10px;padding:2px 9px;border-radius:10px;background:rgba(var(--bs-primary-rgb),.1);white-space:nowrap">Chi phí chung</span></div> <!-- Sprint8 -->
+        <div style="margin-bottom:4px"><span class="text-primary fw-bold" style="font-size:10px;padding:2px 9px;border-radius:10px;background:rgba(var(--bs-primary-rgb),.1);white-space:nowrap">Chi phí chung</span></div>
         <div class="ct-card-count">${companyCosts.count} hóa đơn</div>
       </div>
       <div class="ct-card-total" style="margin-left:8px">${fmtS(companyCosts.total)}</div>
@@ -449,10 +449,10 @@ function _ctRenderGrid() {
       const dim      = p.status === 'closed' ? 'opacity:.72;' : '';
       const durLabel = days > 0 ? `${days} ngày` : '';
       const _pt = _projTypeByName(p.name);
-      const typeTag  = (_pt !== 'OTHER') ? `<span class="text-secondary" style="font-size:10px;margin-left:4px">[${_pt}]</span>` /* Sprint8 */ : '';
+      const typeTag  = (_pt !== 'OTHER') ? `<span class="text-secondary" style="font-size:10px;margin-left:4px">[${_pt}]</span>` : '';
       // [MODIFIED] Hiển thị placeholder nếu count = 0 để card không bị lệch
       const countLine = c.count > 0
-        ? `<span>${c.count} hóa đơn</span>${durLabel ? `<span class="text-secondary">·</span><span>${durLabel}</span>` : ''}` /* Sprint8 */
+        ? `<span>${c.count} hóa đơn</span>${durLabel ? `<span class="text-secondary">·</span><span>${durLabel}</span>` : ''}`
         : `<span class="ghost">Chưa phát sinh</span>`;
       return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
         <div class="ct-card-head" style="align-items:flex-start">
@@ -491,13 +491,13 @@ function openCTDetail(id) {
 
   let html = `
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <div style="flex:1;min-width:90px;background:var(--bs-tertiary-bg);border-radius:8px;padding:12px"> <!-- Sprint8 -->
+      <div style="flex:1;min-width:90px;background:var(--bs-tertiary-bg);border-radius:8px;padding:12px">
         <div class="text-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng HĐ</div>
         <div style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace">${c.count}</div>
       </div>
-      <div style="flex:2;min-width:150px;background:rgba(var(--bs-success-rgb),.1);border-radius:8px;padding:12px"> <!-- Sprint8 -->
+      <div style="flex:2;min-width:150px;background:rgba(var(--bs-success-rgb),.1);border-radius:8px;padding:12px">
         <div class="text-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Chi Phí · ${x(yearLabel)}</div>
-        <div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--bs-success)">${fmtM(c.total)}</div> <!-- Sprint8 -->
+        <div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--bs-success)">${fmtM(c.total)}</div>
       </div>
     </div>`;
 
@@ -506,7 +506,7 @@ function openCTDetail(id) {
     const ed = p.endDate ? _fmtProjDate(p.endDate) : null;
     const dur = _ptDuration(p);
     html += `
-    <div class="text-secondary" style="background:var(--bs-tertiary-bg);border-radius:8px;padding:11px 14px;margin-bottom:12px;font-size:13px"> <!-- Sprint8 -->
+    <div class="text-secondary" style="background:var(--bs-tertiary-bg);border-radius:8px;padding:11px 14px;margin-bottom:12px;font-size:13px">
       ${sd  ? `<div style="margin-bottom:4px"><span class="text-secondary">Bắt đầu: </span>${sd}${ed ? ` → <span class="text-secondary">Hoàn thành:</span> ${ed}` : ''}${dur ? `<span class="text-secondary" style="margin-left:8px;font-size:11px">(${dur})</span>` : ''}</div>` : ''}
       ${p.closedDate ? `<div style="margin-bottom:4px"><span class="text-secondary">Ngày quyết toán: </span><strong>${_fmtProjDate(p.closedDate)}</strong></div>` : ''}
       ${p.note ? `<div><span class="text-secondary">Ghi chú: </span>${x(p.note)}</div>` : ''}
@@ -588,7 +588,7 @@ function openCTDetail(id) {
   }).reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
 
   // ── Màu lãi/lỗ ───────────────────────────────────────────────────────
-  const llColor    = laiLo > 0 ? 'var(--bs-success)' : laiLo < 0 ? 'var(--bs-danger)' : 'var(--bs-secondary-color)'; /* Sprint8 */
+  const llColor    = laiLo > 0 ? 'var(--bs-success)' : laiLo < 0 ? 'var(--bs-danger)' : 'var(--bs-secondary-color)';
   const llPrefix   = laiLo > 0 ? '+' : '';
   const conPhaiThu = tongGiaTriHD - tongThu;
 
@@ -611,27 +611,27 @@ function openCTDetail(id) {
   const _chiPhiChungFixed = _allocEntry ? _allocEntry.allocated : 0;
 
   // ── Semantic color palette ────────────────────────────────────────────
-  const CG = 'var(--bs-success)', CR = 'var(--bs-danger)', CA = 'var(--bs-warning)', CB = 'var(--bs-primary)'; /* Sprint8 */
-  const BG = 'rgba(var(--bs-success-rgb),.09)', BR = 'rgba(var(--bs-danger-rgb),.09)'; /* Sprint8 */
-  const BA = 'rgba(var(--bs-warning-rgb),.09)', BB = 'rgba(var(--bs-primary-rgb),.07)'; /* Sprint8 */
+  const CG = 'var(--bs-success)', CR = 'var(--bs-danger)', CA = 'var(--bs-warning)', CB = 'var(--bs-primary)';
+  const BG = 'rgba(var(--bs-success-rgb),.09)', BR = 'rgba(var(--bs-danger-rgb),.09)';
+  const BA = 'rgba(var(--bs-warning-rgb),.09)', BB = 'rgba(var(--bs-primary-rgb),.07)';
 
   // ── Layout helpers ────────────────────────────────────────────────────
   const _bxBase = 'border-radius:8px;padding:11px 14px';
-  const _bx  = `border:1.5px solid var(--bs-border-color);${_bxBase};background:var(--bs-body-bg)`; /* Sprint8 */
+  const _bx  = `border:1.5px solid var(--bs-border-color);${_bxBase};background:var(--bs-body-bg)`;
   const _bxG = `border:1.5px solid ${CG};${_bxBase};background:${BG}`;   // thu → xanh
   const _bxR = `border:1.5px solid ${CR};${_bxBase};background:${BR}`;   // chi → đỏ
   const _bxA = `border:1.5px solid ${CA};${_bxBase};background:${BA}`;   // HĐ → vàng
   const _bxB = `border:1.5px solid ${CB};${_bxBase};background:${BB}`;   // TB → xanh dương
 
   const _lb  = t =>
-    `<div style="font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">${t}</div>`; /* Sprint8 */
+    `<div style="font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">${t}</div>`;
   const _vl  = (v, color = 'var(--bs-body-color)') =>
-    `<div style="font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:${color};line-height:1.3">${v}</div>`; /* Sprint8 */
+    `<div style="font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:${color};line-height:1.3">${v}</div>`;
   // Fix 5: tab param tường minh, không default sang doanhthu
   const _xct = tab =>
     `<button class="btn btn-outline-secondary btn-sm" style="font-size:10px;padding:2px 8px;flex-shrink:0;align-self:flex-end"
        onclick="_goTabWithCT('${tab}','${x(p.name)}')">Xem chi tiết</button>`;
-  const _box = (bxStyle, label, valHtml, color = 'var(--bs-body-color)', btn = '') => /* Sprint8 */
+  const _box = (bxStyle, label, valHtml, color = 'var(--bs-body-color)', btn = '') =>
     `<div style="${bxStyle}">
        ${_lb(label)}
        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px">
@@ -639,7 +639,7 @@ function openCTDetail(id) {
        </div>
      </div>`;
   const _tag = t =>
-    `<span style="border:1.5px solid var(--bs-border-color);border-radius:6px;padding:4px 10px;font-size:11px;white-space:nowrap">${t}</span>`; /* Sprint8 */
+    `<span style="border:1.5px solid var(--bs-border-color);border-radius:6px;padding:4px 10px;font-size:11px;white-space:nowrap">${t}</span>`;
 
   // ═══ XÂY DỰNG HTML ═══════════════════════════════════════════════════
   // Fix 8: CSS mobile (scoped vào modal, không ảnh hưởng UI ngoài)
@@ -657,15 +657,15 @@ function openCTDetail(id) {
   html += `
   <div class="ctd-hdr" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div style="${_bx};padding:10px 14px">
-      <div style="font-size:14px;font-weight:700;color:var(--bs-body-color);margin-bottom:4px">${x(p.name)}</div> <!-- Sprint8 -->
+      <div style="font-size:14px;font-weight:700;color:var(--bs-body-color);margin-bottom:4px">${x(p.name)}</div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         ${_ptStatusBadge(p.status)}
-        <span class="ctd-note-inline text-secondary" style="display:none;font-size:11px">${p.note ? '· ' + x(p.note) : ''}</span> <!-- Sprint8 -->
+        <span class="ctd-note-inline text-secondary" style="display:none;font-size:11px">${p.note ? '· ' + x(p.note) : ''}</span>
       </div>
     </div>
     <div class="ctd-note-blk" style="${_bx};padding:10px 14px">
       ${_lb('Địa Chỉ / Ghi Chú')}
-      <div class="text-secondary" style="font-size:12px;line-height:1.5">${p.note ? x(p.note) : ''}</div> <!-- Sprint8 -->
+      <div class="text-secondary" style="font-size:12px;line-height:1.5">${p.note ? x(p.note) : ''}</div>
     </div>
   </div>`;
 
@@ -673,7 +673,7 @@ function openCTDetail(id) {
   html += `
   <div class="ctd-grid" style="display:grid;grid-template-columns:${!isCompany && isKetoan() ? '1fr' : '1fr 1fr'};gap:10px;margin-bottom:10px">
     ${_box(_bxR, 'Tổng Chi Công Trình', _chiPhiChungFixed > 0
-        ? fmtS(tongChiCongTrinh) + `<span class="text-secondary" style="font-size:12px;font-weight:400"> / ${fmtS(tongChiCongTrinh + _chiPhiChungFixed)}</span>` /* Sprint8 */
+        ? fmtS(tongChiCongTrinh) + `<span class="text-secondary" style="font-size:12px;font-weight:400"> / ${fmtS(tongChiCongTrinh + _chiPhiChungFixed)}</span>`
         : fmtS(tongChiCongTrinh), CR)}
     ${!isCompany
       ? (isKetoan() ? '' : _box(
@@ -730,7 +730,7 @@ function openCTDetail(id) {
   // ── Row 5: Chi phí chung + Nhà cung cấp ứng ──────────────────────────
   if (!isCompany) {
     const cpChungHtml = (chiPhiCongTy > 0)
-      ? fmtS(chiPhiCongTy) + (_allocEntry ? `<span class="text-secondary" style="font-size:11px;font-weight:400"> / ${fmtS(_chiPhiChungFixed)}</span>` : '') /* Sprint8 */
+      ? fmtS(chiPhiCongTy) + (_allocEntry ? `<span class="text-secondary" style="font-size:11px;font-weight:400"> / ${fmtS(_chiPhiChungFixed)}</span>` : '')
       : '—';
     html += `
   <div class="ctd-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
@@ -752,14 +752,14 @@ function openCTDetail(id) {
   if (!c.invs.length) {
     html += `<div class="text-secondary" style="font-size:12px;padding:2px 0">
                Không có hóa đơn nào trong ${x(yearLabel.toLowerCase())}
-             </div>`; /* Sprint8 */
+             </div>`;
   } else {
     loaiRows.forEach(([loai, invList]) => {
       const lt = invList.reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
       html += `
     <div style="display:flex;justify-content:space-between;align-items:baseline;
                 padding:5px 0;border-top:1px solid rgba(220,38,38,.15);font-size:12px">
-      <span class="text-secondary">${x(loai)}<span class="text-body-secondary"> (${invList.length} hóa đơn)</span></span> <!-- Sprint8 -->
+      <span class="text-secondary">${x(loai)}<span class="text-body-secondary"> (${invList.length} hóa đơn)</span></span>
       <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:${CR}">${fmtS(lt)}</span>
     </div>`;
     });
@@ -788,8 +788,8 @@ function openCTCreateModal() {
   const _defSD  = (typeof activeYear !== 'undefined' && activeYear > 0 && activeYear < _curY)
                   ? `${activeYear}-01-01`
                   : today;
-  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none'; /* Sprint8 */
-  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px'; /* Sprint8 */
+  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
+  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   document.getElementById('modal-title').textContent = '+ Thêm Công Trình Mới';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
@@ -875,12 +875,12 @@ function openCTEditModal(id) {
     : (_autoSd || p.startDate || (p.year ? `${p.year}-01-01` : new Date().toISOString().slice(0, 10)));
   // [PATCH] Hint label nếu đang hiển thị auto date
   const sdHint = !p.startDateUserEdited && _autoSd
-    ? ' <span class="text-secondary" style="font-size:10px;font-weight:400">(tự động từ chấm công)</span>' /* Sprint8 */
+    ? ' <span class="text-secondary" style="font-size:10px;font-weight:400">(tự động từ chấm công)</span>'
     : '';
   const ed  = p.endDate    || '';
   const cld = p.closedDate || '';
-  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none'; /* Sprint8 */
-  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px'; /* Sprint8 */
+  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
+  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   document.getElementById('modal-title').textContent = '✏️ Sửa Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
@@ -973,19 +973,19 @@ function saveCTEdit(id) {
 function quickCloseCT(id) {
   const p = getProjectById(id);
   if (!p) return;
-  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none'; /* Sprint8 */
-  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px'; /* Sprint8 */
+  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
+  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   const todayStr = new Date().toISOString().slice(0, 10);
   document.getElementById('modal-title').textContent = '🔒 Quyết Toán Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="text-secondary" style="font-size:13px">Đánh dấu <strong>${x(p.name)}</strong> là <strong>Đã Quyết Toán</strong>?</div> <!-- Sprint8 -->
+      <div class="text-secondary" style="font-size:13px">Đánh dấu <strong>${x(p.name)}</strong> là <strong>Đã Quyết Toán</strong>?</div>
       <div>
         <label style="${lblStyle}">Ngày Quyết Toán</label>
         <input id="ct-close-date" type="date" value="${todayStr}"
           style="${inpStyle};font-family:'IBM Plex Mono',monospace">
       </div>
-      <div class="text-secondary" style="font-size:12px;background:var(--bs-tertiary-bg);border-radius:6px;padding:8px 10px"> <!-- Sprint8 -->
+      <div class="text-secondary" style="font-size:12px;background:var(--bs-tertiary-bg);border-radius:6px;padding:8px 10px">
         ⚠️ Sau khi quyết toán, không thể thêm mới dữ liệu vào công trình này.
       </div>
       <div style="display:flex;gap:8px">
@@ -1010,13 +1010,13 @@ function confirmQuickClose(id) {
 function quickCompleteCT(id) {
   const p = getProjectById(id);
   if (!p) return;
-  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none'; /* Sprint8 */
-  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px'; /* Sprint8 */
+  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
+  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   const todayStr = new Date().toISOString().slice(0, 10);
   document.getElementById('modal-title').textContent = '✅ Hoàn Thành Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="text-secondary" style="font-size:13px">Đánh dấu <strong>${x(p.name)}</strong> là <strong>Đã Hoàn Thành</strong>?</div> <!-- Sprint8 -->
+      <div class="text-secondary" style="font-size:13px">Đánh dấu <strong>${x(p.name)}</strong> là <strong>Đã Hoàn Thành</strong>?</div>
       <div>
         <label style="${lblStyle}">Ngày Hoàn Thành</label>
         <input id="ct-complete-date" type="date" value="${todayStr}"

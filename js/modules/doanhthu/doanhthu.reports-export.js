@@ -64,7 +64,7 @@ function _renderCongNoTable(rows, tbody, empty) {
     const overdrawn    = (row.tongUng || 0) > (row.tongHD || 0) && (row.tongHD || 0) > 0;
     const conlaiClass  = overdrawn
       ? 'text-danger fw-bold'
-      : (conlai === 0 ? 'text-secondary' : ''); /* Sprint8 */
+      : (conlai === 0 ? 'text-secondary' : '');
     const countLabel   = row.count > 0
       ? `<span class="text-secondary" style="font-size:11px;margin-left:3px">(${row.count})</span>`
       : '';
@@ -83,7 +83,7 @@ function _renderCongNoTable(rows, tbody, empty) {
     </tr>`;
   }).join('');
 
-  const footerConlaiClass = totUng > totHD && totHD > 0 ? 'text-danger' : ''; /* Sprint8 */
+  const footerConlaiClass = totUng > totHD && totHD > 0 ? 'text-danger' : '';
   const footerRow = `<tr style="border-top:2px solid var(--bs-border-color);font-weight:700;background:var(--bs-tertiary-bg)">
     <td colspan="2" class="text-secondary" style="padding:8px 12px">Tổng cộng</td>
     <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px">${fmtS(totUng)}</td>
@@ -260,7 +260,7 @@ function renderLaiLo() {
       <td>${phatSinh  ? fmtS(phatSinh)  : '<span class="text-secondary">—</span>'}</td>
       <td style="font-weight:600">${tongDTct ? fmtS(tongDTct) : '—'}</td>
       <td class="text-danger">${fmtS(chi)}</td>
-      <td class="text-success">${thu ? fmtS(thu) : '—'}</td> <!-- Sprint8 -->
+      <td class="text-success">${thu ? fmtS(thu) : '—'}</td>
       <td>${tongDTct ? fmtS(conPhaiThu) : '—'}</td>
       <td class="${llClass}">${tongDTct ? llPrefix + fmtS(laiLo) : '—'}</td>
     </tr>`;
@@ -294,7 +294,7 @@ function renderLaiLo() {
             <td>${fmtS(tongPS)}</td>
             <td style="font-weight:700">${fmtS(tongDT)}</td>
             <td class="text-danger fw-bold">${fmtS(tongChi_)}</td>
-            <td class="text-success fw-bold">${fmtS(tongThu)}</td> <!-- Sprint8 -->
+            <td class="text-success fw-bold">${fmtS(tongThu)}</td>
             <td>${fmtS(tongDT - tongThu)}</td>
             <td class="${tongLLClass}">${tongDT ? (tongLaiLo >= 0 ? '+' : '') + fmtS(tongLaiLo) : '—'}</td>
           </tr>

@@ -204,7 +204,7 @@ function renderBinModal() {
   const isConnected = fbReady();
   const yearKb = isConnected ? estimateYearKb(yr) : 0;
 
-  const statusColor = yearKb < 200 ? '#1a7a45' : yearKb < 500 ? '#e67e00' : '#c0392b';
+  const statusColor = yearKb < 200 ? 'var(--bs-success)' : yearKb < 500 ? '#e67e00' : 'var(--bs-danger)';
   const statusBg    = yearKb < 200 ? '#d4edda'  : yearKb < 500 ? '#fff3cd' : '#f8d7da';
   const statusLabel = yearKb < 200 ? '✅ OK'    : yearKb < 500 ? '⚠️ Khá lớn' : '🔴 Lớn';
 
@@ -216,18 +216,18 @@ function renderBinModal() {
 
     ${isConnected ? `
     <div style="background:#f0fff4;border:1px solid #b2dfdb;border-radius:8px;padding:10px 14px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:#1a7a45;margin-bottom:4px">✅ ĐÃ KẾT NỐI</div>
+      <div style="font-size:11px;font-weight:700;color:var(--bs-success);margin-bottom:4px">✅ ĐÃ KẾT NỐI</div>
       <div style="font-size:11px;color:#555">Project: <strong>${FB_CONFIG.projectId}</strong></div>
       <div style="font-size:11px;color:#888;margin-top:2px">API Key: ${FB_CONFIG.apiKey.substring(0,8)}••••••••</div>
     </div>
-    <div style="background:#f5f4f0;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px">
+    <div style="background:var(--bs-tertiary-bg);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px">
       📊 Dữ liệu năm ${yr}: <strong style="color:${statusColor}">${yearKb}kb</strong>
       <span style="margin-left:6px;background:${statusBg};color:${statusColor};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">${statusLabel}</span>
       <div style="font-size:10px;color:#aaa;margin-top:2px">Firebase free: 1GB storage · 50K reads/ngày · 20K writes/ngày</div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <button onclick="manualSync();closeBinModal();" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #1565c0;background:transparent;color:#1565c0;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">🔄 Sync</button>
-      <button onclick="fbDisconnect()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #c0392b;background:transparent;color:#c0392b;font-family:inherit;font-size:13px;cursor:pointer">⛔ Ngắt</button>
+      <button onclick="fbDisconnect()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--bs-danger);background:transparent;color:var(--bs-danger);font-family:inherit;font-size:13px;cursor:pointer">⛔ Ngắt</button>
     </div>
     ` : `
     <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#856404">

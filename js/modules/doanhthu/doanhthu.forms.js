@@ -389,7 +389,7 @@ function renderThuTable(page) {
   tbody.innerHTML = slice.map(r => `
     <tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="thu-row-chk" data-id="${r.id}"></td>
-      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td> <!-- Sprint8 -->
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
       <td class="text-secondary">${x(r.nguoi || '—')}</td>
@@ -577,10 +577,10 @@ function renderHdtpTable(page) {
     const tong = (r.giaTri || 0) + (r.phatSinh || 0);
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdtp-row-chk" data-id="${r.id}"></td>
-      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td> <!-- Sprint8 -->
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td style="white-space:nowrap">${x(r.thauphu)}</td>
-      <td class="text-secondary" style="font-size:12px;min-width:90px">${x(r.nd || '—')}</td> <!-- Sprint8 -->
+      <td class="text-secondary" style="font-size:12px;min-width:90px">${x(r.nd || '—')}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${r.giaTri ? fmtS(r.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${r.phatSinh ? fmtS(r.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>

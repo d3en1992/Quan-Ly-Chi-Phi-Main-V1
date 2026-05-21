@@ -26,7 +26,7 @@ function _showDeleteConfirm(title, bodyHtml, onConfirm) {
     + 'display:flex;align-items:center;justify-content:center;padding:16px';
   overlay.innerHTML = `
     <div style="background:var(--bs-body-bg);border-radius:10px;padding:24px;max-width:420px;width:100%;
-                box-shadow:0 8px 32px rgba(0,0,0,.28);font-family:inherit"> <!-- Sprint8 -->
+                box-shadow:0 8px 32px rgba(0,0,0,.28);font-family:inherit">
       <div style="font-size:15px;font-weight:700;color:var(--bs-danger);margin-bottom:10px">${title}</div>
       <div style="font-size:13px;color:var(--bs-body-color);line-height:1.65;margin-bottom:16px">${bodyHtml}</div>
       <div style="margin-bottom:16px">
@@ -45,7 +45,7 @@ function _showDeleteConfirm(title, bodyHtml, onConfirm) {
           Xoá
         </button>
       </div>
-    </div>`; /* Sprint8 */
+    </div>`;
   document.body.appendChild(overlay);
 
   const inp    = overlay.querySelector('#_del-inp');
@@ -813,7 +813,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
 
     return `
       <div style="margin-top:14px;border:1px solid var(--bs-border-color);border-radius:8px;overflow:hidden">
-        <div style="background:#f3f1ec;padding:8px 14px;display:flex;align-items:center;
+        <div style="background:var(--bs-tertiary-bg);padding:8px 14px;display:flex;align-items:center;
                     justify-content:space-between;border-bottom:1px solid var(--bs-border-color)">
           <span style="font-size:12px;font-weight:700;color:var(--bs-body-color)">
             📅 Chi tiết Tuần ${wkNum}

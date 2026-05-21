@@ -421,7 +421,7 @@ async function renderBackupList() {
   const statusLabel = document.getElementById('backup-status-label');
   const list = await _getBackupStore();
   if (!list.length) {
-    wrap.innerHTML = '<div class="text-secondary" style="font-size:13px;padding:8px 0">Chưa có bản sao lưu nào. App sẽ tự động tạo sau 1 phút.</div>'; /* Sprint8 */
+    wrap.innerHTML = '<div class="text-secondary" style="font-size:13px;padding:8px 0">Chưa có bản sao lưu nào. App sẽ tự động tạo sau 1 phút.</div>';
     if (statusLabel) statusLabel.textContent = '';
     return;
   }
@@ -441,10 +441,10 @@ async function renderBackupList() {
     return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
               background:${isNewest ? 'var(--bs-body-bg)' : 'transparent'};
               border-radius:8px;border:1px solid ${isNewest ? 'var(--bs-border-color-translucent)' : 'transparent'};
-              margin-bottom:6px;flex-wrap:wrap"> <!-- Sprint8 -->
+              margin-bottom:6px;flex-wrap:wrap">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600">${label}</div> <!-- Sprint8 -->
-        <div class="text-secondary" style="font-size:11px;margin-top:2px">${time} &nbsp;·&nbsp; ${counts}</div> <!-- Sprint8 -->
+        <div style="font-size:13px;font-weight:600">${label}</div>
+        <div class="text-secondary" style="font-size:11px;margin-top:2px">${time} &nbsp;·&nbsp; ${counts}</div>
       </div>
       <button class="btn btn-outline-secondary btn-sm" onclick="restoreFromBackup(${i})" title="Khôi phục bản này">
         ↩ Khôi phục
@@ -513,7 +513,7 @@ function _showImportJSONConfirm({ data, c, ts }) {
   }
   ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:420px;width:94vw;background:#fff;border-radius:14px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 16px 56px rgba(0,0,0,.25)">
     <div style="font-size:28px;text-align:center;margin-bottom:10px">⚠️</div>
-    <h3 style="font-size:16px;font-weight:800;margin:0 0 12px;text-align:center;color:#c0392b">KHÔI PHỤC TOÀN BỘ DỮ LIỆU</h3>
+    <h3 style="font-size:16px;font-weight:800;margin:0 0 12px;text-align:center;color:var(--bs-danger)">KHÔI PHỤC TOÀN BỘ DỮ LIỆU</h3>
     <div style="background:#fff3cd;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.8;margin-bottom:16px">
       📅 Snapshot lúc: <b>${ts}</b><br>
       📊 Nội dung: ${c.inv} HĐ · ${c.ung} tiền ứng · ${c.cc} tuần CC · ${c.tb} thiết bị
@@ -525,7 +525,7 @@ function _showImportJSONConfirm({ data, c, ts }) {
     </div>
     <div style="display:flex;gap:10px">
       <button onclick="document.getElementById('import-json-overlay').style.display='none'" style="flex:1;padding:11px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-family:inherit;font-size:13px;cursor:pointer">Hủy</button>
-      <button onclick="importJSONFull(window._pendingImportData)" style="flex:2;padding:11px;border-radius:8px;border:none;background:#c0392b;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">Khôi phục</button>
+      <button onclick="importJSONFull(window._pendingImportData)" style="flex:2;padding:11px;border-radius:8px;border:none;background:var(--bs-danger);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">Khôi phục</button>
     </div>
   </div>`;
   window._pendingImportData = data;

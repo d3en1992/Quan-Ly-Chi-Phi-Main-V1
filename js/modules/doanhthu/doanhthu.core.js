@@ -78,7 +78,7 @@ function _initDoanhThuAddons() {
         <button type="button" class="btn btn-outline-secondary btn-sm" id="${prefix}-btn-chitiet" onclick="window.toggle${prefix}ChiTiet()">📊 Khối lượng chi tiết</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyKLCT(this)">📋 Copy</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="pasteKLCT(this)">📥 Paste</button>
-        <div id="${prefix}-chitiet-wrap" style="display:none; margin-top: 10px; border: 1px solid var(--bs-border-color); padding: 10px; border-radius: 6px; background: var(--bs-tertiary-bg)"> <!-- Sprint8 -->
+        <div id="${prefix}-chitiet-wrap" style="display:none; margin-top: 10px; border: 1px solid var(--bs-border-color); padding: 10px; border-radius: 6px; background: var(--bs-tertiary-bg)">
           <div style="overflow-x:auto;">
             <table class="entry-table" style="width:100%; min-width: 500px;">
               <thead>
@@ -103,11 +103,11 @@ function _initDoanhThuAddons() {
     `);
 
     giaTriInput.setAttribute('readonly', 'true');
-    giaTriInput.style.background = 'var(--bs-tertiary-bg)'; /* Sprint8 */
+    giaTriInput.style.background = 'var(--bs-tertiary-bg)';
     giaTriInput.style.pointerEvents = 'none';
 
     const label = giaTriField.querySelector('label');
-    if (label) label.innerHTML += ' <i class="text-secondary" style="font-weight:normal">(Tự động)</i>'; /* Sprint8 */
+    if (label) label.innerHTML += ' <i class="text-secondary" style="font-weight:normal">(Tự động)</i>';
   });
 }
 
@@ -389,7 +389,7 @@ function dtEnsureCongNoSubtab() {
     filterRow.id = 'dt-cn-filter-row';
     filterRow.style = 'margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
     filterRow.innerHTML = `
-      <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label> <!-- Sprint8 -->
+      <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
       <select id="dt-cn-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px"
         onchange="dtSetCtFilter(this.value)">
         <option value="">-- Tất cả công trình --</option>
@@ -419,7 +419,7 @@ function dtEnsureCongNoSubtab() {
       <div style="overflow-x:auto">
         <table class="table table-sm table-hover align-middle mb-0">
           <thead>
-            <tr class="text-secondary" style="font-size:11px;border-bottom:2px solid var(--bs-border-color)"> <!-- Sprint8 -->
+            <tr class="text-secondary" style="font-size:11px;border-bottom:2px solid var(--bs-border-color)">
               <th style="text-align:left;padding:8px 12px;font-weight:700">Nhà Cung Cấp</th>
               <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
               <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng Đã Ứng</th>
@@ -430,7 +430,7 @@ function dtEnsureCongNoSubtab() {
           <tbody id="congno-ncc-tbody"></tbody>
         </table>
       </div>
-      <div id="congno-ncc-empty" class="text-secondary" style="text-align:center;padding:32px;font-size:13px;display:none">Chưa có dữ liệu công nợ nhà cung cấp</div> <!-- Sprint8 -->
+      <div id="congno-ncc-empty" class="text-secondary" style="text-align:center;padding:32px;font-size:13px;display:none">Chưa có dữ liệu công nợ nhà cung cấp</div>
     `;
 
     cnPage.appendChild(header);
