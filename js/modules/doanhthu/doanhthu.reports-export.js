@@ -71,13 +71,13 @@ function _renderCongNoTable(rows, tbody, empty) {
     return `<tr>
       <td style="font-weight:600;white-space:nowrap">${x(row.name)}</td>
       <td style="white-space:nowrap">${x(row.congtrinh || '—')}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">
+      <td class="text-end font-monospace fw-semibold" style="white-space:nowrap;min-width:140px;font-size:14px">
         ${row.tongUng ? fmtS(row.tongUng) : '<span class="text-secondary">—</span>'}${countLabel}
       </td>
-      <td class="text-end font-monospace" style="white-space:nowrap">
+      <td class="text-end font-monospace fw-semibold" style="white-space:nowrap;min-width:140px;font-size:14px">
         ${row.tongHD ? fmtS(row.tongHD) : '<span class="text-secondary">—</span>'}
       </td>
-      <td class="text-end font-monospace ${conlaiClass}" style="white-space:nowrap">
+      <td class="text-end font-monospace fw-semibold ${conlaiClass}" style="white-space:nowrap;min-width:140px;font-size:14px">
         ${fmtS(conlai)}
       </td>
     </tr>`;
@@ -86,9 +86,9 @@ function _renderCongNoTable(rows, tbody, empty) {
   const footerConlaiClass = totUng > totHD && totHD > 0 ? 'text-danger' : '';
   const footerRow = `<tr style="border-top:2px solid var(--bs-border-color);font-weight:700;background:var(--bs-tertiary-bg)">
     <td colspan="2" class="text-secondary" style="padding:8px 12px">Tổng cộng</td>
-    <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px">${fmtS(totUng)}</td>
-    <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px">${fmtS(totHD)}</td>
-    <td class="text-end font-monospace ${footerConlaiClass}" style="white-space:nowrap;padding:8px 10px">${fmtS(totConlai)}</td>
+    <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px;font-size:14px">${fmtS(totUng)}</td>
+    <td class="text-end font-monospace" style="white-space:nowrap;padding:8px 10px;font-size:14px">${fmtS(totHD)}</td>
+    <td class="text-end font-monospace ${footerConlaiClass}" style="white-space:nowrap;padding:8px 10px;font-size:14px">${fmtS(totConlai)}</td>
   </tr>`;
 
   tbody.innerHTML = dataRows + footerRow;

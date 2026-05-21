@@ -476,25 +476,29 @@ function _onKeydown(e, config) {
 
   if (e.key === 'ArrowDown') {
     const rows = _getRows(config);
+    // For number inputs, always prevent default (browser would increment value)
+    if (el.type === 'number') e.preventDefault();
     if (row < rows.length - 1) { e.preventDefault(); _navigateTo(config, row + 1, col); }
     return;
   }
   if (e.key === 'ArrowUp') {
+    // For number inputs, always prevent default (browser would decrement value)
+    if (el.type === 'number') e.preventDefault();
     if (row > 0) { e.preventDefault(); _navigateTo(config, row - 1, col); }
     return;
   }
   if (e.key === 'ArrowRight') {
     if (el.tagName === 'SELECT') { e.preventDefault(); _navigateTo(config, row, col + 1); return; }
-    if (el.selectionStart === el.value.length && el.selectionEnd === el.value.length) {
-      e.preventDefault(); _navigateTo(config, row, col + 1);
-    }
+    // selectionStart is null for type=number; treat as "at end" always → navigate right
+    const atEnd = el.type === 'number' || (el.selectionStart === el.value.length && el.selectionEnd === el.value.length);
+    if (atEnd) { e.preventDefault(); _navigateTo(config, row, col + 1); }
     return;
   }
   if (e.key === 'ArrowLeft') {
     if (el.tagName === 'SELECT') { e.preventDefault(); _navigateTo(config, row, col - 1); return; }
-    if (el.selectionStart === 0 && el.selectionEnd === 0) {
-      e.preventDefault(); _navigateTo(config, row, col - 1);
-    }
+    // selectionStart is null for type=number; treat as "at start" always → navigate left
+    const atStart = el.type === 'number' || (el.selectionStart === 0 && el.selectionEnd === 0);
+    if (atStart) { e.preventDefault(); _navigateTo(config, row, col - 1); }
     return;
   }
 

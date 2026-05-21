@@ -387,7 +387,9 @@ function tbRenderList() {
       </td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
       <td style="padding:6px 4px">
-        <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button>
+        <div class="d-flex justify-content-start align-items-center gap-2">
+          <button class="btn btn-outline-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="white-space:nowrap"><i class="bi bi-arrow-left-right"></i> Luân chuyển</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -618,9 +620,11 @@ function renderKhoTong() {
       <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:10px;white-space:nowrap">${r.ngay||''}</td>
-      <td style="padding:6px 4px;display:flex;gap:4px;flex-wrap:nowrap">
-        <button class="btn btn-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="font-size:11px;white-space:nowrap">↩ Luân chuyển</button>
-        <button class="btn btn-danger btn-sm" onclick="tbDeleteRow('${r.id}')">✕</button>
+      <td style="padding:6px 4px">
+        <div class="d-flex justify-content-start align-items-center gap-2">
+          <button class="btn btn-outline-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="white-space:nowrap"><i class="bi bi-arrow-left-right"></i> Luân chuyển</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="tbDeleteRow('${r.id}')" title="Xóa"><i class="bi bi-trash-fill"></i></button>
+        </div>
       </td>
     </tr>`;
   }).join('');

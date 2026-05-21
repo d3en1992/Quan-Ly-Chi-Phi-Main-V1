@@ -96,12 +96,12 @@ function renderTable() {
     const src      = isCC ? 'cc' : _resolveInvSource(inv);
     const rowClass = src === 'quick' ? 'inv-row-quick' : src === 'detail' ? 'inv-row-detail' : '';
     const actionBtn = isManual
-      ? `<span style="white-space:nowrap;display:inline-flex;gap:3px">
-          <button class="btn btn-outline-secondary btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn">✕</button>
+      ? `<span class="d-flex gap-1">
+          <button class="btn btn-outline-primary btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn"><i class="bi bi-trash-fill"></i></button>
         </span>`
       : isCC
-        ? `<button class="btn btn-outline-secondary btn-sm" style="font-size:10px;padding:3px 7px" onclick="editCCInvoice('${inv.ccKey||inv.id}')" title="Chỉnh sửa tại tab Chấm Công">↩ CC</button>`
+        ? `<button class="btn btn-outline-info btn-sm" style="font-size:11px;white-space:nowrap" onclick="editCCInvoice('${inv.ccKey||inv.id}')" title="Chỉnh sửa tại tab Chấm Công"><i class="bi bi-arrow-return-left"></i> CC</button>`
         : `<span class="text-body-secondary" style="font-size:11px;padding:0 6px">—</span>`;
     const displayDate = fmtISODate(inv.ngay);
     return `<tr class="${rowClass}">

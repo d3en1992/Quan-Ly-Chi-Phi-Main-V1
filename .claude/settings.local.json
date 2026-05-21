@@ -21,7 +21,12 @@
       "Bash(rm -f css_cleanup.py)",
       "Bash(node --check js/modules/danhmuc/danhmuc.categories.js)",
       "Bash(node --check js/modules/doanhthu/doanhthu.forms.js)",
-      "Bash(node --check js/modules/doanhthu/doanhthu.core.js)"
+      "Bash(node --check js/modules/doanhthu/doanhthu.core.js)",
+      "Bash(node --check js/modules/chamcong/chamcong.history-reports.js)",
+      "Bash(node --check js/modules/doanhthu/doanhthu.reports-export.js)",
+      "Bash(node --check js/modules/hoadon/hoadon.list-trash.js)",
+      "Bash(node --check js/modules/hoadon/hoadon.sheet-grid.js)",
+      "Bash(node --check js/legacy/thietbi.js)"
     ]
   }
 }

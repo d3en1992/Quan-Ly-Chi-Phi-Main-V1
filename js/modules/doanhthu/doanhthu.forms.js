@@ -209,13 +209,13 @@ function renderHdcTable(page) {
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.phatSinh ? fmtS(hd.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
-      <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline-secondary btn-sm text-primary" title="Sửa"
-          onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}">✏️</button>
+      <td style="padding:4px">
+        <button class="btn btn-outline-primary btn-sm" title="Sửa"
+          onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
       </td>
-      <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline-secondary btn-sm text-danger" title="Xóa"
-          onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}">✕</button>
+      <td style="padding:4px">
+        <button class="btn btn-outline-danger btn-sm" title="Xóa"
+          onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>
       </td>
     </tr>`;
   }).join('');
@@ -394,13 +394,13 @@ function renderThuTable(page) {
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
       <td class="text-secondary">${x(r.nguoi || '—')}</td>
       <td class="text-body-secondary" style="font-size:12px">${x(r.nd || '—')}</td>
-      <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline-secondary btn-sm text-primary" title="Sửa"
-          onclick="editThuRecord('${r.id}')">✏️</button>
+      <td style="padding:4px">
+        <button class="btn btn-outline-primary btn-sm" title="Sửa"
+          onclick="editThuRecord('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
       </td>
-      <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline-secondary btn-sm text-danger" style="padding:2px 8px" title="Xóa"
-          onclick="delThuRecord('${r.id}')">✕</button>
+      <td style="padding:4px">
+        <button class="btn btn-outline-danger btn-sm" title="Xóa"
+          onclick="delThuRecord('${r.id}')"><i class="bi bi-trash-fill"></i></button>
       </td>
     </tr>`).join('');
 
@@ -584,13 +584,13 @@ function renderHdtpTable(page) {
       <td class="text-end font-monospace" style="white-space:nowrap">${r.giaTri ? fmtS(r.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${r.phatSinh ? fmtS(r.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
-      <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline-secondary btn-sm text-primary" title="Sửa"
-          onclick="editHopDongThauPhu('${r.id}')">✏️</button>
+      <td style="padding:4px">
+        <button class="btn btn-outline-primary btn-sm" title="Sửa"
+          onclick="editHopDongThauPhu('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
       </td>
-      <td style="text-align:center;padding:4px 6px">
-        <button class="btn btn-outline-secondary btn-sm text-danger" title="Xóa"
-          onclick="delHopDongThauPhu('${r.id}')">✕</button>
+      <td style="padding:4px">
+        <button class="btn btn-outline-danger btn-sm" title="Xóa"
+          onclick="delHopDongThauPhu('${r.id}')"><i class="bi bi-trash-fill"></i></button>
       </td>
     </tr>`;
   }).join('');

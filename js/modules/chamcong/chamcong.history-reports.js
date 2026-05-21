@@ -124,9 +124,9 @@ function renderCCHistory(){
     ${r.d.map(v=>`<td class="${v===1?'text-success':v>0?'text-primary':'text-body-secondary'}" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px">${v||'·'}</td>`).join('')}
     <td class="text-warning" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${r.tc}</td>
     <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px">${r.avgLuong?numFmt(r.avgLuong):'—'}</td>
-    <td class="text-end font-monospace fw-semibold text-success">${r.tl?numFmt(r.tl):'—'}</td>
+    <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap;min-width:110px">${r.tl?numFmt(r.tl):'—'}</td>
     <td class="text-primary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${r.pc?numFmt(r.pc):'—'}</td>
-    <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${r.hd?numFmt(r.hd):'—'}</td>
+    <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap;min-width:110px">${r.hd?numFmt(r.hd):'—'}</td>
     <td class="text-secondary" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd||'—')}</td>
     <td class="text-warning" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px">${r.tongcong?numFmt(r.tongcong):'—'}</td>
     <td>

@@ -107,6 +107,14 @@ function goPage(btn, id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   btn.classList.add('active');
+  // Dynamic topbar title
+  const _PAGE_LABELS = {
+    congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
+    thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
+    nhapung: '💰 Tiền Ứng', thietbi: '🔧 Theo Dõi TB',
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', dashboard: '📊 Dashboard'
+  };
+  _setTopbarTabTitle(_PAGE_LABELS[id] || '');
   // Reload globals từ _mem → đảm bảo tab switch luôn thấy data mới nhất (kể cả khi auto-sync chạy ngầm)
   if (typeof _reloadGlobals === 'function') _reloadGlobals();
   if (id==='nhap') { renderTodayInvoices(); }
@@ -119,6 +127,24 @@ function goPage(btn, id) {
   if (id==='thietbi') { tbPopulateSels(); tbBuildRows(5); tbRenderList(); renderKhoTong(); }
   if (id==='congtrinh') renderProjectsPage();
   queueApplyRoleUI();
+}
+
+function _setTopbarTabTitle(label) {
+  const el = document.getElementById('topbar-tab-title');
+  if (!el) return;
+  el.textContent = label;
+  // Show/hide based on scroll position
+  if (!window._topbarTitleScrollBound) {
+    window._topbarTitleScrollBound = true;
+    window.addEventListener('scroll', function() {
+      const el = document.getElementById('topbar-tab-title');
+      if (!el || !el.textContent) return;
+      if (window.scrollY > 40) el.classList.add('visible');
+      else el.classList.remove('visible');
+    }, { passive: true });
+  }
+  // Reset on tab switch — hide until user scrolls
+  el.classList.remove('visible');
 }
 
 // Sub-tab navigation bên trong page-nhap

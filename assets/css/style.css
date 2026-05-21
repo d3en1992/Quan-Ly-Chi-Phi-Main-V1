@@ -1515,3 +1515,24 @@ body { overscroll-behavior-y: none; }
   font-weight: 600;
 }
 
+/* ── Dynamic tab title in topbar ── */
+#topbar-tab-title {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.90);
+  letter-spacing: .3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.10);
+  border-radius: 6px;
+}
+#topbar-tab-title.visible {
+  display: inline-block;
+  opacity: 1;
+}

@@ -422,9 +422,9 @@ function dtEnsureCongNoSubtab() {
             <tr class="text-secondary" style="font-size:11px;border-bottom:2px solid var(--bs-border-color)">
               <th style="text-align:left;padding:8px 12px;font-weight:700">Nhà Cung Cấp</th>
               <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
-              <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng Đã Ứng</th>
-              <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng Số Tiền</th>
-              <th style="text-align:right;padding:8px 10px;font-weight:700">Còn Phải TT</th>
+              <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Tổng Đã Ứng</th>
+              <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Tổng Số Tiền</th>
+              <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Còn Phải TT</th>
             </tr>
           </thead>
           <tbody id="congno-ncc-tbody"></tbody>
