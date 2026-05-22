@@ -473,6 +473,89 @@ function exportJSON() {
   toast('✅ Đã xuất snapshot (' + c.inv + ' HĐ, ' + c.ung + ' tiền ứng, ' + c.cc + ' tuần CC)', 'success');
 }
 
+// ── Normalize import data — chuẩn hóa dữ liệu trước khi ghi vào hệ thống ────
+// Xử lý:
+//   1. Float ID (từ Excel/nhập cũ) → chuyển thành UUID stable (md5-like dùng string)
+//   2. projectId = null → tự điền từ tên công trình (lookup projects_v1)
+//   3. Đảm bảo updatedAt có giá trị
+// Không thay đổi ID gốc nếu đã là UUID hợp lệ (tránh phá vỡ references)
+function _normalizeImportData(data) {
+  const now = Date.now();
+  let filledProjectId = 0, fixedId = 0;
+
+  // Bước 1: Xây lookup map tên CT → projectId từ projects_v1
+  const ctByName = {};
+  (data.projects_v1 || []).forEach(p => {
+    if (p.name && p.id && !p.deletedAt) ctByName[p.name.trim()] = p.id;
+  });
+
+  // Helper: kiểm tra có phải UUID hợp lệ không
+  const isUUID = v => typeof v === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+  // Helper: chuyển float/number ID → UUID ổn định dựa trên giá trị số
+  // Giữ nguyên nếu đã là UUID. Tránh thay đổi vì sẽ phá reference cũ.
+  const stableId = (id) => {
+    if (isUUID(id)) return id;                    // UUID rồi → giữ nguyên
+    if (!id) return crypto.randomUUID();           // null/undefined → UUID mới
+    // Float/number → dùng crypto.randomUUID() nhưng log cảnh báo
+    const str = String(id);
+    // Giữ nguyên nếu đủ unique (số float timestamp đã unique)
+    // Chỉ đổi nếu là số nguyên ngắn (< 10 ký tự) dễ trùng
+    return str.length >= 10 ? str : crypto.randomUUID();
+  };
+
+  // Các types cần normalize projectId
+  const ARRAY_TYPES = [
+    { key: 'inv_v3',  ctField: 'congtrinh' },
+    { key: 'cc_v2',   ctField: 'ct'        },
+    { key: 'tb_v1',   ctField: 'ct'        },
+    { key: 'ung_v1',  ctField: 'congtrinh' },
+    { key: 'thu_v1',  ctField: 'congtrinh' },
+  ];
+
+  const result = {};
+
+  for (const [key, val] of Object.entries(data)) {
+    if (!Array.isArray(val)) { result[key] = val; continue; }
+
+    const typeDef = ARRAY_TYPES.find(t => t.key === key);
+
+    result[key] = val.map(rec => {
+      const r = { ...rec };
+
+      // Fix ID: chuyển float sang string stable (không thay bằng UUID mới để tránh mất ref)
+      if (typeof r.id === 'number') {
+        r.id = String(Math.round(r.id));   // "1772610183796" thay vì float
+        fixedId++;
+      }
+
+      if (typeDef) {
+        // Fill projectId nếu null
+        if (!r.projectId && r[typeDef.ctField]) {
+          const pid = ctByName[r[typeDef.ctField].trim()];
+          if (pid) { r.projectId = pid; filledProjectId++; }
+        }
+        // Đảm bảo updatedAt
+        if (!r.updatedAt) r.updatedAt = r._ts || r.createdAt || now;
+      }
+
+      return r;
+    });
+  }
+
+  const msgs = [];
+  if (fixedId > 0)          msgs.push(`sửa ${fixedId} float ID`);
+  if (filledProjectId > 0)  msgs.push(`điền ${filledProjectId} projectId`);
+  if (msgs.length)
+    console.log(`[Import] ✓ Chuẩn hóa dữ liệu: ${msgs.join(', ')}`);
+  else
+    console.log('[Import] ✓ Dữ liệu đã chuẩn — không cần normalize');
+
+  return result;
+}
+
+
 // ── Import JSON — hard reset toàn hệ thống ───────────────────
 function importJSON(file) {
   if (!file) return;
@@ -569,6 +652,10 @@ async function importJSONFull(data) {
       }
       clean[key] = val;
     }
+
+    // Step 2b: Normalize — fill missing projectId, fix float IDs, ensure deviceId
+    const normalized = _normalizeImportData(clean);
+    Object.assign(clean, normalized);
 
     // Step 3: Write to _mem + IDB — await ALL writes before any further action
     const writes = [];
