@@ -132,7 +132,7 @@ function goPage(btn, id) {
 function _setTopbarTabTitle(label) {
   const el = document.getElementById('topbar-tab-title');
   if (!el) return;
-  el.textContent = label ? 'CPCT | ' + label.replace(/^[^\w\s]+\s*/, '') : '';
+  el.textContent = label ? label.replace(/^[^\w\s]+\s*/, '') : '';
   if (label) el.classList.add('visible');
   else el.classList.remove('visible');
 }

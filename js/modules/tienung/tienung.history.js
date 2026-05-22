@@ -63,27 +63,29 @@ function _ungSectionHTML(pagedRecs, allRecs, title, accentColor, curPage, pgSize
       <span style="${mono};font-size:12px;font-weight:700;color:${accentColor}">${fmtS(sumSec)}</span>
     </div>
     <div style="overflow-x:auto">
-      <table class="table table-sm table-hover align-middle mb-0 w-100">
+      <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
         <thead><tr>
           <th style="width:32px;text-align:center">
             <input type="checkbox" class="ung-section-chk-all" title="Chọn tất cả"
               onchange="this.closest('table').querySelectorAll('.ung-row-chk').forEach(c=>c.checked=this.checked)">
           </th>
-          <th>Ngày</th><th>${nameColLabel}</th><th>Công Trình</th><th>Nội Dung</th>
-          <th style="text-align:right">Số Tiền Ứng</th><th></th>
+          <th style="white-space:nowrap">Ngày</th><th style="white-space:nowrap">${nameColLabel}</th><th style="white-space:nowrap">Công Trình</th><th>Nội Dung</th>
+          <th style="text-align:right;white-space:nowrap">Số Tiền Ứng</th><th></th>
         </tr></thead>
         <tbody>${pagedRecs.map(r=>`<tr data-ung-id="${r.id}" class="${_editingUngId===r.id?'editing-row':''}">
           <td style="text-align:center;padding:4px">
             <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer">
           </td>
-          <td class="text-secondary font-monospace" style="font-size:11px">${fmtISODate(r.ngay)}</td>
-          <td style="font-weight:600;font-size:12px">${x(r.tp)}</td>
-          <td class="text-secondary">${x(resolveProjectName(r)||'—')}</td>
+          <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${fmtISODate(r.ngay)}</td>
+          <td style="font-weight:600;font-size:12px;white-space:nowrap">${x(r.tp)}</td>
+          <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
           <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
-          <td class="text-end font-monospace fw-semibold text-primary">${numFmt(r.tien||0)}</td>
-          <td style="white-space:nowrap;display:flex;gap:4px;justify-content:flex-end">
-            <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')">✕</button>
+          <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
+          <td style="white-space:nowrap">
+            <div style="display:flex;gap:4px;justify-content:flex-end">
+              <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
+              <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')">✕</button>
+            </div>
           </td>
         </tr>`).join('')}</tbody>
       </table>
