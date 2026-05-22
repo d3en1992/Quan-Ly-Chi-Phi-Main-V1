@@ -283,10 +283,6 @@ async function pushChanges(opts = {}) {
         if (res && res.fields) {
           console.log(`[Sync] ▲ Year ${yr} OK (~${kb}kb)`);
           ok++;
-          // ── V2 mirror (fire-and-forget) — human-readable Firestore view ──
-          if (typeof _v2PushYear === 'function') {
-            _v2PushYear(yrInt).catch(e => console.warn('[Sync] V2 year push lỗi:', e.message || e));
-          }
         } else {
           const err = res?.error?.message || JSON.stringify(res?.error) || '?';
           console.warn(`[Sync] ✗ Year ${yr} lỗi:`, err);
@@ -312,10 +308,6 @@ async function pushChanges(opts = {}) {
     fsSet(fbDocCats(), fbCatsPayload()).catch(e =>
       console.warn('[Sync] Cats push lỗi:', e)
     );
-    // ── V2 meta mirror (fire-and-forget) — human-readable Firestore view ──
-    if (typeof _v2PushMeta === 'function') {
-      _v2PushMeta().catch(e => console.warn('[Sync] V2 meta push lỗi:', e.message || e));
-    }
 
     if (fail === 0) {
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
@@ -693,6 +685,17 @@ async function manualSync() {
 
     // Bước 3: Push — đợi xong mới refresh UI (tránh reload sớm trước khi push xong)
     await pushChanges({ silent: false });
+
+    // Bước 3b: V2 subcollection mirror — chỉ sau manual sync (bảo vệ free tier quota)
+    // Fire-and-forget: chạy nền, không block render UI
+    if (typeof _v2PushYear === 'function' && typeof _getAllLocalYears === 'function') {
+      _getAllLocalYears().forEach(yr =>
+        _v2PushYear(parseInt(yr)).catch(e => console.warn('[Sync] V2 year push lỗi:', e.message || e))
+      );
+    }
+    if (typeof _v2PushMeta === 'function') {
+      _v2PushMeta().catch(e => console.warn('[Sync] V2 meta push lỗi:', e.message || e));
+    }
 
     // Reset flag để _migrateCatNamesFormat chạy lại scan data ở lần renderSettings tiếp theo
     if (typeof resetCatNamesMigrated === 'function') resetCatNamesMigrated();
