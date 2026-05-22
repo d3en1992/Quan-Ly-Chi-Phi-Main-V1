@@ -18,7 +18,7 @@ function renderCongNoThauPhu() {
       r.loai === 'thauphu' &&
       !r.deletedAt &&
       inActiveYear(r.ngay) &&
-      _dtMatchProjFilter(r)
+      _dtMatchCnProjFilter(r)
     )
     .forEach(r => {
       const ctDisplay = _resolveCtName(r);
@@ -30,7 +30,7 @@ function renderCongNoThauPhu() {
 
   // Nguồn 2: hợp đồng thầu phụ (thauPhuContracts)
   thauPhuContracts
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchProjFilter(r))
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchCnProjFilter(r))
     .forEach(r => {
       const ctDisplay = _resolveCtName(r);
       const key = (r.thauphu || '') + '|||' + ctDisplay;
@@ -101,8 +101,8 @@ function renderCongNoNhaCungCap() {
   if (!tbody) return;
 
   const selProjId = (() => {
-    if (!_dtCtFilter) return null;
-    const p = getAllProjects().find(prj => prj.name === _dtCtFilter);
+    if (!_dtCnCtFilter) return null;
+    const p = getAllProjects().find(prj => prj.name === _dtCnCtFilter);
     return p ? p.id : null;
   })();
 

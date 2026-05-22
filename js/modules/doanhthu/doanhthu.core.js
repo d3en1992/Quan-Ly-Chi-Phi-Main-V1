@@ -245,8 +245,10 @@ const DT_PG   = 7;
 
 // CT filter cho sub-tab THỐNG KÊ ('' = tất cả)
 let _dtCtFilter = '';
+// CT filter riêng cho sub-tab CÔNG NỢ — cô lập hoàn toàn với Thống Kê
+let _dtCnCtFilter = '';
 
-// ── Match record với CT filter hiện tại (dùng projectId → fallback congtrinh) ─
+// ── Match record với CT filter Thống Kê ────────────────────────────────────
 function _dtMatchProjFilter(record) {
   if (!_dtCtFilter) return true;
   if (record.projectId) {
@@ -254,6 +256,16 @@ function _dtMatchProjFilter(record) {
     if (proj) return record.projectId === proj.id;
   }
   return (record.congtrinh || '') === _dtCtFilter;
+}
+
+// ── Match record với CT filter Công Nợ ─────────────────────────────────────
+function _dtMatchCnProjFilter(record) {
+  if (!_dtCnCtFilter) return true;
+  if (record.projectId) {
+    const proj = getAllProjects().find(p => p.name === _dtCnCtFilter);
+    if (proj) return record.projectId === proj.id;
+  }
+  return (record.congtrinh || '') === _dtCnCtFilter;
 }
 
 // ── Match hopDongData entry (keyed by projectId or ct name) ────────────────
@@ -275,21 +287,26 @@ function _dtMatchHDCFilter(keyId, hd) {
   return false;
 }
 
-// ── Populate CT filter select trong THỐNG KÊ ──────────────────────────────
+// ── Populate CT filter select — mỗi sub-tab dùng state riêng ──────────────
 function dtPopulateCtFilter() {
-  ['dt-ct-filter-sel', 'dt-cn-ct-filter-sel'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (sel) sel.innerHTML = _buildProjFilterOpts(_dtCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
-  });
+  const tkSel = document.getElementById('dt-ct-filter-sel');
+  if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
+  const cnSel = document.getElementById('dt-cn-ct-filter-sel');
+  if (cnSel) cnSel.innerHTML = _buildProjFilterOpts(_dtCnCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
 }
 
-// ── Áp dụng CT filter và re-render tất cả bảng THỐNG KÊ ───────────────────
+// ── Áp dụng CT filter → CHỈ re-render bảng THỐNG KÊ ──────────────────────
 function dtSetCtFilter(val) {
   _dtCtFilter = val || '';
   _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
   renderHdcTable(0);
   renderHdtpTable(0);
   renderThuTable(0);
+}
+
+// ── Áp dụng CT filter → CHỈ re-render bảng CÔNG NỢ ───────────────────────
+function dtSetCnCtFilter(val) {
+  _dtCnCtFilter = val || '';
   renderCongNoThauPhu();
   renderCongNoNhaCungCap();
 }
@@ -343,14 +360,14 @@ function dtGoSub(btn, id) {
   btn.classList.add('active');
   if (id === 'dt-sub-thongke') {
     _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
-    dtPopulateCtFilter();
+    const tkSel = document.getElementById('dt-ct-filter-sel');
+    if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
     renderHdcTable(0);
     renderHdtpTable(0);
     renderThuTable(0);
-    renderCongNoThauPhu();
-    renderCongNoNhaCungCap();
   } else if (id === 'dt-sub-congno') {
-    dtPopulateCtFilter();
+    const cnSel = document.getElementById('dt-cn-ct-filter-sel');
+    if (cnSel) cnSel.innerHTML = _buildProjFilterOpts(_dtCnCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
     renderCongNoThauPhu();
     renderCongNoNhaCungCap();
   }
@@ -391,7 +408,7 @@ function dtEnsureCongNoSubtab() {
     filterRow.innerHTML = `
       <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
       <select id="dt-cn-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px"
-        onchange="dtSetCtFilter(this.value)">
+        onchange="dtSetCnCtFilter(this.value)">
         <option value="">-- Tất cả công trình --</option>
       </select>`;
     cnPage.appendChild(filterRow);

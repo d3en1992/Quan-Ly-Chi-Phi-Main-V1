@@ -6,7 +6,7 @@
 // ══════════════════════════════
 
 function buildUngFilters() {
-  const active = ungRecords.filter(r => !r.deletedAt);
+  const active = ungRecords.filter(r => !r.deletedAt && r.loai !== 'congnhan');
   const tps    = [...new Set(active.map(i=>i.tp))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
   const cts    = [...new Set(active.map(i=>resolveProjectName(i)))].filter(Boolean);
   const sortedCts = getAllProjects().map(p => p.name).filter(name => cts.includes(name));
@@ -132,7 +132,7 @@ function delUngRecord(id) {
 }
 
 function exportUngAllCSV() {
-  const src=filteredUng.length>0?filteredUng:ungRecords;
+  const src=filteredUng.length>0?filteredUng:ungRecords.filter(r=>!r.deletedAt&&r.loai!=='congnhan');
   const rows=[['Ngày','Thầu Phụ / Nhà CC','Công Trình','Nội Dung','Số Tiền Ứng']];
   src.forEach(r=>rows.push([r.ngay,r.tp,r.congtrinh||'',r.nd||'',r.tien]));
   dlCSV(rows,'tien_ung_'+today()+'.csv');

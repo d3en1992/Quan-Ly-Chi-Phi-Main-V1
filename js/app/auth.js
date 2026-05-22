@@ -667,6 +667,9 @@ function applyRoleUI() {
     }
     btn.style.display = visible ? '' : 'none';
   });
+
+  const toolsSection = document.getElementById('dm-tools-section');
+  if (toolsSection) toolsSection.style.display = (user.role === 'giamdoc') ? 'none' : '';
 }
 
 function queueApplyRoleUI() {

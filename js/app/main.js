@@ -132,19 +132,9 @@ function goPage(btn, id) {
 function _setTopbarTabTitle(label) {
   const el = document.getElementById('topbar-tab-title');
   if (!el) return;
-  el.textContent = label;
-  // Show/hide based on scroll position
-  if (!window._topbarTitleScrollBound) {
-    window._topbarTitleScrollBound = true;
-    window.addEventListener('scroll', function() {
-      const el = document.getElementById('topbar-tab-title');
-      if (!el || !el.textContent) return;
-      if (window.scrollY > 40) el.classList.add('visible');
-      else el.classList.remove('visible');
-    }, { passive: true });
-  }
-  // Reset on tab switch — hide until user scrolls
-  el.classList.remove('visible');
+  el.textContent = label ? 'CPCT | ' + label.replace(/^[^\w\s]+\s*/, '') : '';
+  if (label) el.classList.add('visible');
+  else el.classList.remove('visible');
 }
 
 // Sub-tab navigation bên trong page-nhap

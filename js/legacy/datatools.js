@@ -584,8 +584,8 @@ function _dbCalcWeeklyData(invoiceData, ungData) {
     const amt = r.tien || 0;
     if (!amt) return;
     const w = ensure(snapToSunday(r.ngay));
-    if (r.loai === 'thauphu') w.ungTP += amt; else w.ungNCC += amt;
-    w.total += amt;
+    if (r.loai === 'thauphu') { w.ungTP += amt; w.total += amt; }
+    else w.ungNCC += amt; // NCC: theo dõi riêng, không tính vào tổng chi tuần
   });
   return result;
 }
@@ -635,7 +635,6 @@ function _dbKPIWeekly(yr, invoiceData, ungData, thauPhuTotal) {
 
   const cards = [
     { label: 'Tổng Chi Phí ' + yr,   val: fmtM(totalCost),    sub: 'HĐ + HĐ Thầu Phụ',       cls: 'accent-gold'  },
-    { label: 'Tổng Chi Tuần',         val: fmtM(weekKPITotal), sub: weekKPISub,                 cls: 'accent-blue'  },
     { label: 'Tuần Chi Cao Nhất',     val: fmtM(maxWeekTotal), sub: maxWeekSub,                 cls: 'accent-red'   },
     { label: 'Công Trình',            val: ctSet.size,         sub: 'phát sinh năm ' + yr,      cls: 'accent-green' },
   ];
@@ -787,8 +786,8 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       });
 
     const entries = Object.entries(ctMap)
-      .map(([nm, v]) => ({ nm, ...v, total: v.inv + v.ungTP + v.ungNCC }))
-      .filter(e => e.total > 0)
+      .map(([nm, v]) => ({ nm, ...v, total: v.inv + v.ungTP }))
+      .filter(e => e.inv > 0 || e.ungTP > 0 || e.ungNCC > 0)
       .sort((a, b) => b.total - a.total);
 
     if (!entries.length) {

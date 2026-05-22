@@ -129,9 +129,11 @@ function renderCCHistory(){
     <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap;min-width:110px">${r.hd?numFmt(r.hd):'—'}</td>
     <td class="text-secondary" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd||'—')}</td>
     <td class="text-warning" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px">${r.tongcong?numFmt(r.tongcong):'—'}</td>
-    <td>
-      <button class="btn btn-outline-secondary btn-sm" onclick="loadCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Tải tuần này" style="min-width:44px;min-height:36px;padding:6px 10px">↩ Tải</button>
-      <button class="btn btn-danger btn-sm" onclick="delCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Xóa tuần" style="min-width:44px;min-height:36px;padding:6px 10px">✕ Xóa</button>
+    <td style="white-space:nowrap">
+      <div class="d-flex gap-1 flex-nowrap justify-content-center align-items-center">
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Tải tuần này">↩ Tải</button>
+        <button class="btn btn-danger btn-sm" onclick="delCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Xóa tuần">✕ Xóa</button>
+      </div>
     </td>
   </tr>`).join('');
 
