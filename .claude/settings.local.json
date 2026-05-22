@@ -27,7 +27,11 @@
       "Bash(node --check js/modules/hoadon/hoadon.list-trash.js)",
       "Bash(node --check js/modules/hoadon/hoadon.sheet-grid.js)",
       "Bash(node --check js/legacy/thietbi.js)",
-      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\sync\\\\sync.v2format.js\")"
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\sync\\\\sync.v2format.js\")",
+      "Bash(dir /s /b \"cpct_snapshot_2026-05-22_07-05*\")",
+      "Bash(dir /s /b \"%USERPROFILE%\\\\Downloads\\\\cpct_snapshot*\")",
+      "Bash(dir /s /b \"%USERPROFILE%\\\\Desktop\\\\cpct_snapshot*\")",
+      "Bash(dir /s /b \"%USERPROFILE%\\\\Documents\\\\cpct_snapshot*\")"
     ]
   }
 }

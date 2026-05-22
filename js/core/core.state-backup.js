@@ -590,6 +590,23 @@ async function importJSONFull(data) {
       } catch(e) {
         console.warn('[Import] Push cloud lỗi (sẽ sync lại sau reload):', e);
       }
+
+      // Step 5b: Push V2 subcollection mirror — reset cache để full rewrite với data mới
+      try {
+        if (typeof _v2ResetAllLastPush === 'function') _v2ResetAllLastPush();
+        if (typeof _v2PushMeta === 'function') {
+          if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang ghi V2 lên cloud...');
+          await _v2PushMeta();
+        }
+        if (typeof _v2PushYear === 'function' && typeof _getAllLocalYears === 'function') {
+          for (const yr of _getAllLocalYears()) {
+            await _v2PushYear(parseInt(yr));
+          }
+        }
+        console.log('[Import] ✓ V2 mirror push hoàn tất sau import');
+      } catch(e) {
+        console.warn('[Import] V2 push lỗi (không ảnh hưởng app):', e.message || e);
+      }
     }
 
     // Step 6: Reload — dbInit reads fresh IDB, _reloadGlobals rebuilds everything
