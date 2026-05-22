@@ -685,7 +685,8 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
   // colW/gap thích nghi theo số cột
   const colW = n <= 4 ? 52 : n <= 8 ? 46 : n <= 12 ? 34 : 22;
   const gap  = n <= 4 ? 8  : n <= 8 ? 6  : n <= 12 ? 5  : 3;
-  const H    = 160;
+  const H    = 130;          // chiều cao vẽ cột (giảm từ 160 → 130 cho chart nhỏ gọn hơn)
+  const H_SCALE = H - 18;   // chiều cao scale thực: dành 18px headroom trên đỉnh cho nhãn số
   const svgW = n * (colW + gap);
 
   // Nhãn: mỗi 1 tuần (<=8), mỗi 2 tuần (>8)
@@ -718,9 +719,9 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
 
     // MIN_H = 4px: cột vài triệu vẫn thấy bên cạnh cột vài trăm triệu
     const MIN_H = 4;
-    const hInv = v.inv    > 0 ? Math.max(MIN_H, Math.round((v.inv    / maxVal) * H)) : 0;
-    const hTP  = v.ungTP  > 0 ? Math.max(MIN_H, Math.round((v.ungTP  / maxVal) * H)) : 0;
-    const hNCC = v.ungNCC > 0 ? Math.max(MIN_H, Math.round((v.ungNCC / maxVal) * H)) : 0;
+    const hInv = v.inv    > 0 ? Math.max(MIN_H, Math.round((v.inv    / maxVal) * H_SCALE)) : 0;
+    const hTP  = v.ungTP  > 0 ? Math.max(MIN_H, Math.round((v.ungTP  / maxVal) * H_SCALE)) : 0;
+    const hNCC = v.ungNCC > 0 ? Math.max(MIN_H, Math.round((v.ungNCC / maxVal) * H_SCALE)) : 0;
     // Chồng từ dưới lên: NCC → TP → INV
     const yNCC = H - hNCC;
     const yTP  = yNCC - hTP;
@@ -751,7 +752,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       <rect x="${cx}" y="${yTop}" width="${colW}" height="${hTot}" fill="transparent" ${selStroke} rx="2">
         <title>${titleTxt}</title>
       </rect>
-      ${amt && hTot>18 ? `<text x="${cx+colW/2}" y="${yTop-5}" text-anchor="middle" font-size="10" fill="#222" font-weight="700">${amt}</text>` : ''}
+      ${amt && hTot>18 ? `<text x="${cx+colW/2}" y="${yTop < 16 ? yTop+13 : yTop-5}" text-anchor="middle" font-size="10" fill="${yTop < 16 ? '#fff' : '#222'}" font-weight="700">${amt}</text>` : ''}
       <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="${lblColor}" font-weight="${lblWeight}">${lbl}</text>
     </g>`;
   }).join('');

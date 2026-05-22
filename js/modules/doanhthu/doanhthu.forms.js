@@ -392,8 +392,8 @@ function renderThuTable(page) {
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
-      <td class="text-secondary">${x(r.nguoi || '—')}</td>
-      <td class="text-body-secondary" style="font-size:12px">${x(r.nd || '—')}</td>
+      <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
           <button class="btn btn-outline-primary btn-sm" title="Sửa"
