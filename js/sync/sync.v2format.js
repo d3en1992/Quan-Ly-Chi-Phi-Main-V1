@@ -416,47 +416,51 @@ async function _v2FsListIds(parentDocId, collName) {
   }
 }
 
-// Batch write + delete nhiều documents cùng lúc
+// Ghi/xóa nhiều documents bằng PATCH/DELETE song song (thay thế batchWrite)
 // writes = Array of:
-//   { op: 'update', path: 'y2025_hoa_don/ban_ghi/uuid1', fields: { fsField: fsValue } }
-//   { op: 'delete', path: 'y2025_hoa_don/ban_ghi/uuid1' }
-// Tự chia chunk ≤ 400 để tránh giới hạn 500 ops của Firestore
+//   { op: 'update', path: 'y2025_hoa_don/ban_ghi/docId', fields: { fsField: fsValue } }
+//   { op: 'delete', path: 'y2025_hoa_don/ban_ghi/docId' }
+// Chạy tối đa CONCURRENCY requests đồng thời để tránh rate limit
 // Trả về { totalOk, totalFail }
 async function _v2FsBatchWrite(writes) {
   if (!writes || writes.length === 0) return { totalOk: 0, totalFail: 0 };
 
-  const resourceBase = _v2ResourceBase();
-  // batchWrite endpoint: ".../documents:batchWrite" (bỏ "/cpct_data")
-  const batchUrl     = FS_BASE().replace('/cpct_data', ':batchWrite') + `?key=${FB_CONFIG.apiKey}`;
-  const CHUNK        = 400;
+  const BASE        = FS_BASE();   // kết thúc bằng /cpct_data
+  const KEY         = FB_CONFIG.apiKey;
+  const CONCURRENCY = 20;          // số requests song song tối đa
   let totalOk = 0, totalFail = 0;
 
-  for (let i = 0; i < writes.length; i += CHUNK) {
-    const chunk       = writes.slice(i, i + CHUNK);
-    const batchWrites = chunk.map(w => {
-      const fullName = `${resourceBase}/${w.path}`;
-      if (w.op === 'delete') return { delete: fullName };
-      return { update: { name: fullName, fields: w.fields } };
-    });
+  for (let i = 0; i < writes.length; i += CONCURRENCY) {
+    const chunk = writes.slice(i, i + CONCURRENCY);
 
-    try {
-      const res = await fetch(batchUrl, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ writes: batchWrites }),
-      }).then(r => r.json());
-
-      if (res.writeResults) {
-        totalOk += res.writeResults.length;
-      } else {
-        console.warn(`[V2Format] batchWrite chunk [${i}..${i + chunk.length}] lỗi:`,
-          res?.error?.message || JSON.stringify(res?.error) || res);
-        totalFail += chunk.length;
+    const results = await Promise.all(chunk.map(async w => {
+      const url = `${BASE}/${w.path}?key=${KEY}`;
+      try {
+        if (w.op === 'delete') {
+          const res = await fetch(url, { method: 'DELETE' }).then(r => r.json());
+          if (res && res.error) return { ok: false, err: res.error.message };
+          return { ok: true };
+        } else {
+          const res = await fetch(url, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ fields: w.fields }),
+          }).then(r => r.json());
+          if (res && res.error) return { ok: false, err: res.error.message };
+          return { ok: true };
+        }
+      } catch (e) {
+        return { ok: false, err: e.message || e };
       }
-    } catch (e) {
-      console.warn(`[V2Format] batchWrite exception:`, e.message || e);
-      totalFail += chunk.length;
-    }
+    }));
+
+    results.forEach(r => {
+      if (r.ok) totalOk++;
+      else {
+        totalFail++;
+        console.warn('[V2Format] write lỗi:', r.err);
+      }
+    });
   }
 
   return { totalOk, totalFail };
