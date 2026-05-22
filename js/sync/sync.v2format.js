@@ -298,6 +298,86 @@ const _V2_SUBCOLL_NAME = 'ban_ghi';
 
 
 // ══════════════════════════════════════════════════════════════
+// [4e] HUMAN-READABLE DOCUMENT ID HELPERS
+// ══════════════════════════════════════════════════════════════
+
+// Chuyển text tiếng Việt → slug ASCII ngắn (dùng trong document ID)
+// VD: "Công Trình A-Huỳnh" → "cong-trinh-a-huynh"
+function _v2Slug(s, maxLen) {
+  if (!s) return 'x';
+  const viMap = {
+    'à':'a','á':'a','ạ':'a','ả':'a','ã':'a','â':'a','ầ':'a','ấ':'a','ậ':'a','ẩ':'a','ẫ':'a',
+    'ă':'a','ằ':'a','ắ':'a','ặ':'a','ẳ':'a','ẵ':'a',
+    'è':'e','é':'e','ẹ':'e','ẻ':'e','ẽ':'e','ê':'e','ề':'e','ế':'e','ệ':'e','ể':'e','ễ':'e',
+    'ì':'i','í':'i','ị':'i','ỉ':'i','ĩ':'i',
+    'ò':'o','ó':'o','ọ':'o','ỏ':'o','õ':'o','ô':'o','ồ':'o','ố':'o','ộ':'o','ổ':'o','ỗ':'o',
+    'ơ':'o','ờ':'o','ớ':'o','ợ':'o','ở':'o','ỡ':'o',
+    'ù':'u','ú':'u','ụ':'u','ủ':'u','ũ':'u','ư':'u','ừ':'u','ứ':'u','ự':'u','ử':'u','ữ':'u',
+    'ỳ':'y','ý':'y','ỵ':'y','ỷ':'y','ỹ':'y','đ':'d',
+  };
+  return String(s).toLowerCase()
+    .replace(/./g, c => viMap[c] || c)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, maxLen || 20);
+}
+
+// Định dạng số tiền ngắn gọn cho document ID
+// VD: 892500000 → "892tr", 1500000000 → "1ty5", 500000 → "500k", 0 → "0"
+function _v2FmtMoneyShort(n) {
+  const v = Math.round(Number(n) || 0);
+  if (v === 0) return '0';
+  if (v >= 1_000_000_000) {
+    const ty = v / 1_000_000_000;
+    return ty % 1 === 0 ? `${ty}ty` : `${ty.toFixed(1).replace('.', 'ty')}`;
+  }
+  if (v >= 1_000_000) {
+    const tr = v / 1_000_000;
+    return tr % 1 === 0 ? `${tr}tr` : `${Math.round(tr)}tr`;
+  }
+  if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
+  return String(v);
+}
+
+// Tạo document ID dễ đọc cho từng loại record
+// Định dạng: {ngay}_{slug}_{tien}_{uid6}  hoặc  {slug}_{uid6} (không có ngày/tiền)
+// uid6 = 6 ký tự đầu của UUID (bỏ dấu -) → đảm bảo unique khi 2 records giống nhau
+function _v2MakeDocId(type, rec) {
+  const uid6 = ((rec.id || rec._key || '') + '').replace(/-/g, '').slice(0, 6) || 'xxxxxx';
+  const ngay = (rec.ngay || rec.fromDate || rec.startDate || '').slice(0, 10); // YYYY-MM-DD
+
+  let parts;
+  switch (type) {
+    case 'hoa_don':
+      parts = [ngay, _v2Slug(rec.congtrinh || '', 14), _v2FmtMoneyShort(rec.thanhtien || rec.tien), uid6];
+      break;
+    case 'cham_cong':
+      parts = [ngay, _v2Slug(rec.ct || '', 14), uid6];
+      break;
+    case 'tien_ung':
+      parts = [ngay, _v2Slug(rec.tp || '', 14), _v2FmtMoneyShort(rec.tien), uid6];
+      break;
+    case 'thiet_bi':
+      parts = [ngay, _v2Slug(rec.ten || '', 14), uid6];
+      break;
+    case 'thu_tien':
+      parts = [ngay, _v2Slug(rec.congtrinh || '', 14), _v2FmtMoneyShort(rec.tien), uid6];
+      break;
+    case 'cong_trinh':
+      parts = [_v2Slug(rec.name || '', 18), uid6];
+      break;
+    case 'tai_khoan':
+      parts = [_v2Slug(rec.username || '', 18), uid6];
+      break;
+    default:
+      parts = [type, uid6];
+  }
+
+  return parts.filter(p => p && p !== '0').join('_');
+}
+
+
+// ══════════════════════════════════════════════════════════════
 // [4d] FIRESTORE REST HELPERS — Subcollection
 // ══════════════════════════════════════════════════════════════
 // Phụ thuộc: FS_BASE() và FB_CONFIG từ core.storage.js (load ở vị trí 4)
@@ -627,10 +707,25 @@ function _v2MetaPayload(type) {
 //   cpct_data/
 //   └── y2025_hoa_don  (document — summary fields)
 //       └── ban_ghi/   (subcollection)
-//           ├── {uuid-1}  →  { ngay, cong_trinh, loai_chi_phi, ... }
-//           └── {uuid-2}  →  { ... }
+//           ├── 2026-01-25_ct-a-huynh_892tr_9a7744  →  { ngay, cong_trinh, ... }
+//           └── 2026-02-10_vt-sat-thep_15tr_f3c211  →  { ... }
 
-const _V2_LAST_PUSH_KEY = '_v2SubcollLastPush';
+const _V2_LAST_PUSH_KEY    = '_v2SubcollLastPush';
+const _V2_ID_SCHEMA_VER    = 2;          // Tăng số này khi đổi format document ID
+const _V2_SCHEMA_VER_KEY   = '_v2IdSchemaVer';
+
+// Kiểm tra & tự động reset lastPush nếu schema ID đã đổi version
+// (Chạy 1 lần khi load file — reset buộc full rewrite để dọn UUID cũ)
+(function _v2MigrateIdSchema() {
+  try {
+    const stored = Number(localStorage.getItem(_V2_SCHEMA_VER_KEY) || 0);
+    if (stored < _V2_ID_SCHEMA_VER) {
+      localStorage.removeItem(_V2_LAST_PUSH_KEY);
+      localStorage.setItem(_V2_SCHEMA_VER_KEY, String(_V2_ID_SCHEMA_VER));
+      console.log(`[V2Format] 🔄 ID schema nâng lên v${_V2_ID_SCHEMA_VER} — reset lastPush để dọn ID cũ`);
+    }
+  } catch {}
+})();
 
 // Đọc timestamp V2 push cuối cho 1 docId (0 = chưa push lần nào / full rewrite)
 function _v2GetLastPush(docId) {
@@ -661,8 +756,11 @@ function _v2ResetAllLastPush() {
 // ──────────────────────────────────────────────────────────────
 // Core: ghi summary + incremental subcollection records
 // records có id + deletedAt/updatedAt chuẩn (năm data và cong_trinh, tai_khoan)
+// idFn (tuỳ chọn): hàm rec → docId  (mặc định: rec => rec.id)
+//   Truyền vào rec => _v2MakeDocId(type, rec) để tạo ID dễ đọc
 // ──────────────────────────────────────────────────────────────
-async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj) {
+async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) {
+  const getId   = typeof idFn === 'function' ? idFn : rec => rec.id;
   const lastPush = _v2GetLastPush(parentDocId);
   const now      = Date.now();
   const coll     = _V2_SUBCOLL_NAME;
@@ -679,15 +777,24 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj) {
     return { ok: false };
   }
 
-  // 2. Build batch writes (incremental)
+  // 2. Build batch writes
   const writes = [];
 
   if (lastPush === 0) {
-    // Full write: mọi record không bị xóa
-    records.filter(r => !r.deletedAt).forEach(rec => {
+    // Full write: lấy IDs cũ → xóa orphan (dọn UUID cũ khi đổi schema ID) → ghi mới
+    const existingIds = await _v2FsListIds(parentDocId, coll);
+    const activeRecs  = records.filter(r => !r.deletedAt);
+    const newIds      = new Set(activeRecs.map(getId).filter(Boolean));
+    existingIds.forEach(oldId => {
+      if (!newIds.has(oldId))
+        writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${oldId}` });
+    });
+    activeRecs.forEach(rec => {
+      const docId = getId(rec);
+      if (!docId) return;
       writes.push({
         op:     'update',
-        path:   `${parentDocId}/${coll}/${rec.id}`,
+        path:   `${parentDocId}/${coll}/${docId}`,
         fields: _v2ToFsFields(_v2ApplyFieldMap(rec, fieldMap)),
       });
     });
@@ -698,12 +805,14 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj) {
       const tDeleted = rec.deletedAt || 0;
       if (tDeleted && tDeleted > lastPush) {
         // Bị xóa sau lần push cuối → xóa document con
-        writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${rec.id}` });
+        writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${getId(rec)}` });
       } else if (!tDeleted && tUpdated > lastPush) {
         // Mới tạo hoặc đã sửa → ghi/overwrite
+        const docId = getId(rec);
+        if (!docId) return;
         writes.push({
           op:     'update',
-          path:   `${parentDocId}/${coll}/${rec.id}`,
+          path:   `${parentDocId}/${coll}/${docId}`,
           fields: _v2ToFsFields(_v2ApplyFieldMap(rec, fieldMap)),
         });
       }
@@ -812,7 +921,7 @@ async function _v2PushYear(yr) {
         console.warn(`[V2Format] _v2PushYear — không có field map cho "${type}"`);
         continue;
       }
-      const res = await _v2PushSubcoll(docId, records, fieldMap, summaryObj);
+      const res = await _v2PushSubcoll(docId, records, fieldMap, summaryObj, rec => _v2MakeDocId(type, rec));
       results.push({ type, ...res });
     } catch (e) {
       console.warn(`[V2Format] ✗ _v2PushYear ${type} ${yr}:`, e.message || e);
@@ -839,14 +948,16 @@ async function _v2PushMeta() {
         // cong_trinh + tai_khoan: id + deletedAt chuẩn → incremental
         case 'cong_trinh': {
           const res = await _v2PushSubcoll(
-            docId, dataPayload, _V2_FIELD_MAPS.cong_trinh, summaryObj
+            docId, dataPayload, _V2_FIELD_MAPS.cong_trinh, summaryObj,
+            rec => _v2MakeDocId('cong_trinh', rec)
           );
           results.push({ type, ...res });
           break;
         }
         case 'tai_khoan': {
           const res = await _v2PushSubcoll(
-            docId, dataPayload, _V2_FIELD_MAPS.tai_khoan, summaryObj
+            docId, dataPayload, _V2_FIELD_MAPS.tai_khoan, summaryObj,
+            rec => _v2MakeDocId('tai_khoan', rec)
           );
           results.push({ type, ...res });
           break;
@@ -857,17 +968,20 @@ async function _v2PushMeta() {
           const catItems  = (dataPayload && dataPayload.catItems) || {};
           const activeItems = [];
           const dmFieldMap  = {
-            id:        'id',
+            _dmKey:    'id',
             name:      'ten',
             loai:      'loai_danh_muc',
             updatedAt: 'cap_nhat_luc',
           };
           for (const [catType, items] of Object.entries(catItems)) {
             (items || []).filter(i => !i.isDeleted).forEach(item => {
-              activeItems.push({ ...item, loai: catType });
+              // ID dễ đọc: {loai_danh_muc}_{slug_ten}_{uid4}
+              const uid4 = ((item.id || '') + '').replace(/-/g, '').slice(0, 4) || 'xxxx';
+              const _dmKey = `${_v2Slug(catType, 10)}_${_v2Slug(item.name || '', 14)}_${uid4}`;
+              activeItems.push({ ...item, loai: catType, _dmKey });
             });
           }
-          const res = await _v2PushSubcollFull(docId, activeItems, dmFieldMap, summaryObj);
+          const res = await _v2PushSubcollFull(docId, activeItems, dmFieldMap, summaryObj, '_dmKey');
           results.push({ type, ...res });
           break;
         }
@@ -893,16 +1007,21 @@ async function _v2PushMeta() {
           // Hợp đồng chính (hopdong_v1 là object map)
           Object.entries(hopDong).forEach(([key, hd]) => {
             if (hd.deletedAt) return;
+            // _key: "chinh_{projectId}" — prefix phân biệt với thầu phụ
+            const pid = hd.projectId || key || '';
             activeRecs.push({
               ...hd,
-              _key:      hd.projectId || key,
+              _key:      `chinh_${_v2Slug(pid, 20)}`,
               phan_loai: 'hop_dong_chinh',
               congtrinh: hd.congtrinh || key,
             });
           });
           // Hợp đồng thầu phụ (thauphu_v1 là array)
           thauPhu.filter(h => !h.deletedAt).forEach(h => {
-            activeRecs.push({ ...h, _key: h.id, phan_loai: 'hop_dong_thau_phu' });
+            // _key: "phu_{slug_ten_thau_phu}_{uid6}"
+            const uid6 = ((h.id || '') + '').replace(/-/g, '').slice(0, 6) || 'xxxxxx';
+            const tenPhu = _v2Slug(h.thauphu || h.ten_thau_phu || '', 14);
+            activeRecs.push({ ...h, _key: `phu_${tenPhu}_${uid6}`, phan_loai: 'hop_dong_thau_phu' });
           });
           const res = await _v2PushSubcollFull(
             docId, activeRecs, hdFieldMap, summaryObj, '_key'
