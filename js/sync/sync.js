@@ -250,43 +250,53 @@ async function pushChanges(opts = {}) {
     for (const yr of years) {
       const yrInt = parseInt(yr);
 
-      // ── Step 1: Fetch cloud để merge trước khi ghi ─────────
+      // ── Step 1: Pre-push merge — đọc V2 cloud trước khi ghi ─
       // Tránh Device B ghi đè data của Device A
       // Bỏ qua nếu opts.skipPull = true (sau import JSON — local là nguồn sự thật)
-      if (!skipPull) try {
-        const cloudDoc  = await fsGet(fbDocYear(yrInt));
-        const cloudData = fsUnwrap(cloudDoc);
-        if (cloudData) {
-          if (cloudData.i) _mergeKey('inv_v3', expandInv(cloudData.i));
-          if (cloudData.u) _mergeKey('ung_v1', expandUng(cloudData.u));
-          if (cloudData.c) {
-            // cc_v2: dùng normalizeCC thay vì _mergeKey (id-based) để tránh duplicate tuần trước push
-            const cloudCC    = expandCC(cloudData.c);
-            const localCC    = load('cc_v2', []);
-            const normalized = normalizeCC([...localCC, ...cloudCC]);
-            _memSet('cc_v2', normalized);
+      if (!skipPull && typeof _v2PullYearFull === 'function') try {
+        const v2 = await _v2PullYearFull(yrInt);
+        const hasData = Object.values(v2).some(arr => arr && arr.length > 0);
+        if (hasData) {
+          if (v2.inv_v3) _mergeKey('inv_v3', v2.inv_v3);
+          if (v2.ung_v1) _mergeKey('ung_v1', v2.ung_v1);
+          if (v2.cc_v2)  { const norm = normalizeCC([...load('cc_v2',[]), ...v2.cc_v2]); _memSet('cc_v2', norm); }
+          if (v2.tb_v1)  _mergeKey('tb_v1', v2.tb_v1);
+          if (v2.thu_v1) { _mergeKey('thu_v1', v2.thu_v1); thuRecords = load('thu_v1', []); }
+        } else {
+          // V2 chưa có → fallback merge từ V1 (transition period)
+          const cloudDoc  = await fsGet(fbDocYear(yrInt));
+          const cloudData = fsUnwrap(cloudDoc);
+          if (cloudData) {
+            if (cloudData.i)   _mergeKey('inv_v3', expandInv(cloudData.i));
+            if (cloudData.u)   _mergeKey('ung_v1', expandUng(cloudData.u));
+            if (cloudData.c)   { const norm = normalizeCC([...load('cc_v2',[]), ...expandCC(cloudData.c)]); _memSet('cc_v2', norm); }
+            if (cloudData.t)   _mergeKey('tb_v1',  expandTb(cloudData.t));
+            if (cloudData.thu) _mergeKey('thu_v1', cloudData.thu);
           }
-          if (cloudData.t) _mergeKey('tb_v1',  expandTb(cloudData.t));
-          if (cloudData.thu) _mergeKey('thu_v1', cloudData.thu);
-          console.log(`[Sync] ↓ Merged cloud year ${yr}`);
         }
+        console.log(`[Sync] ↓ Merged cloud year ${yr}`);
       } catch (e) {
         console.warn(`[Sync] Không fetch được cloud year ${yr}:`, e.message || e);
-        // Tiếp tục push — không để fetch lỗi block toàn bộ sync
       }
 
-      // ── Step 2: Push merged local lên cloud ────────────────
+      // ── Step 2: Push lên V2 subcollections (thay thế V1) ───
       try {
-        const payload = fbYearPayload(yrInt);
-        const kb      = Math.round(JSON.stringify(payload).length / 1024 * 10) / 10;
-        const res     = await fsSet(fbDocYear(yrInt), payload);
-        if (res && res.fields) {
-          console.log(`[Sync] ▲ Year ${yr} OK (~${kb}kb)`);
-          ok++;
+        if (typeof _v2PushYear === 'function') {
+          const results = await _v2PushYear(yrInt);
+          const allOk   = results.every(r => r.ok !== false);
+          if (allOk) {
+            console.log(`[Sync] ▲ Year ${yr} V2 OK`);
+            ok++;
+          } else {
+            const failed = results.filter(r => r.ok === false).map(r => r.type).join(', ');
+            console.warn(`[Sync] ✗ Year ${yr} V2 lỗi: ${failed}`);
+            fail++;
+          }
         } else {
-          const err = res?.error?.message || JSON.stringify(res?.error) || '?';
-          console.warn(`[Sync] ✗ Year ${yr} lỗi:`, err);
-          fail++;
+          // Fallback V1 nếu V2 chưa load
+          const payload = fbYearPayload(yrInt);
+          const res     = await fsSet(fbDocYear(yrInt), payload);
+          if (res && res.fields) { ok++; } else { fail++; }
         }
       } catch (e) {
         console.warn(`[Sync] ✗ Year ${yr} exception:`, e.message || e);
@@ -556,49 +566,66 @@ async function pullChanges(yr, callback, opts = {}) {
     // ── Year data ─────────────────────────────────────────────
     let totalNew = 0, totalConflicts = 0;
 
+    // Helper: merge 1 key + đếm new/conflict
+    const mergeAndCount = (key, cloudArr, yrStr) => {
+      const local     = load(key, []);
+      const merged    = mergeDatasets(local, cloudArr);
+      const newRecs   = merged.filter(m => !local.find(l => String(l.id) === String(m.id))).length;
+      const conflicts = cloudArr.filter(cr => {
+        const lr = local.find(l => String(l.id) === String(cr.id));
+        return lr && (lr.updatedAt || lr._ts || 0) !== (cr.updatedAt || 0);
+      }).length;
+      totalNew       += newRecs;
+      totalConflicts += conflicts;
+      _memSet(key, merged);
+      if (newRecs || conflicts)
+        console.log(`[Sync] ▼ ${key} year ${yrStr}: +${newRecs} mới, ${conflicts} conflict`);
+    };
+
+    // Helper: merge cc_v2 dùng normalizeCC (logical key dedup)
+    const mergeCCAndCount = (cloudCC, yrStr, source) => {
+      const localCC    = load('cc_v2', []);
+      const normalized = normalizeCC([...localCC, ...cloudCC]);
+      const newRecs    = normalized.filter(n => !localCC.find(l => String(l.id) === String(n.id))).length;
+      const dupsRemoved = (localCC.length + cloudCC.length) - normalized.length;
+      totalNew        += newRecs;
+      _memSet('cc_v2', normalized);
+      if (typeof ccData !== 'undefined') ccData = normalized;
+      console.log(`[Sync] ▼ cc_v2 year ${yrStr} (${source}): +${newRecs} mới${dupsRemoved > 0 ? `, xóa ${dupsRemoved} bản trùng` : ''}`);
+    };
+
     for (const yrStr of years) {
       try {
-        const doc  = await fsGet(fbDocYear(parseInt(yrStr)));
-        const data = fsUnwrap(doc);
-        if (!data) {
-          console.log(`[Sync] ▼ Year ${yrStr} chưa có trên cloud`);
-          continue;
+        // ── Thử V2 subcollection trước ───────────────────────
+        let pulledFromV2 = false;
+        if (typeof _v2PullYearFull === 'function') {
+          const v2 = await _v2PullYearFull(parseInt(yrStr));
+          const hasData = Object.values(v2).some(arr => arr && arr.length > 0);
+          if (hasData) {
+            if (v2.inv_v3)  mergeAndCount('inv_v3', v2.inv_v3, yrStr);
+            if (v2.ung_v1)  mergeAndCount('ung_v1', v2.ung_v1, yrStr);
+            if (v2.cc_v2)   mergeCCAndCount(v2.cc_v2, yrStr, 'V2');
+            if (v2.tb_v1)   mergeAndCount('tb_v1',  v2.tb_v1, yrStr);
+            if (v2.thu_v1)  { mergeAndCount('thu_v1', v2.thu_v1, yrStr); thuRecords = load('thu_v1', []); }
+            pulledFromV2 = true;
+            console.log(`[Sync] ▼ Year ${yrStr} — V2 ✓`);
+          }
         }
 
-        const mergeAndCount = (key, cloudExpanded) => {
-          const local    = load(key, []);
-          const merged   = mergeDatasets(local, cloudExpanded);
-          const newRecs  = merged.filter(m => !local.find(l => String(l.id) === String(m.id))).length;
-          const conflicts = cloudExpanded.filter(cr => {
-            const lr = local.find(l => String(l.id) === String(cr.id));
-            return lr && (lr.updatedAt || lr._ts || 0) !== (cr.updatedAt || 0);
-          }).length;
-          totalNew       += newRecs;
-          totalConflicts += conflicts;
-          _memSet(key, merged); // ghi _mem + IDB
-          if (newRecs || conflicts)
-            console.log(`[Sync] ▼ ${key} year ${yrStr}: +${newRecs} mới, ${conflicts} conflict`);
-        };
-
-        if (data.i)   mergeAndCount('inv_v3', expandInv(data.i));
-        if (data.u)   mergeAndCount('ung_v1', expandUng(data.u));
-        if (data.c) {
-          // cc_v2: KHÔNG dùng mergeDatasets (id-based) — tránh duplicate tuần.
-          // Logical key = fromDate + projectId/ct. Union cả 2 → normalizeCC.
-          const cloudCC   = expandCC(data.c);
-          const localCC   = load('cc_v2', []);
-          const normalized = normalizeCC([...localCC, ...cloudCC]);
-          const newRecs    = normalized.filter(n => !localCC.find(l => String(l.id) === String(n.id))).length;
-          const dupsRemoved = (localCC.length + cloudCC.length) - normalized.length;
-          totalNew         += newRecs;
-          _memSet('cc_v2', normalized);
-          if (typeof ccData !== 'undefined') ccData = normalized;
-          console.log(`[Sync] ▼ cc_v2 year ${yrStr}: +${newRecs} mới${dupsRemoved > 0 ? `, xóa ${dupsRemoved} bản trùng` : ''}`);
-        }
-        if (data.t)   mergeAndCount('tb_v1',  expandTb(data.t));
-        if (data.thu) {
-          mergeAndCount('thu_v1', data.thu);
-          thuRecords = load('thu_v1', []);
+        // ── Fallback V1 nếu V2 chưa có data ─────────────────
+        if (!pulledFromV2) {
+          const doc  = await fsGet(fbDocYear(parseInt(yrStr)));
+          const data = fsUnwrap(doc);
+          if (!data) {
+            console.log(`[Sync] ▼ Year ${yrStr} chưa có trên cloud`);
+            continue;
+          }
+          if (data.i)   mergeAndCount('inv_v3', expandInv(data.i), yrStr);
+          if (data.u)   mergeAndCount('ung_v1', expandUng(data.u), yrStr);
+          if (data.c)   mergeCCAndCount(expandCC(data.c), yrStr, 'V1');
+          if (data.t)   mergeAndCount('tb_v1',  expandTb(data.t), yrStr);
+          if (data.thu) { mergeAndCount('thu_v1', data.thu, yrStr); thuRecords = load('thu_v1', []); }
+          console.log(`[Sync] ▼ Year ${yrStr} — V1 fallback`);
         }
       } catch (e) {
         console.warn(`[Sync] Pull year ${yrStr} lỗi:`, e.message || e);
@@ -684,15 +711,10 @@ async function manualSync() {
     else if (typeof clearAllCache === 'function') clearAllCache();
 
     // Bước 3: Push — đợi xong mới refresh UI (tránh reload sớm trước khi push xong)
+    // V2 year push được tích hợp trong pushChanges() — không cần gọi thêm ở đây
     await pushChanges({ silent: false });
 
-    // Bước 3b: V2 subcollection mirror — chỉ sau manual sync (bảo vệ free tier quota)
-    // Fire-and-forget: chạy nền, không block render UI
-    if (typeof _v2PushYear === 'function' && typeof _getAllLocalYears === 'function') {
-      _getAllLocalYears().forEach(yr =>
-        _v2PushYear(parseInt(yr)).catch(e => console.warn('[Sync] V2 year push lỗi:', e.message || e))
-      );
-    }
+    // Bước 3b: V2 meta push (danh_muc, hop_dong, cong_trinh, tai_khoan) — chỉ manual sync
     if (typeof _v2PushMeta === 'function') {
       _v2PushMeta().catch(e => console.warn('[Sync] V2 meta push lỗi:', e.message || e));
     }

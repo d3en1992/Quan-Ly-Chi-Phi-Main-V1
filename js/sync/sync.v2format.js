@@ -1047,7 +1047,7 @@ async function _v2PushMeta() {
 
 
 // ══════════════════════════════════════════════════════════════
-// [8] PULL HELPERS — dùng trong sync.js pullChanges()
+// [8] LEGACY PULL HELPERS (đọc data field cũ) — deprecated
 // ══════════════════════════════════════════════════════════════
 
 // Pull 1 year type từ V2 document
@@ -1085,6 +1085,115 @@ async function _v2PullMetaType(type) {
     console.warn(`[V2Format] Pull ${_v2DocMetaId(type)} lỗi:`, e.message || e);
     return null;
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// [10] REVERSE CONVERTERS — Firestore typed value → JS native
+// ══════════════════════════════════════════════════════════════
+
+// Chuyển 1 Firestore typed value → JS
+// VD: { integerValue: "490000" } → 490000
+//     { arrayValue: { values: [...] } } → [...]
+function _v2FromFsValue(v) {
+  if (!v || typeof v !== 'object') return null;
+  if ('stringValue'    in v) return v.stringValue;
+  if ('integerValue'   in v) return Number(v.integerValue);
+  if ('doubleValue'    in v) return v.doubleValue;
+  if ('booleanValue'   in v) return v.booleanValue;
+  if ('nullValue'      in v) return null;
+  if ('timestampValue' in v) return new Date(v.timestampValue).getTime();
+  if ('arrayValue'     in v) return (v.arrayValue.values || []).map(_v2FromFsValue);
+  if ('mapValue'       in v) return _v2FromFsFields(v.mapValue.fields || {});
+  return null;
+}
+
+// Chuyển tất cả fields của 1 Firestore document → JS object
+function _v2FromFsFields(fields) {
+  const obj = {};
+  for (const [k, v] of Object.entries(fields || {})) {
+    obj[k] = _v2FromFsValue(v);
+  }
+  return obj;
+}
+
+// Áp dụng reverse field map: Firestore field name → JS field name
+// VD: fieldMap = { congtrinh: 'cong_trinh', projectId: 'project_id', ... }
+//     → reverseMap = { cong_trinh: 'congtrinh', project_id: 'projectId', ... }
+function _v2ReverseApplyFieldMap(fsObj, fieldMap) {
+  const reverseMap = {};
+  for (const [jsKey, fsKey] of Object.entries(fieldMap)) {
+    if (!(fsKey in reverseMap)) reverseMap[fsKey] = jsKey; // first mapping wins
+  }
+  const result = {};
+  for (const [fsKey, val] of Object.entries(fsObj)) {
+    result[reverseMap[fsKey] || fsKey] = val;
+  }
+  return result;
+}
+
+// Lấy tất cả documents trong subcollection — hỗ trợ phân trang (>500 docs)
+// Trả về mảng Firestore document objects (có .name, .fields)
+async function _v2FsGetSubcollDocs(parentDocId, collName) {
+  const docs = [];
+  let pageToken = null;
+  try {
+    do {
+      let url = `${FS_BASE()}/${parentDocId}/${collName}?key=${FB_CONFIG.apiKey}&pageSize=500`;
+      if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`;
+      const res = await fetch(url).then(r => r.json());
+      if (!res || res.error || !res.documents) break;
+      docs.push(...res.documents);
+      pageToken = res.nextPageToken || null;
+    } while (pageToken);
+  } catch (e) {
+    console.warn(`[V2Format] _v2FsGetSubcollDocs lỗi (${parentDocId}/${collName}):`, e.message || e);
+  }
+  return docs;
+}
+
+// Pull subcollection → array records JS (áp dụng reverse field map)
+// Trả về records[] hoặc null nếu subcollection chưa tồn tại / rỗng
+async function _v2PullSubcoll(parentDocId, fieldMap) {
+  const docs = await _v2FsGetSubcollDocs(parentDocId, _V2_SUBCOLL_NAME);
+  if (!docs.length) return null;
+  return docs.map(doc =>
+    _v2ReverseApplyFieldMap(_v2FromFsFields(doc.fields || {}), fieldMap)
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// [11] PULL YEAR FULL — đọc toàn bộ data 1 năm từ V2 subcollections
+// ══════════════════════════════════════════════════════════════
+// Mapping type V2 → local storage key
+const _V2_TYPE_TO_LOCAL_KEY = {
+  hoa_don:   'inv_v3',
+  cham_cong: 'cc_v2',
+  tien_ung:  'ung_v1',
+  thiet_bi:  'tb_v1',
+  thu_tien:  'thu_v1',
+};
+
+// Pull tất cả 5 loại data của 1 năm từ V2 subcollections
+// Trả về { inv_v3: [...], cc_v2: [...], ... } — key vắng mặt = V2 chưa có data
+async function _v2PullYearFull(yr) {
+  const result = {};
+  for (const [type, localKey] of Object.entries(_V2_TYPE_TO_LOCAL_KEY)) {
+    try {
+      const docId    = _v2DocYearId(type, yr);
+      const fieldMap = _V2_FIELD_MAPS[type];
+      if (!fieldMap) continue;
+      const records = await _v2PullSubcoll(docId, fieldMap);
+      if (records !== null) {
+        result[localKey] = records;
+        console.log(`[V2Format] ▼ ${docId}: ${records.length} records`);
+      }
+    } catch (e) {
+      console.warn(`[V2Format] ✗ _v2PullYearFull ${type} yr=${yr}:`, e.message || e);
+    }
+  }
+  return result;
 }
 
 
