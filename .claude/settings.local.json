@@ -26,7 +26,8 @@
       "Bash(node --check js/modules/doanhthu/doanhthu.reports-export.js)",
       "Bash(node --check js/modules/hoadon/hoadon.list-trash.js)",
       "Bash(node --check js/modules/hoadon/hoadon.sheet-grid.js)",
-      "Bash(node --check js/legacy/thietbi.js)"
+      "Bash(node --check js/legacy/thietbi.js)",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\sync\\\\sync.v2format.js\")"
     ]
   }
 }

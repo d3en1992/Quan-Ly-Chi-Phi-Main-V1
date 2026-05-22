@@ -67,11 +67,14 @@ Thứ tự chính xác trong `index.html`:
 | 28 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
 | 29 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
 | 30 | `js/modules/doanhthu/doanhthu.reports-export.js` | Công nợ, Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderCongNoThauPhu`, `_renderCongNoTable`, `renderCongNoNhaCungCap`, `renderLaiLo`, `initDoanhThu`, `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub` |
-| 31 | `js/sync/sync.js` | Sync engine Firestore, conflict merge, auto/manual sync |
-| 32 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
-| 33 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync |
+| 31 | `js/sync/sync.v2format.js` | V2 Firestore mirror — tạo document human-readable trên Firestore console (field tiếng Việt, tiền tệ, tóm tắt); không ảnh hưởng V1 sync flow |
+| 32 | `js/sync/sync.js` | Sync engine Firestore, conflict merge, auto/manual sync |
+| 33 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
+| 34 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync |
 
 Thứ tự này quan trọng vì code không dùng module system. Nhóm `core.*.js` **bắt buộc nạp trước tất cả module nghiệp vụ**. Các file dùng chung biến/hàm global như `load`, `save`, `cats`, `projects`, `invoices`, `ccData`, `hopDongData`, `buildInvoices`, `pullChanges`, `manualSync`. Nếu đổi thứ tự, module có thể đọc biến chưa khai báo hoặc render trước khi `dbInit()` populate `_mem`.
+
+> **`sync.v2format.js` (vị trí 31)** phải nạp **trước `sync.js`** vì `pushChanges()` trong `sync.js` gọi `_v2PushYear()` và `_v2PushMeta()` dưới dạng fire-and-forget. File này không có side-effect lúc nạp (không gọi hàm nào ở top-level), sử dụng `FS_BASE()` và `FB_CONFIG` từ `core.storage.js` (vị trí 4) và `fsGet()` từ `core.cloud-cats-ui.js` (vị trí 6).
 
 ---
 
@@ -127,6 +130,7 @@ js/
     thietbi.js
 
   sync/
+    sync.v2format.js          ← V2 Firestore mirror (human-readable console view)
     sync.js                   ← Sync engine Firestore
 
   app/
@@ -195,6 +199,7 @@ Sync rules:
 | Categories sync | Document categories chứa: <br> - `cat_items_v1`: { [type]: { id, name, isDeleted, updatedAt }[] } (Master category storage) <br> - `cat_ct`: string[] (Derived from projects_v1) <br> - `cat_ct_years`: { [ctName]: number } <br> - `cat_loai`, `cat_ncc`, `cat_nguoi`, `cat_tp`, `cat_cn`, `cat_tbteb`: string[] (Derived from cat_items_v1) |
 | Pull guard | `_blockPullUntil`/`localStorage._blockPullUntil` chặn pull sau reset/import để tránh cloud cũ ghi đè local mới |
 | Pending | `_pendingChanges` và `_PENDING_KEY` giúp hiển thị trạng thái còn thay đổi chưa sync |
+| **V2 Firestore mirror** | `sync.v2format.js` ghi thêm document V2 sau mỗi V1 push thành công (fire-and-forget, không block sync chính). Document V2 có field tiếng Việt dễ đọc trên Firestore console: `loai_du_lieu`, `nam`, `cap_nhat`, `so_ban_ghi`, `da_xoa`, `tong_tien`, `cong_trinh`, `data` (JSON không nén). V2 chỉ là mirror — V1 vẫn là source of truth cho toàn bộ pull/merge logic. |
 
 ---
 
@@ -260,6 +265,7 @@ Metadata chuẩn cho record nghiệp vụ:
 | `js/modules/doanhthu/doanhthu.core.js` | `hopDongData`, `thuRecords`, `thauPhuContracts`, `_hdcItems`, `_hdtpItems`, `_hdcPage`, `_hdtpPage`, `_thuPage`, `DT_PG`, `_dtCtFilter` | `calcHopDongValue()`, `_migrateHopDongSL()`, `_normalizeThuProjectIds()`, `_initDoanhThuAddons()`, `updateGlobalTotals()`, `bindItemsToTable()`, `fmtInputMoney()`, `_readMoneyInput()`, `_dtInYear()`, `_dtPaginationHtml()`, `_dtMatchProjFilter()`, `_dtMatchHDCFilter()`, `dtPopulateCtFilter()`, `dtSetCtFilter()`, `dtGoSub()`, `dtEnsureCongNoSubtab()`, `dtPopulateSels()`, `_dtAddCT()`, `_dtAddTP()` |
 | `js/modules/doanhthu/doanhthu.forms.js` | _(không có global riêng)_ | `hdcUpdateTotal()`, `saveHopDongChinh()`, `_hdcResetForm()`, `editHopDongChinh()`, `delHopDongChinh()`, `renderHdcTable()`, `saveThuRecord()`, `editThuRecord()`, `_thuCancelEdit()`, `_thuResetForm()`, `delThuRecord()`, `renderThuTable()`, `hdtpUpdateTotal()`, `saveHopDongThauPhu()`, `_hdtpResetForm()`, `editHopDongThauPhu()`, `delHopDongThauPhu()`, `renderHdtpTable()` |
 | `js/modules/doanhthu/doanhthu.reports-export.js` | `window.initDoanhThu`, `window.dtGoSub` (top-level assignments) | `renderCongNoThauPhu()`, `_renderCongNoTable()`, `renderCongNoNhaCungCap()`, `renderLaiLo()`, `initDoanhThu()`, `copyKLCT()`, `pasteKLCT()`, `exportHdcToImage()`, `exportHdtpToImage()`, `exportThuToImage()` |
+| `js/sync/sync.v2format.js` | `_V2_YEAR_TYPES`, `_V2_META_TYPES`, `_V2_YEAR_KEY_MAP` | `_v2DocYearId(type,yr)`, `_v2DocMetaId(type)`, `_v2FmtMoney(n)`, `_v2FmtDateTime(ts)`, `_v2FmtCtList(records,ctField)`, `_v2TypeLabel(type)`, `fsWrapV2(dataPayload,summaryObj)`, `_v2Unwrap(doc)`, `_v2ReadSummary(doc,fieldName)`, `_v2FsSetRaw(docId,wrappedDoc)`, `_v2YearPayload(type,yr)`, `_v2MetaPayload(type)`, `_v2PushYear(yr)`, `_v2PushMeta()`, `_v2PullYearType(type,yr)`, `_v2PullMetaType(type)`, `debugV2(filter?)` |
 | `js/sync/sync.js` | `DEVICE_ID`, `_syncPulling`, `_syncPushing`, `_pushTimer` | `mkRecord()`, `stampEdit()`, `softDeleteById()`, `resolveConflict()`, `mergeDatasets()`, `normalizeCC()`, `pullChanges()`, `pushChanges()`, `schedulePush()`, `manualSync()`, `startAutoSync()`, `stampNew()` |
 | `js/app/auth.js` | `currentUser`, role/session helpers | `initAuth()`, login/logout/account settings, user/session persistence, role UI helpers |
 | `js/legacy/datatools.js` | `selectedCT`, migration dry-run reports | `renderDashboard()`, `toolDeleteYear()`, `_doDeleteYear()`, `toolResetAll()`, `_doResetAll()`, `scanDataHealth()`, `normalizeProjectLinks()`, `migrateIdsToUUID()` |

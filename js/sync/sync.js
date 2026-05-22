@@ -283,6 +283,10 @@ async function pushChanges(opts = {}) {
         if (res && res.fields) {
           console.log(`[Sync] ▲ Year ${yr} OK (~${kb}kb)`);
           ok++;
+          // ── V2 mirror (fire-and-forget) — human-readable Firestore view ──
+          if (typeof _v2PushYear === 'function') {
+            _v2PushYear(yrInt).catch(e => console.warn('[Sync] V2 year push lỗi:', e.message || e));
+          }
         } else {
           const err = res?.error?.message || JSON.stringify(res?.error) || '?';
           console.warn(`[Sync] ✗ Year ${yr} lỗi:`, err);
@@ -308,6 +312,10 @@ async function pushChanges(opts = {}) {
     fsSet(fbDocCats(), fbCatsPayload()).catch(e =>
       console.warn('[Sync] Cats push lỗi:', e)
     );
+    // ── V2 meta mirror (fire-and-forget) — human-readable Firestore view ──
+    if (typeof _v2PushMeta === 'function') {
+      _v2PushMeta().catch(e => console.warn('[Sync] V2 meta push lỗi:', e.message || e));
+    }
 
     if (fail === 0) {
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
