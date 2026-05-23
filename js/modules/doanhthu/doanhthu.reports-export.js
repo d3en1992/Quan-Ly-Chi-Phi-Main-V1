@@ -309,7 +309,6 @@ function initDoanhThu() {
   hopDongData      = load('hopdong_v1', {});
   thauPhuContracts = load('thauphu_v1', []);
 
-  _initDoanhThuAddons(); // [ADDED]
   _dtRenderDashboardMini();
 
   dtEnsureCongNoSubtab();
@@ -324,20 +323,20 @@ function initDoanhThu() {
   const hdtpNgayEl = document.getElementById('hdtp-ngay');
   if (hdtpNgayEl && !hdtpNgayEl.value) hdtpNgayEl.value = today();
 
-  // Đảm bảo KHAI BÁO là sub-tab active mặc định
+  // Set HỢP ĐỒNG là sub-tab active mặc định
   const kbBtn = document.getElementById('dt-sub-khaibao-btn');
   const kbPage = document.getElementById('dt-sub-khaibao');
-  const tkBtn  = document.getElementById('dt-sub-thongke-btn');
-  const tkPage = document.getElementById('dt-sub-thongke');
   const cnBtn  = document.getElementById('dt-sub-congno-btn');
   const cnPage = document.getElementById('dt-sub-congno');
   document.querySelectorAll('#page-doanhthu .sub-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
   if (kbBtn && kbPage) { kbPage.classList.add('active'); kbBtn.classList.add('active'); }
-  if (tkPage) tkPage.classList.remove('active');
-  if (tkBtn) tkBtn.classList.remove('active');
   if (cnPage) cnPage.classList.remove('active');
   if (cnBtn) cnBtn.classList.remove('active');
+
+  renderHdcTable(0);
+  renderHdtpTable(0);
+  renderThuTable(0);
 
   // Reset edit state
   _hdcResetForm();

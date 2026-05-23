@@ -7,9 +7,12 @@
 // ungRecords là global shared — nhapxuat.js, projects.js, doanhthu.js đọc/gán lại
 let ungRecords = load('ung_v1', []);
 let filteredUng = [];
+let filteredUngTp = [];
+let filteredUngNcc = [];
 let ungPage = 1;
 const UNG_TP_PG = 10;
 let ungTpPage = 1;
+let ungNccPage = 1;
 let _editingUngId = null;
 
 // ══════════════════════════════

@@ -359,7 +359,7 @@ function renderDashboard() {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<div class="db-empty">Chưa có dữ liệu cho ' + yrLabel + '</div>';
     });
-    if (barTitle) barTitle.textContent = isSingleYear ? 'Chi Phí Theo Tuần' : 'Chi Phí Theo Tháng';
+    if (barTitle) barTitle.textContent = isSingleYear ? 'Chi Phí Theo Tuần' : 'Chi Phí TB / Tháng';
     if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
     return;
   }
@@ -445,13 +445,25 @@ function _dbBarChart(data) {
 
   let vals;
   if (_ay.size !== 1) {
-    // "Tất cả" hoặc multi-year → gộp theo số tháng (T1–T12)
-    const byNum = {};
-    Object.entries(byMonth).forEach(([m, v]) => {
-      const num = m.slice(5);
-      byNum[num] = (byNum[num] || 0) + v;
+    // Multi-year → tính trung bình theo tháng, chỉ chia cho năm đã qua tháng đó
+    const todayD   = new Date();
+    const todayYr  = todayD.getFullYear();
+    const todayMon = todayD.getMonth() + 1;
+    const sortedYears = [..._ay].sort((a, b) => a - b);
+    vals = months12.map((_, i) => {
+      const monthNum = i + 1;
+      const monthStr = String(monthNum).padStart(2, '0');
+      let total = 0;
+      let denom = 0;
+      sortedYears.forEach(yr => {
+        // Bỏ qua tháng chưa xảy ra trong năm đang chọn
+        if (yr > todayYr) return;
+        if (yr === todayYr && monthNum > todayMon) return;
+        total += byMonth[`${yr}-${monthStr}`] || 0;
+        denom++;
+      });
+      return denom > 0 ? Math.round(total / denom) : 0;
     });
-    vals = months12.map((_, i) => byNum[String(i + 1).padStart(2, '0')] || 0);
   } else {
     vals = months12.map(m => byMonth[m] || 0);
   }
@@ -473,7 +485,7 @@ function _dbBarChart(data) {
       <g>
         <rect x="${cx}" y="${y}" width="${colW}" height="${Math.max(h, 2)}"
               rx="3" fill="${v ? 'var(--bs-warning)' : 'var(--bs-border-color)'}" opacity="${v ? '.85' : '.35'}">
-          <title>T${i+1}: ${fmtM(v)}</title>
+          <title>T${i+1}: ${fmtM(v)}${_ay.size !== 1 ? ' (TB/năm)' : ''}</title>
         </rect>
         <text x="${cx + colW/2}" y="${y - 4}" text-anchor="middle"
               font-size="9" fill="var(--bs-secondary-color)">${h > 14 ? amt : ''}</text>
@@ -564,6 +576,13 @@ function _dbGetWeeksInYear(yr) {
 // Trả về { [sunISO]: { inv, ungTP, ungNCC, total, byCT:{[ctName]:number} } }
 // byCT: breakdown theo công trình từ hóa đơn (dùng cho tooltip + heatmap)
 function _dbCalcWeeklyData(invoiceData, ungData) {
+  // Tập hợp tên NCC đã có ứng riêng → không tính lại trong HĐ để tránh cộng đúp
+  const knownNCC = new Set(
+    (typeof ungRecords !== 'undefined' ? ungRecords : [])
+      .filter(r => !r.deletedAt && r.loai === 'nhacungcap' && r.tp)
+      .map(r => (r.tp || '').trim().toUpperCase())
+  );
+
   const result = {};
   function ensure(k) {
     if (!result[k]) result[k] = { inv: 0, ungTP: 0, ungNCC: 0, total: 0, byCT: {} };
@@ -573,9 +592,10 @@ function _dbCalcWeeklyData(invoiceData, ungData) {
     if (!i.ngay) return;
     const amt = i.thanhtien || i.tien || 0;
     if (!amt) return;
+    // Bỏ qua HĐ có NCC khớp với nhà cung cấp đang được theo dõi qua ứng NCC
+    if (i.ncc && knownNCC.has((i.ncc || '').trim().toUpperCase())) return;
     const w = ensure(snapToSunday(i.ngay));
     w.inv += amt; w.total += amt;
-    // Track per-CT cho tooltip & heatmap
     const ct = resolveProjectName(i) || '(Không rõ)';
     w.byCT[ct] = (w.byCT[ct] || 0) + amt;
   });
@@ -585,7 +605,7 @@ function _dbCalcWeeklyData(invoiceData, ungData) {
     if (!amt) return;
     const w = ensure(snapToSunday(r.ngay));
     if (r.loai === 'thauphu') { w.ungTP += amt; w.total += amt; }
-    else w.ungNCC += amt; // NCC: theo dõi riêng, không tính vào tổng chi tuần
+    else { w.ungNCC += amt; w.total += amt; } // NCC tính vào tổng, HĐ tương ứng đã bị loại
   });
   return result;
 }
@@ -774,9 +794,19 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
     const ctMap = {};
     const ensure = nm => { if (!ctMap[nm]) ctMap[nm] = {inv:0, ungTP:0, ungNCC:0}; return ctMap[nm]; };
 
+    // Build NCC exclusion set (same logic as _dbCalcWeeklyData)
+    const _knownNCC = new Set(
+      (typeof ungRecords !== 'undefined' ? ungRecords : [])
+        .filter(r => !r.deletedAt && r.loai === 'nhacungcap' && r.tp)
+        .map(r => (r.tp || '').trim().toUpperCase())
+    );
+
     invoiceData
       .filter(i => i.ngay >= sun && i.ngay <= sat)
-      .forEach(i => { ensure(resolveProjectName(i) || '(Không rõ CT)').inv += (i.thanhtien || i.tien || 0); });
+      .forEach(i => {
+        if (i.ncc && _knownNCC.has((i.ncc || '').trim().toUpperCase())) return;
+        ensure(resolveProjectName(i) || '(Không rõ CT)').inv += (i.thanhtien || i.tien || 0);
+      });
 
     ungData
       .filter(r => r.ngay >= sun && r.ngay <= sat)
@@ -787,7 +817,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
       });
 
     const entries = Object.entries(ctMap)
-      .map(([nm, v]) => ({ nm, ...v, total: v.inv + v.ungTP }))
+      .map(([nm, v]) => ({ nm, ...v, total: v.inv + v.ungTP + v.ungNCC }))
       .filter(e => e.inv > 0 || e.ungTP > 0 || e.ungNCC > 0)
       .sort((a, b) => b.total - a.total);
 

@@ -26,8 +26,8 @@ function _normalizeThuProjectIds() {
 }
 _normalizeThuProjectIds();
 
-// [ADDED] Migration & Globals cho tính năng Khối lượng + Đơn giá Hợp Đồng
-let _hdcItems = [];
+// Globals cho tính năng Khối lượng chi tiết HĐ Thầu Phụ
+let _hdcItems = []; // kept for reset compat; hdc no longer uses chi tiết
 let _hdtpItems = [];
 
 function calcHopDongValue(hd) {
@@ -37,20 +37,20 @@ function calcHopDongValue(hd) {
   return (parseFloat(hd.sl) || 1) * (parseFloat(hd.donGia) || 0);
 }
 
-function _migrateHopDongSL() {
+// Xóa dữ liệu khối lượng chi tiết cũ khỏi HĐ Chính (giữ nguyên giaTri/giaTriphu/phatSinh)
+function _migrateHopDongData() {
   let changed = false;
   Object.values(hopDongData).forEach(hd => {
-    if (hd.sl === undefined) { hd.sl = 1; hd.donGia = hd.giaTri || 0; changed = true; }
+    if (hd.items !== undefined || hd.sl !== undefined || hd.donGia !== undefined) {
+      delete hd.items;
+      delete hd.sl;
+      delete hd.donGia;
+      changed = true;
+    }
   });
   if (changed) save('hopdong_v1', hopDongData);
-
-  changed = false;
-  thauPhuContracts.forEach(hd => {
-    if (hd.sl === undefined) { hd.sl = 1; hd.donGia = hd.giaTri || 0; changed = true; }
-  });
-  if (changed) save('thauphu_v1', thauPhuContracts);
 }
-_migrateHopDongSL();
+_migrateHopDongData();
 
 // Đảm bảo trường khachHang tồn tại trong mọi HĐ Chính
 (function _migrateKhachHang() {
@@ -61,64 +61,6 @@ _migrateHopDongSL();
   if (changed) save('hopdong_v1', hopDongData);
 })();
 
-// [ADDED] Khởi tạo giao diện UI nhập chi tiết
-function _initDoanhThuAddons() {
-  ['hdc','hdtp'].forEach(prefix => {
-    const giaTriInput = document.getElementById(`${prefix}-giatri`);
-    if (!giaTriInput || document.getElementById(`${prefix}-sl`)) return;
-    const giaTriField = giaTriInput.closest('.dt-field');
-    if (!giaTriField) return;
-
-    const uiHtml = `
-      <div class="dt-field">
-        <label>Khối Lượng</label>
-        <input type="number" id="${prefix}-sl" value="1" placeholder="1" oninput="window.${prefix}CalcAuto()">
-      </div>
-      <div class="dt-field">
-        <label>Đơn Giá (đ)</label>
-        <input type="text" id="${prefix}-dongia" placeholder="0" oninput="fmtInputMoney(this); window.${prefix}CalcAuto()">
-      </div>
-    `;
-    giaTriField.insertAdjacentHTML('beforebegin', uiHtml);
-
-    const formGrid = giaTriField.parentElement;
-    formGrid.insertAdjacentHTML('afterend', `
-      <div style="margin-top: 10px; grid-column: 1 / -1;">
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="${prefix}-btn-chitiet" onclick="window.toggle${prefix}ChiTiet()">📊 Khối lượng chi tiết</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyKLCT(this)">📋 Copy</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="pasteKLCT(this)">📥 Paste</button>
-        <div id="${prefix}-chitiet-wrap" style="display:none; margin-top: 10px; border: 1px solid var(--bs-border-color); padding: 10px; border-radius: 6px; background: var(--bs-tertiary-bg)">
-          <div style="overflow-x:auto;">
-            <table class="entry-table" style="width:100%; min-width: 500px;">
-              <thead>
-                <tr>
-                  <th style="text-align:left">Tên hạng mục</th>
-                  <th style="width:70px;text-align:center">Đơn vị</th> <!-- [ADDED] column donVi -->
-                  <th style="width:80px;text-align:center">Khối lượng</th>
-                  <th style="width:140px;text-align:right">Đơn giá (đ)</th>
-                  <th style="width:150px;text-align:right">Thành tiền (đ)</th>
-                  <th style="width:40px"></th>
-                </tr>
-              </thead>
-              <tbody id="${prefix}-chitiet-tbody"></tbody>
-            </table>
-          </div>
-          <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center">
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.add${prefix}ChiTietRow()">+ Thêm dòng</button>
-            <div style="font-weight:bold; font-size:13px"><span class="text-body-secondary">Tổng chi tiết: </span><span id="${prefix}-chitiet-tong" class="text-warning">0</span></div>
-          </div>
-        </div>
-      </div>
-    `);
-
-    giaTriInput.setAttribute('readonly', 'true');
-    giaTriInput.style.background = 'var(--bs-tertiary-bg)';
-    giaTriInput.style.pointerEvents = 'none';
-
-    const label = giaTriField.querySelector('label');
-    if (label) label.innerHTML += ' <i class="text-secondary" style="font-weight:normal">(Tự động)</i>';
-  });
-}
 
 function updateGlobalTotals(prefix, arr) {
   const grandTotal = calcHopDongValue({ items: arr });
@@ -169,7 +111,7 @@ function bindItemsToTable(prefix, getItemsArr) {
       return `<tr data-idx="${i}">
         <td><input type="text" class="bare-input" style="width:100%" value="${x(it.name || '')}" oninput="updateItem('${prefix}', ${i}, 'name', this.value)"></td>
         <td><input type="text" class="bare-input" style="width:100%;text-align:center" placeholder="m2, m3, cái..." value="${x(it.donVi || '')}" oninput="updateItem('${prefix}', ${i}, 'donVi', this.value)"></td> <!-- [ADDED] column donVi -->
-        <td><input type="number" class="bare-input" style="width:100%;text-align:center" value="${it.sl!=null ? it.sl : 1}" oninput="updateItem('${prefix}', ${i}, 'sl', this.value)"></td>
+        <td><input type="number" class="bare-input" style="width:100%;text-align:center;-moz-appearance:textfield" value="${it.sl!=null ? it.sl : 1}" oninput="updateItem('${prefix}', ${i}, 'sl', this.value)"></td>
         <td><input type="text" class="bare-input" style="width:100%;text-align:right" value="${it.donGia ? parseInt(it.donGia).toLocaleString('vi-VN') : ''}" oninput="fmtInputMoney(this); updateItem('${prefix}', ${i}, 'donGia', this.dataset.raw||0)" data-raw="${it.donGia||0}"></td>
         <td class="row-total text-end fw-bold text-warning">${total ? total.toLocaleString('vi-VN') : '0'}</td>
         <td style="text-align:center"><button type="button" class="btn btn-outline-secondary btn-sm text-danger" style="border:none;padding:2px 6px" onclick="removeItem('${prefix}', ${i})">✕</button></td>
@@ -190,7 +132,7 @@ function bindItemsToTable(prefix, getItemsArr) {
     const arr = getItemsArr();
     if (wrap.style.display === 'none') {
       wrap.style.display = 'block';
-      if (arr.length === 0) arr.push({ name: '', donVi: '', sl: 1, donGia: 0 }); // [ADDED] column donVi
+      if (arr.length === 0) arr.push({ name: '', donVi: '', sl: 1, donGia: 0 });
       window[`render${prefix}ChiTiet`]();
     } else {
       if (arr.length > 0 && confirm('Bạn có chắc muốn ẩn và xóa bảng chi tiết?')) {
@@ -201,49 +143,33 @@ function bindItemsToTable(prefix, getItemsArr) {
          wrap.style.display = 'none';
       }
     }
-    if (prefix === 'hdc') window.hdcCalcAuto(); else window.hdtpCalcAuto();
+    if (typeof window[`${prefix}CalcAuto`] === 'function') window[`${prefix}CalcAuto`]();
   };
 
   window[`${prefix}CalcAuto`] = function() {
     const arr = getItemsArr();
     const isDetailed = arr && arr.length > 0;
-    const slEl = document.getElementById(`${prefix}-sl`);
-    const dgEl = document.getElementById(`${prefix}-dongia`);
-    if (!slEl || !dgEl) return;
+    const giaTriInput = document.getElementById(`${prefix}-giatri`);
+    if (!giaTriInput) return;
 
     if (isDetailed) {
-      slEl.disabled = true;
-      dgEl.disabled = true;
-      slEl.style.opacity = '0.5';
-      dgEl.style.opacity = '0.5';
-    } else {
-      slEl.disabled = false;
-      dgEl.disabled = false;
-      slEl.style.opacity = '1';
-      dgEl.style.opacity = '1';
-    }
-
-    const hd = {
-      sl: parseFloat(slEl.value) || 1,
-      donGia: _readMoneyInput(`${prefix}-dongia`),
-      items: arr
-    };
-
-    const val = calcHopDongValue(hd);
-    const giaTriInput = document.getElementById(`${prefix}-giatri`);
-    if (giaTriInput) {
+      const val = calcHopDongValue({ items: arr });
       giaTriInput.dataset.raw = val || 0;
       giaTriInput.value = val ? val.toLocaleString('vi-VN') : '';
-    }
-    if (prefix === 'hdc') {
-      if (typeof hdcUpdateTotal === 'function') hdcUpdateTotal();
+      giaTriInput.readOnly = true;
+      giaTriInput.style.background = 'var(--bs-tertiary-bg)';
+      giaTriInput.style.pointerEvents = 'none';
     } else {
+      giaTriInput.readOnly = false;
+      giaTriInput.style.background = '';
+      giaTriInput.style.pointerEvents = '';
+    }
+    if (prefix === 'hdtp') {
       if (typeof hdtpUpdateTotal === 'function') hdtpUpdateTotal();
     }
   };
 }
 
-bindItemsToTable('hdc', () => _hdcItems);
 bindItemsToTable('hdtp', () => _hdtpItems);
 
 // Pagination state cho tab Doanh Thu
@@ -492,7 +418,6 @@ function dtGoSub(btn, id) {
   btn.classList.add('active');
   if (id === 'dt-sub-khaibao') {
     _dtRenderDashboardMini();
-  } else if (id === 'dt-sub-thongke') {
     _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
     _dtSearch = '';
     const srch = document.getElementById('dt-search-input');
@@ -523,8 +448,8 @@ function dtEnsureCongNoSubtab() {
     btn.id = 'dt-sub-congno-btn';
     btn.innerHTML = '💳 CÔNG NỢ';
     btn.setAttribute('onclick', "dtGoSub(this,'dt-sub-congno')");
-    const tkBtn = document.getElementById('dt-sub-thongke-btn');
-    if (tkBtn) tkBtn.insertAdjacentElement('afterend', btn);
+    const hopdongBtn = document.getElementById('dt-sub-khaibao-btn');
+    if (hopdongBtn) hopdongBtn.insertAdjacentElement('afterend', btn);
     else subNav.appendChild(btn);
   }
 
@@ -555,7 +480,7 @@ function dtEnsureCongNoSubtab() {
   const congnoTbody = document.getElementById('congno-tbody');
   const congnoWrap = congnoTbody ? congnoTbody.closest('.records-wrap') : null;
   const congnoHeader = congnoWrap ? congnoWrap.previousElementSibling : null;
-  if (congnoWrap && congnoHeader && congnoHeader.parentElement?.id === 'dt-sub-thongke') {
+  if (congnoWrap && congnoHeader && cnPage && !cnPage.contains(congnoWrap)) {
     cnPage.appendChild(congnoHeader);
     cnPage.appendChild(congnoWrap);
   }

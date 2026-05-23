@@ -5,7 +5,7 @@
 
 // ── Cập nhật hiển thị Tổng HĐ Chính khi nhập ─────────────────
 function hdcUpdateTotal() {
-  const tong = _readMoneyInput('hdc-giatri') + _readMoneyInput('hdc-giatriphu') + _readMoneyInput('hdc-phatsinh');
+  const tong = _readMoneyInput('hdc-giatri') + _readMoneyInput('hdc-giatriphu');
   const el = document.getElementById('hdc-tong-label');
   if (el) el.textContent = tong ? 'Tổng: ' + fmtM(tong) : '';
 }
@@ -27,12 +27,9 @@ function saveHopDongChinh() {
   const ngay      = document.getElementById('hdc-ngay')?.value || today();
   const nguoi     = document.getElementById('hdc-nguoi')?.value || '';
   const khachHang = (document.getElementById('hdc-khachhang')?.value || '').trim();
-  const slEl      = document.getElementById('hdc-sl'); // [ADDED]
-  const sl        = slEl && slEl.value !== '' ? parseFloat(slEl.value) : 1; // [ADDED]
-  const donGia    = _readMoneyInput('hdc-dongia'); // [ADDED]
-  const giaTri    = calcHopDongValue({ sl, donGia, items: _hdcItems }); // [UPDATED]
+  const nd        = (document.getElementById('hdc-nd')?.value || '').trim();
+  const giaTri    = _readMoneyInput('hdc-giatri');
   const giaTriphu = _readMoneyInput('hdc-giatriphu');
-  const phatSinh  = _readMoneyInput('hdc-phatsinh');
   const editId    = document.getElementById('hdc-edit-id')?.value || '';
 
   _dtAddCT(ct);
@@ -48,8 +45,8 @@ function saveHopDongChinh() {
     if (editId !== _hdSaveKey) {
       // Đổi CT hoặc key cũ khác key mới: tạo mới + xóa mềm cũ
       hopDongData[_hdSaveKey] = {
-        giaTri, giaTriphu, phatSinh, nguoi, khachHang,
-        projectId: _hdcPid, sl, donGia, items: [..._hdcItems], // [UPDATED]
+        giaTri, giaTriphu, nd, nguoi, khachHang,
+        projectId: _hdcPid,
         ngay:      ngay || existing.ngay || today(),
         createdAt: existing.createdAt || now,
         updatedAt: now,
@@ -57,13 +54,13 @@ function saveHopDongChinh() {
       };
       hopDongData[editId] = { ...existing, deletedAt: now, updatedAt: now };
     } else {
-      hopDongData[editId] = { ...existing, giaTri, giaTriphu, phatSinh, nguoi, khachHang, ngay, projectId: _hdcPid, sl, donGia, items: [..._hdcItems], updatedAt: now }; // [UPDATED]
+      hopDongData[editId] = { ...existing, giaTri, giaTriphu, nd, nguoi, khachHang, ngay, projectId: _hdcPid, updatedAt: now };
     }
     toast('✅ Đã cập nhật hợp đồng: ' + ct, 'success');
   } else {
     hopDongData[_hdSaveKey] = {
-      giaTri, giaTriphu, phatSinh, nguoi, khachHang,
-      projectId: _hdcPid, sl, donGia, items: [..._hdcItems], // [UPDATED]
+      giaTri, giaTriphu, nd, nguoi, khachHang,
+      projectId: _hdcPid,
       ngay, createdAt: now, updatedAt: now, deletedAt: null
     };
     toast('✅ Đã lưu hợp đồng: ' + ct, 'success');
@@ -78,15 +75,8 @@ function saveHopDongChinh() {
 }
 
 function _hdcResetForm() {
-  // [ADDED]
   _hdcItems = [];
-  const slEl = document.getElementById('hdc-sl');
-  const dgEl = document.getElementById('hdc-dongia');
-  if(slEl) { slEl.value = '1'; slEl.disabled = false; slEl.style.opacity = '1'; }
-  if(dgEl) { dgEl.value = ''; dgEl.dataset.raw = ''; dgEl.disabled = false; dgEl.style.opacity = '1'; }
-  if(typeof window.renderhdcChiTiet === 'function') window.renderhdcChiTiet();
-
-  ['hdc-giatri','hdc-giatriphu','hdc-phatsinh'].forEach(id => {
+  ['hdc-giatri','hdc-giatriphu'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.value = '';
@@ -98,6 +88,8 @@ function _hdcResetForm() {
   if (nguoiSel) nguoiSel.value = '';
   const khEl = document.getElementById('hdc-khachhang');
   if (khEl) khEl.value = '';
+  const ndEl = document.getElementById('hdc-nd');
+  if (ndEl) ndEl.value = '';
   const ngayEl = document.getElementById('hdc-ngay');
   if (ngayEl) ngayEl.value = today();
   const editEl = document.getElementById('hdc-edit-id');
@@ -126,6 +118,8 @@ function editHopDongChinh(keyId) {
   if (nguoiSel) nguoiSel.value = hd.nguoi || '';
   const khEl = document.getElementById('hdc-khachhang');
   if (khEl) khEl.value = hd.khachHang || '';
+  const ndEl = document.getElementById('hdc-nd');
+  if (ndEl) ndEl.value = hd.nd || '';
 
   function _setMoney(elemId, val) {
     const el = document.getElementById(elemId);
@@ -134,18 +128,9 @@ function editHopDongChinh(keyId) {
     el.value = val ? parseInt(val).toLocaleString('vi-VN') : '';
   }
 
-  // [ADDED] Load sl, donGia, items
-  _hdcItems = Array.isArray(hd.items) ? [...hd.items] : [];
-  const slEl = document.getElementById('hdc-sl');
-  if (slEl) slEl.value = hd.sl !== undefined ? hd.sl : 1;
-  const dG = hd.donGia !== undefined ? hd.donGia : (hd.giaTri || 0);
-  _setMoney('hdc-dongia', dG);
-  if(typeof window.renderhdcChiTiet === 'function') window.renderhdcChiTiet();
-  if(typeof window.hdcCalcAuto === 'function') window.hdcCalcAuto();
-
+  _hdcItems = [];
   _setMoney('hdc-giatri',    hd.giaTri    || 0);
   _setMoney('hdc-giatriphu', hd.giaTriphu || 0);
-  _setMoney('hdc-phatsinh',  hd.phatSinh  || 0);
 
   const editEl = document.getElementById('hdc-edit-id');
   if (editEl) editEl.value = keyId;
@@ -219,12 +204,9 @@ function renderHdcTable(page) {
       <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(hd.khachHang || '—')}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${hd.phatSinh ? fmtS(hd.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-secondary btn-sm" title="Xu&#7845;t phi&#7871;u"
-            onclick="exportHdcRowToImage('${x(keyId)}')"><i class="bi bi-image"></i></button>
           <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
             onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
@@ -247,7 +229,6 @@ function saveThuRecord() {
   const nguoi   = (document.getElementById('thu-nguoi')?.value || '').trim().toUpperCase();
   const nd      = document.getElementById('thu-nd')?.value.trim() || '';
   const loaiThu = document.getElementById('thu-loaithu')?.value || '';
-  const anhUrl  = (document.getElementById('thu-anhurl')?.value || '').trim();
   const editId  = document.getElementById('thu-edit-id')?.value || '';
 
   if (!ct)   { toast('Vui lòng nhập Công Trình!', 'error'); return; }
@@ -271,7 +252,7 @@ function saveThuRecord() {
     // Cập nhật record hiện có
     const idx = thuRecords.findIndex(r => String(r.id) === String(editId));
     if (idx >= 0) {
-      thuRecords[idx] = mkUpdate(thuRecords[idx], { ngay, congtrinh: ct, projectId: _thuPid, tien, nguoi, nd, loaiThu, anhUrl });
+      thuRecords[idx] = mkUpdate(thuRecords[idx], { ngay, congtrinh: ct, projectId: _thuPid, tien, nguoi, nd, loaiThu });
     }
     save('thu_v1', thuRecords);
     _thuResetForm();
@@ -282,7 +263,7 @@ function saveThuRecord() {
     toast('✅ Đã cập nhật thu tiền: ' + fmtM(tien) + ' — ' + ct, 'success');
   } else {
     // Tạo mới
-    thuRecords.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _thuPid, tien, nguoi, nd, loaiThu, anhUrl }));
+    thuRecords.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _thuPid, tien, nguoi, nd, loaiThu }));
     save('thu_v1', thuRecords);
 
     // Reset form nhẹ: chỉ xóa tiền, người, nội dung — giữ ct và ngày
@@ -320,8 +301,6 @@ function editThuRecord(id) {
   if (ndEl) ndEl.value = r.nd || '';
   const loaiThuEl = document.getElementById('thu-loaithu');
   if (loaiThuEl) loaiThuEl.value = r.loaiThu || '';
-  const anhUrlEl = document.getElementById('thu-anhurl');
-  if (anhUrlEl) anhUrlEl.value = r.anhUrl || '';
 
   // Điền tiền
   const tienEl = document.getElementById('thu-tien');
@@ -364,8 +343,6 @@ function _thuResetForm() {
   if (ngayEl) ngayEl.value = today();
   const loaiThuEl = document.getElementById('thu-loaithu');
   if (loaiThuEl) loaiThuEl.value = '';
-  const anhUrlEl = document.getElementById('thu-anhurl');
-  if (anhUrlEl) anhUrlEl.value = '';
   const progInfo = document.getElementById('thu-progress-info');
   if (progInfo) progInfo.style.display = 'none';
   const editEl = document.getElementById('thu-edit-id');
@@ -431,9 +408,6 @@ function renderThuTable(page) {
   tbody.innerHTML = slice.map(r => {
     const [loaiLabel, loaiCls] = _LOAI_BADGE[r.loaiThu] || ['',''];
     const loaiBadge = loaiLabel ? `<span class="${loaiCls}" style="font-size:11px">${loaiLabel}</span>` : '<span class="text-body-secondary">—</span>';
-    const anhCell = r.anhUrl
-      ? `<a href="${x(r.anhUrl)}" target="_blank" rel="noopener" title="${x(r.anhUrl)}" style="font-size:16px">&#x1F4CE;</a>`
-      : '<span class="text-body-secondary">—</span>';
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="thu-row-chk" data-id="${r.id}"></td>
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
@@ -442,11 +416,8 @@ function renderThuTable(page) {
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
       <td class="text-body-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
-      <td style="text-align:center">${anhCell}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-secondary btn-sm" title="Xu&#7845;t phi&#7871;u"
-            onclick="exportThuRowToImage('${r.id}')"><i class="bi bi-image"></i></button>
           <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
             onclick="editThuRecord('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
@@ -463,7 +434,7 @@ function renderThuTable(page) {
 
 // ── Cập nhật hiển thị Tổng HĐ Thầu Phụ khi nhập ─────────────
 function hdtpUpdateTotal() {
-  const tong = _readMoneyInput('hdtp-giatri') + _readMoneyInput('hdtp-phatsinh');
+  const tong = _readMoneyInput('hdtp-giatri');
   const el = document.getElementById('hdtp-tong-label');
   if (el) el.textContent = tong ? 'Tổng: ' + fmtM(tong) : '';
 }
@@ -484,13 +455,10 @@ function saveHopDongThauPhu() {
   }
 
   const ngay     = document.getElementById('hdtp-ngay')?.value || today();
-  const hdcId    = document.getElementById('hdtp-hdcid')?.value || '';
-  const slEl     = document.getElementById('hdtp-sl'); // [ADDED]
-  const sl       = slEl && slEl.value !== '' ? parseFloat(slEl.value) : 1; // [ADDED]
-  const donGia   = _readMoneyInput('hdtp-dongia'); // [ADDED]
-  const giaTri   = calcHopDongValue({ sl, donGia, items: _hdtpItems }); // [UPDATED]
-  const phatSinh = _readMoneyInput('hdtp-phatsinh');
   const nd       = document.getElementById('hdtp-nd')?.value.trim() || '';
+  const giaTri   = _hdtpItems.length > 0
+    ? calcHopDongValue({ items: _hdtpItems })
+    : _readMoneyInput('hdtp-giatri');
   const editId   = document.getElementById('hdtp-edit-id')?.value || '';
 
   _dtAddCT(ct);
@@ -502,11 +470,11 @@ function saveHopDongThauPhu() {
   if (editId) {
     const idx = thauPhuContracts.findIndex(r => r.id === editId);
     if (idx >= 0) {
-      thauPhuContracts[idx] = mkUpdate(thauPhuContracts[idx], { ngay, congtrinh: ct, projectId: _hdtpPid, thauphu: tp, giaTri, phatSinh, nd, sl, donGia, items: [..._hdtpItems], hdcId }); // [UPDATED]
+      thauPhuContracts[idx] = mkUpdate(thauPhuContracts[idx], { ngay, congtrinh: ct, projectId: _hdtpPid, thauphu: tp, giaTri, nd, items: [..._hdtpItems] });
     }
     toast('✅ Đã cập nhật HĐ thầu phụ', 'success');
   } else {
-    thauPhuContracts.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _hdtpPid, thauphu: tp, giaTri, phatSinh, nd, sl, donGia, items: [..._hdtpItems], hdcId })); // [UPDATED]
+    thauPhuContracts.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _hdtpPid, thauphu: tp, giaTri, nd, items: [..._hdtpItems] }));
     toast('✅ Đã lưu HĐ thầu phụ: ' + tp + ' — ' + ct, 'success');
   }
 
@@ -518,24 +486,19 @@ function saveHopDongThauPhu() {
 }
 
 function _hdtpResetForm() {
-  // [ADDED]
   _hdtpItems = [];
-  const slEl = document.getElementById('hdtp-sl');
-  const dgEl = document.getElementById('hdtp-dongia');
-  if(slEl) { slEl.value = '1'; slEl.disabled = false; slEl.style.opacity = '1'; }
-  if(dgEl) { dgEl.value = ''; dgEl.dataset.raw = ''; dgEl.disabled = false; dgEl.style.opacity = '1'; }
   if(typeof window.renderhdtpChiTiet === 'function') window.renderhdtpChiTiet();
 
-  ['hdtp-giatri','hdtp-phatsinh','hdtp-nd'].forEach(id => {
+  ['hdtp-giatri','hdtp-nd'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.value = '';
     if (el.dataset) el.dataset.raw = '';
   });
+  const giaTriEl = document.getElementById('hdtp-giatri');
+  if (giaTriEl) { giaTriEl.readOnly = false; giaTriEl.style.background = ''; giaTriEl.style.pointerEvents = ''; }
   const ctSel = document.getElementById('hdtp-ct-input');
   if (ctSel) ctSel.value = '';
-  const hdcSel = document.getElementById('hdtp-hdcid');
-  if (hdcSel) { hdcSel.innerHTML = '<option value="">-- Chọn HĐ Ch\xednh (tuỳ chọn) --</option>'; }
   const tpSel = document.getElementById('hdtp-thauphu');
   if (tpSel) tpSel.value = '';
   const ngayEl = document.getElementById('hdtp-ngay');
@@ -556,9 +519,6 @@ function editHopDongThauPhu(id) {
   const ctName = resolveProjectName(r) || r.congtrinh || '';
   const ctSel = document.getElementById('hdtp-ct-input');
   if (ctSel) ctSel.value = ctName;
-  _hdtpOnCtChange(ctName);
-  const hdcSel = document.getElementById('hdtp-hdcid');
-  if (hdcSel && r.hdcId) hdcSel.value = r.hdcId;
   const tpSel = document.getElementById('hdtp-thauphu');
   if (tpSel) tpSel.value = r.thauphu || '';
   const ngayEl = document.getElementById('hdtp-ngay');
@@ -573,17 +533,10 @@ function editHopDongThauPhu(id) {
     el.value = val ? parseInt(val).toLocaleString('vi-VN') : '';
   }
 
-  // [ADDED] Load sl, donGia, items
   _hdtpItems = Array.isArray(r.items) ? [...r.items] : [];
-  const slEl = document.getElementById('hdtp-sl');
-  if (slEl) slEl.value = r.sl !== undefined ? r.sl : 1;
-  const dG = r.donGia !== undefined ? r.donGia : (r.giaTri || 0);
-  _setMoney('hdtp-dongia', dG);
   if(typeof window.renderhdtpChiTiet === 'function') window.renderhdtpChiTiet();
   if(typeof window.hdtpCalcAuto === 'function') window.hdtpCalcAuto();
-
-  _setMoney('hdtp-giatri',   r.giaTri   || 0);
-  _setMoney('hdtp-phatsinh', r.phatSinh || 0);
+  if (_hdtpItems.length === 0) _setMoney('hdtp-giatri', r.giaTri || 0);
 
   const editEl = document.getElementById('hdtp-edit-id');
   if (editEl) editEl.value = id;
@@ -641,25 +594,15 @@ function renderHdtpTable(page) {
 
   tbody.innerHTML = slice.map(r => {
     const tong = (r.giaTri || 0) + (r.phatSinh || 0);
-    let ndCell = x(r.nd || '—');
-    if (r.hdcId) {
-      const hdcProj = (typeof projects !== 'undefined' ? projects : []).find(p => p.id === r.hdcId);
-      const hdcLabel = hdcProj ? hdcProj.name : r.hdcId;
-      ndCell += `<br><span class="badge bg-secondary" style="font-size:10px;font-weight:normal">H&#272;C: ${x(hdcLabel)}</span>`;
-    }
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdtp-row-chk" data-id="${r.id}"></td>
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td style="white-space:nowrap">${x(r.thauphu)}</td>
-      <td class="text-secondary" style="font-size:12px;min-width:90px">${ndCell}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${r.giaTri ? fmtS(r.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${r.phatSinh ? fmtS(r.phatSinh) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-secondary" style="font-size:12px;min-width:90px">${x(r.nd || '—')}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-secondary btn-sm" title="Xu&#7845;t phi&#7871;u"
-            onclick="exportHdtpRowToImage('${r.id}')"><i class="bi bi-image"></i></button>
           <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
             onclick="editHopDongThauPhu('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="X&#243;a"

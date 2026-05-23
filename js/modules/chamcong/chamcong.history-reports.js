@@ -266,12 +266,17 @@ function renderCCTLT(){
         <td class="text-warning" style="text-align:center;${mono};font-weight:700">${r.tc}</td>
         <td class="text-success" style="text-align:right;${mono};font-weight:700;font-size:13px">${tcLuong?numFmt(tcLuong):'—'}</td>
         <td class="text-secondary" style="text-align:right;${mono};font-size:12px">${luongTB?numFmt(luongTB):'—'}</td>
-        <td class="text-danger" style="text-align:right;${mono};font-size:12px">${r.tru?numFmt(r.tru):'—'}</td>
-        <td class="text-success fw-bold" style="text-align:right;${mono};background:#f1f8f4">${thucLanh_>0?numFmt(thucLanh_):thucLanh_<0?'('+numFmt(-thucLanh_)+')':'—'}</td>
+        <td class="text-danger cc-tlt-debt-col" style="text-align:right;${mono};font-size:12px">${r.tru?numFmt(r.tru):'—'}</td>
+        <td class="text-success fw-bold cc-tlt-debt-col" style="text-align:right;${mono};background:#f1f8f4">${thucLanh_>0?numFmt(thucLanh_):thucLanh_<0?'('+numFmt(-thucLanh_)+')':'—'}</td>
         <td class="project-col text-secondary" style="font-size:11px">${ctDisplay_}</td>
       </tr>`;
     }).join('');
   }
+
+  // Ẩn/hiện cột TRỪ và THỰC LÃNH: chỉ hiện khi lọc một tuần cụ thể
+  document.querySelectorAll('.cc-tlt-debt-col').forEach(el => {
+    el.style.display = fWk ? '' : 'none';
+  });
 
   const tp=Math.ceil(rows.length/CC_PG_TLT);
   let pag=`<span>${rows.length} công nhân · Tổng TC Lương: <strong class="text-success font-monospace">${fmtS(grandTCLuong)}</strong></span><span id="cc-tlt-selected-sum" class="text-warning fw-bold font-monospace" style="margin-left:14px"></span>`;

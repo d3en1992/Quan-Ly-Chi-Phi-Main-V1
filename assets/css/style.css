@@ -1553,3 +1553,17 @@ td.action-col > div {
   align-items: center;
   flex-wrap: nowrap;
 }
+
+
+/* ── Chi tiết bảng: ẩn spin buttons trên input number ── */
+#hdtp-chitiet-tbody input[type="number"],
+#hdc-chitiet-tbody input[type="number"] {
+  -moz-appearance: textfield;
+}
+#hdtp-chitiet-tbody input[type="number"]::-webkit-inner-spin-button,
+#hdtp-chitiet-tbody input[type="number"]::-webkit-outer-spin-button,
+#hdc-chitiet-tbody input[type="number"]::-webkit-inner-spin-button,
+#hdc-chitiet-tbody input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
