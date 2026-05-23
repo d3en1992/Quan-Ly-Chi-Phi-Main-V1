@@ -754,9 +754,77 @@ function _v2SetLastPush(docId, ts) {
 // Reset 1 docId → buộc full rewrite lần push tiếp theo
 function _v2ResetLastPush(docId) { _v2SetLastPush(docId, 0); }
 
-// Reset toàn bộ cache → dùng sau khi reset/xóa dữ liệu
+// Reset toàn bộ cache → dùng sau khi reset/xóa dữ liệu/import
 function _v2ResetAllLastPush() {
-  try { localStorage.removeItem(_V2_LAST_PUSH_KEY); } catch {}
+  try {
+    localStorage.removeItem(_V2_LAST_PUSH_KEY);
+    // PHASE 2 — Clear cả hash keys để force full rewrite cho danh_muc/hop_dong
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('_v2HashFull_')) keysToRemove.push(k);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // PHASE 1 — Clear cả lastPull để force re-read parent docs
+    localStorage.removeItem('_v2SubcollLastPull');
+    // V2 init flag — sẽ được set lại sau lần push thành công tiếp theo
+    localStorage.removeItem('_v2Initialized');
+  } catch {}
+}
+
+
+// ──────────────────────────────────────────────────────────────
+// PHASE 1 — LAST-MODIFIED GUARD
+// ──────────────────────────────────────────────────────────────
+// Mỗi parent doc (year + meta) lưu field `last_modified_ms` = max(updatedAt, deletedAt).
+// Pull side: đọc parent doc trước (1 read), so sánh với localStorage lastPull.
+// Nếu <= lastPull → bỏ qua subcollection read (tiết kiệm hàng trăm reads/sync).
+
+const _V2_LAST_PULL_KEY = '_v2SubcollLastPull';
+
+function _v2GetLastPull(docId) {
+  try {
+    const map = JSON.parse(localStorage.getItem(_V2_LAST_PULL_KEY) || '{}');
+    return Number(map[docId] || 0);
+  } catch { return 0; }
+}
+
+function _v2SetLastPull(docId, ts) {
+  try {
+    const map = JSON.parse(localStorage.getItem(_V2_LAST_PULL_KEY) || '{}');
+    map[docId] = ts;
+    localStorage.setItem(_V2_LAST_PULL_KEY, JSON.stringify(map));
+  } catch (e) { console.warn('[V2Format] _v2SetLastPull lỗi:', e.message); }
+}
+
+function _v2ResetAllLastPull() {
+  try { localStorage.removeItem(_V2_LAST_PULL_KEY); } catch {}
+}
+
+// Đọc parent doc và kiểm tra xem có thay đổi gì kể từ lastPull.
+// Trả về:
+//   { exists: false }                                    → V2 chưa init cho doc này
+//   { exists: true, unchanged: true,  parentFields }    → cloud KHÔNG đổi → skip subcoll
+//   { exists: true, unchanged: false, parentFields,
+//     cloudLastMod }                                     → cloud đã đổi → cần đọc subcoll
+async function _v2CheckLastModified(parentDocId) {
+  try {
+    const url = `${FS_BASE()}/${parentDocId}?key=${FB_CONFIG.apiKey}`;
+    const res = await fetch(url).then(r => r.json());
+    if (!res || res.error || !res.fields) return { exists: false };
+
+    const parentFields = _v2FromFsFields(res.fields);
+    const cloudLastMod = Number(parentFields.last_modified_ms) || 0;
+    const localLastPull = _v2GetLastPull(parentDocId);
+
+    if (cloudLastMod > 0 && cloudLastMod <= localLastPull) {
+      return { exists: true, unchanged: true, parentFields };
+    }
+    return { exists: true, unchanged: false, parentFields, cloudLastMod };
+  } catch (e) {
+    console.warn(`[V2Format] _v2CheckLastModified lỗi (${parentDocId}):`, e.message || e);
+    return { exists: false };
+  }
 }
 
 
@@ -772,19 +840,7 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
   const now      = Date.now();
   const coll     = _V2_SUBCOLL_NAME;
 
-  // 1. Ghi summary lên parent document
-  try {
-    const res = await _v2FsPatchDoc(parentDocId, _v2ToFsFields(summaryObj));
-    if (res && res.error) {
-      console.warn(`[V2Format] ✗ ${parentDocId} summary lỗi:`, res.error.message);
-      return { ok: false };
-    }
-  } catch (e) {
-    console.warn(`[V2Format] ✗ ${parentDocId} summary exception:`, e.message || e);
-    return { ok: false };
-  }
-
-  // 2. Build batch writes
+  // 1. Build batch writes TRƯỚC (để biết có gì thay đổi mới quyết định ghi summary hay không)
   const writes = [];
 
   if (lastPush === 0) {
@@ -811,10 +867,8 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
       const tUpdated = rec.updatedAt || rec.createdAt || 0;
       const tDeleted = rec.deletedAt || 0;
       if (tDeleted && tDeleted > lastPush) {
-        // Bị xóa sau lần push cuối → xóa document con
         writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${getId(rec)}` });
       } else if (!tDeleted && tUpdated > lastPush) {
-        // Mới tạo hoặc đã sửa → ghi/overwrite
         const docId = getId(rec);
         if (!docId) return;
         writes.push({
@@ -826,14 +880,41 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
     });
   }
 
-  // 3. Thực hiện batch write
-  if (writes.length === 0) {
+  // 2. PHASE 2 OPTIMIZATION — Skip toàn bộ nếu không có thay đổi (idle sync)
+  //    Bỏ qua cả summary PATCH để tiết kiệm writes (tránh ghi parent doc vô ích)
+  if (lastPush > 0 && writes.length === 0) {
     const nActive = records.filter(r => !r.deletedAt).length;
-    console.log(`[V2Format] ▲ ${parentDocId} — không đổi (${nActive} records hiện có)`);
+    console.log(`[V2Format] ⏭ ${parentDocId} — không đổi, skip summary+writes (${nActive} records hiện có)`);
     _v2SetLastPush(parentDocId, now);
+    return { ok: true, written: 0, deleted: 0, skipped: true };
+  }
+
+  // 3. PHASE 1 — Tính last_modified_ms và ghi summary parent doc (để pull side có guard)
+  const lastModMs = records.reduce((max, r) => {
+    return Math.max(max, Number(r.updatedAt) || 0, Number(r.deletedAt) || 0);
+  }, 0) || now;
+
+  try {
+    const enhancedSummary = { ...summaryObj, last_modified_ms: lastModMs };
+    const res = await _v2FsPatchDoc(parentDocId, _v2ToFsFields(enhancedSummary));
+    if (res && res.error) {
+      console.warn(`[V2Format] ✗ ${parentDocId} summary lỗi:`, res.error.message);
+      return { ok: false };
+    }
+  } catch (e) {
+    console.warn(`[V2Format] ✗ ${parentDocId} summary exception:`, e.message || e);
+    return { ok: false };
+  }
+
+  // 4. Nếu chỉ có summary thay đổi (lần đầu push hoặc summary diff) → thoát ngay
+  if (writes.length === 0) {
+    console.log(`[V2Format] ▲ ${parentDocId} — summary OK (0 records)`);
+    _v2SetLastPush(parentDocId, now);
+    _v2SetLastPull(parentDocId, lastModMs);  // ta vừa ghi nên không cần đọc lại
     return { ok: true, written: 0, deleted: 0 };
   }
 
+  // 5. Thực hiện batch write
   const nWrite  = writes.filter(w => w.op === 'update').length;
   const nDelete = writes.filter(w => w.op === 'delete').length;
   const { totalOk, totalFail } = await _v2FsBatchWrite(writes);
@@ -841,6 +922,7 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
 
   if (ok) {
     _v2SetLastPush(parentDocId, now);
+    _v2SetLastPull(parentDocId, lastModMs);  // ta vừa ghi nên không cần đọc lại
     console.log(`[V2Format] ▲ ${parentDocId} OK — ✏${nWrite} ghi, 🗑${nDelete} xóa`);
   } else {
     console.warn(`[V2Format] ✗ ${parentDocId} — ${totalFail}/${writes.length} ops thất bại`);
@@ -859,9 +941,31 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
   const coll   = _V2_SUBCOLL_NAME;
   const getId  = r => r[idField || 'id'];
 
-  // 1. Ghi summary lên parent document
+  // PHASE 2 OPTIMIZATION — Hash-based skip:
+  // Tính hash chữ ký từ (id + updatedAt) của active records.
+  // Nếu hash trùng với lần push trước → toàn bộ records không đổi → skip everything.
+  const recordHash = activeRecords
+    .map(r => `${getId(r) || ''}:${Number(r.updatedAt) || 0}`)
+    .sort()
+    .join('|');
+  const HASH_KEY = `_v2HashFull_${parentDocId}`;
+  let lastHash = null;
+  try { lastHash = localStorage.getItem(HASH_KEY); } catch {}
+
+  if (lastHash !== null && lastHash === recordHash) {
+    console.log(`[V2Format] ⏭ ${parentDocId} (full) — hash unchanged, skip rewrite`);
+    return { ok: true, written: 0, deleted: 0, skipped: true };
+  }
+
+  // PHASE 1 — Tính last_modified_ms (để pull guard hoạt động)
+  const lastModMs = activeRecords.reduce((max, r) => {
+    return Math.max(max, Number(r.updatedAt) || 0);
+  }, 0) || now;
+
+  // 1. Ghi summary lên parent document (kèm last_modified_ms)
   try {
-    const res = await _v2FsPatchDoc(parentDocId, _v2ToFsFields(summaryObj));
+    const enhancedSummary = { ...summaryObj, last_modified_ms: lastModMs };
+    const res = await _v2FsPatchDoc(parentDocId, _v2ToFsFields(enhancedSummary));
     if (res && res.error) {
       console.warn(`[V2Format] ✗ ${parentDocId} summary lỗi:`, res.error.message);
       return { ok: false };
@@ -876,13 +980,11 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
   const newIds      = new Set(activeRecords.map(getId).filter(Boolean));
   const writes      = [];
 
-  // Xóa IDs cũ không còn trong danh sách active
   existingIds.forEach(oldId => {
     if (!newIds.has(oldId))
       writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${oldId}` });
   });
 
-  // Ghi tất cả active records (overwrite)
   activeRecords.forEach(rec => {
     const docId = getId(rec);
     if (!docId) return;
@@ -896,6 +998,8 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
   if (writes.length === 0) {
     console.log(`[V2Format] ▲ ${parentDocId} (full) — không có records`);
     _v2SetLastPush(parentDocId, now);
+    _v2SetLastPull(parentDocId, lastModMs);
+    try { localStorage.setItem(HASH_KEY, recordHash); } catch {}
     return { ok: true, written: 0, deleted: 0 };
   }
 
@@ -906,6 +1010,8 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
 
   if (ok) {
     _v2SetLastPush(parentDocId, now);
+    _v2SetLastPull(parentDocId, lastModMs);
+    try { localStorage.setItem(HASH_KEY, recordHash); } catch {}
     console.log(`[V2Format] ▲ ${parentDocId} (full) OK — ✏${nWrite} ghi, 🗑${nDelete} dọn cũ`);
   } else {
     console.warn(`[V2Format] ✗ ${parentDocId} (full) — ${totalFail}/${writes.length} ops thất bại`);
@@ -944,6 +1050,8 @@ async function _v2PushYear(yr) {
 // ──────────────────────────────────────────────────────────────
 async function _v2PushMeta() {
   const results = [];
+  // Đánh dấu V2 đã được khởi tạo trên cloud — pullChanges dùng flag này để skip V1 fallback
+  try { localStorage.setItem('_v2Initialized', '1'); } catch {}
 
   for (const type of _V2_META_TYPES) {
     try {
@@ -1155,14 +1263,35 @@ async function _v2FsGetSubcollDocs(parentDocId, collName) {
   return docs;
 }
 
-// Pull subcollection → array records JS (áp dụng reverse field map)
-// Trả về records[] hoặc null nếu subcollection chưa tồn tại / rỗng
+// Pull subcollection → object với status code (PHASE 1 — guard)
+// Trả về:
+//   { status: 'absent',    records: null, parentFields: null } → V2 chưa init
+//   { status: 'unchanged', records: null, parentFields }       → cloud không đổi
+//   { status: 'empty',     records: null, parentFields }       → parent có nhưng subcoll rỗng
+//   { status: 'fresh',     records: [...], parentFields }      → có data mới
 async function _v2PullSubcoll(parentDocId, fieldMap) {
+  const guard = await _v2CheckLastModified(parentDocId);
+
+  if (!guard.exists) return { status: 'absent', records: null, parentFields: null };
+
+  if (guard.unchanged) {
+    console.log(`[V2Format] ⏭ ${parentDocId} unchanged — skip subcoll read`);
+    return { status: 'unchanged', records: null, parentFields: guard.parentFields };
+  }
+
+  // Cloud có thay đổi → đọc subcollection
   const docs = await _v2FsGetSubcollDocs(parentDocId, _V2_SUBCOLL_NAME);
-  if (!docs.length) return null;
-  return docs.map(doc =>
+
+  if (guard.cloudLastMod) _v2SetLastPull(parentDocId, guard.cloudLastMod);
+
+  if (!docs.length) {
+    return { status: 'empty', records: null, parentFields: guard.parentFields };
+  }
+
+  const records = docs.map(doc =>
     _v2ReverseApplyFieldMap(_v2FromFsFields(doc.fields || {}), fieldMap)
   );
+  return { status: 'fresh', records, parentFields: guard.parentFields };
 }
 
 
@@ -1179,18 +1308,23 @@ const _V2_TYPE_TO_LOCAL_KEY = {
 };
 
 // Pull tất cả 5 loại data của 1 năm từ V2 subcollections
-// Trả về { inv_v3: [...], cc_v2: [...], ... } — key vắng mặt = V2 chưa có data
+// Trả về { inv_v3: [...], cc_v2: [...], _v2Initialized: true|false, _yearChanged: true|false }
+//   - Key data chỉ xuất hiện khi status='fresh' (có records mới)
+//   - _v2Initialized: true nếu BẤT KỲ doc nào tồn tại trên cloud (parent doc exists)
+//   - _yearChanged:   true nếu có ít nhất 1 type có data mới (status='fresh')
 async function _v2PullYearFull(yr) {
-  const result = {};
+  const result = { _v2Initialized: false, _yearChanged: false };
   for (const [type, localKey] of Object.entries(_V2_TYPE_TO_LOCAL_KEY)) {
     try {
       const docId    = _v2DocYearId(type, yr);
       const fieldMap = _V2_FIELD_MAPS[type];
       if (!fieldMap) continue;
-      const records = await _v2PullSubcoll(docId, fieldMap);
-      if (records !== null) {
-        result[localKey] = records;
-        console.log(`[V2Format] ▼ ${docId}: ${records.length} records`);
+      const res = await _v2PullSubcoll(docId, fieldMap);
+      if (res.status !== 'absent') result._v2Initialized = true;
+      if (res.status === 'fresh') {
+        result[localKey] = res.records;
+        result._yearChanged = true;
+        console.log(`[V2Format] ▼ ${docId}: ${res.records.length} records (fresh)`);
       }
     } catch (e) {
       console.warn(`[V2Format] ✗ _v2PullYearFull ${type} yr=${yr}:`, e.message || e);

@@ -251,19 +251,24 @@ async function pushChanges(opts = {}) {
       const yrInt = parseInt(yr);
 
       // ── Step 1: Pre-push merge — đọc V2 cloud trước khi ghi ─
-      // Tránh Device B ghi đè data của Device A
-      // Bỏ qua nếu opts.skipPull = true (sau import JSON — local là nguồn sự thật)
-      if (!skipPull && typeof _v2PullYearFull === 'function') try {
+      // PHASE 4 OPTIMIZATION: skip nếu pullChanges vừa chạy < 60s trước
+      //   - manualSync luôn gọi pullChanges trước pushChanges → bỏ qua được
+      //   - schedulePush cũng gọi pullChanges trước pushChanges → bỏ qua được
+      const _lastPullTs = Number(localStorage.getItem('_lastPullTs') || 0);
+      const _pullFresh = (Date.now() - _lastPullTs) < 60_000;
+
+      if (!skipPull && !_pullFresh && typeof _v2PullYearFull === 'function') try {
         const v2 = await _v2PullYearFull(yrInt);
-        const hasData = Object.values(v2).some(arr => arr && arr.length > 0);
-        if (hasData) {
+        if (v2._v2Initialized) {
+          // V2 đã init — chỉ merge khi 'fresh' (guard đã skip nếu unchanged)
           if (v2.inv_v3) _mergeKey('inv_v3', v2.inv_v3);
           if (v2.ung_v1) _mergeKey('ung_v1', v2.ung_v1);
           if (v2.cc_v2)  { const norm = normalizeCC([...load('cc_v2',[]), ...v2.cc_v2]); _memSet('cc_v2', norm); }
           if (v2.tb_v1)  _mergeKey('tb_v1', v2.tb_v1);
           if (v2.thu_v1) { _mergeKey('thu_v1', v2.thu_v1); thuRecords = load('thu_v1', []); }
+          console.log(`[Sync] ↓ Year ${yr} pre-push merge (V2${v2._yearChanged ? ' fresh' : ' unchanged'})`);
         } else {
-          // V2 chưa có → fallback merge từ V1 (transition period)
+          // V2 chưa init → V1 fallback (transition period — hiếm)
           const cloudDoc  = await fsGet(fbDocYear(yrInt));
           const cloudData = fsUnwrap(cloudDoc);
           if (cloudData) {
@@ -272,9 +277,9 @@ async function pushChanges(opts = {}) {
             if (cloudData.c)   { const norm = normalizeCC([...load('cc_v2',[]), ...expandCC(cloudData.c)]); _memSet('cc_v2', norm); }
             if (cloudData.t)   _mergeKey('tb_v1',  expandTb(cloudData.t));
             if (cloudData.thu) _mergeKey('thu_v1', cloudData.thu);
+            console.log(`[Sync] ↓ Year ${yr} V1 fallback`);
           }
         }
-        console.log(`[Sync] ↓ Merged cloud year ${yr}`);
       } catch (e) {
         console.warn(`[Sync] Không fetch được cloud year ${yr}:`, e.message || e);
       }
@@ -304,20 +309,20 @@ async function pushChanges(opts = {}) {
       }
     }
 
-    // ── Cats ───────────────────────────────────────────────────
-    try {
-      const catsDoc  = await fsGet(fbDocCats());
-      const catsData = fsUnwrap(catsDoc);
-      if (catsData?.users) {
-        const mergedUsers = _mergeUsersSafe(load('users_v1', []), catsData.users);
+    // ── Users pre-push merge — V2 primary (cheap với guard) ────
+    // PHASE 4: Xóa cats V1 push hoàn toàn. V2 meta đã thay thế.
+    // Vẫn merge users từ V2 trước khi push để tránh device B ghi đè role/deletedAt từ device A
+    if (!_pullFresh && typeof _v2PullUsers === 'function') try {
+      const r = await _v2PullUsers();
+      if (r && r.status === 'fresh' && r.records?.length) {
+        const merger = typeof _mergeUsersV2 === 'function' ? _mergeUsersV2 : _mergeUsersSafe;
+        const mergedUsers = merger(load('users_v1', []), r.records);
         _memSet('users_v1', mergedUsers);
       }
     } catch (e) {
-      console.warn('[Sync] Users pre-push merge lỗi:', e.message || e);
+      console.warn('[Sync] Users V2 pre-push merge lỗi:', e.message || e);
     }
-    fsSet(fbDocCats(), fbCatsPayload()).catch(e =>
-      console.warn('[Sync] Cats push lỗi:', e)
-    );
+    // (V1 cats push ĐÃ XÓA — không còn ai đọc nữa)
 
     if (fail === 0) {
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
@@ -401,12 +406,15 @@ async function pullChanges(yr, callback, opts = {}) {
     // V1 fallback: đọc từ "cats" document — dùng khi V2 chưa có data
     let _pulledMetaFromV2 = false;
 
+    // V2 ready: kiểm tra localStorage flag (set sau lần push meta đầu tiên)
+    // hoặc bất kỳ parent doc nào tồn tại trên cloud (_v2Initialized từ pull)
+    const _v2InitFlag = localStorage.getItem('_v2Initialized') === '1';
+
     if (typeof _v2PullMetaFull === 'function') {
       try {
         const meta = await _v2PullMetaFull();
-        // V2 sẵn sàng khi có ít nhất projects hoặc catItems
-        const v2Ready = (meta.projects?.length > 0) ||
-                        (meta.catItems && Object.keys(meta.catItems).length > 0);
+        // V2 sẵn sàng nếu: flag đã set HOẶC pull vừa rồi phát hiện parent docs tồn tại
+        const v2Ready = _v2InitFlag || meta._v2Initialized;
 
         if (v2Ready) {
           _pulledMetaFromV2 = true;
@@ -713,15 +721,16 @@ async function pullChanges(yr, callback, opts = {}) {
         let pulledFromV2 = false;
         if (typeof _v2PullYearFull === 'function') {
           const v2 = await _v2PullYearFull(parseInt(yrStr));
-          const hasData = Object.values(v2).some(arr => arr && arr.length > 0);
-          if (hasData) {
+          // V2 path per-year: chỉ khi parent doc TỒN TẠI cho năm đó
+          // (tránh case cloud có V2 meta nhưng chưa có V2 year → cần V1 fallback cho năm)
+          if (v2._v2Initialized) {
             if (v2.inv_v3)  mergeAndCount('inv_v3', v2.inv_v3, yrStr);
             if (v2.ung_v1)  mergeAndCount('ung_v1', v2.ung_v1, yrStr);
             if (v2.cc_v2)   mergeCCAndCount(v2.cc_v2, yrStr, 'V2');
             if (v2.tb_v1)   mergeAndCount('tb_v1',  v2.tb_v1, yrStr);
             if (v2.thu_v1)  { mergeAndCount('thu_v1', v2.thu_v1, yrStr); thuRecords = load('thu_v1', []); }
             pulledFromV2 = true;
-            console.log(`[Sync] ▼ Year ${yrStr} — V2 ✓`);
+            console.log(`[Sync] ▼ Year ${yrStr} — V2 ${v2._yearChanged ? '✓ fresh' : '⏭ unchanged'}`);
           }
         }
 
@@ -746,6 +755,8 @@ async function pullChanges(yr, callback, opts = {}) {
     }
 
     if (!silent) hideSyncBanner();
+    // PHASE 4 — Lưu timestamp pull xong → pushChanges có thể skip pre-push pull nếu fresh
+    try { localStorage.setItem('_lastPullTs', String(Date.now())); } catch {}
     console.log(`[Sync] ▼ Pull xong — ${totalNew} record mới, ${totalConflicts} conflicts${_catsChanged ? ', cats changed' : ''} | device: ${DEVICE_ID.slice(0, 8)}`);
     if (callback) callback({ newRecords: totalNew, conflicts: totalConflicts, catsChanged: _catsChanged });
     if (typeof afterSync === 'function') afterSync();
@@ -791,7 +802,7 @@ function schedulePush() {
         pushChanges({ silent: true });
       }
     }, { silent: true });
-  }, 30_000);
+  }, 300_000); // PHASE 4 — Tăng debounce 30s → 5 phút để giảm tần suất sync (tiết kiệm quota)
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -33,7 +33,10 @@
       "Bash(dir /s /b \"%USERPROFILE%\\\\Desktop\\\\cpct_snapshot*\")",
       "Bash(dir /s /b \"%USERPROFILE%\\\\Documents\\\\cpct_snapshot*\")",
       "Bash(python3 patch_sync.py)",
-      "Bash(del \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\patch_sync.py\")"
+      "Bash(del \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\patch_sync.py\")",
+      "Bash(node --check js/sync/sync.v2format.js)",
+      "Bash(node --check js/sync/sync.v2meta.js)",
+      "Bash(node --check js/sync/sync.js)"
     ]
   }
 }
