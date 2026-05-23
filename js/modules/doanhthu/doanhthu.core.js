@@ -52,6 +52,15 @@ function _migrateHopDongSL() {
 }
 _migrateHopDongSL();
 
+// Đảm bảo trường khachHang tồn tại trong mọi HĐ Chính
+(function _migrateKhachHang() {
+  let changed = false;
+  Object.values(hopDongData).forEach(hd => {
+    if (hd.khachHang === undefined) { hd.khachHang = ''; changed = true; }
+  });
+  if (changed) save('hopdong_v1', hopDongData);
+})();
+
 // [ADDED] Khởi tạo giao diện UI nhập chi tiết
 function _initDoanhThuAddons() {
   ['hdc','hdtp'].forEach(prefix => {
@@ -352,14 +361,142 @@ function _dtPaginationHtml(total, curPage, onClickFn) {
   return `<ul class="pagination pagination-sm mb-0">${items.join('')}</ul>`;
 }
 
+// ── Text search state (THỐNG KÊ) ─────────────────────────────
+let _dtSearch = '';
+
+function dtSetSearch(val) {
+  _dtSearch = (val || '').trim().toLowerCase();
+  _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
+  renderHdcTable(0);
+  renderHdtpTable(0);
+  renderThuTable(0);
+}
+
+// ── Dashboard mini: 3 stat cards trên sub-tab TỔNG QUAN ──────
+function _dtRenderDashboardMini() {
+  const hdEl  = document.getElementById('dt-mini-tonghd');
+  const thuEl = document.getElementById('dt-mini-dathu');
+  const conEl = document.getElementById('dt-mini-con');
+  if (!hdEl) return;
+
+  let tongHD = 0;
+  Object.values(hopDongData).forEach(hd => {
+    if (!hd.deletedAt && _dtInYear(hd.ngay)) tongHD += (hd.giaTri||0) + (hd.giaTriphu||0) + (hd.phatSinh||0);
+  });
+  let tongThu = 0;
+  thuRecords.forEach(r => { if (!r.deletedAt && inActiveYear(r.ngay)) tongThu += (r.tien||0); });
+  const conPhaiThu = tongHD - tongThu;
+
+  hdEl.textContent  = tongHD  ? fmtM(tongHD)  : '—';
+  thuEl.textContent = tongThu  ? fmtM(tongThu)  : '—';
+  conEl.textContent = tongHD  ? fmtM(conPhaiThu) : '—';
+  conEl.className = 'fw-bold ' + (conPhaiThu > 0 ? 'text-warning' : conPhaiThu < 0 ? 'text-danger' : 'text-success');
+  conEl.style.fontSize = '20px';
+}
+
+// ── Modal open/close helpers ──────────────────────────────────
+function openDtModal(type) {
+  ['hdc','thu','hdtp'].forEach(t => {
+    const ov = document.getElementById('dt-modal-' + t + '-ov');
+    if (ov) ov.classList.remove('open');
+  });
+  const ov = document.getElementById('dt-modal-' + type + '-ov');
+  if (ov) {
+    ov.classList.add('open');
+    setTimeout(() => {
+      const first = ov.querySelector('select:not([id$="-edit-id"]), input[type="date"]');
+      if (first) first.focus();
+    }, 150);
+  }
+}
+
+function closeDtModal(type) {
+  const ids = type ? ['dt-modal-' + type + '-ov'] : ['dt-modal-hdc-ov','dt-modal-thu-ov','dt-modal-hdtp-ov'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('open'); });
+}
+
+// ── Progress info khi chọn CT trong modal Thu Tiền ────────────
+function _thuOnCtChange(ctName) {
+  const infoEl = document.getElementById('thu-progress-info');
+  if (!infoEl) return;
+  if (!ctName) { infoEl.style.display = 'none'; return; }
+
+  const proj  = (typeof getAllProjects === 'function' ? getAllProjects() : []).find(p => p.name === ctName) || null;
+  const pid   = proj ? proj.id : null;
+
+  // Tìm HĐ chính của CT
+  let hdKey = null;
+  if (pid && hopDongData[pid] && !hopDongData[pid].deletedAt) {
+    hdKey = pid;
+  } else {
+    hdKey = Object.keys(hopDongData).find(k => {
+      const hd = hopDongData[k];
+      if (hd.deletedAt) return false;
+      const p2 = (typeof projects !== 'undefined' ? projects : []).find(pr => pr.id === k);
+      return p2 ? p2.name === ctName : k === ctName;
+    }) || null;
+  }
+
+  const hd     = hdKey ? hopDongData[hdKey] : null;
+  const tongHD = hd ? (hd.giaTri||0) + (hd.giaTriphu||0) + (hd.phatSinh||0) : 0;
+
+  let tongThu = 0;
+  thuRecords.forEach(r => {
+    if (r.deletedAt) return;
+    if ((pid && r.projectId === pid) || (!pid && (r.congtrinh||'') === ctName)) tongThu += (r.tien||0);
+  });
+  const conLai = tongHD - tongThu;
+
+  const hdSpan  = document.getElementById('thu-prog-hd');
+  const thuSpan = document.getElementById('thu-prog-dathu');
+  const conSpan = document.getElementById('thu-prog-con');
+  if (hdSpan)  hdSpan.textContent  = tongHD ? fmtM(tongHD) : 'Chưa có HĐ';
+  if (thuSpan) thuSpan.textContent = fmtM(tongThu);
+  if (conSpan) {
+    conSpan.textContent = fmtM(conLai);
+    conSpan.className = 'fw-bold ' + (conLai > 0 ? 'text-warning' : conLai < 0 ? 'text-danger' : 'text-success');
+  }
+  infoEl.style.display = 'flex';
+}
+
+// ── Populate hdtp-hdcid khi chọn CT trong modal HĐ Thầu Phụ ──
+function _hdtpOnCtChange(ctName) {
+  const sel = document.getElementById('hdtp-hdcid');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- Chọn HĐ Ch\xednh (tuỳ chọn) --</option>';
+  if (!ctName) return;
+
+  const proj = (typeof getAllProjects === 'function' ? getAllProjects() : []).find(p => p.name === ctName) || null;
+  const pid  = proj ? proj.id : null;
+
+  // Tìm HĐ Chính của CT này
+  Object.entries(hopDongData).forEach(([key, hd]) => {
+    if (hd.deletedAt) return;
+    const p = (typeof projects !== 'undefined' ? projects : []).find(pr => pr.id === key);
+    const hdCtName = p ? p.name : key;
+    if (hdCtName !== ctName) return;
+    const tong = (hd.giaTri||0) + (hd.giaTriphu||0) + (hd.phatSinh||0);
+    const label = (hd.ngay || '') + ' — ' + (tong ? fmtM(tong) : 'Chưa có giá trị');
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+}
+
 // ── Sub-tab navigation trong page-doanhthu ────────────────────
 function dtGoSub(btn, id) {
   document.querySelectorAll('#page-doanhthu .sub-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'dt-sub-thongke') {
+  if (id === 'dt-sub-khaibao') {
+    _dtRenderDashboardMini();
+  } else if (id === 'dt-sub-thongke') {
     _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
+    _dtSearch = '';
+    const srch = document.getElementById('dt-search-input');
+    if (srch) srch.value = '';
     const tkSel = document.getElementById('dt-ct-filter-sel');
     if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
     renderHdcTable(0);

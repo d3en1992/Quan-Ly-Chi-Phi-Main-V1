@@ -310,7 +310,7 @@ function initDoanhThu() {
   thauPhuContracts = load('thauphu_v1', []);
 
   _initDoanhThuAddons(); // [ADDED]
-
+  _dtRenderDashboardMini();
 
   dtEnsureCongNoSubtab();
   dtPopulateSels();
@@ -564,5 +564,116 @@ function exportThuToImage() {
     link.href = canvas.toDataURL('image/png');
     link.click();
     toast('✅ Đã xuất phiếu thu tiền!', 'success');
+  }).catch(err => { tpl.style.display = 'none'; toast('❌ Lỗi: ' + err.message, 'error'); });
+}
+
+// ── Per-row export helpers (không cần tick checkbox) ──────────
+function exportHdcRowToImage(keyId) {
+  const hd = hopDongData[keyId];
+  if (!hd) return;
+  const ctName = (typeof projects !== 'undefined' ? projects : []).find(p => p.id === keyId)?.name || keyId;
+  const total = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
+
+  document.getElementById('phdc-ct-name').textContent = ctName;
+  document.getElementById('phdc-ct-label').textContent = ctName;
+  document.getElementById('phdc-date').textContent = hd.ngay || today();
+  document.getElementById('phdc-nguoi').textContent = hd.nguoi || '—';
+  document.getElementById('phdc-giatri').textContent = numFmt(hd.giaTri || 0) + ' đ';
+  document.getElementById('phdc-phatsinh').textContent = numFmt((hd.giaTriphu || 0) + (hd.phatSinh || 0)) + ' đ';
+  document.getElementById('phdc-tong').textContent = numFmt(total) + ' đ';
+
+  const items = Array.isArray(hd.items) ? hd.items : [];
+  let totalDetail = 0;
+  document.getElementById('phdc-tbody').innerHTML = items.map(it => {
+    const st = (it.sl || 0) * (it.donGia || 0);
+    totalDetail += st;
+    return `<tr>
+      <td style="padding:8px 10px;border:1px solid #1a1814">${x(it.name)}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:center">${x(it.donVi || '—')}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:center">${it.sl || 0}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:right">${numFmt(it.donGia || 0)}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:right;font-weight:700">${numFmt(st)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('phdc-total-detail').textContent = numFmt(totalDetail) + ' đ';
+
+  const tpl = document.getElementById('hdchinh-template');
+  tpl.style.display = 'block';
+  toast('⏳ Đang tạo phiếu...', 'info');
+  html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 800 }).then(canvas => {
+    tpl.style.display = 'none';
+    const link = document.createElement('a');
+    link.download = 'HDChinh_' + removeVietnameseTones(ctName) + '_' + today() + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('✅ Đã xuất phiếu HĐ Chính!', 'success');
+  }).catch(err => { tpl.style.display = 'none'; toast('❌ Lỗi: ' + err.message, 'error'); });
+}
+
+function exportThuRowToImage(id) {
+  const r = thuRecords.find(t => t.id === id);
+  if (!r) return;
+  const ctName = _resolveCtName(r);
+
+  document.getElementById('ppt-ct-name').textContent = ctName;
+  document.getElementById('ppt-ct-label').textContent = ctName;
+  document.getElementById('ppt-date').textContent = r.ngay || today();
+  document.getElementById('ppt-nguoi').textContent = r.nguoi || '—';
+  document.getElementById('ppt-tien').textContent = numFmt(r.tien || 0) + ' đ';
+  document.getElementById('ppt-nd').textContent = r.nd || '—';
+
+  const tpl = document.getElementById('phieuthu-template');
+  tpl.style.display = 'block';
+  toast('⏳ Đang tạo phiếu...', 'info');
+  html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 680 }).then(canvas => {
+    tpl.style.display = 'none';
+    const link = document.createElement('a');
+    link.download = 'PhieuThu_' + removeVietnameseTones(ctName) + '_' + (r.ngay || today()) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('✅ Đã xuất phiếu thu tiền!', 'success');
+  }).catch(err => { tpl.style.display = 'none'; toast('❌ Lỗi: ' + err.message, 'error'); });
+}
+
+function exportHdtpRowToImage(id) {
+  const r = thauPhuContracts.find(c => c.id === id);
+  if (!r) return;
+  const ctName = _resolveCtName(r);
+  const total = (r.giaTri || 0) + (r.phatSinh || 0);
+
+  document.getElementById('phdtp-ct-name').textContent = ctName;
+  document.getElementById('phdtp-ct-label').textContent = ctName;
+  document.getElementById('phdtp-date').textContent = r.ngay || today();
+  document.getElementById('phdtp-thauphu').textContent = r.thauphu || '—';
+  document.getElementById('phdtp-nd').textContent = r.nd || '—';
+  document.getElementById('phdtp-giatri').textContent = numFmt(r.giaTri || 0) + ' đ';
+  document.getElementById('phdtp-phatsinh').textContent = numFmt(r.phatSinh || 0) + ' đ';
+  document.getElementById('phdtp-tong').textContent = numFmt(total) + ' đ';
+
+  const items = Array.isArray(r.items) ? r.items : [];
+  let totalDetail = 0;
+  document.getElementById('phdtp-tbody').innerHTML = items.map(it => {
+    const st = (it.sl || 0) * (it.donGia || 0);
+    totalDetail += st;
+    return `<tr>
+      <td style="padding:8px 10px;border:1px solid #1a1814">${x(it.name)}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:center">${x(it.donVi || '—')}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:center">${it.sl || 0}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:right">${numFmt(it.donGia || 0)}</td>
+      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:right;font-weight:700">${numFmt(st)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('phdtp-total-detail').textContent = numFmt(totalDetail) + ' đ';
+
+  const tpl = document.getElementById('hdthauphu-template');
+  tpl.style.display = 'block';
+  toast('⏳ Đang tạo phiếu...', 'info');
+  html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 800 }).then(canvas => {
+    tpl.style.display = 'none';
+    const link = document.createElement('a');
+    link.download = 'HDThauPhu_' + removeVietnameseTones(ctName) + '_' + removeVietnameseTones(r.thauphu || '') + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('✅ Đã xuất phiếu HĐ Thầu Phụ!', 'success');
   }).catch(err => { tpl.style.display = 'none'; toast('❌ Lỗi: ' + err.message, 'error'); });
 }
