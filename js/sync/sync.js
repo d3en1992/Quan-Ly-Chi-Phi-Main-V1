@@ -396,171 +396,284 @@ async function pullChanges(yr, callback, opts = {}) {
   if (!silent) showSyncBanner('⬇ Đang tải (pull)...');
 
   try {
-    // ── Cats ─────────────────────────────────────────────────
-    try {
-      const catsDoc  = await fsGet(fbDocCats());
-      const catsData = fsUnwrap(catsDoc);
-      if (catsData?.cats) {
-        const ct = catsData.cats;
-        // Chiến lược merge cat string-array:
-        //  • Nếu còn pending changes (local chưa push) → BỎ QUA, giữ nguyên local.
-        //    Tránh cloud cũ ghi đè danh mục user vừa xóa nhưng chưa sync.
-        //  • Nếu không có pending (local đã sync với cloud) → dùng cloud làm source of truth.
-        //    Tránh resurrection: union additive sẽ làm sống lại danh mục đã xóa trên cloud.
-        const hasPending = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
-        if (!hasPending) {
-          const _overrideCatArr = (key, cloudArr) => {
-            if (!cloudArr) return;
-            _memSet(key, cloudArr.slice()); // cloud là source of truth, kể cả mảng rỗng
-          };
-          // cat_ct là derived data — KHÔNG pull từ cloud; được rebuild từ projects_v1 bên dưới
-          if (ct.loai)  _overrideCatArr('cat_loai',  ct.loai);
-          if (ct.ncc)   _overrideCatArr('cat_ncc',   ct.ncc);
-          if (ct.nguoi) _overrideCatArr('cat_nguoi', ct.nguoi);
-        } else {
-          console.log('[Sync] Cats pull bỏ qua — còn pending changes, giữ nguyên local');
-        }
-      }
-      if (catsData?.hopDong && typeof catsData.hopDong === 'object') {
-        // Merge per-CT: giữ local nếu local.updatedAt >= cloud.updatedAt
-        // Không ghi đè thô — tránh mất HĐ chính vừa nhập/import chưa push kịp
-        const localHd  = load('hopdong_v1', {});
-        const cloudHd  = catsData.hopDong;
-        const mergedHd = { ...cloudHd };
-        Object.entries(localHd).forEach(([ct, local]) => {
-          const cloud = mergedHd[ct];
-          if (!cloud || (local.updatedAt || 0) >= (cloud.updatedAt || 0)) {
-            mergedHd[ct] = local; // local mới hơn hoặc không có trên cloud → giữ local
+    // ── Cats / Meta ──────────────────────────────────────────────
+    // V2 primary: đọc từ meta_* subcollections (sync.v2meta.js)
+    // V1 fallback: đọc từ "cats" document — dùng khi V2 chưa có data
+    let _pulledMetaFromV2 = false;
+
+    if (typeof _v2PullMetaFull === 'function') {
+      try {
+        const meta = await _v2PullMetaFull();
+        // V2 sẵn sàng khi có ít nhất projects hoặc catItems
+        const v2Ready = (meta.projects?.length > 0) ||
+                        (meta.catItems && Object.keys(meta.catItems).length > 0);
+
+        if (v2Ready) {
+          _pulledMetaFromV2 = true;
+          const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+            .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
+          const nowMs = Date.now();
+
+          // projects_v1
+          if (meta.projects?.length) {
+            const local  = load('projects_v1', []);
+            const merged = mergeDatasets(local, meta.projects);
+            _memSet('projects_v1', merged);
+            if (typeof projects !== 'undefined') projects = merged;
+            if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
           }
-        });
-        _memSet('hopdong_v1', mergedHd);
-        hopDongData = mergedHd;
-      }
-      if (catsData?.thauPhu && Array.isArray(catsData.thauPhu)) {
-        const local  = load('thauphu_v1', []);
-        const merged = mergeDatasets(local, catsData.thauPhu);
-        _memSet('thauphu_v1', merged);
-        thauPhuContracts = merged;
-      }
-      if (catsData?.users && Array.isArray(catsData.users)) {
-        const localUsers  = load('users_v1', []);
-        const mergedUsers = _mergeUsersSafe(localUsers, catsData.users);
-        _memSet('users_v1', mergedUsers);
-        console.log('[Sync] ▼ users_v1 merged');
-      }
-      // Merge catItems: per-item soft-delete — luôn merge (không phụ thuộc pending)
-      // Chiến lược: merge từng type theo id, updatedAt mới hơn thắng
-      if (catsData?.catItems && typeof catsData.catItems === 'object') {
-        const localItems = load('cat_items_v1', {});
-        const cloudItems = catsData.catItems;
-        const merged = {};
-        const allTypes = new Set([...Object.keys(localItems), ...Object.keys(cloudItems)]);
-        const _normKey = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-          .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
-        const nowMs = Date.now();
-        allTypes.forEach(type => {
-          const byId = new Map();
-          (localItems[type] || []).forEach(item => byId.set(item.id, item));
-          (cloudItems[type] || []).forEach(cloudItem => {
-            const localItem = byId.get(cloudItem.id);
-            // Cloud thắng nếu mới hơn hoặc không có local
-            if (!localItem || (cloudItem.updatedAt || 0) >= (localItem.updatedAt || 0)) {
-              byId.set(cloudItem.id, cloudItem);
+
+          // users_v1 — password-safe merge (V2 không lưu password)
+          if (meta.users?.length) {
+            const localUsers  = load('users_v1', []);
+            const mergedUsers = _mergeUsersV2(localUsers, meta.users);
+            _memSet('users_v1', mergedUsers);
+            console.log('[Sync] ▼ users (V2):', mergedUsers.length);
+          }
+
+          // cat_items_v1 — per-item merge theo updatedAt
+          if (meta.catItems) {
+            const localItems = load('cat_items_v1', {});
+            const cloudItems = meta.catItems;
+            const merged     = {};
+            const allTypes   = new Set([...Object.keys(localItems), ...Object.keys(cloudItems)]);
+
+            allTypes.forEach(type => {
+              const byId = new Map();
+              (localItems[type] || []).forEach(item => byId.set(item.id, item));
+              (cloudItems[type] || []).forEach(ci => {
+                const li = byId.get(ci.id);
+                if (!li || (ci.updatedAt || 0) >= (li.updatedAt || 0)) byId.set(ci.id, ci);
+              });
+              // Dedup by name — mark bản trùng là isDeleted
+              const byNorm = new Map();
+              [...byId.values()]
+                .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                .forEach(item => {
+                  if (item.isDeleted) return;
+                  const norm = _normKey(item.name);
+                  if (byNorm.has(norm)) byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
+                  else byNorm.set(norm, item.id);
+                });
+              merged[type] = [...byId.values()];
+            });
+
+            // Canonicalize tên
+            if (typeof normalizeCatDisplayName === 'function') {
+              Object.keys(merged).forEach(type => {
+                (merged[type] || []).forEach(item => {
+                  if (item.isDeleted) return;
+                  const canonical = normalizeCatDisplayName(type, item.name);
+                  if (canonical !== item.name) { item.name = canonical; item.updatedAt = nowMs; }
+                });
+              });
             }
-          });
-          // Dedup by name: 2 device tạo cùng tên khác UUID → mark bản cũ isDeleted
-          // Giữ bản có updatedAt cao nhất, push tombstone cho bản còn lại lên cloud sau
-          const byNorm = new Map();
-          [...byId.values()]
-            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)) // mới nhất trước
-            .forEach(item => {
-              if (item.isDeleted) return;
-              const norm = _normKey(item.name);
-              if (byNorm.has(norm)) {
-                // Duplicate tên — mark deleted (bản mới hơn đã được giữ trước)
-                byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
-              } else {
-                byNorm.set(norm, item.id);
-              }
-            });
-          merged[type] = [...byId.values()];
-        });
 
-        // Canonicalize item.name trong merged (sửa "COPHA" → "Copha", v.v.)
-        if (typeof normalizeCatDisplayName === 'function') {
-          Object.keys(merged).forEach(type => {
-            (merged[type] || []).forEach(item => {
-              if (item.isDeleted) return;
-              const canonical = normalizeCatDisplayName(type, item.name);
-              if (canonical !== item.name) {
-                item.name = canonical;
-                item.updatedAt = nowMs;
-              }
+            _memSet('cat_items_v1', merged);
+            const nameArr = (items, type) => {
+              const seen = new Set();
+              return (items || []).filter(i => !i.isDeleted)
+                .map(i => typeof normalizeCatDisplayName === 'function'
+                  ? normalizeCatDisplayName(type, i.name) : i.name)
+                .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
+            };
+            if (merged.loai)  _memSet('cat_loai',  nameArr(merged.loai,  'loai'));
+            if (merged.ncc)   _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc'));
+            if (merged.nguoi) _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi'));
+            if (merged.tp)    _memSet('cat_tp',    nameArr(merged.tp,    'tp'));
+            if (merged.cn)    _memSet('cat_cn',    nameArr(merged.cn,    'cn'));
+            if (merged.tbteb) _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb'));
+            console.log('[Sync] ▼ catItems (V2) merged');
+          }
+
+          // cnRoles — pending guard
+          if (meta.cnRoles && Object.keys(meta.cnRoles).length) {
+            const hasPendingRoles = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
+            if (!hasPendingRoles) {
+              const localRoles  = load('cat_cn_roles', {});
+              const cloudRoles  = meta.cnRoles;
+              const mergedRoles = { ...cloudRoles, ...localRoles };
+              Object.keys(cloudRoles).forEach(k => { if (!(k in localRoles)) mergedRoles[k] = cloudRoles[k]; });
+              _memSet('cat_cn_roles', mergedRoles);
+              if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
+              _catsChanged = true;
+              console.log('[Sync] ▼ cnRoles (V2) merged');
+            }
+          }
+
+          // ctYears — union merge
+          if (meta.ctYears && Object.keys(meta.ctYears).length) {
+            const localYears  = load('cat_ct_years', {});
+            const mergedYears = { ...localYears };
+            Object.entries(meta.ctYears).forEach(([ct, yr]) => {
+              if (!(ct in mergedYears)) mergedYears[ct] = yr;
             });
-          });
+            _memSet('cat_ct_years', mergedYears);
+            cats.congTrinhYears = mergedYears;
+            _catsChanged = true;
+            console.log('[Sync] ▼ ctYears (V2) merged');
+          }
+
+          // hopdong_v1
+          if (meta.hopDong && Object.keys(meta.hopDong).length) {
+            const localHd  = load('hopdong_v1', {});
+            const mergedHd = { ...meta.hopDong };
+            Object.entries(localHd).forEach(([ct, local]) => {
+              const cloud = mergedHd[ct];
+              if (!cloud || (local.updatedAt || 0) >= (cloud.updatedAt || 0)) mergedHd[ct] = local;
+            });
+            _memSet('hopdong_v1', mergedHd);
+            hopDongData = mergedHd;
+          }
+
+          // thauphu_v1
+          if (meta.thauPhu?.length) {
+            const local  = load('thauphu_v1', []);
+            const merged = mergeDatasets(local, meta.thauPhu);
+            _memSet('thauphu_v1', merged);
+            thauPhuContracts = merged;
+          }
+
+          console.log('[Sync] ▼ Meta — V2 ✓');
         }
+      } catch (e) {
+        console.warn('[Sync] Meta V2 pull lỗi:', e.message || e);
+      }
+    }
 
-        _memSet('cat_items_v1', merged);
-        // Rebuild string arrays với tên canonical + dedup
-        const nameArr = (items, type) => {
-          const seen = new Set();
-          return (items || []).filter(i => !i.isDeleted)
-            .map(i => typeof normalizeCatDisplayName === 'function'
-              ? normalizeCatDisplayName(type, i.name)
-              : i.name)
-            .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
-        };
-        if (merged.loai)  { _memSet('cat_loai',  nameArr(merged.loai,  'loai')); }
-        if (merged.ncc)   { _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc')); }
-        if (merged.nguoi) { _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi')); }
-        if (merged.tp)    { _memSet('cat_tp',    nameArr(merged.tp,    'tp')); }
-        if (merged.cn)    { _memSet('cat_cn',    nameArr(merged.cn,    'cn')); }
-        if (merged.tbteb) { _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb')); }
-        console.log('[Sync] ▼ catItems merged — soft-deletes applied, names canonicalized');
-      }
-      if (catsData?.projects && Array.isArray(catsData.projects)) {
-        const local  = load('projects_v1', []);
-        const merged = mergeDatasets(local, catsData.projects);
-        _memSet('projects_v1', merged);
-        if (typeof projects !== 'undefined') projects = merged;
-        // Rebuild cats.congTrinh to stay in sync with newly merged projects
-        if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
-      }
-      // cnRoles: merge với pending guard — tránh cloud ghi đè vai trò vừa xóa local
-      if (catsData?.cnRoles && typeof catsData.cnRoles === 'object') {
-        const hasPendingRoles = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
-        if (!hasPendingRoles) {
-          const localRoles  = load('cat_cn_roles', {});
-          const cloudRoles  = catsData.cnRoles;
-          // Union merge: cloud thắng nếu có key, giữ local key nếu cloud thiếu
-          const mergedRoles = { ...cloudRoles, ...localRoles };
-          // Dùng cloud cho key nào local không có (device mới nhận vai trò từ device khác)
-          Object.keys(cloudRoles).forEach(k => {
-            if (!(k in localRoles)) mergedRoles[k] = cloudRoles[k];
+    // V1 fallback — chạy khi V2 chưa có data (thiết bị mới / chưa push lần nào)
+    if (!_pulledMetaFromV2) {
+      try {
+        const catsDoc  = await fsGet(fbDocCats());
+        const catsData = fsUnwrap(catsDoc);
+        if (catsData?.cats) {
+          const ct = catsData.cats;
+          const hasPending = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
+          if (!hasPending) {
+            const _overrideCatArr = (key, cloudArr) => {
+              if (!cloudArr) return;
+              _memSet(key, cloudArr.slice());
+            };
+            if (ct.loai)  _overrideCatArr('cat_loai',  ct.loai);
+            if (ct.ncc)   _overrideCatArr('cat_ncc',   ct.ncc);
+            if (ct.nguoi) _overrideCatArr('cat_nguoi', ct.nguoi);
+          } else {
+            console.log('[Sync] Cats pull bỏ qua — còn pending changes, giữ nguyên local');
+          }
+        }
+        if (catsData?.hopDong && typeof catsData.hopDong === 'object') {
+          const localHd  = load('hopdong_v1', {});
+          const cloudHd  = catsData.hopDong;
+          const mergedHd = { ...cloudHd };
+          Object.entries(localHd).forEach(([ct, local]) => {
+            const cloud = mergedHd[ct];
+            if (!cloud || (local.updatedAt || 0) >= (cloud.updatedAt || 0)) mergedHd[ct] = local;
           });
-          _memSet('cat_cn_roles', mergedRoles);
-          if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
+          _memSet('hopdong_v1', mergedHd);
+          hopDongData = mergedHd;
+        }
+        if (catsData?.thauPhu && Array.isArray(catsData.thauPhu)) {
+          const local  = load('thauphu_v1', []);
+          const merged = mergeDatasets(local, catsData.thauPhu);
+          _memSet('thauphu_v1', merged);
+          thauPhuContracts = merged;
+        }
+        if (catsData?.users && Array.isArray(catsData.users)) {
+          const localUsers  = load('users_v1', []);
+          const mergedUsers = _mergeUsersSafe(localUsers, catsData.users);
+          _memSet('users_v1', mergedUsers);
+          console.log('[Sync] ▼ users_v1 (V1) merged');
+        }
+        if (catsData?.catItems && typeof catsData.catItems === 'object') {
+          const localItems = load('cat_items_v1', {});
+          const cloudItems = catsData.catItems;
+          const merged = {};
+          const allTypes = new Set([...Object.keys(localItems), ...Object.keys(cloudItems)]);
+          const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+            .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
+          const nowMs = Date.now();
+          allTypes.forEach(type => {
+            const byId = new Map();
+            (localItems[type] || []).forEach(item => byId.set(item.id, item));
+            (cloudItems[type] || []).forEach(cloudItem => {
+              const localItem = byId.get(cloudItem.id);
+              if (!localItem || (cloudItem.updatedAt || 0) >= (localItem.updatedAt || 0))
+                byId.set(cloudItem.id, cloudItem);
+            });
+            const byNorm = new Map();
+            [...byId.values()]
+              .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+              .forEach(item => {
+                if (item.isDeleted) return;
+                const norm = _normKey(item.name);
+                if (byNorm.has(norm)) byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
+                else byNorm.set(norm, item.id);
+              });
+            merged[type] = [...byId.values()];
+          });
+          if (typeof normalizeCatDisplayName === 'function') {
+            Object.keys(merged).forEach(type => {
+              (merged[type] || []).forEach(item => {
+                if (item.isDeleted) return;
+                const canonical = normalizeCatDisplayName(type, item.name);
+                if (canonical !== item.name) { item.name = canonical; item.updatedAt = nowMs; }
+              });
+            });
+          }
+          _memSet('cat_items_v1', merged);
+          const nameArr = (items, type) => {
+            const seen = new Set();
+            return (items || []).filter(i => !i.isDeleted)
+              .map(i => typeof normalizeCatDisplayName === 'function'
+                ? normalizeCatDisplayName(type, i.name) : i.name)
+              .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
+          };
+          if (merged.loai)  _memSet('cat_loai',  nameArr(merged.loai,  'loai'));
+          if (merged.ncc)   _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc'));
+          if (merged.nguoi) _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi'));
+          if (merged.tp)    _memSet('cat_tp',    nameArr(merged.tp,    'tp'));
+          if (merged.cn)    _memSet('cat_cn',    nameArr(merged.cn,    'cn'));
+          if (merged.tbteb) _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb'));
+          console.log('[Sync] ▼ catItems (V1) merged — soft-deletes applied, names canonicalized');
+        }
+        if (catsData?.projects && Array.isArray(catsData.projects)) {
+          const local  = load('projects_v1', []);
+          const merged = mergeDatasets(local, catsData.projects);
+          _memSet('projects_v1', merged);
+          if (typeof projects !== 'undefined') projects = merged;
+          if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
+        }
+        if (catsData?.cnRoles && typeof catsData.cnRoles === 'object') {
+          const hasPendingRoles = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
+          if (!hasPendingRoles) {
+            const localRoles  = load('cat_cn_roles', {});
+            const cloudRoles  = catsData.cnRoles;
+            const mergedRoles = { ...cloudRoles, ...localRoles };
+            Object.keys(cloudRoles).forEach(k => { if (!(k in localRoles)) mergedRoles[k] = cloudRoles[k]; });
+            _memSet('cat_cn_roles', mergedRoles);
+            if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
+            _catsChanged = true;
+            console.log('[Sync] ▼ cnRoles (V1) merged');
+          } else {
+            console.log('[Sync] cnRoles pull bỏ qua — còn pending changes');
+          }
+        }
+        if (catsData?.ctYears && typeof catsData.ctYears === 'object') {
+          const localYears  = load('cat_ct_years', {});
+          const cloudYears  = catsData.ctYears;
+          const mergedYears = { ...localYears };
+          Object.entries(cloudYears).forEach(([ct, yr]) => {
+            if (!(ct in mergedYears)) mergedYears[ct] = yr;
+          });
+          _memSet('cat_ct_years', mergedYears);
+          cats.congTrinhYears = mergedYears;
           _catsChanged = true;
-          console.log('[Sync] ▼ cnRoles merged');
-        } else {
-          console.log('[Sync] cnRoles pull bỏ qua — còn pending changes');
+          console.log('[Sync] ▼ ctYears (V1) merged');
         }
+        console.log('[Sync] ▼ Meta — V1 cats fallback');
+      } catch (e) {
+        console.warn('[Sync] Cats pull lỗi:', e.message || e);
       }
-      // ctYears: union merge — không ghi đè, thêm năm thiếu từ cloud vào local
-      if (catsData?.ctYears && typeof catsData.ctYears === 'object') {
-        const localYears  = load('cat_ct_years', {});
-        const cloudYears  = catsData.ctYears;
-        const mergedYears = { ...localYears };
-        Object.entries(cloudYears).forEach(([ct, yr]) => {
-          if (!(ct in mergedYears)) mergedYears[ct] = yr; // chỉ thêm key mới, không ghi đè local
-        });
-        _memSet('cat_ct_years', mergedYears);
-        cats.congTrinhYears = mergedYears;
-        _catsChanged = true;
-        console.log('[Sync] ▼ ctYears merged');
-      }
-    } catch (e) {
-      console.warn('[Sync] Cats pull lỗi:', e.message || e);
     }
 
     // ── Year data ─────────────────────────────────────────────

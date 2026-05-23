@@ -657,6 +657,9 @@ function _v2MetaPayload(type) {
         tong_muc_danh_muc : tongItem,
         chi_tiet          : parts.join(' · ') || '(Chưa có)',
         vai_tro_cong_nhan : Object.keys(cnRoles).length + ' công nhân có vai trò',
+        // cn_roles + ct_years lưu trên parent doc → _v2PullDanhMuc đọc lại được
+        cn_roles          : cnRoles,
+        ct_years          : ctYears,
       };
       break;
     }

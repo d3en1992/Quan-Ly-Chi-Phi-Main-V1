@@ -31,7 +31,9 @@
       "Bash(dir /s /b \"cpct_snapshot_2026-05-22_07-05*\")",
       "Bash(dir /s /b \"%USERPROFILE%\\\\Downloads\\\\cpct_snapshot*\")",
       "Bash(dir /s /b \"%USERPROFILE%\\\\Desktop\\\\cpct_snapshot*\")",
-      "Bash(dir /s /b \"%USERPROFILE%\\\\Documents\\\\cpct_snapshot*\")"
+      "Bash(dir /s /b \"%USERPROFILE%\\\\Documents\\\\cpct_snapshot*\")",
+      "Bash(python3 patch_sync.py)",
+      "Bash(del \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\patch_sync.py\")"
     ]
   }
 }
