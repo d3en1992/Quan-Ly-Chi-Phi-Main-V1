@@ -247,15 +247,17 @@ async function pushChanges(opts = {}) {
   try {
     let ok = 0, fail = 0;
 
+    // PHASE 4 OPTIMIZATION: tính 1 lần ở scope ngoài để dùng cho cả pre-push pull
+    // (per-year) lẫn users pre-push merge (sau for loop)
+    //   - manualSync luôn gọi pullChanges trước pushChanges → skip pre-push
+    //   - schedulePush cũng gọi pullChanges trước pushChanges → skip pre-push
+    const _lastPullTs = Number(localStorage.getItem('_lastPullTs') || 0);
+    const _pullFresh = (Date.now() - _lastPullTs) < 60_000;
+
     for (const yr of years) {
       const yrInt = parseInt(yr);
 
       // ── Step 1: Pre-push merge — đọc V2 cloud trước khi ghi ─
-      // PHASE 4 OPTIMIZATION: skip nếu pullChanges vừa chạy < 60s trước
-      //   - manualSync luôn gọi pullChanges trước pushChanges → bỏ qua được
-      //   - schedulePush cũng gọi pullChanges trước pushChanges → bỏ qua được
-      const _lastPullTs = Number(localStorage.getItem('_lastPullTs') || 0);
-      const _pullFresh = (Date.now() - _lastPullTs) < 60_000;
 
       if (!skipPull && !_pullFresh && typeof _v2PullYearFull === 'function') try {
         const v2 = await _v2PullYearFull(yrInt);
