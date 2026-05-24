@@ -252,14 +252,13 @@ function load(k, def) {
 // Keys khi thay đổi sẽ làm invoice cache (buildInvoices) stale
 const _INV_CACHE_KEYS = new Set(['inv_v3','cc_v2','projects_v1','hopdong_v1','thauphu_v1','cat_items_v1']);
 
-function save(k, v) {
+// opts.skipSync = true → ghi local (IDB + _mem) nhưng KHÔNG tăng pending và KHÔNG lên lịch push
+// Dùng cho cập nhật nội bộ như heartbeat session (lastActive) — không phải thay đổi nghiệp vụ
+function save(k, v, opts) {
   _mem[k] = v;
-  // Chỉ ghi local (IDB). Sync lên cloud ngầm qua schedulePush() debounce 30s.
   _dbSave(k, v).catch(e => console.warn('[IDB] save lỗi:', k, e));
-  // Xóa invoice cache ngay sau mỗi mutation liên quan — list + edit luôn dùng data mới nhất
   if (_INV_CACHE_KEYS.has(k) && typeof clearInvoiceCache === 'function') clearInvoiceCache();
-  // Cập nhật badge pending + lên lịch push ngầm
-  if (_SYNC_DATA_KEYS.has(k)) {
+  if (!opts?.skipSync && _SYNC_DATA_KEYS.has(k)) {
     _incPending();
     if (typeof schedulePush === 'function') schedulePush();
   }

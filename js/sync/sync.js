@@ -788,23 +788,25 @@ function cancelScheduledPush() {
 
 function schedulePush() {
   if (!fbReady()) return;
-  // Guard: không lên lịch push nếu không có gì để gửi
-  // (quan trọng cho retry path: 15s sau khi isSyncing, pending có thể đã về 0)
   if (typeof _pendingChanges !== 'undefined' && _pendingChanges <= 0) return;
   clearTimeout(_pushTimer);
-  _pushTimer = setTimeout(() => {
+  _pushTimer = setTimeout(async () => {
     _pushTimer = null;
     if (isSyncing()) {
-      // Đang sync → lùi thêm 15s
       _pushTimer = setTimeout(schedulePush, 15_000);
       return;
     }
-    pullChanges(null, () => {
-      if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
-        pushChanges({ silent: true });
+    // Auto-sync: bỏ qua pull trước push — mỗi thiết bị ghi vào subcollection riêng,
+    // không có nguy cơ ghi đè record của thiết bị khác.
+    // Giúp tiết kiệm ~19 reads mỗi lần auto-sync ngầm.
+    if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
+      await pushChanges({ silent: true, skipPull: true });
+      // Đẩy meta (danh_muc, hop_dong, cong_trinh, tai_khoan) ngầm sau khi year push xong
+      if (typeof _v2PushMeta === 'function') {
+        _v2PushMeta().catch(e => console.warn('[Sync] V2 meta auto push lỗi:', e.message || e));
       }
-    }, { silent: true });
-  }, 300_000); // PHASE 4 — Tăng debounce 30s → 5 phút để giảm tần suất sync (tiết kiệm quota)
+    }
+  }, 30_000); // Rút ngắn xuống 30s để flush nhanh trước khi user tắt máy
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -863,5 +865,35 @@ async function manualSync() {
 // ══════════════════════════════════════════════════════════════
 function processQueue() {
   // No-op: sync không còn tự động sau save
-  // Dùng nút 🔄 Sync hoặc chờ auto timer 13 phút
+  // Dùng nút 🔄 Sync hoặc chờ auto timer 30s
 }
+
+// ══════════════════════════════════════════════════════════════
+// [13] FLUSH ON HIDE — đẩy data ngay khi tab bị ẩn/đóng
+// Giải quyết lỗi mất dữ liệu trên mobile: khi user khóa màn hình
+// hoặc tắt trình duyệt, bộ đếm 30s bị hủy → data kẹt local.
+// keepalive=true đảm bảo browser gửi xong request dù tab đã đóng.
+// ══════════════════════════════════════════════════════════════
+
+// Flag báo cho fetch calls trong sync.v2format.js dùng keepalive
+let _syncKeepAlive = false;
+
+(function() {
+  function _flushOnHide() {
+    if (!fbReady()) return;
+    if (typeof _pendingChanges === 'undefined' || _pendingChanges <= 0) return;
+    if (isSyncing()) return;
+    console.log('[Sync] ⚡ Flush on hide — có', _pendingChanges, 'thay đổi chưa sync');
+    _syncKeepAlive = true;
+    const done = () => { _syncKeepAlive = false; };
+    pushChanges({ silent: true, skipPull: true }).then(done, done);
+  }
+
+  // Tab bị ẩn (khóa màn hình, chuyển app, giảm thiểu)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) _flushOnHide();
+  });
+
+  // Tab hoặc cửa sổ bị đóng
+  window.addEventListener('pagehide', _flushOnHide);
+})();

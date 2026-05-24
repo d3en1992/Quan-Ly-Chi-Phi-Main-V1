@@ -36,7 +36,10 @@
       "Bash(del \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\patch_sync.py\")",
       "Bash(node --check js/sync/sync.v2format.js)",
       "Bash(node --check js/sync/sync.v2meta.js)",
-      "Bash(node --check js/sync/sync.js)"
+      "Bash(node --check js/sync/sync.js)",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\core\\\\core.storage.js\")",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\app\\\\auth.js\")",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\sync\\\\sync.js\")"
     ]
   }
 }

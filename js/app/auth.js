@@ -150,9 +150,10 @@ function loadUsers() {
   return users;
 }
 
-function saveUsers(arr) {
-  save(USER_KEY, normalizeUsersArray(arr || []));
-  if (typeof schedulePush === 'function') schedulePush();
+// opts.skipSync = true → chỉ ghi local, không tăng pending counter
+function saveUsers(arr, opts) {
+  save(USER_KEY, normalizeUsersArray(arr || []), opts);
+  if (!opts?.skipSync && typeof schedulePush === 'function') schedulePush();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -427,13 +428,14 @@ function _startSessionHeartbeat() {
       sessions: _touchUserSession(users[idx], true),
       updatedAt: Math.max(users[idx].updatedAt || 0, Date.now())
     };
-    saveUsers(users);
+    // skipSync: cập nhật lastActive chỉ là heartbeat — không phải thay đổi nghiệp vụ
+    saveUsers(users, { skipSync: true });
     setCurrentUser(users[idx]);
   };
   _userHeartbeatTimer = setInterval(tick, 60 * 1000);
 }
 
-// Cập nhật lastActive khi tab được focus lại
+// Cập nhật lastActive khi tab được focus lại — local only (skipSync)
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   const session = getCurrentUser();
@@ -446,7 +448,7 @@ document.addEventListener('visibilitychange', () => {
     sessions: _touchUserSession(users[idx], true),
     updatedAt: Math.max(users[idx].updatedAt || 0, Date.now())
   };
-  saveUsers(users);
+  saveUsers(users, { skipSync: true });
   setCurrentUser(users[idx]);
 });
 

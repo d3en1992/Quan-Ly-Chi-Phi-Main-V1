@@ -394,11 +394,14 @@ function _v2ResourceBase() {
 
 // PATCH 1 document ở bất kỳ path nào trong cpct_data
 // docPath = "y2025_hoa_don" hoặc "y2025_hoa_don/ban_ghi/uuid1"
+// keepalive=true: trình duyệt tiếp tục gửi dù tab đã đóng (dùng khi flush-on-hide)
 function _v2FsPatchDoc(docPath, firestoreFields) {
+  const keepalive = typeof _syncKeepAlive !== 'undefined' && !!_syncKeepAlive;
   return fetch(`${FS_BASE()}/${docPath}?key=${FB_CONFIG.apiKey}`, {
     method:  'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ fields: firestoreFields }),
+    keepalive,
   }).then(r => r.json());
 }
 
@@ -433,11 +436,12 @@ async function _v2FsBatchWrite(writes) {
   for (let i = 0; i < writes.length; i += CONCURRENCY) {
     const chunk = writes.slice(i, i + CONCURRENCY);
 
+    const keepalive = typeof _syncKeepAlive !== 'undefined' && !!_syncKeepAlive;
     const results = await Promise.all(chunk.map(async w => {
       const url = `${BASE}/${w.path}?key=${KEY}`;
       try {
         if (w.op === 'delete') {
-          const res = await fetch(url, { method: 'DELETE' }).then(r => r.json());
+          const res = await fetch(url, { method: 'DELETE', keepalive }).then(r => r.json());
           if (res && res.error) return { ok: false, err: res.error.message };
           return { ok: true };
         } else {
@@ -445,6 +449,7 @@ async function _v2FsBatchWrite(writes) {
             method:  'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ fields: w.fields }),
+            keepalive,
           }).then(r => r.json());
           if (res && res.error) return { ok: false, err: res.error.message };
           return { ok: true };
