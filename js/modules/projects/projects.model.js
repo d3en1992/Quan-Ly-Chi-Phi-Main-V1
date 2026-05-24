@@ -158,6 +158,26 @@ function _migrateProjectDates() {
   if (changed) _saveProjects();
 }
 
+/**
+ * Backfill project.chuDauTu từ hopdong_v1.khachHang (legacy data).
+ * Chạy 1 lần lúc khởi động — idempotent. Nếu project chưa có chuDauTu nhưng
+ * có HĐ Chính khớp với khachHang → copy giá trị về project.
+ */
+function _migrateChuDauTuFromHopDong() {
+  if (typeof hopDongData === 'undefined') return;
+  let changed = false;
+  projects.forEach(p => {
+    if (p.deletedAt || p.chuDauTu) return;
+    // Tìm hd khớp theo projectId hoặc tên
+    const hd = hopDongData[p.id] || hopDongData[p.name];
+    if (hd && !hd.deletedAt && hd.khachHang) {
+      p.chuDauTu = (hd.khachHang || '').trim();
+      changed = true;
+    }
+  });
+  if (changed) _saveProjects();
+}
+
 // ══════════════════════════════
 //  PUBLIC API
 // ══════════════════════════════
@@ -197,7 +217,7 @@ function getProjectAutoStartDate(projectId) {
  * @param {string} [opts.note]      Ghi chú
  * @returns {Object} Công trình vừa tạo
  */
-function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '' } = {}) {
+function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '', chuDauTu = '' } = {}) {
   if (!name || !name.trim()) throw new Error('Tên công trình không được để trống');
   if (!PROJECT_STATUS[status]) throw new Error('Trạng thái không hợp lệ: ' + status);
   const nowMs  = Date.now();
@@ -221,6 +241,7 @@ function createProject({ name, type = 'OTHER', status = 'active', startDate, end
     endDate:     endDate    || null,
     closedDate:  closedDate || null,
     note:        note || '',
+    chuDauTu:    (chuDauTu || '').trim(),
     createdYear: _year,
     createdAt:   nowMs,
     updatedAt:   nowMs
@@ -245,6 +266,7 @@ function updateProject(id, changes = {}) {
   const { createdAt } = projects[idx]; // bảo toàn thời điểm tạo gốc
   // Loại bỏ các trường không được phép ghi đè qua changes
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...safeChanges } = changes;
+  if (typeof safeChanges.chuDauTu === 'string') safeChanges.chuDauTu = safeChanges.chuDauTu.trim();
   projects[idx] = {
     ...projects[idx],
     ...safeChanges,
@@ -254,7 +276,30 @@ function updateProject(id, changes = {}) {
   };
   _saveProjects();
   rebuildCatCTFromProjects();
+  // Đồng bộ chuDauTu → hopdong_v1.khachHang (đảm bảo HĐ Chính hiển thị đúng tên CĐT mới)
+  if ('chuDauTu' in safeChanges) _syncChuDauTuToHopDong(id);
   return projects[idx];
+}
+
+/**
+ * Đồng bộ project.chuDauTu → hopdong_v1[projectId].khachHang.
+ * Gọi sau khi updateProject() đổi chuDauTu để HĐ Chính reflect ngay.
+ */
+function _syncChuDauTuToHopDong(projectId) {
+  if (typeof hopDongData === 'undefined' || !projectId) return;
+  const p = getProjectById(projectId);
+  if (!p) return;
+  // Tìm key trong hopDongData: ưu tiên projectId, fallback tên CT (legacy)
+  const keys = [projectId, p.name].filter(k => hopDongData[k] && !hopDongData[k].deletedAt);
+  let changed = false;
+  keys.forEach(k => {
+    if (hopDongData[k].khachHang !== p.chuDauTu) {
+      hopDongData[k].khachHang = p.chuDauTu || '';
+      hopDongData[k].updatedAt = Date.now();
+      changed = true;
+    }
+  });
+  if (changed) save('hopdong_v1', hopDongData);
 }
 
 /**

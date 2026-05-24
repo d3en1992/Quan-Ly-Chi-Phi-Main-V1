@@ -653,15 +653,13 @@ function openCTDetail(id) {
     }
   </style>`;
 
-  // ── Row 0: Header compact — Desktop 2-col | Mobile 1-col ────────────
+  // ── Row 0: Header compact — Chủ đầu tư | Địa chỉ / Ghi chú ───────────
+  // Tên công trình đã có ở header modal → thay ô tên bằng ô CHỦ ĐẦU TƯ
   html += `
   <div class="ctd-hdr" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div style="${_bx};padding:10px 14px">
-      <div style="font-size:14px;font-weight:700;color:var(--bs-body-color);margin-bottom:4px">${x(p.name)}</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        ${_ptStatusBadge(p.status)}
-        <span class="ctd-note-inline text-secondary" style="display:none;font-size:11px">${p.note ? '· ' + x(p.note) : ''}</span>
-      </div>
+      ${_lb('Chủ Đầu Tư')}
+      <div style="font-size:14px;font-weight:700;color:var(--bs-body-color);line-height:1.4">${p.chuDauTu ? x(p.chuDauTu) : '<span class="text-secondary" style="font-weight:400;font-size:12px">— Chưa nhập —</span>'}</div>
     </div>
     <div class="ctd-note-blk" style="${_bx};padding:10px 14px">
       ${_lb('Địa Chỉ / Ghi Chú')}
@@ -793,12 +791,19 @@ function openCTCreateModal() {
   document.getElementById('modal-title').textContent = '+ Thêm Công Trình Mới';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- Hàng 1: Tên công trình -->
       <div>
         <label style="${lblStyle}">Tên Công Trình *</label>
         <input id="ct-new-name" type="text" placeholder="VD: CT Anh Bình - 123 Lê Lai..." autocomplete="off"
           style="${inpStyle};font-size:14px">
       </div>
+      <!-- Hàng 2: Chủ đầu tư | Trạng thái -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="${lblStyle}">Chủ Đầu Tư</label>
+          <input id="ct-new-chudautu" type="text" placeholder="Tên chủ đầu tư..." autocomplete="off"
+            style="${inpStyle}">
+        </div>
         <div>
           <label style="${lblStyle}">Trạng Thái</label>
           <select id="ct-new-status" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)"
@@ -809,22 +814,26 @@ function openCTCreateModal() {
             <option value="closed">Đã quyết toán</option>
           </select>
         </div>
+      </div>
+      <!-- Hàng 3: Ngày bắt đầu | Ngày kết thúc -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
           <label style="${lblStyle}">Ngày Bắt Đầu</label>
           <input id="ct-new-startdate" type="date" value="${_defSD}"
             style="${inpStyle};font-family:'IBM Plex Mono',monospace">
         </div>
-      </div>
-      <div>
-        <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
-        <input id="ct-new-enddate" type="date"
-          style="${inpStyle};font-family:'IBM Plex Mono',monospace">
+        <div>
+          <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
+          <input id="ct-new-enddate" type="date"
+            style="${inpStyle};font-family:'IBM Plex Mono',monospace">
+        </div>
       </div>
       <div id="ct-new-closeddate-wrap" style="display:none">
         <label style="${lblStyle}">Ngày Quyết Toán</label>
         <input id="ct-new-closeddate" type="date"
           style="${inpStyle};font-family:'IBM Plex Mono',monospace">
       </div>
+      <!-- Hàng 4: Ghi chú -->
       <div>
         <label style="${lblStyle}">Ghi Chú</label>
         <input id="ct-new-note" type="text" placeholder="Địa chỉ, mô tả..." autocomplete="off"
@@ -847,9 +856,10 @@ function saveCTCreate() {
   const endDate    = document.getElementById('ct-new-enddate')?.value || '';
   const closedDate = document.getElementById('ct-new-closeddate')?.value || '';
   const note       = (document.getElementById('ct-new-note')?.value || '').trim();
+  const chuDauTu   = (document.getElementById('ct-new-chudautu')?.value || '').trim();
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-new-name')?.focus(); return; }
   try {
-    createProject({ name, status, startDate, endDate: endDate || null, closedDate: closedDate || null, note });
+    createProject({ name, status, startDate, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu });
     closeModal();
     toast('✅ Đã thêm: ' + name, 'success');
     renderProjectsPage();
@@ -884,12 +894,19 @@ function openCTEditModal(id) {
   document.getElementById('modal-title').textContent = '✏️ Sửa Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- Hàng 1: Tên công trình -->
       <div>
         <label style="${lblStyle}">Tên Công Trình *</label>
         <input id="ct-edit-name" type="text" value="${x(p.name)}" autocomplete="off"
           style="${inpStyle};font-size:14px">
       </div>
+      <!-- Hàng 2: Chủ đầu tư | Trạng thái -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="${lblStyle}">Chủ Đầu Tư</label>
+          <input id="ct-edit-chudautu" type="text" value="${x(p.chuDauTu||'')}" placeholder="Tên chủ đầu tư..." autocomplete="off"
+            style="${inpStyle}">
+        </div>
         <div>
           <label style="${lblStyle}">Trạng Thái</label>
           <select id="ct-edit-status" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)"
@@ -897,22 +914,26 @@ function openCTEditModal(id) {
             ${Object.entries(PROJECT_STATUS).map(([v,l]) => `<option value="${v}"${p.status===v?' selected':''}>${l}</option>`).join('')}
           </select>
         </div>
+      </div>
+      <!-- Hàng 3: Ngày bắt đầu | Ngày kết thúc -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
           <label style="${lblStyle}">Ngày Bắt Đầu${sdHint}</label>
           <input id="ct-edit-startdate" type="date" value="${sd}"
             style="${inpStyle};font-family:'IBM Plex Mono',monospace">
         </div>
-      </div>
-      <div>
-        <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
-        <input id="ct-edit-enddate" type="date" value="${ed}"
-          style="${inpStyle};font-family:'IBM Plex Mono',monospace">
+        <div>
+          <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
+          <input id="ct-edit-enddate" type="date" value="${ed}"
+            style="${inpStyle};font-family:'IBM Plex Mono',monospace">
+        </div>
       </div>
       <div id="ct-edit-closeddate-wrap" style="${p.status==='closed'?'':'display:none'}">
         <label style="${lblStyle}">Ngày Quyết Toán</label>
         <input id="ct-edit-closeddate" type="date" value="${cld}"
           style="${inpStyle};font-family:'IBM Plex Mono',monospace">
       </div>
+      <!-- Hàng 4: Ghi chú -->
       <div>
         <label style="${lblStyle}">Ghi Chú</label>
         <input id="ct-edit-note" type="text" value="${x(p.note||'')}" autocomplete="off"
@@ -934,6 +955,7 @@ function saveCTEdit(id) {
   const endDate    = document.getElementById('ct-edit-enddate')?.value || '';
   const closedDate = document.getElementById('ct-edit-closeddate')?.value || '';
   const note       = (document.getElementById('ct-edit-note')?.value || '').trim();
+  const chuDauTu   = (document.getElementById('ct-edit-chudautu')?.value || '').trim();
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-edit-name')?.focus(); return; }
 
   // [PATCH] Validation: block nếu status=completed mà thiếu endDate
@@ -959,7 +981,7 @@ function saveCTEdit(id) {
     ? true
     : (p?.startDateUserEdited || false);
 
-  updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note });
+  updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu });
   closeModal();
   toast('✅ Đã cập nhật công trình', 'success');
   renderProjectsPage();

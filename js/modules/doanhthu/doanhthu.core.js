@@ -527,15 +527,17 @@ function dtEnsureCongNoSubtab() {
 // ── Populate selects trong tab Doanh Thu ─────────────────────
 function dtPopulateSels() {
   // CT select: lấy từ projects lọc theo năm — không dùng cats.congTrinh, không có COMPANY
+  // 3 tab nhập liệu (HĐ Chính, Ghi nhận thu, HĐ Thầu phụ) → ẩn CT đã quyết toán,
+  // nhưng vẫn giữ giá trị đang chọn (cur) để edit dữ liệu cũ không mất.
   const projForYear = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => activeYear === 0 || _ctInActiveYear(p.name));
-  const ctOpts = '<option value="">-- Chọn công trình --</option>' +
-    projForYear.map(p => `<option value="${x(p.name)}">${x(p.name)}</option>`).join('');
   ['hdc-ct-input','thu-ct-input','hdtp-ct-input'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel || sel.tagName !== 'SELECT') return;
     const cur = sel.value;
-    sel.innerHTML = ctOpts;
+    const visible = projForYear.filter(p => p.status !== 'closed' || p.name === cur);
+    sel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
+      visible.map(p => `<option value="${x(p.name)}">${x(p.name)}</option>`).join('');
     if (cur) sel.value = cur;
   });
 

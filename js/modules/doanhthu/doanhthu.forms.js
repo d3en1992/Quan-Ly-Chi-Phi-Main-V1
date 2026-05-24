@@ -3,6 +3,18 @@
 
 // ══ PHẦN 1: HỢP ĐỒNG CHÍNH ════════════════════════════════════
 
+// ── Đồng bộ ô Chủ Đầu Tư (read-only) với project.chuDauTu khi chọn CT ──
+// Tên CĐT chỉ được nhập/sửa ở tab CÔNG TRÌNH; form HĐ Chính chỉ HIỂN THỊ.
+function hdcSyncChuDauTu() {
+  const ctSel  = document.getElementById('hdc-ct-input');
+  const khEl   = document.getElementById('hdc-khachhang');
+  if (!ctSel || !khEl) return;
+  const ctName = (ctSel.value || '').trim();
+  if (!ctName) { khEl.value = ''; return; }
+  const proj   = (typeof projects !== 'undefined') ? projects.find(p => !p.deletedAt && p.name === ctName) : null;
+  khEl.value   = (proj && proj.chuDauTu) ? proj.chuDauTu : '';
+}
+
 // ── Cập nhật hiển thị Tổng HĐ Chính khi nhập ─────────────────
 function hdcUpdateTotal() {
   const tong = _readMoneyInput('hdc-giatri') + _readMoneyInput('hdc-giatriphu');
@@ -26,7 +38,9 @@ function saveHopDongChinh() {
 
   const ngay      = document.getElementById('hdc-ngay')?.value || today();
   const nguoi     = document.getElementById('hdc-nguoi')?.value || '';
-  const khachHang = (document.getElementById('hdc-khachhang')?.value || '').trim();
+  // khachHang KHÔNG đọc từ input (ô read-only) — luôn lấy từ project.chuDauTu để tránh lệch
+  const _hdcProjForKh = (typeof projects !== 'undefined') ? projects.find(p => !p.deletedAt && p.name === ct) : null;
+  const khachHang = (_hdcProjForKh && _hdcProjForKh.chuDauTu) ? _hdcProjForKh.chuDauTu : '';
   const nd        = (document.getElementById('hdc-nd')?.value || '').trim();
   const giaTri    = _readMoneyInput('hdc-giatri');
   const giaTriphu = _readMoneyInput('hdc-giatriphu');
@@ -87,7 +101,7 @@ function _hdcResetForm() {
   const nguoiSel = document.getElementById('hdc-nguoi');
   if (nguoiSel) nguoiSel.value = '';
   const khEl = document.getElementById('hdc-khachhang');
-  if (khEl) khEl.value = '';
+  if (khEl) khEl.value = ''; // read-only ô sẽ được hdcSyncChuDauTu() set lại khi user chọn CT
   const ndEl = document.getElementById('hdc-nd');
   if (ndEl) ndEl.value = '';
   const ngayEl = document.getElementById('hdc-ngay');
@@ -116,8 +130,12 @@ function editHopDongChinh(keyId) {
   if (ngayEl) ngayEl.value = hd.ngay || '';
   const nguoiSel = document.getElementById('hdc-nguoi');
   if (nguoiSel) nguoiSel.value = hd.nguoi || '';
+  // Hiển thị Chủ Đầu Tư (read-only) — ưu tiên project.chuDauTu, fallback hd.khachHang legacy
   const khEl = document.getElementById('hdc-khachhang');
-  if (khEl) khEl.value = hd.khachHang || '';
+  if (khEl) {
+    const _editProj = p || (typeof projects !== 'undefined' ? projects.find(pr => !pr.deletedAt && pr.name === ctName) : null);
+    khEl.value = (_editProj && _editProj.chuDauTu) ? _editProj.chuDauTu : (hd.khachHang || '');
+  }
   const ndEl = document.getElementById('hdc-nd');
   if (ndEl) ndEl.value = hd.nd || '';
 
@@ -196,12 +214,15 @@ function renderHdcTable(page) {
 
   tbody.innerHTML = slice.map(([keyId, hd]) => {
     const ctName = _resolveCtName(keyId);
+    // CĐT hiển thị: ưu tiên project.chuDauTu (đồng bộ realtime), fallback hd.khachHang (legacy)
+    const _hdcProjRow = _allProjs.find(pr => !pr.deletedAt && (pr.id === keyId || pr.name === ctName));
+    const _cdt = (_hdcProjRow && _hdcProjRow.chuDauTu) ? _hdcProjRow.chuDauTu : (hd.khachHang || '');
     const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
       <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(ctName)}</td>
-      <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(hd.khachHang || '—')}</td>
+      <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(_cdt || '—')}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>

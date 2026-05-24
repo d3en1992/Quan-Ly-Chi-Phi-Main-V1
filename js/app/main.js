@@ -350,6 +350,7 @@ window._dataReady = false;
   thauPhuContracts = load('thauphu_v1',  []);
   projects         = load('projects_v1', []);
   _migrateProjectDates(); // year → startDate/endDate migration (idempotent)
+  if (typeof _migrateChuDauTuFromHopDong === 'function') _migrateChuDauTuFromHopDong(); // backfill chuDauTu từ hopdong_v1.khachHang
   cats.congTrinh      = load('cat_ct',       DEFAULTS.congTrinh);
   cats.congTrinhYears = load('cat_ct_years', {});
   cats.loaiChiPhi     = load('cat_loai',     DEFAULTS.loaiChiPhi);

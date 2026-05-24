@@ -645,3 +645,58 @@ Phase 2 đã thêm sticky cho cả 2 cột chk + tên (left:0, left:32px). Phase
 - Khi ẩn cột bằng `display:none`, `nth-of-type` / `nth-child` vẫn ám chỉ thứ tự DOM ban đầu (không tính lại) — đây là behavior cần thiết để CSS selector ổn định.
 - `_dbSelectWeek` không tự render full dashboard — chỉ re-render bar chart + pie chart từ cached data. Scroll preservation chỉ cần cover 2 element này.
 
+### 8.10. Chủ Đầu Tư + Hide Closed Projects (24/05/2026)
+
+#### Task 1 — Field `chuDauTu` trên project (single source of truth)
+
+**Mô hình:** `projects_v1[].chuDauTu` là nguồn duy nhất của tên Chủ Đầu Tư. `hopdong_v1[k].khachHang` còn lại làm legacy fallback và được auto-sync.
+
+**File thay đổi:**
+- `projects.model.js`: `createProject({...chuDauTu})` và `updateProject(id, {chuDauTu})` đều persist field này. Khi `updateProject` thay đổi `chuDauTu`, gọi `_syncChuDauTuToHopDong(id)` để cập nhật `hopDongData[projectId/name].khachHang` tương ứng (LWW: ghi đè nếu khác). Thêm `_migrateChuDauTuFromHopDong()` chạy 1 lần ở `main.js` sau `_migrateProjectDates()` để backfill từ `hopdong_v1.khachHang` lên `project.chuDauTu` (idempotent, chỉ ghi khi project chưa có).
+- `projects.ui.js`: Add/Edit modal có ô `ct-new-chudautu` / `ct-edit-chudautu`. Detail modal Row 0 thay ô "Tên công trình" (đã có ở header) bằng ô "Chủ Đầu Tư".
+- `doanhthu.forms.js`: thêm `hdcSyncChuDauTu()` — onchange của `#hdc-ct-input` sẽ đọc `project.chuDauTu` và set vào `#hdc-khachhang` (read-only). `saveHopDongChinh()` lấy `khachHang` từ project (không đọc từ input). `editHopDongChinh()` show CĐT ưu tiên `project.chuDauTu`, fallback `hd.khachHang`. `renderHdcTable` cũng đọc theo thứ tự ưu tiên này.
+- `index.html`: input `#hdc-khachhang` thêm `readonly`, đổi background tertiary, đổi placeholder, label thêm chú thích "(tự động từ Công Trình)"; `#hdc-ct-input` thêm `onchange="hdcSyncChuDauTu()"`.
+
+#### Task 2 — Layout popup Add/Edit Project (4 hàng)
+
+Bố cục thống nhất cho cả Add và Edit:
+- Hàng 1: Tên Công Trình (full width)
+- Hàng 2: Chủ Đầu Tư | Trạng Thái (grid 1fr 1fr)
+- Hàng 3: Ngày Bắt Đầu | Ngày Kết Thúc (grid 1fr 1fr) — trước đây Ngày Kết Thúc nằm hàng riêng
+- Hàng 4: Ghi Chú (full width)
+- Ngày Quyết Toán: hiển thị conditional khi status=closed (giữ vị trí cũ giữa hàng 3 và hàng 4)
+
+#### Task 3 — Ẩn CT "Đã quyết toán" khỏi 6 tab nhập liệu
+
+**Helper:** `_buildProjOpts(selected, placeholder, { includeCompany, excludeClosed })` — thêm option `excludeClosed: false` (default). Khi `true`, loại CT có `status === 'closed'` khỏi dropdown, NHƯNG vẫn giữ giá trị đang chọn (selectedName) để edit dữ liệu cũ không mất.
+
+**6 tab áp dụng `excludeClosed: true`:**
+| Tab | Caller |
+|-----|--------|
+| Nhập Nhanh | `hoadon.quick-entry.js` (source filter `p.status !== 'closed'`), `hoadon.list-trash.js` `refreshHoadonCtDropdowns`, `danhmuc.categories.js` `rebuildEntrySelects` |
+| Hóa Đơn Chi Tiết | `hoadon.detail-entry.js` line 56 + `refreshHoadonCtDropdowns` `#detail-ct` |
+| Sổ Chấm Công | `chamcong.core.js` `populateCCCtSel` |
+| KHAI BÁO Hợp Đồng Chính | `doanhthu.core.js` `dtPopulateSels` `#hdc-ct-input` (inline filter, không dùng `_buildProjOpts`) |
+| HĐ Thầu Phụ | `doanhthu.core.js` `dtPopulateSels` `#hdtp-ct-input` |
+| Ghi Nhận Thu | `doanhthu.core.js` `dtPopulateSels` `#thu-ct-input` |
+
+**Các tab xem/filter giữ nguyên hiển thị closed:** `_buildProjFilterOpts`, filter dropdowns ở danh sách hóa đơn, Tiền Ứng entry/filter, Thiết Bị filter, etc. — không truyền `excludeClosed`.
+
+#### Task 4 — CSS Card Công Trình (gọn + nền đồng nhất)
+
+**File:** `assets/css/style.css` `.ct-card` / `.ct-card-head`.
+
+- Bỏ `min-height: 120px` và `justify-content: space-between` → xoá khoảng trắng dưới đáy mỗi card khi card chỉ có `.ct-card-head`.
+- `.ct-card` thêm `background: var(--bs-body-bg)` (solid).
+- `.ct-card-head` bỏ `border-bottom` + chuyển `background` sang `transparent` → nền đồng nhất bao phủ toàn bộ card.
+
+#### Task 5 — Detail Popup: thay Tên CT bằng Chủ Đầu Tư
+
+Tên công trình đã có ở `modal-title` header. Row 0 trong `openCTDetail` đổi từ box hiển thị `p.name` → box hiển thị `p.chuDauTu` (label "Chủ Đầu Tư", fallback `— Chưa nhập —`). Box "Địa Chỉ / Ghi Chú" giữ nguyên.
+
+**Lưu ý cho AI:**
+- Tên Chủ Đầu Tư chỉ được sửa ở **tab CÔNG TRÌNH**; form HĐ Chính chỉ hiển thị (read-only).
+- Backward compat: cả `renderHdcTable` và `editHopDongChinh` đọc theo ưu tiên `project.chuDauTu` → `hd.khachHang` → '—'.
+- `_migrateChuDauTuFromHopDong()` chỉ chạy khi `project.chuDauTu` rỗng → an toàn khi gọi nhiều lần.
+- `excludeClosed: true` **không** ảnh hưởng đến hành vi của filter/view dropdown, chỉ tab nhập liệu mới truyền flag này.
+

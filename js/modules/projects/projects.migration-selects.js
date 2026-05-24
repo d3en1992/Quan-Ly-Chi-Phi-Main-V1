@@ -200,16 +200,17 @@ function deduplicateProjects() {
  * - selectedName luôn giữ để edit data cũ không bị mất
  * value = project.name | data-pid = project.id
  */
-function _buildProjOpts(selectedName, placeholder = '-- Chọn công trình --', { includeCompany = true } = {}) {
+function _buildProjOpts(selectedName, placeholder = '-- Chọn công trình --', { includeCompany = true, excludeClosed = false } = {}) {
   const projs = getAllProjects(); // không có COMPANY
   const base  = includeCompany ? [PROJECT_COMPANY, ...projs] : projs;
-  const filtered = (typeof activeYear === 'undefined' || activeYear === 0)
-    ? base
-    : base.filter(p => {
-        if (p.id === 'COMPANY') return true; // COMPANY luôn có nếu includeCompany
-        if (p.name === selectedName) return true; // giữ giá trị hiện tại khi edit
-        return _ctInActiveYear(p.name);
-      });
+  // Lọc theo năm (nếu có) — đồng thời lọc trạng thái "Đã quyết toán" cho tab nhập liệu
+  const filtered = base.filter(p => {
+    if (p.id === 'COMPANY') return true; // COMPANY luôn có nếu includeCompany
+    if (p.name === selectedName) return true; // giữ giá trị hiện tại khi edit (kể cả CT đã quyết toán)
+    if (excludeClosed && p.status === 'closed') return false; // ẩn CT đã quyết toán khỏi dropdown nhập liệu
+    if (typeof activeYear === 'undefined' || activeYear === 0) return true;
+    return _ctInActiveYear(p.name);
+  });
   return `<option value="">${placeholder}</option>` +
     filtered.map(p => {
       const sel = p.name === selectedName ? ' selected' : '';

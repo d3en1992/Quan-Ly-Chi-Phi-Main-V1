@@ -702,7 +702,8 @@ function rebuildEntrySelects() {
   document.querySelectorAll('#entry-tbody [data-f="ct"]').forEach(sel=>{
     if(sel.tagName==='SELECT'){
       const cur=sel.value;
-      sel.innerHTML = _buildProjOpts(cur, '-- Chọn --');
+      // Nhập Nhanh là tab nhập liệu → ẩn CT đã quyết toán
+      sel.innerHTML = _buildProjOpts(cur, '-- Chọn --', { excludeClosed: true });
     }
   });
   document.querySelectorAll('#entry-tbody [data-f="loai"]').forEach(sel=>{

@@ -53,7 +53,8 @@ function _initDetailFormSelects() {
     [...cats.loaiChiPhi].sort((a,b)=>a.localeCompare(b,'vi')).map(v => `<option value="${x(v)}" ${v===loaiV?'selected':''}>${x(v)}</option>`).join('');
 
   const ctSel = document.getElementById('detail-ct');
-  ctSel.innerHTML = _buildProjOpts(ctSel.value || '', '-- Chọn Công Trình --');
+  // Tab nhập Hóa Đơn Chi Tiết → ẩn CT đã quyết toán
+  ctSel.innerHTML = _buildProjOpts(ctSel.value || '', '-- Chọn Công Trình --', { excludeClosed: true });
 
   const nccSel = document.getElementById('detail-ncc');
   if(nccSel) {

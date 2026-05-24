@@ -364,15 +364,16 @@ function renderTodayInvoices() {
 
 /** Cập nhật tất cả dropdown CT trong tab Hóa Đơn (nhập nhanh + chi tiết) ngay lập tức. */
 function refreshHoadonCtDropdowns() {
+  // Cả Nhập Nhanh lẫn Hóa Đơn Chi Tiết đều là tab nhập liệu → ẩn CT đã quyết toán
   document.querySelectorAll('#entry-tbody [data-f="ct"]').forEach(sel => {
     const cur = sel.value;
-    sel.innerHTML = _buildProjOpts(cur, '-- Chọn --');
+    sel.innerHTML = _buildProjOpts(cur, '-- Chọn --', { excludeClosed: true });
     sel.value = cur;
   });
   const detCtSel = document.getElementById('detail-ct');
   if (detCtSel) {
     const cur = detCtSel.value;
-    detCtSel.innerHTML = _buildProjOpts(cur, '-- Chọn Công Trình --');
+    detCtSel.innerHTML = _buildProjOpts(cur, '-- Chọn Công Trình --', { excludeClosed: true });
     detCtSel.value = cur;
   }
 }

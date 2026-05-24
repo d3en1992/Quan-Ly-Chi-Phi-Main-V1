@@ -2759,13 +2759,13 @@
                 <div class="dt-field"><label>Ng&#224;y</label><input type="date" id="hdc-ngay" /></div>
                 <div class="dt-field">
                   <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
-                  <select id="hdc-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                  <select id="hdc-ct-input" onchange="if(typeof hdcSyncChuDauTu==='function')hdcSyncChuDauTu()" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
                     <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
                   </select>
                 </div>
                 <div class="dt-field">
-                  <label>Ch&#7911; &#272;&#7847;u T&#432; / C&#272;T</label>
-                  <input type="text" id="hdc-khachhang" placeholder="T&#234;n ch&#7911; &#273;&#7847;u t&#432;..." style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" />
+                  <label>Ch&#7911; &#272;&#7847;u T&#432; / C&#272;T <span style="font-weight:400;font-size:10px;color:var(--bs-secondary-color)">(t&#7921; &#273;&#7897;ng t&#7915; C&#244;ng Tr&#236;nh)</span></label>
+                  <input type="text" id="hdc-khachhang" placeholder="C&#225;c h&#227;y nh&#7853;p &#7903; tab C&#244;ng Tr&#236;nh..." readonly style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-tertiary-bg);color:var(--bs-body-color);cursor:not-allowed" />
                 </div>
                 <div class="dt-field">
                   <label>Ng&#432;&#7901;i TH</label>

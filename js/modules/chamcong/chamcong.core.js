@@ -227,7 +227,8 @@ function updateTopFromCC(){
 function populateCCCtSel(){
   const sel = document.getElementById('cc-ct-sel');
   const cur = sel.value;
-  sel.innerHTML = _buildProjOpts(cur);
+  // Tab nhập liệu Sổ Chấm Công → ẩn CT đã quyết toán
+  sel.innerHTML = _buildProjOpts(cur, '-- Chọn công trình --', { excludeClosed: true });
   updateCCSaveBtn();
 }
 

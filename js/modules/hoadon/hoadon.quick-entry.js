@@ -26,8 +26,9 @@ function _initQuickSheetGrid() {
         required: true, copyFromAbove: true },
       { field: 'ct',    type: 'project-autocomplete',
         source: () => {
+          // Nhập Nhanh là tab nhập liệu → ẩn CT đã quyết toán khỏi gợi ý
           const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects||[]);
-          return projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+          return projs.filter(p => !p.deletedAt && p.id && p.status !== 'closed').map(p => ({ name: p.name, id: p.id }));
         },
         required: true, copyFromAbove: true },
       { field: 'tien',  type: 'money' },
