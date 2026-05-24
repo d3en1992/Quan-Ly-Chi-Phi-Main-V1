@@ -558,6 +558,7 @@ body { max-width: 100%; overflow-x: hidden; }
   border-radius: 8px; min-width: 140px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   padding: 6px 0 4px;
+  max-height: 70vh; overflow-y: auto;
 }
 .year-dropdown.open { display: block; }
 
@@ -1723,4 +1724,119 @@ td.action-col > div {
   font-size: 11px;
   opacity: 0.7;
   font-weight: 500;
+}
+
+/* =========================================================
+   UI/UX Phase 3 (24/05/2026) — Year dropdown, hide Cloud desktop,
+   Tiền Ứng entry sticky, HDTP layout, Dashboard weekly fixes
+   ========================================================= */
+
+/* ── Task 1a: Year dropdown anchor right + clip-safe (mobile) ── */
+@media (max-width: 768px) {
+  /* Khi year-wrap nằm sát mép phải, dropdown left:0 sẽ tràn ra ngoài viewport.
+     Đổi sang anchor phải để bung sang TRÁI thay vì PHẢI. */
+  .year-dropdown {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 24px);
+  }
+}
+
+/* ── Task 1b: Ẩn nút Cloud góc trên-phải trên DESKTOP ──────── */
+/* Cloud đã có trong dropdown User — không cần button riêng trên topbar.
+   Quy tắc trước đó chỉ ẩn trên mobile; bổ sung ẩn trên DESKTOP để gọn gàng. */
+#jb-btn {
+  display: none !important;
+}
+
+/* ── Task 2a: Bảng NHẬP Tiền Ứng — ẩn cột # + sticky cột "Đối Tượng" (mobile) ── */
+@media (max-width: 768px) {
+  /* Ẩn cột số thứ tự để dành không gian cho ô nhập liệu */
+  #page-nhapung .entry-table .col-num,
+  #page-nhapung .entry-table .row-num {
+    display: none !important;
+  }
+
+  /* Đóng băng cột "Đối Tượng" (column 2 sau khi ẩn # = column 1 còn lại).
+     Sau khi #col-num ẩn, td:nth-of-type(2) chính là "Đối Tượng" TRƯỚC KHI thay đổi DOM.
+     Nhưng vì CSS nth-of-type không thay đổi sau display:none, ta dùng nth-of-type(2)
+     (vì display:none chỉ ẩn visually chứ không loại khỏi DOM/order). */
+  #page-nhapung .entry-table thead th:nth-of-type(2),
+  #page-nhapung .entry-table tbody td:nth-of-type(2) {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--paper, #fff);
+    box-shadow: 4px 0 6px -3px rgba(0, 0, 0, 0.18);
+    min-width: 96px;
+    max-width: 110px;
+  }
+  /* Header sticky cần z-index cao hơn body */
+  #page-nhapung .entry-table thead th:nth-of-type(2) {
+    z-index: 5;
+    background: var(--bs-tertiary-bg, #f4f1ea);
+  }
+}
+
+/* ── Task 2b: Bảng Thầu Phụ / NCC — ẩn checkbox + sticky cột Tên (mobile) ── */
+@media (max-width: 768px) {
+  /* Ẩn cột checkbox để dành không gian cho thao tác cuộn ngang */
+  .ung-sticky-table .ung-sticky-chk {
+    display: none !important;
+  }
+  /* Cột Tên Thầu Phụ/NCC chuyển left:32px → left:0 vì checkbox đã ẩn */
+  .ung-sticky-table .ung-sticky-name {
+    left: 0 !important;
+    min-width: 110px;
+  }
+}
+
+/* ── Task 3a: Bảng HĐ Thầu Phụ — cột "Nội Dung" clamp 2 dòng + tăng width 40% ── */
+/* Cấu trúc cột: chk(1), Ngày(2), CT(3), TP(4), Nội Dung(5), Giá Trị(6), action(7) */
+#hdtp-tbody td:nth-child(5) {
+  /* +40% width: trước min-width:90px (inline) → ép max-width hợp lý + line-clamp */
+  max-width: 220px;
+  min-width: 126px !important;  /* +40% so với 90px */
+  white-space: normal !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  box-orient: vertical;
+  line-height: 1.35;
+  word-break: break-word;
+}
+/* Đảm bảo row height không bị nở quá lớn — chỉ cho phép tối đa 2 dòng */
+#hdtp-tbody tr {
+  vertical-align: middle;
+}
+
+/* ── Task 3b: Stat boxes (Tổng đã thu / Còn phải thu) nowrap + responsive font ── */
+#dt-mini-tonghd,
+#dt-mini-dathu,
+#dt-mini-con {
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Font tự co theo viewport: tối thiểu 13px, lý tưởng 4.6vw, tối đa 20px */
+  font-size: clamp(13px, 4.6vw, 20px) !important;
+  letter-spacing: -0.3px;
+}
+@media (min-width: 576px) {
+  /* sm+: trở về cỡ chữ ổn định, vẫn nowrap */
+  #dt-mini-tonghd,
+  #dt-mini-dathu,
+  #dt-mini-con {
+    font-size: clamp(14px, 1.8vw, 20px) !important;
+  }
+}
+
+/* ── Task 4b: Dashboard — Bảng Chi Tiết Tuần: tiền nowrap ─── */
+/* Tất cả TD trong bảng chi tiết tuần (render bởi _dbBarChartWeekly weekDetailHtml) —
+   các cột tiền dùng font-family monospace, ép nowrap để không xuống dòng */
+#db-bar-chart table td[style*="monospace"],
+#db-bar-chart table tfoot td {
+  white-space: nowrap !important;
 }

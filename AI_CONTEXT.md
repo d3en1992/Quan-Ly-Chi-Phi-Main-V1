@@ -581,3 +581,67 @@ Nếu có output mới, cần phân loại là comment mô tả hợp lệ hay c
 - Nút Cloud (`#jb-btn`) chỉ ẩn trên mobile (via CSS), vẫn còn trong DOM để `updateJbBtn()` cập nhật được nếu desktop.
 - `openBinModal()` dùng chung từ cả 3 entry points: jb-btn, ud-cloud-btn (guest), ud-action-btn (auth).
 
+### 8.9. UI/UX Phase 3 (24/05/2026) — Sticky + dropdown + dashboard fixes
+
+#### Task A — Year dropdown bị che (mobile)
+**Vấn đề:** Sau khi đẩy `topbar-year-wrap` sang góc phải (Phase 2), dropdown anchored `left:0` tràn ra ngoài viewport → bị clip.
+
+**Giải pháp:** `style.css` (@media 768px):
+- `.year-dropdown { left:auto; right:0; max-width: calc(100vw - 24px) }` → dropdown anchor PHẢI và bung sang TRÁI.
+- Base `.year-dropdown` thêm `max-height:70vh; overflow-y:auto` để không vượt chiều cao màn hình.
+
+#### Task B — Ẩn Cloud button trên DESKTOP
+**Lý do:** Phase 2 đã đưa Cloud vào dropdown User. Topbar không còn cần nút Cloud riêng.
+
+**Giải pháp:** `style.css` global rule: `#jb-btn { display:none !important }`. Hàm `updateJbBtn()` vẫn chạy bình thường (chỉ update `if (btn)`) và đồng bộ status vào dropdown User.
+
+#### Task C — Bảng NHẬP Tiền Ứng: ẩn `#` + sticky "Đối Tượng" (mobile)
+**Cấu trúc table:** `<table class="entry-table">` trong `#page-nhapung > .entry-table-wrap > .table-scroll`. TH có class `.col-num` (cột `#`) và TD có class `.row-num`.
+
+**Giải pháp:** `style.css` (@media 768px):
+- Ẩn `.col-num` và `.row-num` (giải phóng không gian).
+- Cột thứ 2 (Đối Tượng = `<select>` thầu phụ/NCC): `position:sticky; left:0` với background + box-shadow. Vì `display:none` không loại element khỏi DOM/order, `nth-of-type(2)` vẫn ám chỉ đúng cột "Đối Tượng".
+- Header sticky z-index 5, body sticky z-index 3.
+
+#### Task D — Bảng Thầu Phụ/NCC: ẩn checkbox + sticky cột Tên (mobile)
+Phase 2 đã thêm sticky cho cả 2 cột chk + tên (left:0, left:32px). Phase 3:
+- `.ung-sticky-table .ung-sticky-chk { display:none !important }` — ẩn cột checkbox.
+- `.ung-sticky-table .ung-sticky-name { left:0 !important; min-width:110px }` — cột tên dời về left:0.
+
+#### Task E — Bảng HĐ Thầu Phụ (Doanh Thu): clamp + tăng width cột "Nội Dung"
+**Cấu trúc:** `<tbody id="hdtp-tbody">` render TR có cột Nội Dung tại `nth-child(5)`. Inline style cũ: `min-width:90px`.
+
+**Giải pháp:** `style.css` global rule cho `#hdtp-tbody td:nth-child(5)`:
+- `min-width:126px !important` (+40% so 90px), `max-width:220px`.
+- `display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis; white-space:normal !important` → giới hạn 2 dòng + `...`.
+- `word-break:break-word; line-height:1.35` để text gọn.
+
+#### Task F — Stat boxes "Tổng đã thu" / "Còn phải thu": nowrap + responsive font
+**Element:** `#dt-mini-tonghd`, `#dt-mini-dathu`, `#dt-mini-con` (id trong dt-mini-dash).
+
+**Giải pháp:** `style.css` global:
+- `white-space:nowrap !important; overflow:hidden; text-overflow:ellipsis`.
+- `font-size: clamp(13px, 4.6vw, 20px) !important` cho mobile; `clamp(14px, 1.8vw, 20px)` cho sm+ (≥576px).
+- Số tiền tự thu nhỏ khi card hẹp thay vì xuống dòng.
+
+#### Task G — Dashboard chart scroll jump (mobile)
+**Vấn đề:** Click cột T20, `_dbSelectWeek` → `_dbBarChartWeekly` → re-render innerHTML của `#db-bar-chart` → outer `<div style="overflow-x:auto">` bị thay mới → scrollLeft reset về 0 → user thấy giật về T1.
+
+**Giải pháp:** `datatools.js` → `_dbSelectWeek(weekKey)`:
+1. Capture `scrollLeft` của inner `div[style*="overflow-x"]` TRƯỚC re-render.
+2. Capture `window.scrollY` để chống browser auto-scroll lên focused element.
+3. Sau re-render, dùng `requestAnimationFrame` để khôi phục cả 2 scroll positions.
+4. Nếu `window.scrollY` lệch quá 4px → `window.scrollTo({behavior:'instant'})`.
+
+#### Task H — Bảng Chi Tiết Tuần: tiền nowrap
+**Vấn đề:** Inline style của TD tiền trong `_dbBarChartWeekly weekDetailHtml` không có `white-space:nowrap` → số tiền dài bị bẻ 2 dòng trên mobile.
+
+**Giải pháp:** `style.css` global selector:
+- `#db-bar-chart table td[style*="monospace"]` → match tất cả TD monospace (cột Hóa đơn, Ứng TP, Ứng NCC, Tổng) → `white-space:nowrap !important`.
+- `#db-bar-chart table tfoot td` → match grandTotal row + summary cell.
+
+**Lưu ý cho AI:**
+- `position:sticky` trên TD cần ancestor scrollable. `.entry-table` có `.table-scroll` (parent) + `.entry-table-wrap` (grandparent) — cả 2 đều `overflow-x:auto` trên mobile.
+- Khi ẩn cột bằng `display:none`, `nth-of-type` / `nth-child` vẫn ám chỉ thứ tự DOM ban đầu (không tính lại) — đây là behavior cần thiết để CSS selector ổn định.
+- `_dbSelectWeek` không tự render full dashboard — chỉ re-render bar chart + pie chart từ cached data. Scroll preservation chỉ cần cover 2 element này.
+

@@ -1018,10 +1018,28 @@ function _dbPieChartWeekly(invoiceData, ungData) {
 // ── Chọn/bỏ chọn tuần (click cột tuần) ───────────────────────
 function _dbSelectWeek(weekKey) {
   selectedDashboardWeekKey = (selectedDashboardWeekKey === weekKey) ? '' : weekKey;
-  // Dùng cached data — không cần chạy lại full renderDashboard
   if (!_dbLastWeeklyInvData || !_dbLastWeeklyYr) return;
+
+  // Preserve scroll positions trước khi re-render
+  // (a) horizontal scroll của container chart — tránh "giật" về T1 khi click T20
+  // (b) vertical scroll của window — tránh nhảy lên đầu trang
+  const chartHost = document.getElementById('db-bar-chart');
+  const innerScrollEl = chartHost?.querySelector('div[style*="overflow-x"]');
+  const prevScrollLeft = innerScrollEl ? innerScrollEl.scrollLeft : 0;
+  const prevWinScrollY = window.scrollY || window.pageYOffset;
+
   _dbBarChartWeekly(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
   _dbPieChartWeekly(_dbLastWeeklyInvData, _dbLastWeeklyUngData);
+
+  // Khôi phục sau khi DOM mới đã render
+  requestAnimationFrame(() => {
+    const newInner = document.getElementById('db-bar-chart')?.querySelector('div[style*="overflow-x"]');
+    if (newInner) newInner.scrollLeft = prevScrollLeft;
+    // Reset window scroll nếu bị nhảy (browser đôi khi tự cuộn về focused element)
+    if (Math.abs((window.scrollY || window.pageYOffset) - prevWinScrollY) > 4) {
+      window.scrollTo({ top: prevWinScrollY, behavior: 'instant' });
+    }
+  });
 }
 
 
