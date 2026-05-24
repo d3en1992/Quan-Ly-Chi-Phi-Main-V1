@@ -528,9 +528,13 @@ async function pullChanges(yr, callback, opts = {}) {
           if (meta.hopDong && Object.keys(meta.hopDong).length) {
             const localHd  = load('hopdong_v1', {});
             const mergedHd = { ...meta.hopDong };
+            // TOMBSTONE FIX: LWW so sánh max(updatedAt, deletedAt) để tombstone thắng đúng
             Object.entries(localHd).forEach(([ct, local]) => {
-              const cloud = mergedHd[ct];
-              if (!cloud || (local.updatedAt || 0) >= (cloud.updatedAt || 0)) mergedHd[ct] = local;
+              const cloud    = mergedHd[ct];
+              if (!cloud) { mergedHd[ct] = local; return; }
+              const localTs  = Math.max(Number(local.updatedAt) || 0, Number(local.deletedAt) || 0);
+              const cloudTs  = Math.max(Number(cloud.updatedAt) || 0, Number(cloud.deletedAt) || 0);
+              if (localTs >= cloudTs) mergedHd[ct] = local;
             });
             _memSet('hopdong_v1', mergedHd);
             hopDongData = mergedHd;
@@ -575,9 +579,13 @@ async function pullChanges(yr, callback, opts = {}) {
           const localHd  = load('hopdong_v1', {});
           const cloudHd  = catsData.hopDong;
           const mergedHd = { ...cloudHd };
+          // TOMBSTONE FIX: LWW so sánh max(updatedAt, deletedAt)
           Object.entries(localHd).forEach(([ct, local]) => {
-            const cloud = mergedHd[ct];
-            if (!cloud || (local.updatedAt || 0) >= (cloud.updatedAt || 0)) mergedHd[ct] = local;
+            const cloud   = mergedHd[ct];
+            if (!cloud) { mergedHd[ct] = local; return; }
+            const localTs = Math.max(Number(local.updatedAt) || 0, Number(local.deletedAt) || 0);
+            const cloudTs = Math.max(Number(cloud.updatedAt) || 0, Number(cloud.deletedAt) || 0);
+            if (localTs >= cloudTs) mergedHd[ct] = local;
           });
           _memSet('hopdong_v1', mergedHd);
           hopDongData = mergedHd;

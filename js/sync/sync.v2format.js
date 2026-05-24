@@ -723,18 +723,27 @@ function _v2MetaPayload(type) {
 //           └── 2026-02-10_vt-sat-thep_15tr_f3c211  →  { ... }
 
 const _V2_LAST_PUSH_KEY    = '_v2SubcollLastPush';
-const _V2_ID_SCHEMA_VER    = 2;          // Tăng số này khi đổi format document ID
+const _V2_ID_SCHEMA_VER    = 3;          // v3: tombstone cloud sync — buộc full rewrite để ghi tombstone lên cloud
 const _V2_SCHEMA_VER_KEY   = '_v2IdSchemaVer';
 
 // Kiểm tra & tự động reset lastPush nếu schema ID đã đổi version
-// (Chạy 1 lần khi load file — reset buộc full rewrite để dọn UUID cũ)
+// (Chạy 1 lần khi load file — reset buộc full rewrite để dọn dữ liệu cũ)
 (function _v2MigrateIdSchema() {
   try {
     const stored = Number(localStorage.getItem(_V2_SCHEMA_VER_KEY) || 0);
     if (stored < _V2_ID_SCHEMA_VER) {
+      // Xóa toàn bộ push/pull cache để force full rewrite ở lần sync tiếp
       localStorage.removeItem(_V2_LAST_PUSH_KEY);
+      localStorage.removeItem('_v2SubcollLastPull');
+      localStorage.removeItem('_v2Initialized');
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('_v2HashFull_')) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
       localStorage.setItem(_V2_SCHEMA_VER_KEY, String(_V2_ID_SCHEMA_VER));
-      console.log(`[V2Format] 🔄 ID schema nâng lên v${_V2_ID_SCHEMA_VER} — reset lastPush để dọn ID cũ`);
+      console.log(`[V2Format] 🔄 ID schema nâng lên v${_V2_ID_SCHEMA_VER} — reset toàn bộ cache để push tombstone`);
     }
   } catch {}
 })();
@@ -849,15 +858,15 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
   const writes = [];
 
   if (lastPush === 0) {
-    // Full write: lấy IDs cũ → xóa orphan (dọn UUID cũ khi đổi schema ID) → ghi mới
+    // Full write: lấy IDs cũ → xóa orphan thực sự (không thuộc bất kỳ record nào) → ghi mới
+    // TOMBSTONE FIX: ghi TẤT CẢ records (active + tombstone) để thiết bị khác nhận được tín hiệu xóa
     const existingIds = await _v2FsListIds(parentDocId, coll);
-    const activeRecs  = records.filter(r => !r.deletedAt);
-    const newIds      = new Set(activeRecs.map(getId).filter(Boolean));
+    const newIds      = new Set(records.map(getId).filter(Boolean));
     existingIds.forEach(oldId => {
       if (!newIds.has(oldId))
         writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${oldId}` });
     });
-    activeRecs.forEach(rec => {
+    records.forEach(rec => {
       const docId = getId(rec);
       if (!docId) return;
       writes.push({
@@ -868,12 +877,12 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
     });
   } else {
     // Incremental: chỉ records thay đổi sau lastPush
+    // TOMBSTONE FIX: record đã xóa → PATCH tombstone thay vì DELETE khỏi Firestore
     records.forEach(rec => {
       const tUpdated = rec.updatedAt || rec.createdAt || 0;
       const tDeleted = rec.deletedAt || 0;
-      if (tDeleted && tDeleted > lastPush) {
-        writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${getId(rec)}` });
-      } else if (!tDeleted && tUpdated > lastPush) {
+      const changed  = (tDeleted && tDeleted > lastPush) || (!tDeleted && tUpdated > lastPush);
+      if (changed) {
         const docId = getId(rec);
         if (!docId) return;
         writes.push({
@@ -920,37 +929,39 @@ async function _v2PushSubcoll(parentDocId, records, fieldMap, summaryObj, idFn) 
   }
 
   // 5. Thực hiện batch write
-  const nWrite  = writes.filter(w => w.op === 'update').length;
-  const nDelete = writes.filter(w => w.op === 'delete').length;
+  const nWrite    = writes.filter(w => w.op === 'update').length;
+  const nDelOrph  = writes.filter(w => w.op === 'delete').length;
   const { totalOk, totalFail } = await _v2FsBatchWrite(writes);
   const ok = totalFail === 0;
 
   if (ok) {
     _v2SetLastPush(parentDocId, now);
     _v2SetLastPull(parentDocId, lastModMs);  // ta vừa ghi nên không cần đọc lại
-    console.log(`[V2Format] ▲ ${parentDocId} OK — ✏${nWrite} ghi, 🗑${nDelete} xóa`);
+    console.log(`[V2Format] ▲ ${parentDocId} OK — ✏${nWrite} ghi/tombstone, 🗑${nDelOrph} orphan`);
   } else {
     console.warn(`[V2Format] ✗ ${parentDocId} — ${totalFail}/${writes.length} ops thất bại`);
   }
-  return { ok, written: nWrite, deleted: nDelete, totalOk, totalFail };
+  return { ok, written: nWrite, deleted: nDelOrph, totalOk, totalFail };
 }
 
 
 // ──────────────────────────────────────────────────────────────
-// Full-rewrite: xóa docs cũ không còn tồn tại + ghi lại toàn bộ
+// Full-rewrite: xóa orphan thực sự + ghi lại toàn bộ (active + tombstone)
 // Dùng cho danh_muc (isDeleted boolean) và hop_dong (object map)
+// TOMBSTONE FIX: records gồm cả items đã xóa — ghi tombstone lên Firestore
+//   thay vì bỏ qua, để thiết bị khác nhận được tín hiệu xóa.
 // idField: tên field chứa document ID (mặc định 'id')
 // ──────────────────────────────────────────────────────────────
-async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryObj, idField) {
+async function _v2PushSubcollFull(parentDocId, records, fieldMap, summaryObj, idField) {
   const now    = Date.now();
   const coll   = _V2_SUBCOLL_NAME;
   const getId  = r => r[idField || 'id'];
 
   // PHASE 2 OPTIMIZATION — Hash-based skip:
-  // Tính hash chữ ký từ (id + updatedAt) của active records.
-  // Nếu hash trùng với lần push trước → toàn bộ records không đổi → skip everything.
-  const recordHash = activeRecords
-    .map(r => `${getId(r) || ''}:${Number(r.updatedAt) || 0}`)
+  // Tính hash chữ ký từ (id + updatedAt + isDeleted + deletedAt) của tất cả records.
+  // Nếu hash trùng → không có thay đổi nào → skip.
+  const recordHash = records
+    .map(r => `${getId(r) || ''}:${Number(r.updatedAt) || 0}:${r.isDeleted ? '1' : '0'}:${Number(r.deletedAt) || 0}`)
     .sort()
     .join('|');
   const HASH_KEY = `_v2HashFull_${parentDocId}`;
@@ -963,8 +974,9 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
   }
 
   // PHASE 1 — Tính last_modified_ms (để pull guard hoạt động)
-  const lastModMs = activeRecords.reduce((max, r) => {
-    return Math.max(max, Number(r.updatedAt) || 0);
+  // Bao gồm deletedAt để tombstone cũng kích hoạt guard ở thiết bị khác
+  const lastModMs = records.reduce((max, r) => {
+    return Math.max(max, Number(r.updatedAt) || 0, Number(r.deletedAt) || 0);
   }, 0) || now;
 
   // 1. Ghi summary lên parent document (kèm last_modified_ms)
@@ -982,7 +994,8 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
 
   // 2. Lấy IDs hiện có trong subcollection
   const existingIds = await _v2FsListIds(parentDocId, coll);
-  const newIds      = new Set(activeRecords.map(getId).filter(Boolean));
+  // TOMBSTONE FIX: newIds gồm cả tombstone records — không xóa chúng khỏi cloud
+  const newIds      = new Set(records.map(getId).filter(Boolean));
   const writes      = [];
 
   existingIds.forEach(oldId => {
@@ -990,7 +1003,8 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
       writes.push({ op: 'delete', path: `${parentDocId}/${coll}/${oldId}` });
   });
 
-  activeRecords.forEach(rec => {
+  // TOMBSTONE FIX: ghi TẤT CẢ records (active + tombstone)
+  records.forEach(rec => {
     const docId = getId(rec);
     if (!docId) return;
     writes.push({
@@ -1008,8 +1022,8 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
     return { ok: true, written: 0, deleted: 0 };
   }
 
-  const nDelete = writes.filter(w => w.op === 'delete').length;
-  const nWrite  = writes.filter(w => w.op === 'update').length;
+  const nDelOrph = writes.filter(w => w.op === 'delete').length;
+  const nWrite   = writes.filter(w => w.op === 'update').length;
   const { totalOk, totalFail } = await _v2FsBatchWrite(writes);
   const ok = totalFail === 0;
 
@@ -1017,11 +1031,11 @@ async function _v2PushSubcollFull(parentDocId, activeRecords, fieldMap, summaryO
     _v2SetLastPush(parentDocId, now);
     _v2SetLastPull(parentDocId, lastModMs);
     try { localStorage.setItem(HASH_KEY, recordHash); } catch {}
-    console.log(`[V2Format] ▲ ${parentDocId} (full) OK — ✏${nWrite} ghi, 🗑${nDelete} dọn cũ`);
+    console.log(`[V2Format] ▲ ${parentDocId} (full) OK — ✏${nWrite} ghi/tombstone, 🗑${nDelOrph} orphan`);
   } else {
     console.warn(`[V2Format] ✗ ${parentDocId} (full) — ${totalFail}/${writes.length} ops thất bại`);
   }
-  return { ok, written: nWrite, deleted: nDelete, totalOk, totalFail };
+  return { ok, written: nWrite, deleted: nDelOrph, totalOk, totalFail };
 }
 
 
@@ -1083,33 +1097,34 @@ async function _v2PushMeta() {
           break;
         }
 
-        // danh_muc: flatten cat_items_v1 (boolean isDeleted) → full rewrite
+        // danh_muc: flatten cat_items_v1 → full rewrite
+        // TOMBSTONE FIX: dùng item.id (UUID) làm doc ID; ghi CẢ items đã xóa (isDeleted:true)
+        // để thiết bị khác nhận được tín hiệu xóa và ẩn item khỏi dropdown.
         case 'danh_muc': {
           const catItems  = (dataPayload && dataPayload.catItems) || {};
-          const activeItems = [];
+          const allItems  = [];   // bao gồm active + isDeleted
           const dmFieldMap  = {
-            _dmKey:    'id',
+            id:        'id',            // UUID — dùng làm doc ID trên Firestore
             name:      'ten',
             loai:      'loai_danh_muc',
+            isDeleted: 'da_xoa',        // TOMBSTONE: ghi trạng thái xóa lên cloud
             updatedAt: 'cap_nhat_luc',
           };
           for (const [catType, items] of Object.entries(catItems)) {
-            (items || []).filter(i => !i.isDeleted).forEach(item => {
-              // ID dễ đọc: {loai_danh_muc}_{slug_ten}_{uid4}
-              const uid4 = ((item.id || '') + '').replace(/-/g, '').slice(0, 4) || 'xxxx';
-              const _dmKey = `${_v2Slug(catType, 10)}_${_v2Slug(item.name || '', 14)}_${uid4}`;
-              activeItems.push({ ...item, loai: catType, _dmKey });
+            (items || []).forEach(item => {
+              allItems.push({ ...item, loai: catType });
             });
           }
-          const res = await _v2PushSubcollFull(docId, activeItems, dmFieldMap, summaryObj, '_dmKey');
+          const res = await _v2PushSubcollFull(docId, allItems, dmFieldMap, summaryObj, 'id');
           results.push({ type, ...res });
           break;
         }
 
         // hop_dong: merge hopdong_v1 (object) + thauphu_v1 (array) → full rewrite
+        // TOMBSTONE FIX: bao gồm cả hợp đồng đã xóa (deletedAt set) để thiết bị khác xóa theo
         case 'hop_dong': {
           const { hopDong = {}, thauPhu = [] } = dataPayload || {};
-          const activeRecs = [];
+          const allRecs  = [];   // bao gồm active + tombstone
           const hdFieldMap = {
             _key:      'id',
             phan_loai: 'phan_loai',
@@ -1122,29 +1137,27 @@ async function _v2PushMeta() {
             nguoi:     'nguoi_ky',
             thauphu:   'ten_thau_phu',
             nd:        'noi_dung',
+            deletedAt: 'da_xoa_luc',  // TOMBSTONE: ghi trạng thái xóa lên cloud
             updatedAt: 'cap_nhat_luc',
           };
-          // Hợp đồng chính (hopdong_v1 là object map)
+          // Hợp đồng chính (hopdong_v1 là object map) — bao gồm cả đã xóa
           Object.entries(hopDong).forEach(([key, hd]) => {
-            if (hd.deletedAt) return;
-            // _key: "chinh_{projectId}" — prefix phân biệt với thầu phụ
             const pid = hd.projectId || key || '';
-            activeRecs.push({
+            allRecs.push({
               ...hd,
               _key:      `chinh_${_v2Slug(pid, 20)}`,
               phan_loai: 'hop_dong_chinh',
               congtrinh: hd.congtrinh || key,
             });
           });
-          // Hợp đồng thầu phụ (thauphu_v1 là array)
-          thauPhu.filter(h => !h.deletedAt).forEach(h => {
-            // _key: "phu_{slug_ten_thau_phu}_{uid6}"
-            const uid6 = ((h.id || '') + '').replace(/-/g, '').slice(0, 6) || 'xxxxxx';
+          // Hợp đồng thầu phụ (thauphu_v1 là array) — bao gồm cả đã xóa
+          thauPhu.forEach(h => {
+            const uid6   = ((h.id || '') + '').replace(/-/g, '').slice(0, 6) || 'xxxxxx';
             const tenPhu = _v2Slug(h.thauphu || h.ten_thau_phu || '', 14);
-            activeRecs.push({ ...h, _key: `phu_${tenPhu}_${uid6}`, phan_loai: 'hop_dong_thau_phu' });
+            allRecs.push({ ...h, _key: `phu_${tenPhu}_${uid6}`, phan_loai: 'hop_dong_thau_phu' });
           });
           const res = await _v2PushSubcollFull(
-            docId, activeRecs, hdFieldMap, summaryObj, '_key'
+            docId, allRecs, hdFieldMap, summaryObj, '_key'
           );
           results.push({ type, ...res });
           break;

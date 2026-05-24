@@ -62,7 +62,14 @@ function _mergeUsersV2(localUsers, cloudUsers) {
 
 async function _v2PullDanhMuc() {
   // PHASE 1 — Dùng _v2PullSubcoll (đã có guard) để vừa đọc parent vừa kiểm tra unchanged
-  const res = await _v2PullSubcoll('meta_danh_muc', { id: 'id', name: 'ten', loai: 'loai_danh_muc', updatedAt: 'cap_nhat_luc' });
+  // TOMBSTONE FIX: thêm isDeleted (da_xoa) vào field map để pull về trạng thái xóa của item
+  const res = await _v2PullSubcoll('meta_danh_muc', {
+    id:        'id',
+    name:      'ten',
+    loai:      'loai_danh_muc',
+    isDeleted: 'da_xoa',          // TOMBSTONE: đọc trạng thái xóa từ cloud
+    updatedAt: 'cap_nhat_luc',
+  });
 
   // Trả về cấu trúc đặc biệt — _v2PullMetaFull sẽ extract
   if (res.status === 'absent') return { status: 'absent' };
@@ -71,13 +78,14 @@ async function _v2PullDanhMuc() {
   // 'fresh' hoặc 'empty' → rebuild catItems từ subcoll, cnRoles/ctYears từ parentFields
   const catItems = {};
   (res.records || []).forEach(rec => {
-    // Sau reverse map: id (= _dmKey), name, loai, updatedAt
+    // Sau reverse map: id (UUID), name, loai, isDeleted, updatedAt
     const loai = rec.loai;
     if (!loai) return;
     if (!catItems[loai]) catItems[loai] = [];
     catItems[loai].push({
       id:        rec.id,
       name:      rec.name,
+      isDeleted: rec.isDeleted || false,  // TOMBSTONE: truyền trạng thái xóa về local
       updatedAt: rec.updatedAt,
     });
   });
@@ -136,28 +144,30 @@ async function _v2PullHopDong() {
       const key = raw.project_id || raw.cong_trinh || '';
       if (!key) return;
       hopDong[key] = {
-        projectId:  raw.project_id  || null,
-        congtrinh:  raw.cong_trinh  || null,
-        ngay:       raw.ngay        || null,
-        giaTri:     raw.gia_tri     || 0,
-        giaTriphu:  raw.gia_tri_phu || 0,
-        phatSinh:   raw.phat_sinh   || 0,
-        nguoi:      raw.nguoi_ky    || null,
-        nd:         raw.noi_dung    || null,
+        projectId:  raw.project_id   || null,
+        congtrinh:  raw.cong_trinh   || null,
+        ngay:       raw.ngay         || null,
+        giaTri:     raw.gia_tri      || 0,
+        giaTriphu:  raw.gia_tri_phu  || 0,
+        phatSinh:   raw.phat_sinh    || 0,
+        nguoi:      raw.nguoi_ky     || null,
+        nd:         raw.noi_dung     || null,
         updatedAt:  raw.cap_nhat_luc || null,
+        deletedAt:  raw.da_xoa_luc   || null,  // TOMBSTONE: đọc trạng thái xóa từ cloud
       };
     } else if (phanLoai === 'hop_dong_thau_phu') {
       thauPhu.push({
         id:        raw.id,
-        thauphu:   raw.ten_thau_phu    || null,
-        ngay:      raw.ngay            || null,
-        projectId: raw.project_id      || null,
-        congtrinh: raw.cong_trinh      || null,
-        giaTri:    raw.gia_tri         || 0,
-        phatSinh:  raw.phat_sinh       || 0,
-        nguoi:     raw.nguoi_ky        || null,
-        nd:        raw.noi_dung        || null,
-        updatedAt: raw.cap_nhat_luc    || null,
+        thauphu:   raw.ten_thau_phu  || null,
+        ngay:      raw.ngay          || null,
+        projectId: raw.project_id    || null,
+        congtrinh: raw.cong_trinh    || null,
+        giaTri:    raw.gia_tri       || 0,
+        phatSinh:  raw.phat_sinh     || 0,
+        nguoi:     raw.nguoi_ky      || null,
+        nd:        raw.noi_dung      || null,
+        updatedAt: raw.cap_nhat_luc  || null,
+        deletedAt: raw.da_xoa_luc    || null,  // TOMBSTONE: đọc trạng thái xóa từ cloud
       });
     }
   });
