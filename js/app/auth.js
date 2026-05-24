@@ -643,21 +643,6 @@ function applyRoleUI() {
   applyNavPermissions();
   if (!loggedIn) return;
 
-  const lock = isGiamdoc();
-  _setRoleDisabled(
-    '#sub-nhap-hd input, #sub-nhap-hd select, #sub-nhap-hd textarea, #sub-nhap-hd button',
-    lock,
-    el => el.classList.contains('nav-link') || el.classList.contains('sub-nav-btn')
-  );
-  _setRoleDisabled(
-    '#page-chamcong > .section-header:first-of-type button, #page-chamcong > .entry-date-bar input, #page-chamcong > .entry-date-bar select, #page-chamcong > .entry-date-bar button, #page-chamcong > .entry-table-wrap .add-row-bar button, #cc-tbody input, #cc-tbody button, #cc-tbody select, #cc-tbody textarea',
-    lock
-  );
-  _setRoleDisabled(
-    '#page-thietbi > .section-header:first-of-type button, #thietbi-form input, #thietbi-form button, #thietbi-form select, #thietbi-form textarea',
-    lock
-  );
-
   const user = getCurrentUser();
   if (!user) return;
 
@@ -670,8 +655,11 @@ function applyRoleUI() {
     btn.style.display = visible ? '' : 'none';
   });
 
+  // Ẩn khu vực Tools với giamdoc (chỉ tab Danh Mục) và ketoan (toàn hệ thống)
   const toolsSection = document.getElementById('dm-tools-section');
-  if (toolsSection) toolsSection.style.display = (user.role === 'giamdoc') ? 'none' : '';
+  if (toolsSection) {
+    toolsSection.style.display = (user.role === 'giamdoc' || user.role === 'ketoan') ? 'none' : '';
+  }
 }
 
 function queueApplyRoleUI() {
