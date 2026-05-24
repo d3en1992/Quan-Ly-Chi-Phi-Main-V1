@@ -329,6 +329,7 @@ function openDtModal(type) {
   const ov = document.getElementById('dt-modal-' + type + '-ov');
   if (ov) {
     ov.classList.add('open');
+    document.body.classList.add('modal-open');
     setTimeout(() => {
       const first = ov.querySelector('select:not([id$="-edit-id"]), input[type="date"]');
       if (first) first.focus();
@@ -339,6 +340,12 @@ function openDtModal(type) {
 function closeDtModal(type) {
   const ids = type ? ['dt-modal-' + type + '-ov'] : ['dt-modal-hdc-ov','dt-modal-thu-ov','dt-modal-hdtp-ov'];
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('open'); });
+  // Mở khóa cuộn trang nền nếu không còn modal nào đang open
+  const anyOpen = ['hdc','thu','hdtp'].some(t => {
+    const el = document.getElementById('dt-modal-' + t + '-ov');
+    return el && el.classList.contains('open');
+  });
+  if (!anyOpen) document.body.classList.remove('modal-open');
 }
 
 // ── Progress info khi chọn CT trong modal Thu Tiền ────────────

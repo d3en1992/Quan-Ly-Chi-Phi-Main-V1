@@ -2439,7 +2439,8 @@
         <div class="sub-page active" id="dt-sub-khaibao">
           <!-- Dashboard mini: 3 stat cards -->
           <div class="row g-3 mb-4" id="dt-mini-dash">
-            <div class="col-sm-4">
+            <!-- Mobile: chiếm toàn hàng; sm+: 1/3 -->
+            <div class="col-12 col-sm-4">
               <div class="card shadow-sm border-0 h-100" style="background:var(--bs-primary-bg-subtle)">
                 <div class="card-body text-center py-3">
                   <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Giá Trị HĐ</div>
@@ -2447,7 +2448,8 @@
                 </div>
               </div>
             </div>
-            <div class="col-sm-4">
+            <!-- Mobile: mỗi card chiếm 50%; sm+: 1/3 -->
+            <div class="col-6 col-sm-4">
               <div class="card shadow-sm border-0 h-100" style="background:var(--bs-success-bg-subtle)">
                 <div class="card-body text-center py-3">
                   <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Đã Thu</div>
@@ -2455,7 +2457,7 @@
                 </div>
               </div>
             </div>
-            <div class="col-sm-4">
+            <div class="col-6 col-sm-4">
               <div class="card shadow-sm border-0 h-100" style="background:var(--bs-warning-bg-subtle)">
                 <div class="card-body text-center py-3">
                   <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Còn Phải Thu</div>
@@ -2464,17 +2466,23 @@
               </div>
             </div>
           </div>
-          <!-- 3 action buttons -->
-          <div class="d-flex gap-3 flex-wrap justify-content-center mb-4">
-            <button class="btn btn-primary" style="min-width:190px;padding:14px 22px;font-size:14px;font-weight:700;border-radius:10px" onclick="_hdcResetForm();openDtModal('hdc')">
-              <i class="bi bi-file-earmark-text me-2"></i>+ Khai Báo HĐ Chính
-            </button>
-            <button class="btn btn-success" style="min-width:190px;padding:14px 22px;font-size:14px;font-weight:700;border-radius:10px" onclick="_thuResetForm();openDtModal('thu')">
-              <i class="bi bi-cash-coin me-2"></i>+ Ghi Nhận Thu Tiền
-            </button>
-            <button class="btn btn-warning" style="min-width:190px;padding:14px 22px;font-size:14px;font-weight:700;border-radius:10px" onclick="_hdtpResetForm();openDtModal('hdtp')">
-              <i class="bi bi-people me-2"></i>+ HĐ Thầu Phụ
-            </button>
+          <!-- Action buttons: Hàng 1 = HĐ Chính + Thu Tiền (50/50); Hàng 2 = HĐ TP (full) -->
+          <div class="row g-2 mb-4">
+            <div class="col-6">
+              <button class="btn btn-primary w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdcResetForm();openDtModal('hdc')">
+                <i class="bi bi-file-earmark-text me-1"></i>+ Khai Báo HĐ Chính
+              </button>
+            </div>
+            <div class="col-6">
+              <button class="btn btn-success w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_thuResetForm();openDtModal('thu')">
+                <i class="bi bi-cash-coin me-1"></i>+ Ghi Nhận Thu Tiền
+              </button>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-warning w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdtpResetForm();openDtModal('hdtp')">
+                <i class="bi bi-people me-1"></i>+ HĐ Thầu Phụ
+              </button>
+            </div>
           </div>
           <!-- Filter CT + search -->
           <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">

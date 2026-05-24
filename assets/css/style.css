@@ -305,6 +305,8 @@ select.cell-input {
 /* z-index 1060: trên Bootstrap offcanvas (1045) và topbar (1030) */
 .overlay { position: fixed; inset: 0; background: rgba(26,24,20,0.5); z-index: 1060; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(2px); }
 .overlay.open { opacity: 1; pointer-events: all; }
+/* Khóa cuộn trang nền khi modal đang mở */
+body.modal-open { overflow: hidden; touch-action: none; }
 /* .app-modal: modal custom của app, đặt tên riêng để không xung đột Bootstrap Modal */
 .overlay .app-modal {
   position: relative !important;
@@ -485,12 +487,12 @@ select.cell-input {
   /* ════════════════════════════════════
      MODAL
   ════════════════════════════════════ */
-  .overlay { padding: 10px; align-items: flex-end; }
+  .overlay { padding: 10px; align-items: center; }
   .app-modal {
-    max-width: 100%; max-height: 90vh; border-radius: 12px 12px 0 0;
-    transform: translateY(20px);
+    max-width: 100%; max-height: 92vh; border-radius: 12px;
+    transform: scale(0.96) translateY(10px);
   }
-  .overlay.open .app-modal { transform: translateY(0); }
+  .overlay.open .app-modal { transform: scale(1) translateY(0); }
   .app-modal-body { padding: 14px; }
 
   /* ════════════════════════════════════
@@ -503,6 +505,12 @@ select.cell-input {
   ════════════════════════════════════ */
   #page-chamcong .entry-date-bar { flex-wrap: wrap; gap: 6px; }
   #page-chamcong .d-flex { flex-wrap: wrap; }
+
+  /* ════════════════════════════════════
+     CHẤM CÔNG — Bảng chấm công cuộn ngang
+     (overflow: hidden của .entry-table-wrap chặn .table-scroll trên mobile)
+  ════════════════════════════════════ */
+  .entry-table-wrap { overflow-x: auto; }
 }
 
 /* ═══════════════════════════════════════════════════════════

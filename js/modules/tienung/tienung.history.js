@@ -133,26 +133,28 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
       <ul class="pagination pagination-sm mb-0">${btns.join('')}</ul>
     </div>`;
   }
+  const stickyChk  = 'position:sticky;left:0;z-index:2;background:var(--bs-body-bg)';
+  const stickyName = 'position:sticky;left:32px;z-index:2;background:var(--bs-body-bg);box-shadow:2px 0 4px -2px rgba(0,0,0,0.12)';
   return `<div style="overflow-x:auto">
     <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
       <thead><tr>
-        <th style="width:32px;text-align:center">
+        <th style="width:32px;text-align:center;${stickyChk}">
           <input type="checkbox" class="ung-section-chk-all" title="Chọn tất cả"
             onchange="this.closest('table').querySelectorAll('.ung-row-chk').forEach(c=>c.checked=this.checked)">
         </th>
         <th style="white-space:nowrap">Ngày</th>
-        <th style="white-space:nowrap">${nameColLabel}</th>
+        <th style="white-space:nowrap;${stickyName}">${nameColLabel}</th>
         <th style="white-space:nowrap">Công Trình</th>
         <th>Nội Dung</th>
         <th style="text-align:right;white-space:nowrap">Số Tiền Ứng</th>
         <th></th>
       </tr></thead>
       <tbody>${pagedRecs.map(r => `<tr data-ung-id="${r.id}" class="${_editingUngId===r.id?'editing-row':''}">
-        <td style="text-align:center;padding:4px">
+        <td style="text-align:center;padding:4px;${stickyChk}">
           <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer">
         </td>
         <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${fmtISODate(r.ngay)}</td>
-        <td style="font-weight:600;font-size:12px;white-space:nowrap">${x(r.tp)}</td>
+        <td style="font-weight:600;font-size:12px;white-space:nowrap;${stickyName}">${x(r.tp)}</td>
         <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
         <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
         <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
