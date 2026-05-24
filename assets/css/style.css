@@ -1575,3 +1575,152 @@ td.action-col > div {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* =========================================================
+   UI/UX Phase 2 (24/05/2026) — Sticky col + dropdown overflow + layout
+   ========================================================= */
+
+/* ── Task 1: Tiền Ứng sticky columns ─────────────────────── */
+/* Dùng background opaque + cover hover state để không bị transparent */
+.ung-sticky-table .ung-sticky-chk {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--bs-body-bg);
+}
+.ung-sticky-table .ung-sticky-name {
+  position: sticky;
+  left: 32px;
+  z-index: 3;
+  background: var(--bs-body-bg);
+  box-shadow: 4px 0 6px -3px rgba(0, 0, 0, 0.18);
+}
+/* Header row z-index cao hơn body */
+.ung-sticky-table thead .ung-sticky-chk,
+.ung-sticky-table thead .ung-sticky-name {
+  z-index: 5;
+  background: var(--bs-tertiary-bg);
+}
+/* Preserve background khi hover (Bootstrap .table-hover áp dụng bg-color lên tr) */
+.ung-sticky-table tbody tr:hover .ung-sticky-chk,
+.ung-sticky-table tbody tr:hover .ung-sticky-name {
+  background: var(--bs-tertiary-bg);
+}
+/* Editing row giữ màu highlight */
+.ung-sticky-table tbody tr.editing-row .ung-sticky-chk,
+.ung-sticky-table tbody tr.editing-row .ung-sticky-name {
+  background: var(--bs-warning-bg-subtle, #fff3cd);
+}
+
+/* ── Task 2: Dropdown overflow fix (form-select dài bị tràn mobile) ── */
+@media (max-width: 768px) {
+  #page-nhapung .form-select,
+  #page-nhapung select.form-select {
+    max-width: 100%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  /* Toolbar dropdown của Tiền Ứng: giới hạn rộng để không tràn ngang */
+  #page-nhapung .records-toolbar .form-select.w-auto {
+    max-width: calc(100vw - 48px);
+    width: auto;
+  }
+  /* Options trong dropdown khi bung: cho phép xuống dòng để không bị cắt */
+  #page-nhapung select.form-select option {
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+
+/* ── Task 3: Layout reorganization (mobile) ──────────────── */
+@media (max-width: 768px) {
+  /* 3a. Tổng CP rời khỏi header — đẩy xuống bottom bar */
+  .top-stat-header-mobile {
+    display: none !important;
+  }
+
+  /* 3b. Year select đẩy sang góc PHẢI của header */
+  .topbar-year-wrap {
+    margin-left: auto !important;
+  }
+  /* Tab title giữ vị trí giữa logo và year-select */
+  #topbar-tab-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 3c. Cloud button ẩn khỏi bottom bar — chuyển vào dropdown User */
+  .topbar-controls #jb-btn {
+    display: none !important;
+  }
+
+  /* 3d. Tổng CP hiển thị ở bottom-LEFT (vị trí cũ của Cloud) */
+  .topbar-controls .top-stat-mobile {
+    display: flex !important;
+    order: 0;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: #2a2620;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    margin: 0;
+    height: 36px;
+  }
+  .topbar-controls .top-stat-mobile .top-stat-label {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .topbar-controls .top-stat-mobile .top-stat-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    color: #facc15;
+    font-size: 12px;
+  }
+
+  /* Bottom bar: justify space-between → Tổng CP | User | Sync */
+  .topbar-controls {
+    justify-content: space-between !important;
+  }
+  .topbar-controls .mobile-btn-center { order: 2; }
+  .topbar-controls .mobile-btn-right  { order: 3; }
+}
+
+/* 3e. Cloud button trong User dropdown (cả guest + auth view) */
+.ud-cloud-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.15s;
+}
+.ud-cloud-btn:hover {
+  background: rgba(240, 180, 41, 0.12);
+  border-color: rgba(240, 180, 41, 0.4);
+  color: #f0b429;
+}
+.ud-cloud-btn .ud-cloud-label {
+  flex: 1;
+  text-align: left;
+}
+.ud-cloud-btn .ud-cloud-status {
+  font-size: 11px;
+  opacity: 0.7;
+  font-weight: 500;
+}

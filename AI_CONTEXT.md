@@ -531,3 +531,53 @@ rg -n -- "<!-- Sprint|/\\* Sprint|REMOVED Sprint|btn-gold|btn-green|records-tabl
 
 Nếu có output mới, cần phân loại là comment mô tả hợp lệ hay code cũ cần xóa.
 
+### 8.8. Cải tiến UI/UX Phase 2 (24/05/2026) — Sticky col + Dropdown + Layout
+
+#### Task A — Tiền Ứng: sticky column ổn định khi cuộn ngang
+
+**Vấn đề:** Sticky inline style ở `_ungTableHTML()` dùng `background:var(--bs-body-bg)` bị Bootstrap `.table-hover` ghi đè khi hover row → cột bị "trong suốt".
+
+**Giải pháp:**
+- `tienung.history.js` → `_ungTableHTML()`: thay inline style bằng class `.ung-sticky-chk` / `.ung-sticky-name` + table có class `.ung-sticky-table`.
+- `style.css`: định nghĩa CSS sticky chuyên dụng:
+  - z-index 3 (body) / 5 (header) để header luôn nằm trên body khi cuộn dọc.
+  - Background tay đôi: cell mặc định `var(--bs-body-bg)`, hover/editing-row có rule riêng để preserve màu.
+  - Box-shadow phải `4px 0 6px -3px rgba(0,0,0,0.18)` cho hiệu ứng "tách" cột sticky khỏi content cuộn.
+
+#### Task B — Dropdown chống tràn màn hình
+
+**Vấn đề:** `<select class="form-select w-auto">` filter công trình ở Tiền Ứng có thể chứa tên CT dài → tràn ngang trên mobile.
+
+**Giải pháp:** `style.css` (@media 768px):
+- `#page-nhapung .records-toolbar .form-select.w-auto`: `max-width: calc(100vw - 48px)`.
+- `#page-nhapung select.form-select option`: `white-space: normal; word-break: break-word` để options khi bung được wrap.
+
+#### Task C — Tái cấu trúc layout (mobile)
+
+**Vấn đề:** Header chật, Tổng CP và Cloud button chiếm vị trí quan trọng, năm chọn lẫn vào giữa.
+
+**Giải pháp layout mới (mobile):**
+
+| Vùng | Trước | Sau |
+|------|-------|-----|
+| Header trái | ☰ + Logo + tab title + year select + Tổng CP pill (right) | ☰ + Logo + tab title + **Year select ở góc PHẢI** |
+| Bottom bar | Cloud / User / Sync | **Tổng CP** / User / Sync (Cloud rời) |
+| Cloud button | Bottom-left | **Trong dropdown User** (cả guest + auth view) |
+
+**File thay đổi:**
+- `index.html`:
+  - Thêm `.ud-cloud-btn` vào `#user-guest` sau nút "Đăng nhập hệ thống".
+  - Thêm `.ud-action-btn` (Kết nối Cloud) vào `#ud-main-view .ud-actions`.
+- `style.css` (@media 768px):
+  - `.top-stat-header-mobile { display:none !important }` — xóa Tổng CP khỏi header.
+  - `.topbar-year-wrap { margin-left:auto !important }` — đẩy Year select sang phải.
+  - `.topbar-controls #jb-btn { display:none !important }` — ẩn Cloud khỏi bottom bar.
+  - `.topbar-controls .top-stat-mobile`: override `display:flex !important` + styling pill (background `#2a2620`, border + radius 999px) — Tổng CP hiển thị ở bottom-LEFT.
+- `style.css` (global): class `.ud-cloud-btn` cho nút Cloud trong dropdown User.
+- `core.cloud-cats-ui.js` → `updateJbBtn()`: đồng bộ trạng thái `#ud-cloud-status-guest` / `#ud-cloud-status-auth` (✅ Đã kết nối / Chưa kết nối) mỗi khi `updateJbBtn()` chạy.
+
+**Lưu ý cho AI:**
+- `top-total`, `top-total-mobile`, `top-total-header` là 3 ID cùng hiển thị Tổng CP — `updateTop()` ở `tienich.js` và `chamcong.core.js` đều update cả 3. Khi sửa layout không xóa bất kỳ ID nào.
+- Nút Cloud (`#jb-btn`) chỉ ẩn trên mobile (via CSS), vẫn còn trong DOM để `updateJbBtn()` cập nhật được nếu desktop.
+- `openBinModal()` dùng chung từ cả 3 entry points: jb-btn, ud-cloud-btn (guest), ud-action-btn (auth).
+

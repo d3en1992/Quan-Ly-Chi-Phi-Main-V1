@@ -160,19 +160,27 @@ function gsLoadAll(callback) {
 // ══ CẬP NHẬT NÚT CLOUD ════════════════════════════════════
 function updateJbBtn() {
   const btn = document.getElementById('jb-btn');
-  if (!btn) return;
-  if (fbReady()) {
-    btn.textContent = '✅ Cloud';
-    btn.style.background = 'rgba(26,122,69,0.4)';
-    btn.style.borderColor = 'rgba(26,200,100,0.5)';
-    _ensureSyncDot();
-  } else {
-    btn.textContent = '☁️ Cloud';
-    btn.style.background = 'rgba(255,255,255,0.12)';
-    btn.style.borderColor = 'rgba(255,255,255,0.25)';
-    const dot = document.getElementById('sync-dot');
-    if (dot) dot.className = 'hidden';
+  if (btn) {
+    if (fbReady()) {
+      btn.textContent = '✅ Cloud';
+      btn.style.background = 'rgba(26,122,69,0.4)';
+      btn.style.borderColor = 'rgba(26,200,100,0.5)';
+      _ensureSyncDot();
+    } else {
+      btn.textContent = '☁️ Cloud';
+      btn.style.background = 'rgba(255,255,255,0.12)';
+      btn.style.borderColor = 'rgba(255,255,255,0.25)';
+      const dot = document.getElementById('sync-dot');
+      if (dot) dot.className = 'hidden';
+    }
   }
+  // Đồng bộ trạng thái Cloud trong user dropdown (cả guest + auth view)
+  const statusText  = fbReady() ? '✅ Đã kết nối' : 'Chưa kết nối';
+  const statusColor = fbReady() ? '#16a34a' : '#9ca3af';
+  ['ud-cloud-status-guest', 'ud-cloud-status-auth'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = statusText; el.style.color = statusColor; }
+  });
 }
 
 // VI: Sync status dot

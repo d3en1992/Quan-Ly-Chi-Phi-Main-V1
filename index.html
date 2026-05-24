@@ -1007,6 +1007,11 @@
             <button class="ud-btn-primary" onclick="doLogin()">
               Đăng nhập hệ thống
             </button>
+            <button type="button" class="ud-cloud-btn" onclick="openBinModal()" title="Cấu hình kết nối Firebase">
+              <span>☁️</span>
+              <span class="ud-cloud-label">Cấu hình Cloud</span>
+              <span class="ud-cloud-status" id="ud-cloud-status-guest">—</span>
+            </button>
           </div>
         </div>
 
@@ -1025,6 +1030,10 @@
             <div class="ud-actions">
               <button class="ud-action-btn" onclick="openAccountSettings()">
                 <span>⚙️</span> Cài đặt tài khoản
+              </button>
+              <button class="ud-action-btn" onclick="openBinModal()" title="Trạng thái & cấu hình Firebase">
+                <span>☁️</span> Kết nối Cloud
+                <span id="ud-cloud-status-auth" class="ud-cloud-status ms-auto">—</span>
               </button>
               <button class="ud-action-btn ud-logout" onclick="logout()">
                 <span>🚪</span> Đăng xuất
