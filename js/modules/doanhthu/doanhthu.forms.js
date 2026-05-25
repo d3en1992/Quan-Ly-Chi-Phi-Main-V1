@@ -620,7 +620,7 @@ function renderHdtpTable(page) {
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td style="white-space:nowrap">${x(r.thauphu)}</td>
-      <td class="text-secondary" style="font-size:12px;min-width:90px">${x(r.nd || '—')}</td>
+      <td class="text-secondary hdtp-nd-cell"><span class="hdtp-nd-clamp">${x(r.nd || '—')}</span></td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">

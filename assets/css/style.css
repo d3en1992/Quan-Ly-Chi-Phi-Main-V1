@@ -1793,24 +1793,31 @@ td.action-col > div {
 }
 
 /* ── Task 3a: Bảng HĐ Thầu Phụ — cột "Nội Dung" clamp 2 dòng + tăng width 40% ── */
-/* Cấu trúc cột: chk(1), Ngày(2), CT(3), TP(4), Nội Dung(5), Giá Trị(6), action(7) */
-#hdtp-tbody td:nth-child(5) {
-  /* +40% width: trước min-width:90px (inline) → ép max-width hợp lý + line-clamp */
+/* Cấu trúc cột: chk(1), Ngày(2), CT(3), TP(4), Nội Dung(5), Giá Trị(6), action(7)
+   QUAN TRỌNG: KHÔNG đặt display:-webkit-box trực tiếp lên <td> — sẽ phá display:table-cell
+   khiến vertical-align bị mất, text lệch xuống đáy/đỉnh so với các cột bên cạnh.
+   Giải pháp: giữ <td> ở table-cell + vertical-align:middle; áp clamp lên <span> bên trong. */
+#hdtp-tbody td.hdtp-nd-cell {
   max-width: 220px;
-  min-width: 126px !important;  /* +40% so với 90px */
-  white-space: normal !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 126px !important;  /* +40% so với 90px gốc */
+  font-size: 12px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+  vertical-align: middle !important;  /* căn giữa dọc, đồng tâm với các cột khác */
+}
+#hdtp-tbody td.hdtp-nd-cell .hdtp-nd-clamp {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-clamp: 2;
-  box-orient: vertical;
-  line-height: 1.35;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Inner block — không ảnh hưởng vertical-align của TD ngoài */
 }
-/* Đảm bảo row height không bị nở quá lớn — chỉ cho phép tối đa 2 dòng */
-#hdtp-tbody tr {
+/* Đảm bảo cả row dùng middle (phòng khi class .align-middle của Bootstrap bị override) */
+#hdtp-tbody tr,
+#hdtp-tbody tr td {
   vertical-align: middle;
 }
 
