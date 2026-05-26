@@ -117,14 +117,22 @@ function fbCatsPayload() {
   };
 }
 
+// ── Firestore quota counter ──────────────────────────────────
+let _fsReads = 0, _fsWrites = 0;
+function _fsCountRead()  { _fsReads++;  console.log(`[FS Counter] reads: ${_fsReads}, writes: ${_fsWrites}`); }
+function _fsCountWrite() { _fsWrites++; console.log(`[FS Counter] reads: ${_fsReads}, writes: ${_fsWrites}`); }
+function getFsCounter()  { return { reads: _fsReads, writes: _fsWrites }; }
+
 // ── Firebase REST helpers ──────────────────────────────────
 function fsUrl(docId) {
   return `${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`;
 }
 function fsGet(docId) {
+  _fsCountRead();
   return fetch(fsUrl(docId)).then(r=>r.json());
 }
 function fsSet(docId, payload) {
+  _fsCountWrite();
   // PATCH = upsert (tạo hoặc cập nhật)
   return fetch(`${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`, {
     method: 'PATCH',
@@ -323,7 +331,7 @@ function syncNow() {
   reloadFromCloud();
 }
 
-function buildYearSelect() {
+function buildYearSelect(skipCloud) {
   const years = new Set();
   years.add(new Date().getFullYear());
   invoices.forEach(i=>{ if(i.ngay) years.add(parseInt(i.ngay.slice(0,4))); });
@@ -332,7 +340,7 @@ function buildYearSelect() {
   _renderYearSelect(years);
 
   // Nếu Firebase ready → fetch danh sách doc để biết có năm nào
-  if(fbReady()) {
+  if(fbReady() && !skipCloud) {
     fetch(`${FS_BASE()}?key=${FB_CONFIG.apiKey}&pageSize=20`)
       .then(r=>r.json()).then(data=>{
         if(data.documents) {

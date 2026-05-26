@@ -241,7 +241,15 @@ async function pushChanges(opts = {}) {
   _setSyncState('syncing'); // luôn cập nhật nút, dù silent
   if (!silent) showSyncBanner('⏳ Đang đẩy (push)...');
 
-  const years = _getAllLocalYears();
+  // Chỉ push năm có pending changes thực sự, không push mọi năm
+  const _curYr = String(activeYear || new Date().getFullYear());
+  const years = _getAllLocalYears().filter(yr => {
+    if (yr === _curYr) return true;
+    return _V2_YEAR_TYPES.some(type => {
+      const docId = _v2DocYearId(type, parseInt(yr));
+      return _v2GetLastPush(docId) === 0;
+    });
+  });
   console.log('[Sync] ▲ Push bắt đầu — năm:', years.join(', '), '| device:', DEVICE_ID.slice(0, 8));
 
   try {
@@ -809,12 +817,10 @@ function schedulePush() {
     // Giúp tiết kiệm ~19 reads mỗi lần auto-sync ngầm.
     if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
       await pushChanges({ silent: true, skipPull: true });
-      // Đẩy meta (danh_muc, hop_dong, cong_trinh, tai_khoan) ngầm sau khi year push xong
-      if (typeof _v2PushMeta === 'function') {
-        _v2PushMeta().catch(e => console.warn('[Sync] V2 meta auto push lỗi:', e.message || e));
-      }
+      // Meta chỉ push khi user bấm manual sync (🔄 Sync)
+      // Year data changes (hóa đơn, chấm công...) không cần push meta mỗi lần
     }
-  }, 30_000); // Rút ngắn xuống 30s để flush nhanh trước khi user tắt máy
+  }, 300_000); // 5 phút — _flushOnHide() đã đảm bảo flush khi đóng tab
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -839,8 +845,11 @@ async function manualSync() {
   _sBtns.forEach(b => { b.disabled = true; b.style.opacity = '.6'; });
 
   try {
-    // Bước 1: Pull — đợi xong mới tiếp tục
-    await new Promise(resolve => pullChanges(null, resolve));
+    // Bước 1: Pull — chỉ pull năm đang xem, tránh pull toàn bộ lịch sử
+    const _syncYr = (typeof activeYears !== 'undefined' && activeYears.size === 1)
+      ? [...activeYears][0]
+      : (typeof activeYear !== 'undefined' && activeYear ? activeYear : new Date().getFullYear());
+    await new Promise(resolve => pullChanges(_syncYr, resolve));
 
     // Bước 2: Reload globals + clear cache (không render trước khi push xong)
     if (typeof _reloadGlobals === 'function') _reloadGlobals();
@@ -885,12 +894,15 @@ function processQueue() {
 
 // Flag báo cho fetch calls trong sync.v2format.js dùng keepalive
 let _syncKeepAlive = false;
+let _lastFlushTs = 0; // Rate-limit flush: tối đa 1 lần mỗi 10s
 
 (function() {
   function _flushOnHide() {
     if (!fbReady()) return;
     if (typeof _pendingChanges === 'undefined' || _pendingChanges <= 0) return;
     if (isSyncing()) return;
+    if (Date.now() - _lastFlushTs < 10_000) return;
+    _lastFlushTs = Date.now();
     console.log('[Sync] ⚡ Flush on hide — có', _pendingChanges, 'thay đổi chưa sync');
     _syncKeepAlive = true;
     const done = () => { _syncKeepAlive = false; };

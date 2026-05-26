@@ -396,6 +396,7 @@ function _v2ResourceBase() {
 // docPath = "y2025_hoa_don" hoặc "y2025_hoa_don/ban_ghi/uuid1"
 // keepalive=true: trình duyệt tiếp tục gửi dù tab đã đóng (dùng khi flush-on-hide)
 function _v2FsPatchDoc(docPath, firestoreFields) {
+  if (typeof _fsCountWrite === 'function') _fsCountWrite();
   const keepalive = typeof _syncKeepAlive !== 'undefined' && !!_syncKeepAlive;
   return fetch(`${FS_BASE()}/${docPath}?key=${FB_CONFIG.apiKey}`, {
     method:  'PATCH',
@@ -409,6 +410,7 @@ function _v2FsPatchDoc(docPath, firestoreFields) {
 // Trả về string[] (chỉ phần id cuối path) — [] nếu rỗng / chưa tồn tại
 async function _v2FsListIds(parentDocId, collName) {
   try {
+    if (typeof _fsCountRead === 'function') _fsCountRead();
     const url = `${FS_BASE()}/${parentDocId}/${collName}?key=${FB_CONFIG.apiKey}&pageSize=500`;
     const res = await fetch(url).then(r => r.json());
     if (!res || res.error || !res.documents) return [];
@@ -823,6 +825,7 @@ function _v2ResetAllLastPull() {
 //     cloudLastMod }                                     → cloud đã đổi → cần đọc subcoll
 async function _v2CheckLastModified(parentDocId) {
   try {
+    if (typeof _fsCountRead === 'function') _fsCountRead();
     const url = `${FS_BASE()}/${parentDocId}?key=${FB_CONFIG.apiKey}`;
     const res = await fetch(url).then(r => r.json());
     if (!res || res.error || !res.fields) return { exists: false };

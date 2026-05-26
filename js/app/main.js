@@ -38,7 +38,7 @@ function init() {
   // ── Nâng cấp schema nếu cần (chạy trước khi dùng data) ──
   migrateData();
 
-  buildYearSelect();
+  buildYearSelect(true); // skipCloud=true: chỉ render local, chờ gsLoadAll fetch cloud
   renderTrash();
   renderTodayInvoices();
   applyNavPermissions();
