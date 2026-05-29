@@ -87,9 +87,59 @@ function fsUnwrap(doc) {
 }
 
 // ── Doc ID helpers ─────────────────────────────────────────
+// CŨ (giữ lại cho công cụ reset/legacy datatools.js — Prompt 5 sẽ dọn):
 function fbDocYear(yr)  { return `y${yr}`; }
-// Document danh mục dùng chung (đổi tên từ 'cats' → 'danh_muc' cho dễ đọc trên Firebase)
 function fbDocCats()    { return 'danh_muc'; }
+
+// ── CẤU TRÚC MỚI (B): mỗi hạng mục theo năm = 1 document, + 4 doc danh mục dùng chung ──
+// Tên field bên trong viết ĐẦY ĐỦ (không nén) cho dễ đọc trên Firebase Console.
+//   cpct_data/meta_cong_trinh  → { projects }
+//   cpct_data/meta_danh_muc    → { cats, catItems, cnRoles, ctYears }
+//   cpct_data/meta_tai_khoan   → { users }
+//   cpct_data/meta_hop_dong    → { hopDong, thauPhu }
+//   cpct_data/y2025_hoa_don / _tien_ung / _cham_cong / _thiet_bi / _thu_tien → { records }
+function fbDocYearCat(yr, cat) { return `y${yr}_${cat}`; }
+function fbDocMetaCT() { return 'meta_cong_trinh'; }
+function fbDocMetaDM() { return 'meta_danh_muc'; }
+function fbDocMetaTK() { return 'meta_tai_khoan'; }
+function fbDocMetaHD() { return 'meta_hop_dong'; }
+
+// Bảng ánh xạ: hạng mục theo năm → key local + trường ngày để lọc theo năm
+const _YEAR_CATS = [
+  { cat: 'hoa_don',   key: 'inv_v3', dateField: 'ngay'     },
+  { cat: 'tien_ung',  key: 'ung_v1', dateField: 'ngay'     },
+  { cat: 'cham_cong', key: 'cc_v2',  dateField: 'fromDate' },
+  { cat: 'thiet_bi',  key: 'tb_v1',  dateField: 'ngay'     },
+  { cat: 'thu_tien',  key: 'thu_v1', dateField: 'ngay'     },
+];
+
+// Payload 1 hạng mục theo năm — lưu record nguyên dạng (tên field đầy đủ)
+function fbYearCatPayload(yr, key, dateField) {
+  const ys = String(yr);
+  const records = load(key, []).filter(x => x[dateField] && x[dateField].startsWith(ys));
+  return { v: 4, yr: Number(yr), cat: key, records };
+}
+
+// Payload 4 doc danh mục dùng chung
+function fbMetaCTPayload() {
+  return { v: 4, projects: load('projects_v1', []) };
+}
+function fbMetaDMPayload() {
+  return { v: 4,
+    cats: { loai:  load('cat_loai',  DEFAULTS.loaiChiPhi),
+            ncc:   load('cat_ncc',   DEFAULTS.nhaCungCap),
+            nguoi: load('cat_nguoi', DEFAULTS.nguoiTH) },
+    catItems: load('cat_items_v1', {}),
+    cnRoles:  load('cat_cn_roles', {}),
+    ctYears:  load('cat_ct_years', {}),
+  };
+}
+function fbMetaTKPayload() {
+  return { v: 4, users: load('users_v1', []) };
+}
+function fbMetaHDPayload() {
+  return { v: 4, hopDong: load('hopdong_v1', {}), thauPhu: load('thauphu_v1', []) };
+}
 
 // ── Build payload cho từng loại ───────────────────────────
 function fbYearPayload(yr) {
@@ -144,13 +194,13 @@ function fsSet(docId, payload) {
 
 // ── Estimate size ──────────────────────────────────────────
 function estimateYearKb(yr) {
-  const ys = String(yr || activeYear || new Date().getFullYear());
-  const data = {
-    i: compressInv(load('inv_v3',[]).filter(x=>x.ngay&&x.ngay.startsWith(ys))),
-    u: compressUng(load('ung_v1',[]).filter(x=>x.ngay&&x.ngay.startsWith(ys))),
-    c: compressCC(load('cc_v2',[]).filter(x=>x.fromDate&&x.fromDate.startsWith(ys))),
-  };
-  return Math.round(JSON.stringify(data).length/1024*10)/10;
+  const y = yr || activeYear || new Date().getFullYear();
+  // Tổng dung lượng tất cả hạng mục của năm (tên field đầy đủ, không nén)
+  let bytes = 0;
+  _YEAR_CATS.forEach(({ key, dateField }) => {
+    bytes += JSON.stringify(fbYearCatPayload(y, key, dateField).records).length;
+  });
+  return Math.round(bytes / 1024 * 10) / 10;
 }
 
 
@@ -342,7 +392,7 @@ function buildYearSelect(skipCloud) {
 
   // Nếu Firebase ready → fetch danh sách doc để biết có năm nào
   if(fbReady() && !skipCloud) {
-    fetch(`${FS_BASE()}?key=${FB_CONFIG.apiKey}&pageSize=20`)
+    fetch(`${FS_BASE()}?key=${FB_CONFIG.apiKey}&pageSize=300`)
       .then(r=>r.json()).then(data=>{
         if(data.documents) {
           data.documents.forEach(doc=>{

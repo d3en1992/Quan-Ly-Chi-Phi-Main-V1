@@ -51,7 +51,8 @@
       "Bash(ls -1 *.json)",
       "Bash(ls -la cpct_snapshot*)",
       "Bash(node -e ' *)",
-      "Bash(node --check js/core/core.storage.js)"
+      "Bash(node --check js/core/core.storage.js)",
+      "Bash(node --check js/core/core.cloud-cats-ui.js)"
     ]
   }
 }

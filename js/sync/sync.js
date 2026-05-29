@@ -1,12 +1,13 @@
 // sync.js — Sync Engine (bản gọn, 1 document/năm + 1 document danh_muc)
 // Load order: sau doanhthu.js, trước main.js
 // ─────────────────────────────────────────────────────────────────────────────
-// KIẾN TRÚC MỚI (đã gỡ bỏ engine V2 subcollection):
-//   • Mỗi NĂM dữ liệu nghiệp vụ = 1 document trên Firestore:  cpct_data/y{NĂM}
-//       (chứa hóa đơn, tiền ứng, chấm công, thiết bị, doanh thu của năm đó — đã nén)
-//   • Toàn bộ DANH MỤC dùng chung = 1 document:  cpct_data/danh_muc
-//       (loại CP, NCC, người TH, thầu phụ, công trình/projects, hợp đồng, users, ...)
-//   → Không còn hàng nghìn document con (subcollection). Cloud gọn, dễ đọc.
+// KIẾN TRÚC (B) — chia theo HẠNG MỤC cho dễ đọc trên Firebase Console:
+//   • Mỗi HẠNG MỤC theo NĂM = 1 document (tên field đầy đủ, không nén):
+//       cpct_data/y{NĂM}_hoa_don · _tien_ung · _cham_cong · _thiet_bi · _thu_tien
+//   • 4 document DANH MỤC dùng chung:
+//       meta_cong_trinh (projects) · meta_danh_muc (cat/role/năm-CT)
+//       meta_tai_khoan (users)     · meta_hop_dong (HĐ chính + thầu phụ)
+//   → Đổi lại để dễ nhìn; cái giá là đọc/ghi nhiều hơn (mỗi hạng mục 1 lượt).
 //
 //   • CLOUD LÀ DUY NHẤT ĐÚNG (online 100%):
 //       - PULL  = TẢI cloud về và THAY THẾ dữ liệu local của (các) năm được pull.
@@ -14,7 +15,7 @@
 //       - SAVE  = ghi xuống IndexedDB (đọc nhanh) RỒI đẩy cloud gần như tức thì.
 //   • IndexedDB chỉ còn là "bộ nhớ đệm để mở app cho nhanh", không phải nguồn chính.
 //     Khi pull, slice năm đó trong IndexedDB bị cloud ghi đè hoàn toàn.
-//   • danh_muc cũng được THAY THẾ theo cloud (riêng users giữ lại mật khẩu local).
+//   • 4 doc danh mục cũng được THAY THẾ theo cloud (riêng users giữ mật khẩu local).
 // ─────────────────────────────────────────────────────────────────────────────
 
 'use strict';
@@ -268,7 +269,7 @@ function _applyCatItemArrays(merged) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [9] PUSH — đẩy dữ liệu local lên cloud (đọc-gộp-ghi từng năm + danh_muc)
+// [9] PUSH — đẩy local lên cloud (mỗi hạng mục/năm = 1 doc + 4 doc danh mục)
 // ══════════════════════════════════════════════════════════════
 // opts.silent   = true  → chạy ngầm, chỉ hiện banner khi lỗi
 // opts.skipPull = true  → bỏ bước đọc-gộp cloud trước khi ghi (dùng sau import)
@@ -293,38 +294,51 @@ async function pushChanges(opts = {}) {
 
     for (const yr of years) {
       const yrInt = parseInt(yr);
-      try {
-        // ── B1: đọc cloud năm này, gộp vào local (tránh ghi đè dữ liệu thiết bị khác) ──
-        if (!skipPull) {
-          const cloudDoc  = await fsGet(fbDocYear(yrInt));
-          const cloudData = fsUnwrap(cloudDoc);
-          if (cloudData) {
-            if (cloudData.i)   _mergeKey('inv_v3', expandInv(cloudData.i));
-            if (cloudData.u)   _mergeKey('ung_v1', expandUng(cloudData.u));
-            if (cloudData.c)   { const norm = normalizeCC([...load('cc_v2',[]), ...expandCC(cloudData.c)]); _memSet('cc_v2', norm); }
-            if (cloudData.t)   _mergeKey('tb_v1',  expandTb(cloudData.t));
-            if (cloudData.thu) { _mergeKey('thu_v1', cloudData.thu); thuRecords = load('thu_v1', []); }
+      // Ghi từng hạng mục theo năm (hoa_don, tien_ung, cham_cong, thiet_bi, thu_tien)
+      for (const { cat, key, dateField } of _YEAR_CATS) {
+        const ys = String(yrInt);
+        const localRecs = load(key, []).filter(x => x[dateField] && x[dateField].startsWith(ys));
+        if (!localRecs.length) continue; // năm này không có dữ liệu hạng mục đó → bỏ qua
+        try {
+          // ── B1: đọc cloud hạng mục này, gộp vào local (tránh đè dữ liệu máy khác) ──
+          if (!skipPull) {
+            const cd = fsUnwrap(await fsGet(fbDocYearCat(yrInt, cat)));
+            if (cd && Array.isArray(cd.records)) {
+              if (key === 'cc_v2') {
+                _memSet('cc_v2', normalizeCC([...load('cc_v2', []), ...cd.records]));
+              } else {
+                _mergeKey(key, cd.records);
+                if (key === 'thu_v1') thuRecords = load('thu_v1', []);
+              }
+            }
           }
+          // ── B2: ghi đè doc hạng mục bằng dữ liệu local đã gộp ──
+          const res = await fsSet(fbDocYearCat(yrInt, cat), fbYearCatPayload(yrInt, key, dateField));
+          if (res && res.fields) ok++;
+          else { fail++; console.warn(`[Sync] ✗ ${cat} ${yr} ghi lỗi`); }
+        } catch (e) {
+          console.warn(`[Sync] ✗ ${cat} ${yr} exception:`, e.message || e);
+          fail++;
         }
-
-        // ── B2: ghi (overwrite) document năm bằng dữ liệu local đã gộp ──
-        const payload = fbYearPayload(yrInt);
-        const res     = await fsSet(fbDocYear(yrInt), payload);
-        if (res && res.fields) { ok++; console.log(`[Sync] ▲ Year ${yr} OK`); }
-        else { fail++; console.warn(`[Sync] ✗ Year ${yr} ghi lỗi`); }
-      } catch (e) {
-        console.warn(`[Sync] ✗ Year ${yr} exception:`, e.message || e);
-        fail++;
       }
+      console.log(`[Sync] ▲ Year ${yr} OK`);
     }
 
-    // ── Danh mục dùng chung: đọc-gộp-ghi document danh_muc ──
+    // ── 4 doc danh mục dùng chung: đọc-gộp-ghi ──
     try {
-      if (!skipPull) await _pullDanhMuc();   // gộp cloud → local trước
-      const res = await fsSet(fbDocCats(), fbCatsPayload());
-      if (!(res && res.fields)) console.warn('[Sync] ✗ danh_muc ghi lỗi');
+      if (!skipPull) await _pullMeta();   // gộp cloud → local trước
+      const metas = [
+        [fbDocMetaCT(), fbMetaCTPayload()],
+        [fbDocMetaDM(), fbMetaDMPayload()],
+        [fbDocMetaTK(), fbMetaTKPayload()],
+        [fbDocMetaHD(), fbMetaHDPayload()],
+      ];
+      for (const [docId, payload] of metas) {
+        const res = await fsSet(docId, payload);
+        if (!(res && res.fields)) console.warn(`[Sync] ✗ ${docId} ghi lỗi`);
+      }
     } catch (e) {
-      console.warn('[Sync] danh_muc push lỗi:', e.message || e);
+      console.warn('[Sync] danh mục push lỗi:', e.message || e);
     }
 
     if (fail === 0) {
@@ -353,70 +367,82 @@ async function pushChanges(opts = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [10] PULL DANH MỤC — đọc document danh_muc, THAY THẾ local bằng cloud
-// (riêng users: lấy theo cloud nhưng vá lại mật khẩu local nếu cloud thiếu)
+// [10] PULL META — đọc 4 doc danh mục dùng chung, THAY THẾ local bằng cloud
+//   meta_cong_trinh · meta_danh_muc · meta_tai_khoan · meta_hop_dong
+//   (riêng users: lấy theo cloud nhưng vá lại mật khẩu local nếu cloud thiếu)
 // ══════════════════════════════════════════════════════════════
-async function _pullDanhMuc() {
-  const doc  = await fsGet(fbDocCats());
-  const data = fsUnwrap(doc);
-  if (!data) { console.log('[Sync] ▼ danh_muc chưa có trên cloud'); return false; }
+async function _pullMeta() {
+  let changed = false;
 
-  // projects (công trình) — nguồn gốc của cat_ct
-  if (Array.isArray(data.projects)) {
-    _memSet('projects_v1', data.projects);
-    if (typeof projects !== 'undefined') projects = data.projects;
-    if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
-  }
+  // ── meta_cong_trinh: projects (công trình) — nguồn gốc của cat_ct ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaCT()));
+    if (d && Array.isArray(d.projects)) {
+      _memSet('projects_v1', d.projects);
+      if (typeof projects !== 'undefined') projects = d.projects;
+      if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
+      changed = true;
+    }
+  } catch (e) { console.warn('[Sync] meta_cong_trinh pull lỗi:', e.message || e); }
 
-  // users — lấy theo cloud, nhưng vá mật khẩu từ local nếu cloud thiếu
-  // (tránh trường hợp user mới tạo trên máy này chưa kịp đẩy mật khẩu lên cloud)
-  if (Array.isArray(data.users)) {
-    const pwById = new Map();
-    load('users_v1', []).forEach(u => {
-      if (u && u.password) pwById.set(u.id || u.username, u.password);
-    });
-    const replaced = data.users.map(u => {
-      if (u && !u.password) {
-        const pw = pwById.get(u.id || u.username);
-        if (pw) return { ...u, password: pw };
+  // ── meta_danh_muc: catItems (source of truth), vai trò CN, năm theo CT ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaDM()));
+    if (d) {
+      if (d.catItems && typeof d.catItems === 'object') {
+        _memSet('cat_items_v1', d.catItems);
+        _applyCatItemArrays(d.catItems);
       }
-      return u;
-    });
-    _memSet('users_v1', replaced);
-  }
+      if (d.cnRoles && typeof d.cnRoles === 'object') {
+        _memSet('cat_cn_roles', d.cnRoles);
+        if (typeof cnRoles !== 'undefined') cnRoles = d.cnRoles;
+      }
+      if (d.ctYears && typeof d.ctYears === 'object') {
+        _memSet('cat_ct_years', d.ctYears);
+        if (typeof cats !== 'undefined') cats.congTrinhYears = d.ctYears;
+      }
+      changed = true;
+    }
+  } catch (e) { console.warn('[Sync] meta_danh_muc pull lỗi:', e.message || e); }
 
-  // cat_items_v1 — per-item, source of truth cho các mảng tên danh mục
-  if (data.catItems && typeof data.catItems === 'object') {
-    _memSet('cat_items_v1', data.catItems);
-    _applyCatItemArrays(data.catItems);
-  }
+  // ── meta_tai_khoan: users (vá mật khẩu local nếu cloud thiếu) ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaTK()));
+    if (d && Array.isArray(d.users)) {
+      const pwById = new Map();
+      load('users_v1', []).forEach(u => {
+        if (u && u.password) pwById.set(u.id || u.username, u.password);
+      });
+      const replaced = d.users.map(u => {
+        if (u && !u.password) {
+          const pw = pwById.get(u.id || u.username);
+          if (pw) return { ...u, password: pw };
+        }
+        return u;
+      });
+      _memSet('users_v1', replaced);
+      changed = true;
+    }
+  } catch (e) { console.warn('[Sync] meta_tai_khoan pull lỗi:', e.message || e); }
 
-  // hợp đồng (object map theo tên CT)
-  if (data.hopDong && typeof data.hopDong === 'object') {
-    _memSet('hopdong_v1', data.hopDong);
-    if (typeof hopDongData !== 'undefined') hopDongData = data.hopDong;
-  }
+  // ── meta_hop_dong: hợp đồng chính + thầu phụ ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaHD()));
+    if (d) {
+      if (d.hopDong && typeof d.hopDong === 'object') {
+        _memSet('hopdong_v1', d.hopDong);
+        if (typeof hopDongData !== 'undefined') hopDongData = d.hopDong;
+      }
+      if (Array.isArray(d.thauPhu)) {
+        _memSet('thauphu_v1', d.thauPhu);
+        if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = d.thauPhu;
+      }
+      changed = true;
+    }
+  } catch (e) { console.warn('[Sync] meta_hop_dong pull lỗi:', e.message || e); }
 
-  // thầu phụ (mảng)
-  if (Array.isArray(data.thauPhu)) {
-    _memSet('thauphu_v1', data.thauPhu);
-    if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = data.thauPhu;
-  }
-
-  // vai trò công nhân
-  if (data.cnRoles && typeof data.cnRoles === 'object') {
-    _memSet('cat_cn_roles', data.cnRoles);
-    if (typeof cnRoles !== 'undefined') cnRoles = data.cnRoles;
-  }
-
-  // năm theo công trình
-  if (data.ctYears && typeof data.ctYears === 'object') {
-    _memSet('cat_ct_years', data.ctYears);
-    if (typeof cats !== 'undefined') cats.congTrinhYears = data.ctYears;
-  }
-
-  console.log('[Sync] ▼ danh_muc đã thay thế theo cloud');
-  return true;
+  if (changed) console.log('[Sync] ▼ danh mục đã thay thế theo cloud');
+  return changed;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -456,12 +482,12 @@ async function pullChanges(yr, callback, opts = {}) {
   if (!silent) showSyncBanner('⬇ Đang tải (pull)...');
 
   try {
-    // ── Danh mục dùng chung ──
+    // ── Danh mục dùng chung (4 doc meta) ──
     let _catsChanged = false;
-    try { _catsChanged = await _pullDanhMuc(); }
-    catch (e) { console.warn('[Sync] danh_muc pull lỗi:', e.message || e); }
+    try { _catsChanged = await _pullMeta(); }
+    catch (e) { console.warn('[Sync] meta pull lỗi:', e.message || e); }
 
-    // ── Dữ liệu từng năm: THAY THẾ slice năm đó bằng cloud ──
+    // ── Dữ liệu từng năm: đọc từng hạng mục, THAY THẾ slice năm đó bằng cloud ──
     let totalRecords = 0;
 
     // CC cần normalize (gom theo tuần+công trình) sau khi thay slice năm
@@ -479,26 +505,23 @@ async function pullChanges(yr, callback, opts = {}) {
     };
 
     for (const yrStr of years) {
-      try {
-        const doc  = await fsGet(fbDocYear(parseInt(yrStr)));
-        const data = fsUnwrap(doc);
-        // Năm chưa có trên cloud (null xác nhận) → để nguyên local năm đó (an toàn, không xóa)
-        if (!data) { console.log(`[Sync] ▼ Năm ${yrStr} chưa có trên cloud — giữ nguyên local`); continue; }
-        const inv = data.i ? expandInv(data.i) : [];
-        const ung = data.u ? expandUng(data.u) : [];
-        const tb  = data.t ? expandTb(data.t)  : [];
-        const thu = Array.isArray(data.thu) ? data.thu : [];
-        _replaceYearData('inv_v3', inv, yrStr);
-        _replaceYearData('ung_v1', ung, yrStr);
-        _replaceYearData('tb_v1',  tb,  yrStr);
-        _replaceYearData('thu_v1', thu, yrStr);
-        thuRecords = load('thu_v1', []);
-        replaceCC(data.c ? expandCC(data.c) : [], yrStr);
-        totalRecords += inv.length + ung.length + tb.length + thu.length;
-        console.log(`[Sync] ▼ Năm ${yrStr} đã thay thế theo cloud`);
-      } catch (e) {
-        console.warn(`[Sync] Pull năm ${yrStr} lỗi:`, e.message || e);
+      for (const { cat, key } of _YEAR_CATS) {
+        try {
+          const d = fsUnwrap(await fsGet(fbDocYearCat(parseInt(yrStr), cat)));
+          // doc chưa có / sai định dạng → giữ nguyên local hạng mục đó (an toàn)
+          if (!d || !Array.isArray(d.records)) continue;
+          if (key === 'cc_v2') {
+            replaceCC(d.records, yrStr);
+          } else {
+            _replaceYearData(key, d.records, yrStr);
+            if (key === 'thu_v1') thuRecords = load('thu_v1', []);
+            totalRecords += d.records.length;
+          }
+        } catch (e) {
+          console.warn(`[Sync] Pull ${cat} ${yrStr} lỗi:`, e.message || e);
+        }
       }
+      console.log(`[Sync] ▼ Năm ${yrStr} đã thay thế theo cloud`);
     }
 
     if (!silent) hideSyncBanner();
