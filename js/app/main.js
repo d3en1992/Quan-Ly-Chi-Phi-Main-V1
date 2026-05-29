@@ -334,10 +334,38 @@ function renderActiveTab() {
   queueApplyRoleUI();
 }
 
+// ══════════════════════════════════════════════════════════════
+// MÀN HÌNH CHẶN KHI MẤT MẠNG (app chạy online 100%)
+// ══════════════════════════════════════════════════════════════
+// Hiện overlay che toàn màn, tự tải lại app ngay khi có mạng trở lại.
+function _showOfflineBlock() {
+  if (document.getElementById('offline-block')) return;
+  const el = document.createElement('div');
+  el.id = 'offline-block';
+  el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#111;color:#fff;'
+    + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
+    + 'text-align:center;font-family:system-ui,sans-serif;padding:24px;gap:14px';
+  el.innerHTML =
+    '<div style="font-size:52px">📡</div>'
+    + '<div style="font-size:20px;font-weight:700">Mất kết nối internet</div>'
+    + '<div style="font-size:15px;opacity:.8;max-width:320px;line-height:1.5">'
+    + 'App cần có mạng để làm việc với dữ liệu trên cloud. '
+    + 'Vui lòng bật mạng — app sẽ tự mở lại khi có kết nối.</div>'
+    + '<button id="offline-retry" style="margin-top:8px;padding:10px 22px;border:0;border-radius:8px;'
+    + 'background:#2563eb;color:#fff;font-size:15px;cursor:pointer">Thử lại</button>';
+  document.body.appendChild(el);
+  document.getElementById('offline-retry').onclick = () => location.reload();
+  // Có mạng trở lại → tự tải lại để khởi động bình thường
+  window.addEventListener('online', () => location.reload(), { once: true });
+}
+
 // Khoi dong app — IDB preflight truoc, sau do moi chay init()
 // Flag bảo vệ: render sẽ bail-out nếu data chưa sẵn sàng
 window._dataReady = false;
 (async () => {
+  // Online 100%: bắt buộc có mạng mới chạy. Mất mạng → chặn + tự thử lại.
+  if (!navigator.onLine) { _showOfflineBlock(); return; }
+
   await dbInit();
   // Re-load globals từ _mem (đã được dbInit() populate từ IDB)
   trash       = load('trash_v1', []);

@@ -50,7 +50,8 @@
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\modules\\\\doanhthu\\\\doanhthu.forms.js\")",
       "Bash(ls -1 *.json)",
       "Bash(ls -la cpct_snapshot*)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node --check js/core/core.storage.js)"
     ]
   }
 }

@@ -8,10 +8,13 @@
 //       (loại CP, NCC, người TH, thầu phụ, công trình/projects, hợp đồng, users, ...)
 //   → Không còn hàng nghìn document con (subcollection). Cloud gọn, dễ đọc.
 //
-//   • IndexedDB vẫn là nơi đọc nhanh (qua _mem) khi app chạy.
-//   • Cloud là nguồn dữ liệu chính: pull = tải cloud về, push = đẩy local lên.
-//   • Bước này VẪN merge (gộp) khi pull để KHÔNG mất dữ liệu trong giai đoạn chuyển đổi.
-//     (Việc "chặn offline + ghi cloud tức thì" sẽ làm ở bước kế tiếp.)
+//   • CLOUD LÀ DUY NHẤT ĐÚNG (online 100%):
+//       - PULL  = TẢI cloud về và THAY THẾ dữ liệu local của (các) năm được pull.
+//                 → Hết cảnh 2 máy lệch số: máy nào pull xong cũng giống hệt cloud.
+//       - SAVE  = ghi xuống IndexedDB (đọc nhanh) RỒI đẩy cloud gần như tức thì.
+//   • IndexedDB chỉ còn là "bộ nhớ đệm để mở app cho nhanh", không phải nguồn chính.
+//     Khi pull, slice năm đó trong IndexedDB bị cloud ghi đè hoàn toàn.
+//   • danh_muc cũng được THAY THẾ theo cloud (riêng users giữ lại mật khẩu local).
 // ─────────────────────────────────────────────────────────────────────────────
 
 'use strict';
@@ -177,6 +180,24 @@ function _mergeKey(key, cloudExpanded) {
   return merged.length - local.length;
 }
 
+// Trường chứa ngày (để biết record thuộc năm nào) của từng loại dữ liệu
+const _YEAR_FIELD = { inv_v3: 'ngay', ung_v1: 'ngay', cc_v2: 'fromDate', tb_v1: 'ngay', thu_v1: 'ngay' };
+
+// THAY THẾ slice 1 năm: giữ nguyên record các năm KHÁC, ghi đè record năm yrStr bằng cloud.
+// → đây là cốt lõi của "cloud là chuẩn": local năm đó = đúng những gì cloud có.
+function _replaceYearData(key, cloudArr, yrStr) {
+  const field = _YEAR_FIELD[key] || 'ngay';
+  const y     = String(yrStr);
+  const local = load(key, []);
+  // giữ lại record của các năm khác (không bị pull lần này)
+  const kept  = local.filter(r => {
+    const d = r[field];
+    return !(d && d.length >= 4 && d.slice(0, 4) === y);
+  });
+  const result = [...kept, ...(cloudArr || [])];
+  _memSet(key, result);
+}
+
 // Gộp danh mục dạng object {tên: dữ liệu} theo LWW (max của updatedAt & deletedAt)
 function _mergeHopDong(localHd, cloudHd) {
   const merged = { ...cloudHd };
@@ -332,73 +353,74 @@ async function pushChanges(opts = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [10] PULL DANH MỤC — đọc document danh_muc, gộp vào local
+// [10] PULL DANH MỤC — đọc document danh_muc, THAY THẾ local bằng cloud
+// (riêng users: lấy theo cloud nhưng vá lại mật khẩu local nếu cloud thiếu)
 // ══════════════════════════════════════════════════════════════
 async function _pullDanhMuc() {
   const doc  = await fsGet(fbDocCats());
   const data = fsUnwrap(doc);
   if (!data) { console.log('[Sync] ▼ danh_muc chưa có trên cloud'); return false; }
 
-  // còn pending → giữ nguyên các mảng tên danh mục local (tránh xóa nhầm)
-  const hasPending = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
-
   // projects (công trình) — nguồn gốc của cat_ct
   if (Array.isArray(data.projects)) {
-    const merged = mergeDatasets(load('projects_v1', []), data.projects);
-    _memSet('projects_v1', merged);
-    if (typeof projects !== 'undefined') projects = merged;
+    _memSet('projects_v1', data.projects);
+    if (typeof projects !== 'undefined') projects = data.projects;
     if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
   }
 
-  // users — gộp an toàn (giữ mật khẩu local)
+  // users — lấy theo cloud, nhưng vá mật khẩu từ local nếu cloud thiếu
+  // (tránh trường hợp user mới tạo trên máy này chưa kịp đẩy mật khẩu lên cloud)
   if (Array.isArray(data.users)) {
-    const merger = typeof _mergeUsersV2 === 'function' ? _mergeUsersV2 : _mergeUsersSafe;
-    _memSet('users_v1', merger(load('users_v1', []), data.users));
+    const pwById = new Map();
+    load('users_v1', []).forEach(u => {
+      if (u && u.password) pwById.set(u.id || u.username, u.password);
+    });
+    const replaced = data.users.map(u => {
+      if (u && !u.password) {
+        const pw = pwById.get(u.id || u.username);
+        if (pw) return { ...u, password: pw };
+      }
+      return u;
+    });
+    _memSet('users_v1', replaced);
   }
 
   // cat_items_v1 — per-item, source of truth cho các mảng tên danh mục
   if (data.catItems && typeof data.catItems === 'object') {
-    const merged = _mergeCatItems(load('cat_items_v1', {}), data.catItems);
-    _memSet('cat_items_v1', merged);
-    _applyCatItemArrays(merged);
+    _memSet('cat_items_v1', data.catItems);
+    _applyCatItemArrays(data.catItems);
   }
 
   // hợp đồng (object map theo tên CT)
   if (data.hopDong && typeof data.hopDong === 'object') {
-    const merged = _mergeHopDong(load('hopdong_v1', {}), data.hopDong);
-    _memSet('hopdong_v1', merged);
-    if (typeof hopDongData !== 'undefined') hopDongData = merged;
+    _memSet('hopdong_v1', data.hopDong);
+    if (typeof hopDongData !== 'undefined') hopDongData = data.hopDong;
   }
 
   // thầu phụ (mảng)
   if (Array.isArray(data.thauPhu)) {
-    const merged = mergeDatasets(load('thauphu_v1', []), data.thauPhu);
-    _memSet('thauphu_v1', merged);
-    if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = merged;
+    _memSet('thauphu_v1', data.thauPhu);
+    if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = data.thauPhu;
   }
 
-  // vai trò công nhân — chỉ áp khi không còn pending
-  if (data.cnRoles && typeof data.cnRoles === 'object' && !hasPending) {
-    const localRoles  = load('cat_cn_roles', {});
-    const mergedRoles  = { ...data.cnRoles, ...localRoles };
-    _memSet('cat_cn_roles', mergedRoles);
-    if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
+  // vai trò công nhân
+  if (data.cnRoles && typeof data.cnRoles === 'object') {
+    _memSet('cat_cn_roles', data.cnRoles);
+    if (typeof cnRoles !== 'undefined') cnRoles = data.cnRoles;
   }
 
-  // năm theo công trình — union
+  // năm theo công trình
   if (data.ctYears && typeof data.ctYears === 'object') {
-    const mergedYears = { ...load('cat_ct_years', {}) };
-    Object.entries(data.ctYears).forEach(([ct, yr]) => { if (!(ct in mergedYears)) mergedYears[ct] = yr; });
-    _memSet('cat_ct_years', mergedYears);
-    if (typeof cats !== 'undefined') cats.congTrinhYears = mergedYears;
+    _memSet('cat_ct_years', data.ctYears);
+    if (typeof cats !== 'undefined') cats.congTrinhYears = data.ctYears;
   }
 
-  console.log('[Sync] ▼ danh_muc đã gộp');
+  console.log('[Sync] ▼ danh_muc đã thay thế theo cloud');
   return true;
 }
 
 // ══════════════════════════════════════════════════════════════
-// [11] PULL — tải cloud về, gộp vào local (danh_muc + từng năm)
+// [11] PULL — tải cloud về, THAY THẾ local (danh_muc + từng năm)
 // ══════════════════════════════════════════════════════════════
 // yr=null → pull tất cả năm local; yr=số → pull đúng năm đó
 async function pullChanges(yr, callback, opts = {}) {
@@ -439,50 +461,49 @@ async function pullChanges(yr, callback, opts = {}) {
     try { _catsChanged = await _pullDanhMuc(); }
     catch (e) { console.warn('[Sync] danh_muc pull lỗi:', e.message || e); }
 
-    // ── Dữ liệu từng năm ──
-    let totalNew = 0, totalConflicts = 0;
+    // ── Dữ liệu từng năm: THAY THẾ slice năm đó bằng cloud ──
+    let totalRecords = 0;
 
-    const mergeAndCount = (key, cloudArr, yrStr) => {
-      const local     = load(key, []);
-      const merged    = mergeDatasets(local, cloudArr);
-      const newRecs   = merged.filter(m => !local.find(l => String(l.id) === String(m.id))).length;
-      const conflicts = cloudArr.filter(cr => {
-        const lr = local.find(l => String(l.id) === String(cr.id));
-        return lr && (lr.updatedAt || lr._ts || 0) !== (cr.updatedAt || 0);
-      }).length;
-      totalNew += newRecs; totalConflicts += conflicts;
-      _memSet(key, merged);
-      if (newRecs || conflicts) console.log(`[Sync] ▼ ${key} năm ${yrStr}: +${newRecs} mới, ${conflicts} đổi`);
-    };
-
-    const mergeCCAndCount = (cloudCC, yrStr) => {
-      const localCC    = load('cc_v2', []);
-      const normalized = normalizeCC([...localCC, ...cloudCC]);
-      const newRecs    = normalized.filter(n => !localCC.find(l => String(l.id) === String(n.id))).length;
-      totalNew += newRecs;
+    // CC cần normalize (gom theo tuần+công trình) sau khi thay slice năm
+    const replaceCC = (cloudCC, yrStr) => {
+      const y     = String(yrStr);
+      const local = load('cc_v2', []);
+      const kept  = local.filter(r => {
+        const d = r.fromDate || r.from || '';
+        return !(d && d.length >= 4 && d.slice(0, 4) === y);
+      });
+      const normalized = normalizeCC([...kept, ...(cloudCC || [])]);
       _memSet('cc_v2', normalized);
       if (typeof ccData !== 'undefined') ccData = normalized;
+      totalRecords += (cloudCC || []).length;
     };
 
     for (const yrStr of years) {
       try {
         const doc  = await fsGet(fbDocYear(parseInt(yrStr)));
         const data = fsUnwrap(doc);
-        if (!data) { console.log(`[Sync] ▼ Năm ${yrStr} chưa có trên cloud`); continue; }
-        if (data.i)   mergeAndCount('inv_v3', expandInv(data.i), yrStr);
-        if (data.u)   mergeAndCount('ung_v1', expandUng(data.u), yrStr);
-        if (data.c)   mergeCCAndCount(expandCC(data.c), yrStr);
-        if (data.t)   mergeAndCount('tb_v1',  expandTb(data.t), yrStr);
-        if (data.thu) { mergeAndCount('thu_v1', data.thu, yrStr); thuRecords = load('thu_v1', []); }
-        console.log(`[Sync] ▼ Năm ${yrStr} đã gộp`);
+        // Năm chưa có trên cloud (null xác nhận) → để nguyên local năm đó (an toàn, không xóa)
+        if (!data) { console.log(`[Sync] ▼ Năm ${yrStr} chưa có trên cloud — giữ nguyên local`); continue; }
+        const inv = data.i ? expandInv(data.i) : [];
+        const ung = data.u ? expandUng(data.u) : [];
+        const tb  = data.t ? expandTb(data.t)  : [];
+        const thu = Array.isArray(data.thu) ? data.thu : [];
+        _replaceYearData('inv_v3', inv, yrStr);
+        _replaceYearData('ung_v1', ung, yrStr);
+        _replaceYearData('tb_v1',  tb,  yrStr);
+        _replaceYearData('thu_v1', thu, yrStr);
+        thuRecords = load('thu_v1', []);
+        replaceCC(data.c ? expandCC(data.c) : [], yrStr);
+        totalRecords += inv.length + ung.length + tb.length + thu.length;
+        console.log(`[Sync] ▼ Năm ${yrStr} đã thay thế theo cloud`);
       } catch (e) {
         console.warn(`[Sync] Pull năm ${yrStr} lỗi:`, e.message || e);
       }
     }
 
     if (!silent) hideSyncBanner();
-    console.log(`[Sync] ▼ Pull xong — ${totalNew} record mới, ${totalConflicts} đổi${_catsChanged ? ', danh mục cập nhật' : ''}`);
-    if (callback) callback({ newRecords: totalNew, conflicts: totalConflicts, catsChanged: _catsChanged });
+    console.log(`[Sync] ▼ Pull xong — ${totalRecords} record từ cloud${_catsChanged ? ', danh mục cập nhật' : ''}`);
+    if (callback) callback({ newRecords: totalRecords, conflicts: 0, catsChanged: _catsChanged });
     if (typeof afterSync === 'function') afterSync();
 
   } catch (e) {
@@ -495,8 +516,8 @@ async function pullChanges(yr, callback, opts = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [12] SCHEDULE PUSH — đẩy ngầm sau khi save() (debounce 5 phút)
-// (sẽ được thay bằng "ghi cloud tức thì" ở bước kế tiếp)
+// [12] SCHEDULE PUSH — đẩy cloud gần như tức thì sau khi save()
+// (debounce ngắn 800ms để gộp nhiều save liên tiếp thành 1 lần đẩy)
 // ══════════════════════════════════════════════════════════════
 let _pushTimer = null;
 
@@ -511,11 +532,12 @@ function schedulePush() {
   clearTimeout(_pushTimer);
   _pushTimer = setTimeout(async () => {
     _pushTimer = null;
-    if (isSyncing()) { _pushTimer = setTimeout(schedulePush, 15_000); return; }
+    if (isSyncing()) { _pushTimer = setTimeout(schedulePush, 3_000); return; }
     if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
-      await pushChanges({ silent: true, skipPull: true });
+      // skipPull:false → đẩy có gộp cloud trước (an toàn khi nhiều máy cùng ghi 1 năm)
+      await pushChanges({ silent: true });
     }
-  }, 300_000); // 5 phút — flush-on-hide đảm bảo đẩy nốt khi đóng tab
+  }, 800); // ~tức thì — gộp các thao tác gõ liên tiếp
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -539,7 +561,13 @@ async function manualSync() {
   _sBtns.forEach(b => { b.disabled = true; b.style.opacity = '.6'; });
 
   try {
-    // B1: Pull — chỉ pull năm đang xem
+    // B0: nếu còn thay đổi chưa đẩy → đẩy trước (vì pull giờ THAY THẾ, sẽ ghi đè local)
+    if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
+      cancelScheduledPush();
+      await pushChanges({ silent: true });
+    }
+
+    // B1: Pull — chỉ pull năm đang xem (thay thế local bằng cloud)
     const _syncYr = (typeof activeYears !== 'undefined' && activeYears.size === 1)
       ? [...activeYears][0]
       : (typeof activeYear !== 'undefined' && activeYear ? activeYear : new Date().getFullYear());
@@ -586,3 +614,15 @@ let _lastFlushTs = 0; // giới hạn: tối đa 1 lần / 10s
   document.addEventListener('visibilitychange', () => { if (document.hidden) _flushOnHide(); });
   window.addEventListener('pagehide', _flushOnHide);
 })();
+
+// ══════════════════════════════════════════════════════════════
+// [16] CÓ MẠNG LẠI — tự đẩy nốt thay đổi đã lưu khi offline
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('online', () => {
+  if (!fbReady()) return;
+  if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
+    console.log('[Sync] 🟢 Có mạng lại — đẩy nốt', _pendingChanges, 'thay đổi');
+    if (typeof toast === 'function') toast('🟢 Có mạng lại — đang đồng bộ...', 'info');
+    schedulePush();
+  }
+});

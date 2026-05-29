@@ -260,8 +260,19 @@ function save(k, v, opts) {
   if (_INV_CACHE_KEYS.has(k) && typeof clearInvoiceCache === 'function') clearInvoiceCache();
   if (!opts?.skipSync && _SYNC_DATA_KEYS.has(k)) {
     _incPending();
+    // Online 100%: cố đẩy cloud gần như tức thì. Nếu mất mạng → vẫn lưu local
+    // nhưng nhắc user là chưa đẩy được (tránh ngộ nhận đã đồng bộ).
+    if (!navigator.onLine) _warnOfflineSave();
     if (typeof schedulePush === 'function') schedulePush();
   }
+}
+
+// Nhắc "mất mạng" tối đa 1 lần / 10s để khỏi spam
+let _lastOfflineWarnTs = 0;
+function _warnOfflineSave() {
+  if (Date.now() - _lastOfflineWarnTs < 10_000) return;
+  _lastOfflineWarnTs = Date.now();
+  if (typeof toast === 'function') toast('🔴 Mất mạng — thay đổi sẽ được đẩy lên khi có mạng lại', 'error');
 }
 
 
