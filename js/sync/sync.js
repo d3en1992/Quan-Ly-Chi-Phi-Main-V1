@@ -287,7 +287,31 @@ async function pushChanges(opts = {}) {
   // Push ngầm: chỉ năm hiện tại (nhẹ). Push thủ công: tất cả năm.
   const _curYr = String(activeYear || new Date().getFullYear());
   const years  = silent ? [_curYr] : _getAllLocalYears();
-  console.log('[Sync] ▲ Push bắt đầu — năm:', years.join(', '), '| device:', DEVICE_ID.slice(0, 8));
+
+  // ── Lọc theo key đã đổi (chỉ áp dụng cho push ngầm) ──
+  // Push thủ công (silent=false) luôn đẩy đủ. Push ngầm: nếu biết key nào đổi
+  // thì chỉ đẩy đúng hạng mục + meta liên quan để tiết kiệm read/write.
+  const _hasDirty   = (typeof _dirtyKeys !== 'undefined' && _dirtyKeys.size > 0);
+  const _scoped     = silent && _hasDirty;            // có đủ thông tin để thu hẹp phạm vi
+  const _catsToPush = _scoped
+    ? _YEAR_CATS.filter(c => _dirtyKeys.has(c.key))
+    : _YEAR_CATS;
+  // Các key kích hoạt từng doc meta (gộp theo payload tương ứng)
+  const _META_TRIGGER_KEYS = new Set([
+    'projects_v1','cat_ct',                                   // → meta_cong_trinh
+    'cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb',
+    'cat_items_v1','cat_cn_roles','cat_ct_years',             // → meta_danh_muc
+    'users_v1',                                               // → meta_tai_khoan
+    'hopdong_v1','thauphu_v1',                                // → meta_hop_dong
+  ]);
+  const _pushMeta = _scoped
+    ? [..._dirtyKeys].some(k => _META_TRIGGER_KEYS.has(k))
+    : true;
+
+  console.log('[Sync] ▲ Push bắt đầu — năm:', years.join(', '),
+    '| hạng mục:', _catsToPush.map(c => c.cat).join(',') || '(none)',
+    '| meta:', _pushMeta ? 'có' : 'bỏ',
+    '| device:', DEVICE_ID.slice(0, 8));
 
   try {
     let ok = 0, fail = 0;
@@ -295,7 +319,7 @@ async function pushChanges(opts = {}) {
     for (const yr of years) {
       const yrInt = parseInt(yr);
       // Ghi từng hạng mục theo năm (hoa_don, tien_ung, cham_cong, thiet_bi, thu_tien)
-      for (const { cat, key, dateField } of _YEAR_CATS) {
+      for (const { cat, key, dateField } of _catsToPush) {
         const ys = String(yrInt);
         const localRecs = load(key, []).filter(x => x[dateField] && x[dateField].startsWith(ys));
         if (!localRecs.length) continue; // năm này không có dữ liệu hạng mục đó → bỏ qua
@@ -324,21 +348,23 @@ async function pushChanges(opts = {}) {
       console.log(`[Sync] ▲ Year ${yr} OK`);
     }
 
-    // ── 4 doc danh mục dùng chung: đọc-gộp-ghi ──
-    try {
-      if (!skipPull) await _pullMeta();   // gộp cloud → local trước
-      const metas = [
-        [fbDocMetaCT(), fbMetaCTPayload()],
-        [fbDocMetaDM(), fbMetaDMPayload()],
-        [fbDocMetaTK(), fbMetaTKPayload()],
-        [fbDocMetaHD(), fbMetaHDPayload()],
-      ];
-      for (const [docId, payload] of metas) {
-        const res = await fsSet(docId, payload);
-        if (!(res && res.fields)) console.warn(`[Sync] ✗ ${docId} ghi lỗi`);
+    // ── 4 doc danh mục dùng chung: đọc-gộp-ghi (bỏ qua nếu meta không đổi) ──
+    if (_pushMeta) {
+      try {
+        if (!skipPull) await _pullMeta();   // gộp cloud → local trước
+        const metas = [
+          [fbDocMetaCT(), fbMetaCTPayload()],
+          [fbDocMetaDM(), fbMetaDMPayload()],
+          [fbDocMetaTK(), fbMetaTKPayload()],
+          [fbDocMetaHD(), fbMetaHDPayload()],
+        ];
+        for (const [docId, payload] of metas) {
+          const res = await fsSet(docId, payload);
+          if (!(res && res.fields)) console.warn(`[Sync] ✗ ${docId} ghi lỗi`);
+        }
+      } catch (e) {
+        console.warn('[Sync] danh mục push lỗi:', e.message || e);
       }
-    } catch (e) {
-      console.warn('[Sync] danh mục push lỗi:', e.message || e);
     }
 
     if (fail === 0) {

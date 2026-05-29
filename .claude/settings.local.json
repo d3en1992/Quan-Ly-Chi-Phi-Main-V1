@@ -56,7 +56,8 @@
       "Bash(node --check js/core/core.state-backup.js)",
       "Bash(node --check js/core/core.normalize.js)",
       "Bash(ls -la cpct_snapshot_2026-05-29_11-25.json)",
-      "Bash(ls cpct_snapshot*)"
+      "Bash(ls cpct_snapshot*)",
+      "Bash(python -c ' *)"
     ]
   }
 }

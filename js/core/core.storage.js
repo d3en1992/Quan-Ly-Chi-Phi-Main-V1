@@ -185,6 +185,10 @@ async function dbInit() {
 
 let _pendingChanges = 0;
 
+// Tập các key đã thay đổi kể từ lần push cuối — để push ngầm chỉ đẩy đúng
+// doc bị ảnh hưởng (tiết kiệm read/write), thay vì đẩy lại toàn bộ.
+const _dirtyKeys = new Set();
+
 // Timestamp cho đến khi pull bị chặn (set sau reset để tránh cloud hồi dữ liệu)
 let _blockPullUntil = 0;
 
@@ -212,6 +216,7 @@ function _incPending() {
 // Gọi sau push thành công, hoặc sau startup để reset bộ đếm
 function _resetPending() {
   _pendingChanges = 0;
+  _dirtyKeys.clear();
   _updateSyncBtnBadge();
 }
 
@@ -260,6 +265,7 @@ function save(k, v, opts) {
   if (_INV_CACHE_KEYS.has(k) && typeof clearInvoiceCache === 'function') clearInvoiceCache();
   if (!opts?.skipSync && _SYNC_DATA_KEYS.has(k)) {
     _incPending();
+    _dirtyKeys.add(k); // ghi nhớ key này đã đổi → push ngầm chỉ đẩy doc liên quan
     // Online 100%: cố đẩy cloud gần như tức thì. Nếu mất mạng → vẫn lưu local
     // nhưng nhắc user là chưa đẩy được (tránh ngộ nhận đã đồng bộ).
     if (!navigator.onLine) _warnOfflineSave();
