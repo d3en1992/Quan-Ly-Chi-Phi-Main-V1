@@ -88,7 +88,8 @@ function fsUnwrap(doc) {
 
 // ── Doc ID helpers ─────────────────────────────────────────
 function fbDocYear(yr)  { return `y${yr}`; }
-function fbDocCats()    { return 'cats'; }
+// Document danh mục dùng chung (đổi tên từ 'cats' → 'danh_muc' cho dễ đọc trên Firebase)
+function fbDocCats()    { return 'danh_muc'; }
 
 // ── Build payload cho từng loại ───────────────────────────
 function fbYearPayload(yr) {

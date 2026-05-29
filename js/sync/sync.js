@@ -1,11 +1,23 @@
-// sync.js — Sync Engine v2
+// sync.js — Sync Engine (bản gọn, 1 document/năm + 1 document danh_muc)
 // Load order: sau doanhthu.js, trước main.js
-// Nguyên tắc: IndexedDB = source of truth | pull→merge→push | all years | soft delete
+// ─────────────────────────────────────────────────────────────────────────────
+// KIẾN TRÚC MỚI (đã gỡ bỏ engine V2 subcollection):
+//   • Mỗi NĂM dữ liệu nghiệp vụ = 1 document trên Firestore:  cpct_data/y{NĂM}
+//       (chứa hóa đơn, tiền ứng, chấm công, thiết bị, doanh thu của năm đó — đã nén)
+//   • Toàn bộ DANH MỤC dùng chung = 1 document:  cpct_data/danh_muc
+//       (loại CP, NCC, người TH, thầu phụ, công trình/projects, hợp đồng, users, ...)
+//   → Không còn hàng nghìn document con (subcollection). Cloud gọn, dễ đọc.
+//
+//   • IndexedDB vẫn là nơi đọc nhanh (qua _mem) khi app chạy.
+//   • Cloud là nguồn dữ liệu chính: pull = tải cloud về, push = đẩy local lên.
+//   • Bước này VẪN merge (gộp) khi pull để KHÔNG mất dữ liệu trong giai đoạn chuyển đổi.
+//     (Việc "chặn offline + ghi cloud tức thì" sẽ làm ở bước kế tiếp.)
+// ─────────────────────────────────────────────────────────────────────────────
 
 'use strict';
 
 // ══════════════════════════════════════════════════════════════
-// [1] DEVICE IDENTITY — sinh 1 lần, lưu mãi
+// [1] DEVICE IDENTITY — mã thiết bị, sinh 1 lần, lưu mãi
 // ══════════════════════════════════════════════════════════════
 const DEVICE_ID = (() => {
   let id = localStorage.getItem('deviceId');
@@ -17,8 +29,11 @@ const DEVICE_ID = (() => {
   return id;
 })();
 
+// Key lưu thời điểm sync thành công cuối cùng (đặt ở core.storage.js: LAST_SYNC_KEY)
+
 // ══════════════════════════════════════════════════════════════
-// [2] SOFT DELETE — không xóa khỏi array, chỉ đánh dấu
+// [2] SOFT DELETE — không xóa khỏi mảng, chỉ đánh dấu deletedAt
+// (nhiều module gọi: thietbi.js, projects, chấm công...)
 // ══════════════════════════════════════════════════════════════
 function softDeleteRecord(arr, id) {
   const now = Date.now();
@@ -30,33 +45,23 @@ function softDeleteRecord(arr, id) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [4] CONFLICT RESOLUTION — tombstone priority, rồi updatedAt mới hơn thắng
+// [3] CONFLICT RESOLUTION — bản nào mới hơn thì thắng (tombstone ưu tiên)
 // ══════════════════════════════════════════════════════════════
 function resolveConflict(local, cloud) {
-  // Tombstone priority: nếu 1 bên đã xóa và bên kia chưa → bên xóa luôn thắng.
-  // Ngăn record sống lại khi thiết bị khác chưa nhận tombstone và push lại version cũ.
+  // Ưu tiên tombstone: nếu 1 bên đã xóa, bên kia chưa → bên xóa thắng
+  // (tránh record "sống lại" khi thiết bị khác chưa nhận được lệnh xóa)
   if (local.deletedAt && !cloud.deletedAt) return local;
   if (!local.deletedAt && cloud.deletedAt) return cloud;
 
-  // Cả 2 cùng trạng thái xóa (hoặc cùng chưa xóa): latest updatedAt thắng
-  // Fallback sang _ts nếu record cũ chưa có updatedAt
-  const lt = local.updatedAt  || local.createdAt  || local._ts || 0;
-  const ct = cloud.updatedAt  || cloud.createdAt  || 0;
-  if (lt !== ct) {
-    console.log('[Sync] ⚔ Conflict id:', String(local.id).slice(0, 8),
-      '| local.updatedAt:', lt, '| cloud.updatedAt:', ct,
-      '| winner:', lt >= ct ? 'LOCAL' : 'CLOUD');
-  }
+  // Cùng trạng thái → bản có updatedAt mới hơn thắng
+  const lt = local.updatedAt || local.createdAt || local._ts || 0;
+  const ct = cloud.updatedAt || cloud.createdAt || 0;
   return lt >= ct ? local : cloud;
 }
 
 // ══════════════════════════════════════════════════════════════
-// [5] MERGE ALGORITHM — idempotent, safe
+// [4] MERGE — gộp 2 mảng theo id, mỗi id giữ bản mới nhất
 // ══════════════════════════════════════════════════════════════
-// Khác mergeUnique (dùng object spread đơn giản):
-//  - Dùng resolveConflict() có logging
-//  - Local-only records được giữ (chưa push lên cloud)
-//  - Cloud-only records được thêm vào local
 function mergeDatasets(local, cloud) {
   const map = new Map();
   (local || []).forEach(r => map.set(String(r.id), r));
@@ -68,35 +73,7 @@ function mergeDatasets(local, cloud) {
   return [...map.values()];
 }
 
-// ══════════════════════════════════════════════════════════════
-// [6] MULTI-YEAR HELPER — lấy tất cả năm có trong local data
-// ══════════════════════════════════════════════════════════════
-function _getAllLocalYears() {
-  const yrs = new Set();
-  const addYr = (arr, field) =>
-    (arr || []).forEach(r => { const d = r[field]; if (d && d.length >= 4) yrs.add(d.slice(0, 4)); });
-  addYr(load('inv_v3', []), 'ngay');
-  addYr(load('ung_v1', []), 'ngay');
-  addYr(load('cc_v2',  []), 'fromDate');
-  addYr(load('tb_v1',  []), 'ngay');
-  addYr(load('thu_v1', []), 'ngay');
-  // Luôn bao gồm năm hiện tại
-  yrs.add(String(activeYear || new Date().getFullYear()));
-  return [...yrs].filter(Boolean).sort();
-}
-
-// ══════════════════════════════════════════════════════════════
-// [7] MERGE KEY — merge cloud data vào _mem + IDB
-// ══════════════════════════════════════════════════════════════
-function _mergeKey(key, cloudExpanded) {
-  if (!cloudExpanded || !cloudExpanded.length) return 0;
-  const local  = load(key, []);
-  const merged = mergeDatasets(local, cloudExpanded);
-  _memSet(key, merged); // ghi _mem + IDB, không trigger sync
-  return merged.length - local.length;
-}
-
-// [ADDED] users_v1 merge — safe fallback when auth helpers are not ready yet
+// Gộp users an toàn (mật khẩu chỉ có ở local — không bị cloud ghi đè mất)
 function _mergeUsersSafe(localUsers, cloudUsers) {
   if (typeof mergeUsers === 'function') return mergeUsers(localUsers, cloudUsers);
   const local = Array.isArray(localUsers) ? localUsers : [];
@@ -112,173 +89,192 @@ function _mergeUsersSafe(localUsers, cloudUsers) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [7b] SYNC LOCK — block dangerous ops khi đang sync
+// [5] MULTI-YEAR HELPER — lấy tất cả năm có trong dữ liệu local
 // ══════════════════════════════════════════════════════════════
-let _syncPulling = false;
-function isSyncing() { return _syncPushing || _syncPulling; }
-
-// ══════════════════════════════════════════════════════════════
-// [8] SYNC QUEUE (lightweight tracking)
-// ══════════════════════════════════════════════════════════════
-const _PENDING_KEY = 'syncPending';
-
-function enqueueChange(recordId, type) {
-  const q   = _loadLS(_PENDING_KEY) || [];
-  const idx = q.findIndex(c => String(c.id) === String(recordId));
-  const entry = { id: String(recordId), type, ts: Date.now() };
-  if (idx >= 0) q[idx] = entry; else q.push(entry);
-  if (q.length > 500) q.splice(0, q.length - 500); // giới hạn 500 entries
-  _saveLS(_PENDING_KEY, q);
+function _getAllLocalYears() {
+  const yrs = new Set();
+  const addYr = (arr, field) =>
+    (arr || []).forEach(r => { const d = r[field]; if (d && d.length >= 4) yrs.add(d.slice(0, 4)); });
+  addYr(load('inv_v3', []), 'ngay');
+  addYr(load('ung_v1', []), 'ngay');
+  addYr(load('cc_v2',  []), 'fromDate');
+  addYr(load('tb_v1',  []), 'ngay');
+  addYr(load('thu_v1', []), 'ngay');
+  yrs.add(String(activeYear || new Date().getFullYear())); // luôn gồm năm hiện tại
+  return [...yrs].filter(Boolean).sort();
 }
 
-function _clearQueue() { _saveLS(_PENDING_KEY, []); }
-
-function getPendingCount() { return (_loadLS(_PENDING_KEY) || []).length; }
-
 // ══════════════════════════════════════════════════════════════
-// [8b] NORMALIZE CC — logical key dedup + safe timestamps
+// [6] NORMALIZE CC — 1 tuần + 1 công trình = 1 record duy nhất
+// (chamcong.core.js gọi qua _dedupCC; giữ nguyên logic dedup theo logical key)
 // ══════════════════════════════════════════════════════════════
 
-// Timestamp hợp lệ tối thiểu: 2020-01-01 (ms). Trước ngày này = chưa set hoặc lỗi.
+// Mốc thời gian hợp lệ tối thiểu: 2020-01-01 (ms). Trước mốc này = chưa set / lỗi.
 const _TS_EPOCH = 1577836800000;
 
-/**
- * Fix 2 — Safe updatedAt: sanitize timestamp trước khi so sánh.
- * - < 2020: chưa set hoặc invalid → trả 0 (sẽ thua mọi record có ts hợp lệ)
- * - > now + 24h: clock skew trên thiết bị gửi → clamp về now()
- * - Còn lại: giữ nguyên
- */
+// Làm sạch timestamp trước khi so sánh (chống lệch giờ máy / giá trị 0)
 function _safeTs(ts) {
   const n = typeof ts === 'number' ? ts : parseInt(ts) || 0;
-  if (n < _TS_EPOCH)             return 0;           // too old / unset — loses
-  if (n > Date.now() + 86400000) return Date.now();  // clock skew — clamp
+  if (n < _TS_EPOCH)             return 0;           // quá cũ / chưa set → thua
+  if (n > Date.now() + 86400000) return Date.now();  // lệch giờ tương lai → kẹp về now
   return n;
 }
 
-/**
- * Fix 1 — Enforce projectId: điền projectId cho cc records thiếu (có ct nhưng không có projectId).
- * Cần `projects[]` đã load. Nếu chưa có → trả nguyên (không thay đổi).
- * Immutable: chỉ tạo array mới khi thực sự có record nào được fill.
- */
+// Điền projectId cho record CC thiếu (có tên CT nhưng chưa có projectId)
 function _fillCCProjectId(records) {
   if (!records || !records.length) return records;
   if (typeof projects === 'undefined' || !projects.length) return records;
-  // Build name → id map (chỉ project chưa xóa)
   const nameMap = new Map();
   projects.forEach(p => { if (p.id && p.name && !p.deletedAt) nameMap.set(p.name, p.id); });
   if (!nameMap.size) return records;
   let changed = false;
   const result = records.map(r => {
-    if (r.projectId || !r.ct) return r;   // đã có hoặc không có tên CT → bỏ qua
+    if (r.projectId || !r.ct) return r;
     const pid = nameMap.get(r.ct);
-    if (!pid) return r;                    // CT không khớp project nào → bỏ qua
+    if (!pid) return r;
     changed = true;
     return { ...r, projectId: pid };
   });
   return changed ? result : records;
 }
 
-/**
- * HARD RULE: 1 tuần + 1 công trình = 1 record duy nhất.
- *
- * cc_v2 records được tạo độc lập trên nhiều thiết bị → khác id nhưng cùng tuần+CT.
- * normalizeCC nhóm theo logical key (fromDate + projectId), giữ record mới nhất.
- *
- * Gọi ở: pullChanges (union cloud+local), pushChanges (pre-merge), _reloadGlobals, import.
- */
+// Gom CC theo (tuần + công trình), giữ bản mới nhất
 function normalizeCC(records) {
-  // Fill missing projectId trước — làm cho logical key ổn định
   const filled = _fillCCProjectId(records || []);
-
   const byKey = new Map();
   filled.forEach(r => {
-    // Fix 1: dùng projectId làm key; ct chỉ là fallback khi map thất bại (record legacy)
     const date = r.fromDate || r.from || '';
     const proj = r.projectId || r.ct  || '';
     const key  = `${date}__${proj}`;
-
     const prev = byKey.get(key);
     if (!prev) { byKey.set(key, r); return; }
-
-    // Fix 2: _safeTs loại bỏ ảnh hưởng của clock skew và timestamp bị 0/invalid
     const prevTs = _safeTs(prev.updatedAt || prev.createdAt || 0);
     const rTs    = _safeTs(r.updatedAt   || r.createdAt   || 0);
-
     if (rTs > prevTs) {
-      byKey.set(key, r);                             // mới hơn thắng
+      byKey.set(key, r);
     } else if (rTs === prevTs && r.deletedAt && !prev.deletedAt) {
-      byKey.set(key, r);                             // tie + tombstone: deleted wins
+      byKey.set(key, r); // hòa + có tombstone → bản xóa thắng
     }
-    // rTs < prevTs → giữ prev
   });
   return [...byKey.values()];
 }
 
-// NOTE: _dedupCC được định nghĩa trong chamcong.js (load trước sync.js).
-// normalizeCC là canonical implementation; chamcong.js/_dedupCC dùng cùng logic.
-
 // ══════════════════════════════════════════════════════════════
-// [9] PUSH — pull-then-merge-then-push, tất cả năm
+// [7] CỜ TRẠNG THÁI SYNC
 // ══════════════════════════════════════════════════════════════
 let _syncPushing = false;
+let _syncPulling = false;
+function isSyncing() { return _syncPushing || _syncPulling; }
 
-// opts.silent   = true  → chạy ngầm, không banner, chỉ lỗi mới hiện
-// opts.silent   = false → hiện đầy đủ UI (mặc định khi user bấm lưu)
-// opts.skipPull = true  → bỏ qua bước fetch+merge cloud trước khi push (dùng sau import JSON)
+// ══════════════════════════════════════════════════════════════
+// [8] MERGE CLOUD → LOCAL — ghi vào _mem + IDB (không trigger sync)
+// ══════════════════════════════════════════════════════════════
+function _mergeKey(key, cloudExpanded) {
+  if (!cloudExpanded || !cloudExpanded.length) return 0;
+  const local  = load(key, []);
+  const merged = mergeDatasets(local, cloudExpanded);
+  _memSet(key, merged);
+  return merged.length - local.length;
+}
+
+// Gộp danh mục dạng object {tên: dữ liệu} theo LWW (max của updatedAt & deletedAt)
+function _mergeHopDong(localHd, cloudHd) {
+  const merged = { ...cloudHd };
+  Object.entries(localHd || {}).forEach(([ct, local]) => {
+    const cloud = merged[ct];
+    if (!cloud) { merged[ct] = local; return; }
+    const localTs = Math.max(Number(local.updatedAt) || 0, Number(local.deletedAt) || 0);
+    const cloudTs = Math.max(Number(cloud.updatedAt) || 0, Number(cloud.deletedAt) || 0);
+    if (localTs >= cloudTs) merged[ct] = local;
+  });
+  return merged;
+}
+
+// Gộp cat_items_v1 (per-item theo updatedAt) + dedup theo tên + canonical hóa tên
+function _mergeCatItems(localItems, cloudItems) {
+  const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
+  const nowMs = Date.now();
+  const merged   = {};
+  const allTypes = new Set([...Object.keys(localItems || {}), ...Object.keys(cloudItems || {})]);
+  allTypes.forEach(type => {
+    const byId = new Map();
+    (localItems[type] || []).forEach(item => byId.set(item.id, item));
+    (cloudItems[type] || []).forEach(ci => {
+      const li = byId.get(ci.id);
+      if (!li || (ci.updatedAt || 0) >= (li.updatedAt || 0)) byId.set(ci.id, ci);
+    });
+    const byNorm = new Map();
+    [...byId.values()]
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .forEach(item => {
+        if (item.isDeleted) return;
+        const norm = _normKey(item.name);
+        if (byNorm.has(norm)) byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
+        else byNorm.set(norm, item.id);
+      });
+    merged[type] = [...byId.values()];
+  });
+  if (typeof normalizeCatDisplayName === 'function') {
+    Object.keys(merged).forEach(type => {
+      (merged[type] || []).forEach(item => {
+        if (item.isDeleted) return;
+        const canonical = normalizeCatDisplayName(type, item.name);
+        if (canonical !== item.name) { item.name = canonical; item.updatedAt = nowMs; }
+      });
+    });
+  }
+  return merged;
+}
+
+// Từ cat_items_v1 đã merge → dựng lại các mảng tên (cat_loai, cat_ncc, ...)
+function _applyCatItemArrays(merged) {
+  const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
+  const nameArr = (items, type) => {
+    const seen = new Set();
+    return (items || []).filter(i => !i.isDeleted)
+      .map(i => typeof normalizeCatDisplayName === 'function'
+        ? normalizeCatDisplayName(type, i.name) : i.name)
+      .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
+  };
+  if (merged.loai)  _memSet('cat_loai',  nameArr(merged.loai,  'loai'));
+  if (merged.ncc)   _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc'));
+  if (merged.nguoi) _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi'));
+  if (merged.tp)    _memSet('cat_tp',    nameArr(merged.tp,    'tp'));
+  if (merged.cn)    _memSet('cat_cn',    nameArr(merged.cn,    'cn'));
+  if (merged.tbteb) _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// [9] PUSH — đẩy dữ liệu local lên cloud (đọc-gộp-ghi từng năm + danh_muc)
+// ══════════════════════════════════════════════════════════════
+// opts.silent   = true  → chạy ngầm, chỉ hiện banner khi lỗi
+// opts.skipPull = true  → bỏ bước đọc-gộp cloud trước khi ghi (dùng sau import)
 async function pushChanges(opts = {}) {
   const silent   = opts?.silent   ?? false;
   const skipPull = opts?.skipPull ?? false;
-  if (!fbReady()) {
-    console.log('[Sync] Push bỏ qua — Firebase chưa cấu hình');
-    return;
-  }
-  if (_syncPushing) {
-    console.log('[Sync] Push bỏ qua — đang sync');
-    return;
-  }
+  if (!fbReady()) { console.log('[Sync] Push bỏ qua — Firebase chưa cấu hình'); return; }
+  if (_syncPushing) { console.log('[Sync] Push bỏ qua — đang sync'); return; }
+
   _syncPushing = true;
   _ensureSyncDot(); _setSyncDot('syncing');
-  _setSyncState('syncing'); // luôn cập nhật nút, dù silent
+  _setSyncState('syncing');
   if (!silent) showSyncBanner('⏳ Đang đẩy (push)...');
 
-  // Chỉ push năm có pending changes thực sự, không push mọi năm
+  // Push ngầm: chỉ năm hiện tại (nhẹ). Push thủ công: tất cả năm.
   const _curYr = String(activeYear || new Date().getFullYear());
-  const years = _getAllLocalYears().filter(yr => {
-    if (yr === _curYr) return true;
-    return _V2_YEAR_TYPES.some(type => {
-      const docId = _v2DocYearId(type, parseInt(yr));
-      return _v2GetLastPush(docId) === 0;
-    });
-  });
+  const years  = silent ? [_curYr] : _getAllLocalYears();
   console.log('[Sync] ▲ Push bắt đầu — năm:', years.join(', '), '| device:', DEVICE_ID.slice(0, 8));
 
   try {
     let ok = 0, fail = 0;
 
-    // PHASE 4 OPTIMIZATION: tính 1 lần ở scope ngoài để dùng cho cả pre-push pull
-    // (per-year) lẫn users pre-push merge (sau for loop)
-    //   - manualSync luôn gọi pullChanges trước pushChanges → skip pre-push
-    //   - schedulePush cũng gọi pullChanges trước pushChanges → skip pre-push
-    const _lastPullTs = Number(localStorage.getItem('_lastPullTs') || 0);
-    const _pullFresh = (Date.now() - _lastPullTs) < 60_000;
-
     for (const yr of years) {
       const yrInt = parseInt(yr);
-
-      // ── Step 1: Pre-push merge — đọc V2 cloud trước khi ghi ─
-
-      if (!skipPull && !_pullFresh && typeof _v2PullYearFull === 'function') try {
-        const v2 = await _v2PullYearFull(yrInt);
-        if (v2._v2Initialized) {
-          // V2 đã init — chỉ merge khi 'fresh' (guard đã skip nếu unchanged)
-          if (v2.inv_v3) _mergeKey('inv_v3', v2.inv_v3);
-          if (v2.ung_v1) _mergeKey('ung_v1', v2.ung_v1);
-          if (v2.cc_v2)  { const norm = normalizeCC([...load('cc_v2',[]), ...v2.cc_v2]); _memSet('cc_v2', norm); }
-          if (v2.tb_v1)  _mergeKey('tb_v1', v2.tb_v1);
-          if (v2.thu_v1) { _mergeKey('thu_v1', v2.thu_v1); thuRecords = load('thu_v1', []); }
-          console.log(`[Sync] ↓ Year ${yr} pre-push merge (V2${v2._yearChanged ? ' fresh' : ' unchanged'})`);
-        } else {
-          // V2 chưa init → V1 fallback (transition period — hiếm)
+      try {
+        // ── B1: đọc cloud năm này, gộp vào local (tránh ghi đè dữ liệu thiết bị khác) ──
+        if (!skipPull) {
           const cloudDoc  = await fsGet(fbDocYear(yrInt));
           const cloudData = fsUnwrap(cloudDoc);
           if (cloudData) {
@@ -286,94 +282,125 @@ async function pushChanges(opts = {}) {
             if (cloudData.u)   _mergeKey('ung_v1', expandUng(cloudData.u));
             if (cloudData.c)   { const norm = normalizeCC([...load('cc_v2',[]), ...expandCC(cloudData.c)]); _memSet('cc_v2', norm); }
             if (cloudData.t)   _mergeKey('tb_v1',  expandTb(cloudData.t));
-            if (cloudData.thu) _mergeKey('thu_v1', cloudData.thu);
-            console.log(`[Sync] ↓ Year ${yr} V1 fallback`);
+            if (cloudData.thu) { _mergeKey('thu_v1', cloudData.thu); thuRecords = load('thu_v1', []); }
           }
         }
-      } catch (e) {
-        console.warn(`[Sync] Không fetch được cloud year ${yr}:`, e.message || e);
-      }
 
-      // ── Step 2: Push lên V2 subcollections (thay thế V1) ───
-      try {
-        if (typeof _v2PushYear === 'function') {
-          const results = await _v2PushYear(yrInt);
-          const allOk   = results.every(r => r.ok !== false);
-          if (allOk) {
-            console.log(`[Sync] ▲ Year ${yr} V2 OK`);
-            ok++;
-          } else {
-            const failed = results.filter(r => r.ok === false).map(r => r.type).join(', ');
-            console.warn(`[Sync] ✗ Year ${yr} V2 lỗi: ${failed}`);
-            fail++;
-          }
-        } else {
-          // Fallback V1 nếu V2 chưa load
-          const payload = fbYearPayload(yrInt);
-          const res     = await fsSet(fbDocYear(yrInt), payload);
-          if (res && res.fields) { ok++; } else { fail++; }
-        }
+        // ── B2: ghi (overwrite) document năm bằng dữ liệu local đã gộp ──
+        const payload = fbYearPayload(yrInt);
+        const res     = await fsSet(fbDocYear(yrInt), payload);
+        if (res && res.fields) { ok++; console.log(`[Sync] ▲ Year ${yr} OK`); }
+        else { fail++; console.warn(`[Sync] ✗ Year ${yr} ghi lỗi`); }
       } catch (e) {
         console.warn(`[Sync] ✗ Year ${yr} exception:`, e.message || e);
         fail++;
       }
     }
 
-    // ── Users pre-push merge — V2 primary (cheap với guard) ────
-    // PHASE 4: Xóa cats V1 push hoàn toàn. V2 meta đã thay thế.
-    // Vẫn merge users từ V2 trước khi push để tránh device B ghi đè role/deletedAt từ device A
-    if (!_pullFresh && typeof _v2PullUsers === 'function') try {
-      const r = await _v2PullUsers();
-      if (r && r.status === 'fresh' && r.records?.length) {
-        const merger = typeof _mergeUsersV2 === 'function' ? _mergeUsersV2 : _mergeUsersSafe;
-        const mergedUsers = merger(load('users_v1', []), r.records);
-        _memSet('users_v1', mergedUsers);
-      }
+    // ── Danh mục dùng chung: đọc-gộp-ghi document danh_muc ──
+    try {
+      if (!skipPull) await _pullDanhMuc();   // gộp cloud → local trước
+      const res = await fsSet(fbDocCats(), fbCatsPayload());
+      if (!(res && res.fields)) console.warn('[Sync] ✗ danh_muc ghi lỗi');
     } catch (e) {
-      console.warn('[Sync] Users V2 pre-push merge lỗi:', e.message || e);
+      console.warn('[Sync] danh_muc push lỗi:', e.message || e);
     }
-    // (V1 cats push ĐÃ XÓA — không còn ai đọc nữa)
 
     if (fail === 0) {
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-      _clearQueue();
       _setSyncDot('');
-      // Reset pending counter — data đã lên cloud
       if (typeof _resetPending === 'function') _resetPending();
       if (!silent) {
-        // Push chủ động: hiện banner + cập nhật state đầy đủ
         _setSyncState('success');
         const hhmm = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
         showSyncBanner(`✅ Đã đồng bộ lúc ${hhmm}`, 3000);
-      } else {
-        // Push ngầm: không banner nhưng phải reset jb-btn về trạng thái bình thường
-        // (tránh jb-btn kẹt trên "⏳ Đang sync..." sau silent push)
-        if (typeof updateJbBtn === 'function') updateJbBtn();
+      } else if (typeof updateJbBtn === 'function') {
+        updateJbBtn();
       }
       console.log(`[Sync] ▲ Push xong — ${ok} năm | device: ${DEVICE_ID.slice(0, 8)}`);
     } else {
-      _setSyncDot('error');
-      _setSyncState('error');
-      // Lỗi luôn hiện dù silent — user cần biết
+      _setSyncDot('error'); _setSyncState('error');
       showSyncBanner('⚠️ Sync lỗi', 4000);
     }
   } catch (e) {
     console.warn('[Sync] ▲ Push lỗi toàn bộ:', e);
-    _setSyncDot('offline');
-    _setSyncState('error');
-    // Lỗi mạng luôn hiện
+    _setSyncDot('offline'); _setSyncState('error');
     showSyncBanner('⚠️ Mất kết nối internet', 3000);
   } finally {
     _syncPushing = false;
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// [10] PULL DANH MỤC — đọc document danh_muc, gộp vào local
+// ══════════════════════════════════════════════════════════════
+async function _pullDanhMuc() {
+  const doc  = await fsGet(fbDocCats());
+  const data = fsUnwrap(doc);
+  if (!data) { console.log('[Sync] ▼ danh_muc chưa có trên cloud'); return false; }
+
+  // còn pending → giữ nguyên các mảng tên danh mục local (tránh xóa nhầm)
+  const hasPending = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
+
+  // projects (công trình) — nguồn gốc của cat_ct
+  if (Array.isArray(data.projects)) {
+    const merged = mergeDatasets(load('projects_v1', []), data.projects);
+    _memSet('projects_v1', merged);
+    if (typeof projects !== 'undefined') projects = merged;
+    if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
+  }
+
+  // users — gộp an toàn (giữ mật khẩu local)
+  if (Array.isArray(data.users)) {
+    const merger = typeof _mergeUsersV2 === 'function' ? _mergeUsersV2 : _mergeUsersSafe;
+    _memSet('users_v1', merger(load('users_v1', []), data.users));
+  }
+
+  // cat_items_v1 — per-item, source of truth cho các mảng tên danh mục
+  if (data.catItems && typeof data.catItems === 'object') {
+    const merged = _mergeCatItems(load('cat_items_v1', {}), data.catItems);
+    _memSet('cat_items_v1', merged);
+    _applyCatItemArrays(merged);
+  }
+
+  // hợp đồng (object map theo tên CT)
+  if (data.hopDong && typeof data.hopDong === 'object') {
+    const merged = _mergeHopDong(load('hopdong_v1', {}), data.hopDong);
+    _memSet('hopdong_v1', merged);
+    if (typeof hopDongData !== 'undefined') hopDongData = merged;
+  }
+
+  // thầu phụ (mảng)
+  if (Array.isArray(data.thauPhu)) {
+    const merged = mergeDatasets(load('thauphu_v1', []), data.thauPhu);
+    _memSet('thauphu_v1', merged);
+    if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = merged;
+  }
+
+  // vai trò công nhân — chỉ áp khi không còn pending
+  if (data.cnRoles && typeof data.cnRoles === 'object' && !hasPending) {
+    const localRoles  = load('cat_cn_roles', {});
+    const mergedRoles  = { ...data.cnRoles, ...localRoles };
+    _memSet('cat_cn_roles', mergedRoles);
+    if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
+  }
+
+  // năm theo công trình — union
+  if (data.ctYears && typeof data.ctYears === 'object') {
+    const mergedYears = { ...load('cat_ct_years', {}) };
+    Object.entries(data.ctYears).forEach(([ct, yr]) => { if (!(ct in mergedYears)) mergedYears[ct] = yr; });
+    _memSet('cat_ct_years', mergedYears);
+    if (typeof cats !== 'undefined') cats.congTrinhYears = mergedYears;
+  }
+
+  console.log('[Sync] ▼ danh_muc đã gộp');
+  return true;
+}
 
 // ══════════════════════════════════════════════════════════════
-// [10] PULL — merge cloud vào local, tất cả năm
+// [11] PULL — tải cloud về, gộp vào local (danh_muc + từng năm)
 // ══════════════════════════════════════════════════════════════
-// opts.silent = true  → chạy ngầm (auto-sync), không banner
-// opts.silent = false → hiện banner đầy đủ (mặc định khi user chủ động pull)
+// yr=null → pull tất cả năm local; yr=số → pull đúng năm đó
 async function pullChanges(yr, callback, opts = {}) {
   const silent = opts?.silent ?? false;
   if (!fbReady()) {
@@ -388,324 +415,33 @@ async function pullChanges(yr, callback, opts = {}) {
   }
   _syncPulling = true;
 
-  // Bảo vệ: chặn pull sau reset — kiểm tra cả biến _mem (in-page) và localStorage (sau F5)
+  // Chặn pull sau reset (giữ tương thích với import/reset — dùng cờ localStorage)
   {
     const _lsBlock = parseInt(localStorage.getItem('_blockPullUntil') || '0');
     const _memBlock = (typeof _blockPullUntil !== 'undefined') ? _blockPullUntil : 0;
     const _blockEnd = Math.max(_lsBlock, _memBlock);
     if (Date.now() < _blockEnd) {
-      const remain = Math.round((_blockEnd - Date.now()) / 1000);
-      console.log(`[Sync] Pull bị chặn sau reset — còn ${remain}s`);
+      console.log(`[Sync] Pull bị chặn sau reset — còn ${Math.round((_blockEnd - Date.now())/1000)}s`);
       _syncPulling = false;
       if (callback) callback(null);
       return;
     }
-    // Hết hạn → xóa LS key để không cản pull lần sau
     if (_lsBlock && Date.now() >= _lsBlock) localStorage.removeItem('_blockPullUntil');
   }
 
-  // yr=null → pull tất cả năm local; yr=number → pull năm cụ thể
-  let _catsChanged = false;
   const years = yr ? [String(yr)] : _getAllLocalYears();
   console.log('[Sync] ▼ Pull bắt đầu — năm:', years.join(', '), '| device:', DEVICE_ID.slice(0, 8));
   if (!silent) showSyncBanner('⬇ Đang tải (pull)...');
 
   try {
-    // ── Cats / Meta ──────────────────────────────────────────────
-    // V2 primary: đọc từ meta_* subcollections (sync.v2meta.js)
-    // V1 fallback: đọc từ "cats" document — dùng khi V2 chưa có data
-    let _pulledMetaFromV2 = false;
+    // ── Danh mục dùng chung ──
+    let _catsChanged = false;
+    try { _catsChanged = await _pullDanhMuc(); }
+    catch (e) { console.warn('[Sync] danh_muc pull lỗi:', e.message || e); }
 
-    // V2 ready: kiểm tra localStorage flag (set sau lần push meta đầu tiên)
-    // hoặc bất kỳ parent doc nào tồn tại trên cloud (_v2Initialized từ pull)
-    const _v2InitFlag = localStorage.getItem('_v2Initialized') === '1';
-
-    if (typeof _v2PullMetaFull === 'function') {
-      try {
-        const meta = await _v2PullMetaFull();
-        // V2 sẵn sàng nếu: flag đã set HOẶC pull vừa rồi phát hiện parent docs tồn tại
-        const v2Ready = _v2InitFlag || meta._v2Initialized;
-
-        if (v2Ready) {
-          _pulledMetaFromV2 = true;
-          const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
-            .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
-          const nowMs = Date.now();
-
-          // projects_v1
-          if (meta.projects?.length) {
-            const local  = load('projects_v1', []);
-            const merged = mergeDatasets(local, meta.projects);
-            _memSet('projects_v1', merged);
-            if (typeof projects !== 'undefined') projects = merged;
-            if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
-          }
-
-          // users_v1 — password-safe merge (V2 không lưu password)
-          if (meta.users?.length) {
-            const localUsers  = load('users_v1', []);
-            const mergedUsers = _mergeUsersV2(localUsers, meta.users);
-            _memSet('users_v1', mergedUsers);
-            console.log('[Sync] ▼ users (V2):', mergedUsers.length);
-          }
-
-          // cat_items_v1 — per-item merge theo updatedAt
-          if (meta.catItems) {
-            const localItems = load('cat_items_v1', {});
-            const cloudItems = meta.catItems;
-            const merged     = {};
-            const allTypes   = new Set([...Object.keys(localItems), ...Object.keys(cloudItems)]);
-
-            allTypes.forEach(type => {
-              const byId = new Map();
-              (localItems[type] || []).forEach(item => byId.set(item.id, item));
-              (cloudItems[type] || []).forEach(ci => {
-                const li = byId.get(ci.id);
-                if (!li || (ci.updatedAt || 0) >= (li.updatedAt || 0)) byId.set(ci.id, ci);
-              });
-              // Dedup by name — mark bản trùng là isDeleted
-              const byNorm = new Map();
-              [...byId.values()]
-                .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                .forEach(item => {
-                  if (item.isDeleted) return;
-                  const norm = _normKey(item.name);
-                  if (byNorm.has(norm)) byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
-                  else byNorm.set(norm, item.id);
-                });
-              merged[type] = [...byId.values()];
-            });
-
-            // Canonicalize tên
-            if (typeof normalizeCatDisplayName === 'function') {
-              Object.keys(merged).forEach(type => {
-                (merged[type] || []).forEach(item => {
-                  if (item.isDeleted) return;
-                  const canonical = normalizeCatDisplayName(type, item.name);
-                  if (canonical !== item.name) { item.name = canonical; item.updatedAt = nowMs; }
-                });
-              });
-            }
-
-            _memSet('cat_items_v1', merged);
-            const nameArr = (items, type) => {
-              const seen = new Set();
-              return (items || []).filter(i => !i.isDeleted)
-                .map(i => typeof normalizeCatDisplayName === 'function'
-                  ? normalizeCatDisplayName(type, i.name) : i.name)
-                .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
-            };
-            if (merged.loai)  _memSet('cat_loai',  nameArr(merged.loai,  'loai'));
-            if (merged.ncc)   _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc'));
-            if (merged.nguoi) _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi'));
-            if (merged.tp)    _memSet('cat_tp',    nameArr(merged.tp,    'tp'));
-            if (merged.cn)    _memSet('cat_cn',    nameArr(merged.cn,    'cn'));
-            if (merged.tbteb) _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb'));
-            console.log('[Sync] ▼ catItems (V2) merged');
-          }
-
-          // cnRoles — pending guard
-          if (meta.cnRoles && Object.keys(meta.cnRoles).length) {
-            const hasPendingRoles = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
-            if (!hasPendingRoles) {
-              const localRoles  = load('cat_cn_roles', {});
-              const cloudRoles  = meta.cnRoles;
-              const mergedRoles = { ...cloudRoles, ...localRoles };
-              Object.keys(cloudRoles).forEach(k => { if (!(k in localRoles)) mergedRoles[k] = cloudRoles[k]; });
-              _memSet('cat_cn_roles', mergedRoles);
-              if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
-              _catsChanged = true;
-              console.log('[Sync] ▼ cnRoles (V2) merged');
-            }
-          }
-
-          // ctYears — union merge
-          if (meta.ctYears && Object.keys(meta.ctYears).length) {
-            const localYears  = load('cat_ct_years', {});
-            const mergedYears = { ...localYears };
-            Object.entries(meta.ctYears).forEach(([ct, yr]) => {
-              if (!(ct in mergedYears)) mergedYears[ct] = yr;
-            });
-            _memSet('cat_ct_years', mergedYears);
-            cats.congTrinhYears = mergedYears;
-            _catsChanged = true;
-            console.log('[Sync] ▼ ctYears (V2) merged');
-          }
-
-          // hopdong_v1
-          if (meta.hopDong && Object.keys(meta.hopDong).length) {
-            const localHd  = load('hopdong_v1', {});
-            const mergedHd = { ...meta.hopDong };
-            // TOMBSTONE FIX: LWW so sánh max(updatedAt, deletedAt) để tombstone thắng đúng
-            Object.entries(localHd).forEach(([ct, local]) => {
-              const cloud    = mergedHd[ct];
-              if (!cloud) { mergedHd[ct] = local; return; }
-              const localTs  = Math.max(Number(local.updatedAt) || 0, Number(local.deletedAt) || 0);
-              const cloudTs  = Math.max(Number(cloud.updatedAt) || 0, Number(cloud.deletedAt) || 0);
-              if (localTs >= cloudTs) mergedHd[ct] = local;
-            });
-            _memSet('hopdong_v1', mergedHd);
-            hopDongData = mergedHd;
-          }
-
-          // thauphu_v1
-          if (meta.thauPhu?.length) {
-            const local  = load('thauphu_v1', []);
-            const merged = mergeDatasets(local, meta.thauPhu);
-            _memSet('thauphu_v1', merged);
-            thauPhuContracts = merged;
-          }
-
-          console.log('[Sync] ▼ Meta — V2 ✓');
-        }
-      } catch (e) {
-        console.warn('[Sync] Meta V2 pull lỗi:', e.message || e);
-      }
-    }
-
-    // V1 fallback — chạy khi V2 chưa có data (thiết bị mới / chưa push lần nào)
-    if (!_pulledMetaFromV2) {
-      try {
-        const catsDoc  = await fsGet(fbDocCats());
-        const catsData = fsUnwrap(catsDoc);
-        if (catsData?.cats) {
-          const ct = catsData.cats;
-          const hasPending = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
-          if (!hasPending) {
-            const _overrideCatArr = (key, cloudArr) => {
-              if (!cloudArr) return;
-              _memSet(key, cloudArr.slice());
-            };
-            if (ct.loai)  _overrideCatArr('cat_loai',  ct.loai);
-            if (ct.ncc)   _overrideCatArr('cat_ncc',   ct.ncc);
-            if (ct.nguoi) _overrideCatArr('cat_nguoi', ct.nguoi);
-          } else {
-            console.log('[Sync] Cats pull bỏ qua — còn pending changes, giữ nguyên local');
-          }
-        }
-        if (catsData?.hopDong && typeof catsData.hopDong === 'object') {
-          const localHd  = load('hopdong_v1', {});
-          const cloudHd  = catsData.hopDong;
-          const mergedHd = { ...cloudHd };
-          // TOMBSTONE FIX: LWW so sánh max(updatedAt, deletedAt)
-          Object.entries(localHd).forEach(([ct, local]) => {
-            const cloud   = mergedHd[ct];
-            if (!cloud) { mergedHd[ct] = local; return; }
-            const localTs = Math.max(Number(local.updatedAt) || 0, Number(local.deletedAt) || 0);
-            const cloudTs = Math.max(Number(cloud.updatedAt) || 0, Number(cloud.deletedAt) || 0);
-            if (localTs >= cloudTs) mergedHd[ct] = local;
-          });
-          _memSet('hopdong_v1', mergedHd);
-          hopDongData = mergedHd;
-        }
-        if (catsData?.thauPhu && Array.isArray(catsData.thauPhu)) {
-          const local  = load('thauphu_v1', []);
-          const merged = mergeDatasets(local, catsData.thauPhu);
-          _memSet('thauphu_v1', merged);
-          thauPhuContracts = merged;
-        }
-        if (catsData?.users && Array.isArray(catsData.users)) {
-          const localUsers  = load('users_v1', []);
-          const mergedUsers = _mergeUsersSafe(localUsers, catsData.users);
-          _memSet('users_v1', mergedUsers);
-          console.log('[Sync] ▼ users_v1 (V1) merged');
-        }
-        if (catsData?.catItems && typeof catsData.catItems === 'object') {
-          const localItems = load('cat_items_v1', {});
-          const cloudItems = catsData.catItems;
-          const merged = {};
-          const allTypes = new Set([...Object.keys(localItems), ...Object.keys(cloudItems)]);
-          const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
-            .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
-          const nowMs = Date.now();
-          allTypes.forEach(type => {
-            const byId = new Map();
-            (localItems[type] || []).forEach(item => byId.set(item.id, item));
-            (cloudItems[type] || []).forEach(cloudItem => {
-              const localItem = byId.get(cloudItem.id);
-              if (!localItem || (cloudItem.updatedAt || 0) >= (localItem.updatedAt || 0))
-                byId.set(cloudItem.id, cloudItem);
-            });
-            const byNorm = new Map();
-            [...byId.values()]
-              .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-              .forEach(item => {
-                if (item.isDeleted) return;
-                const norm = _normKey(item.name);
-                if (byNorm.has(norm)) byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
-                else byNorm.set(norm, item.id);
-              });
-            merged[type] = [...byId.values()];
-          });
-          if (typeof normalizeCatDisplayName === 'function') {
-            Object.keys(merged).forEach(type => {
-              (merged[type] || []).forEach(item => {
-                if (item.isDeleted) return;
-                const canonical = normalizeCatDisplayName(type, item.name);
-                if (canonical !== item.name) { item.name = canonical; item.updatedAt = nowMs; }
-              });
-            });
-          }
-          _memSet('cat_items_v1', merged);
-          const nameArr = (items, type) => {
-            const seen = new Set();
-            return (items || []).filter(i => !i.isDeleted)
-              .map(i => typeof normalizeCatDisplayName === 'function'
-                ? normalizeCatDisplayName(type, i.name) : i.name)
-              .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
-          };
-          if (merged.loai)  _memSet('cat_loai',  nameArr(merged.loai,  'loai'));
-          if (merged.ncc)   _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc'));
-          if (merged.nguoi) _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi'));
-          if (merged.tp)    _memSet('cat_tp',    nameArr(merged.tp,    'tp'));
-          if (merged.cn)    _memSet('cat_cn',    nameArr(merged.cn,    'cn'));
-          if (merged.tbteb) _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb'));
-          console.log('[Sync] ▼ catItems (V1) merged — soft-deletes applied, names canonicalized');
-        }
-        if (catsData?.projects && Array.isArray(catsData.projects)) {
-          const local  = load('projects_v1', []);
-          const merged = mergeDatasets(local, catsData.projects);
-          _memSet('projects_v1', merged);
-          if (typeof projects !== 'undefined') projects = merged;
-          if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
-        }
-        if (catsData?.cnRoles && typeof catsData.cnRoles === 'object') {
-          const hasPendingRoles = typeof _pendingChanges !== 'undefined' && _pendingChanges > 0;
-          if (!hasPendingRoles) {
-            const localRoles  = load('cat_cn_roles', {});
-            const cloudRoles  = catsData.cnRoles;
-            const mergedRoles = { ...cloudRoles, ...localRoles };
-            Object.keys(cloudRoles).forEach(k => { if (!(k in localRoles)) mergedRoles[k] = cloudRoles[k]; });
-            _memSet('cat_cn_roles', mergedRoles);
-            if (typeof cnRoles !== 'undefined') cnRoles = mergedRoles;
-            _catsChanged = true;
-            console.log('[Sync] ▼ cnRoles (V1) merged');
-          } else {
-            console.log('[Sync] cnRoles pull bỏ qua — còn pending changes');
-          }
-        }
-        if (catsData?.ctYears && typeof catsData.ctYears === 'object') {
-          const localYears  = load('cat_ct_years', {});
-          const cloudYears  = catsData.ctYears;
-          const mergedYears = { ...localYears };
-          Object.entries(cloudYears).forEach(([ct, yr]) => {
-            if (!(ct in mergedYears)) mergedYears[ct] = yr;
-          });
-          _memSet('cat_ct_years', mergedYears);
-          cats.congTrinhYears = mergedYears;
-          _catsChanged = true;
-          console.log('[Sync] ▼ ctYears (V1) merged');
-        }
-        console.log('[Sync] ▼ Meta — V1 cats fallback');
-      } catch (e) {
-        console.warn('[Sync] Cats pull lỗi:', e.message || e);
-      }
-    }
-
-    // ── Year data ─────────────────────────────────────────────
+    // ── Dữ liệu từng năm ──
     let totalNew = 0, totalConflicts = 0;
 
-    // Helper: merge 1 key + đếm new/conflict
     const mergeAndCount = (key, cloudArr, yrStr) => {
       const local     = load(key, []);
       const merged    = mergeDatasets(local, cloudArr);
@@ -714,71 +450,40 @@ async function pullChanges(yr, callback, opts = {}) {
         const lr = local.find(l => String(l.id) === String(cr.id));
         return lr && (lr.updatedAt || lr._ts || 0) !== (cr.updatedAt || 0);
       }).length;
-      totalNew       += newRecs;
-      totalConflicts += conflicts;
+      totalNew += newRecs; totalConflicts += conflicts;
       _memSet(key, merged);
-      if (newRecs || conflicts)
-        console.log(`[Sync] ▼ ${key} year ${yrStr}: +${newRecs} mới, ${conflicts} conflict`);
+      if (newRecs || conflicts) console.log(`[Sync] ▼ ${key} năm ${yrStr}: +${newRecs} mới, ${conflicts} đổi`);
     };
 
-    // Helper: merge cc_v2 dùng normalizeCC (logical key dedup)
-    const mergeCCAndCount = (cloudCC, yrStr, source) => {
+    const mergeCCAndCount = (cloudCC, yrStr) => {
       const localCC    = load('cc_v2', []);
       const normalized = normalizeCC([...localCC, ...cloudCC]);
       const newRecs    = normalized.filter(n => !localCC.find(l => String(l.id) === String(n.id))).length;
-      const dupsRemoved = (localCC.length + cloudCC.length) - normalized.length;
-      totalNew        += newRecs;
+      totalNew += newRecs;
       _memSet('cc_v2', normalized);
       if (typeof ccData !== 'undefined') ccData = normalized;
-      console.log(`[Sync] ▼ cc_v2 year ${yrStr} (${source}): +${newRecs} mới${dupsRemoved > 0 ? `, xóa ${dupsRemoved} bản trùng` : ''}`);
     };
 
     for (const yrStr of years) {
       try {
-        // ── Thử V2 subcollection trước ───────────────────────
-        let pulledFromV2 = false;
-        if (typeof _v2PullYearFull === 'function') {
-          const v2 = await _v2PullYearFull(parseInt(yrStr));
-          // V2 path per-year: chỉ khi parent doc TỒN TẠI cho năm đó
-          // (tránh case cloud có V2 meta nhưng chưa có V2 year → cần V1 fallback cho năm)
-          if (v2._v2Initialized) {
-            if (v2.inv_v3)  mergeAndCount('inv_v3', v2.inv_v3, yrStr);
-            if (v2.ung_v1)  mergeAndCount('ung_v1', v2.ung_v1, yrStr);
-            if (v2.cc_v2)   mergeCCAndCount(v2.cc_v2, yrStr, 'V2');
-            if (v2.tb_v1)   mergeAndCount('tb_v1',  v2.tb_v1, yrStr);
-            if (v2.thu_v1)  { mergeAndCount('thu_v1', v2.thu_v1, yrStr); thuRecords = load('thu_v1', []); }
-            pulledFromV2 = true;
-            console.log(`[Sync] ▼ Year ${yrStr} — V2 ${v2._yearChanged ? '✓ fresh' : '⏭ unchanged'}`);
-          }
-        }
-
-        // ── Fallback V1 nếu V2 chưa có data ─────────────────
-        if (!pulledFromV2) {
-          const doc  = await fsGet(fbDocYear(parseInt(yrStr)));
-          const data = fsUnwrap(doc);
-          if (!data) {
-            console.log(`[Sync] ▼ Year ${yrStr} chưa có trên cloud`);
-            continue;
-          }
-          if (data.i)   mergeAndCount('inv_v3', expandInv(data.i), yrStr);
-          if (data.u)   mergeAndCount('ung_v1', expandUng(data.u), yrStr);
-          if (data.c)   mergeCCAndCount(expandCC(data.c), yrStr, 'V1');
-          if (data.t)   mergeAndCount('tb_v1',  expandTb(data.t), yrStr);
-          if (data.thu) { mergeAndCount('thu_v1', data.thu, yrStr); thuRecords = load('thu_v1', []); }
-          console.log(`[Sync] ▼ Year ${yrStr} — V1 fallback`);
-        }
+        const doc  = await fsGet(fbDocYear(parseInt(yrStr)));
+        const data = fsUnwrap(doc);
+        if (!data) { console.log(`[Sync] ▼ Năm ${yrStr} chưa có trên cloud`); continue; }
+        if (data.i)   mergeAndCount('inv_v3', expandInv(data.i), yrStr);
+        if (data.u)   mergeAndCount('ung_v1', expandUng(data.u), yrStr);
+        if (data.c)   mergeCCAndCount(expandCC(data.c), yrStr);
+        if (data.t)   mergeAndCount('tb_v1',  expandTb(data.t), yrStr);
+        if (data.thu) { mergeAndCount('thu_v1', data.thu, yrStr); thuRecords = load('thu_v1', []); }
+        console.log(`[Sync] ▼ Năm ${yrStr} đã gộp`);
       } catch (e) {
-        console.warn(`[Sync] Pull year ${yrStr} lỗi:`, e.message || e);
+        console.warn(`[Sync] Pull năm ${yrStr} lỗi:`, e.message || e);
       }
     }
 
     if (!silent) hideSyncBanner();
-    // PHASE 4 — Lưu timestamp pull xong → pushChanges có thể skip pre-push pull nếu fresh
-    try { localStorage.setItem('_lastPullTs', String(Date.now())); } catch {}
-    console.log(`[Sync] ▼ Pull xong — ${totalNew} record mới, ${totalConflicts} conflicts${_catsChanged ? ', cats changed' : ''} | device: ${DEVICE_ID.slice(0, 8)}`);
+    console.log(`[Sync] ▼ Pull xong — ${totalNew} record mới, ${totalConflicts} đổi${_catsChanged ? ', danh mục cập nhật' : ''}`);
     if (callback) callback({ newRecords: totalNew, conflicts: totalConflicts, catsChanged: _catsChanged });
     if (typeof afterSync === 'function') afterSync();
-    // Push KHÔNG tự chạy sau pull — chỉ manualSync() mới push
 
   } catch (e) {
     console.warn('[Sync] ▼ Pull lỗi toàn bộ:', e);
@@ -790,13 +495,11 @@ async function pullChanges(yr, callback, opts = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [12a] SCHEDULE PUSH — debounce 30s sau mỗi save()
-// Gọi từ core.js/save() sau _incPending().
-// Nếu tab bị ẩn trước khi timer chạy → visibilitychange flush ngay.
+// [12] SCHEDULE PUSH — đẩy ngầm sau khi save() (debounce 5 phút)
+// (sẽ được thay bằng "ghi cloud tức thì" ở bước kế tiếp)
 // ══════════════════════════════════════════════════════════════
 let _pushTimer = null;
 
-// Hủy debounce push đang chờ — gọi trước khi force push thủ công (e.g. sau import)
 function cancelScheduledPush() {
   clearTimeout(_pushTimer);
   _pushTimer = null;
@@ -808,23 +511,15 @@ function schedulePush() {
   clearTimeout(_pushTimer);
   _pushTimer = setTimeout(async () => {
     _pushTimer = null;
-    if (isSyncing()) {
-      _pushTimer = setTimeout(schedulePush, 15_000);
-      return;
-    }
-    // Auto-sync: bỏ qua pull trước push — mỗi thiết bị ghi vào subcollection riêng,
-    // không có nguy cơ ghi đè record của thiết bị khác.
-    // Giúp tiết kiệm ~19 reads mỗi lần auto-sync ngầm.
+    if (isSyncing()) { _pushTimer = setTimeout(schedulePush, 15_000); return; }
     if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
       await pushChanges({ silent: true, skipPull: true });
-      // Meta chỉ push khi user bấm manual sync (🔄 Sync)
-      // Year data changes (hóa đơn, chấm công...) không cần push meta mỗi lần
     }
-  }, 300_000); // 5 phút — _flushOnHide() đã đảm bảo flush khi đóng tab
+  }, 300_000); // 5 phút — flush-on-hide đảm bảo đẩy nốt khi đóng tab
 }
 
 // ══════════════════════════════════════════════════════════════
-// [12] MANUAL SYNC — nút 🔄 Sync: pull → push → reload globals → refresh UI
+// [13] MANUAL SYNC — nút 🔄 Sync: pull → reload globals → push → render
 // ══════════════════════════════════════════════════════════════
 async function manualSync() {
   if (!navigator.onLine) {
@@ -840,34 +535,26 @@ async function manualSync() {
     return;
   }
 
-  // Disable cả 2 nút sync trong suốt quá trình — re-enable trong finally dù lỗi
   const _sBtns = ['sync-btn', 'jb-btn'].map(id => document.getElementById(id)).filter(Boolean);
   _sBtns.forEach(b => { b.disabled = true; b.style.opacity = '.6'; });
 
   try {
-    // Bước 1: Pull — chỉ pull năm đang xem, tránh pull toàn bộ lịch sử
+    // B1: Pull — chỉ pull năm đang xem
     const _syncYr = (typeof activeYears !== 'undefined' && activeYears.size === 1)
       ? [...activeYears][0]
       : (typeof activeYear !== 'undefined' && activeYear ? activeYear : new Date().getFullYear());
     await new Promise(resolve => pullChanges(_syncYr, resolve));
 
-    // Bước 2: Reload globals + clear cache (không render trước khi push xong)
+    // B2: Reload globals + clear cache
     if (typeof _reloadGlobals === 'function') _reloadGlobals();
     else if (typeof clearAllCache === 'function') clearAllCache();
 
-    // Bước 3: Push — đợi xong mới refresh UI (tránh reload sớm trước khi push xong)
-    // V2 year push được tích hợp trong pushChanges() — không cần gọi thêm ở đây
+    // B3: Push (đẩy lên cả year doc + danh_muc)
     await pushChanges({ silent: false });
 
-    // Bước 3b: V2 meta push (danh_muc, hop_dong, cong_trinh, tai_khoan) — chỉ manual sync
-    if (typeof _v2PushMeta === 'function') {
-      _v2PushMeta().catch(e => console.warn('[Sync] V2 meta push lỗi:', e.message || e));
-    }
-
-    // Reset flag để _migrateCatNamesFormat chạy lại scan data ở lần renderSettings tiếp theo
     if (typeof resetCatNamesMigrated === 'function') resetCatNamesMigrated();
 
-    // Bước 4: Render — dùng afterDataChange nếu có, fallback inline
+    // B4: Render
     if (typeof afterDataChange === 'function') afterDataChange();
     else if (typeof renderActiveTab === 'function') renderActiveTab();
     else if (typeof _refreshAllTabs === 'function') _refreshAllTabs();
@@ -877,25 +564,15 @@ async function manualSync() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [11] PROCESS QUEUE — đã vô hiệu hoá (sync theo batch qua manualSync)
-// Giữ lại stub để không break code cũ còn gọi processQueue()
+// [14] PROCESS QUEUE — giữ stub để code cũ gọi không lỗi
 // ══════════════════════════════════════════════════════════════
-function processQueue() {
-  // No-op: sync không còn tự động sau save
-  // Dùng nút 🔄 Sync hoặc chờ auto timer 30s
-}
+function processQueue() { /* no-op: sync theo batch qua manualSync / schedulePush */ }
 
 // ══════════════════════════════════════════════════════════════
-// [13] FLUSH ON HIDE — đẩy data ngay khi tab bị ẩn/đóng
-// Giải quyết lỗi mất dữ liệu trên mobile: khi user khóa màn hình
-// hoặc tắt trình duyệt, bộ đếm 30s bị hủy → data kẹt local.
-// keepalive=true đảm bảo browser gửi xong request dù tab đã đóng.
+// [15] FLUSH ON HIDE — đẩy nốt dữ liệu khi tab bị ẩn/đóng
+// (chống mất dữ liệu trên mobile khi khóa màn hình / tắt trình duyệt)
 // ══════════════════════════════════════════════════════════════
-
-// Flag báo cho fetch calls trong sync.v2format.js dùng keepalive
-let _syncKeepAlive = false;
-let _lastFlushTs = 0; // Rate-limit flush: tối đa 1 lần mỗi 10s
-
+let _lastFlushTs = 0; // giới hạn: tối đa 1 lần / 10s
 (function() {
   function _flushOnHide() {
     if (!fbReady()) return;
@@ -904,16 +581,8 @@ let _lastFlushTs = 0; // Rate-limit flush: tối đa 1 lần mỗi 10s
     if (Date.now() - _lastFlushTs < 10_000) return;
     _lastFlushTs = Date.now();
     console.log('[Sync] ⚡ Flush on hide — có', _pendingChanges, 'thay đổi chưa sync');
-    _syncKeepAlive = true;
-    const done = () => { _syncKeepAlive = false; };
-    pushChanges({ silent: true, skipPull: true }).then(done, done);
+    pushChanges({ silent: true, skipPull: true });
   }
-
-  // Tab bị ẩn (khóa màn hình, chuyển app, giảm thiểu)
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) _flushOnHide();
-  });
-
-  // Tab hoặc cửa sổ bị đóng
+  document.addEventListener('visibilitychange', () => { if (document.hidden) _flushOnHide(); });
   window.addEventListener('pagehide', _flushOnHide);
 })();

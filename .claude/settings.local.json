@@ -47,7 +47,10 @@
       "Bash(node --check js/modules/projects/projects.ui.js)",
       "Bash(node --check js/modules/chamcong/chamcong.core.js)",
       "Bash(node --check js/modules/hoadon/hoadon.quick-entry.js)",
-      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\modules\\\\doanhthu\\\\doanhthu.forms.js\")"
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\modules\\\\doanhthu\\\\doanhthu.forms.js\")",
+      "Bash(ls -1 *.json)",
+      "Bash(ls -la cpct_snapshot*)",
+      "Bash(node -e ' *)"
     ]
   }
 }
