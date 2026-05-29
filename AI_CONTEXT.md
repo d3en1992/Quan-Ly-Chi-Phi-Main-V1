@@ -41,8 +41,9 @@ Thứ tự chính xác trong `index.html`:
 | 2 | `https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js` | Export UI/table thành ảnh |
 | 3 | `https://unpkg.com/dexie@4/dist/dexie.min.js` | IndexedDB wrapper |
 | 4 | `js/core/core.storage.js` | Lớp nền thấp nhất: `DEFAULTS`, `CATS`, `FB_CONFIG`, Dexie `db`, `DB_KEY_MAP`, `_mem`, `load/save`, pending sync counter (`_pendingChanges`, `_SYNC_DATA_KEYS`, `_incPending`, `_resetPending`, `_updateSyncBtnBadge`), `LAST_SYNC_KEY`, `mkRecord`, `mkUpdate`, autocomplete |
-| 5 | `js/core/core.state-backup.js` | State orchestration: `DATA_VERSION`, `migrateData`, `_migrateHopDongKeys`, project lookup helpers, `BACKUP_KEYS`, backup/restore (`_snapshotNow`, `restoreFromBackup`, `renderBackupList`), `exportJSON`, `importJSON`, `importJSONFull`, `clearAllCache`, `afterDataChange`, `_reloadGlobals`, khởi tạo global `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` |
-| 6 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, compress/expand (Firestore format), `fsWrap/fsUnwrap`, `fbYearPayload`, `fbCatsPayload`, Firebase REST (`fsGet/fsSet`), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `showSyncBanner`, `_setSyncState` |
+| 5 | `js/core/core.normalize.js` | Module chuẩn hóa record về 6 field tiêu chuẩn (`id`, `createdAt`, `updatedAt`, `deletedAt`, `deviceId`, `projectId`) dùng cho import/restore: `normalizeRecord`, `normalizeDataset`, `normalizeImportStore`, `_NORM_CT_FIELD`. Nạp sau `core.storage.js`, trước `core.state-backup.js`. |
+| 5b | `js/core/core.state-backup.js` | State orchestration: `DATA_VERSION`, `migrateData`, `_migrateHopDongKeys`, project lookup helpers, `BACKUP_KEYS`, backup/restore (`_snapshotNow`, `restoreFromBackup`, `renderBackupList`), `exportJSON`, `importJSON`, `importJSONFull` (push cloud cấu trúc B), `_normalizeImportData` (wrapper gọi `normalizeImportStore`), `clearAllCache`, `afterDataChange`, `_reloadGlobals`, khởi tạo global `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` |
+| 6 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, `fsWrap/fsUnwrap`, Firebase REST (`fsGet/fsSet/fsDelete`), cấu trúc B (`fbDocYearCat`, `fbDocMetaCT/DM/TK/HD`, `_YEAR_CATS`, `fbYearCatPayload`, `fbMetaCT/DM/TK/HDPayload`), `_wipeOrphanCloudDocs` (dọn doc rác cấu trúc cũ), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `showSyncBanner`, `_setSyncState` |
 | 7 | `js/modules/projects/projects.model.js` | Domain model công trình: `PROJECT_STATUS`, `PROJECT_COMPANY`, `let projects = []`, `_saveProjects`, `rebuildCatCTFromProjects`, `createProject`, `updateProject`, `getProjectById`, `findProjectIdByName`, `getSortedProjects`, `getAllProjects`, `getProjectOptions`, `getProjectDays/Factor/Weight`, `getCompanyCost`, `allocateCompanyCost`, `canDeleteProject`, `resolveProjectName` |
 | 8 | `js/modules/projects/projects.migration-selects.js` | Migration linking + shared select helpers: `migrateProjectLinks`, `deduplicateProjects`, `_buildProjOpts`, `_buildProjFilterOpts`, `_readPidFromSel`, `_checkProjectClosed` |
 | 9 | `js/modules/projects/projects.ui.js` | Full UI tab Công Trình: `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_goTabWithCT`, `renderProjectsPage`, `renderCTOverview`, `_ctApply`, `_ctRenderGrid`, `openCTDetail`, `openCTCreateModal`, `saveCTCreate`, `openCTEditModal`, `saveCTEdit`, `quickCloseCT`, `confirmQuickClose`, `quickCompleteCT`, `confirmQuickComplete`, `confirmDeleteCT` |
@@ -67,17 +68,13 @@ Thứ tự chính xác trong `index.html`:
 | 28 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
 | 29 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
 | 30 | `js/modules/doanhthu/doanhthu.reports-export.js` | Công nợ, Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderCongNoThauPhu`, `_renderCongNoTable`, `renderCongNoNhaCungCap`, `renderLaiLo`, `initDoanhThu`, `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub` |
-| 31 | `js/sync/sync.v2format.js` | V2 Firestore format helpers — human-readable document IDs, field maps, typed value converters, push subcollection (year + meta), pull subcollection (year), debug helper |
-| 32 | `js/sync/sync.v2meta.js` | V2 Meta Pull Module — đọc 4 loại meta từ V2 subcollections song song: `_v2PullProjects`, `_v2PullUsers`, `_v2PullDanhMuc`, `_v2PullHopDong`, `_v2PullMetaFull`; `_mergeUsersV2` (password-safe merge) |
-| 33 | `js/sync/sync.js` | Sync engine Firestore, conflict merge, auto/manual sync |
-| 34 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
-| 35 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync |
+| 31 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 4 meta doc), `pullChanges` (REPLACE local bằng cloud), `_pullMeta`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
+| 32 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
+| 33 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`) |
 
 Thứ tự này quan trọng vì code không dùng module system. Nhóm `core.*.js` **bắt buộc nạp trước tất cả module nghiệp vụ**. Các file dùng chung biến/hàm global như `load`, `save`, `cats`, `projects`, `invoices`, `ccData`, `hopDongData`, `buildInvoices`, `pullChanges`, `manualSync`. Nếu đổi thứ tự, module có thể đọc biến chưa khai báo hoặc render trước khi `dbInit()` populate `_mem`.
 
-> **`sync.v2format.js` (vị trí 31)** phải nạp **trước `sync.v2meta.js` và `sync.js`** vì cả hai file sau đều dùng `_v2FsGetSubcollDocs`, `_v2FromFsFields`, `_v2ReverseApplyFieldMap`, `_V2_FIELD_MAPS`, `_V2_SUBCOLL_NAME` từ file này. File này không có side-effect lúc nạp, sử dụng `FS_BASE()` và `FB_CONFIG` từ `core.storage.js` (vị trí 4).
-
-> **`sync.v2meta.js` (vị trí 32)** phải nạp **sau `sync.v2format.js`** (phụ thuộc các helpers V2) và **trước `sync.js`** (pullChanges gọi `_v2PullMetaFull`). File không có side-effect lúc nạp.
+> **Hai file V2 (`sync.v2format.js`, `sync.v2meta.js`) đã bị XÓA** trong đợt chuyển sang online-only + cấu trúc B. `sync.js` không còn phụ thuộc engine subcollection V2. Nếu thấy tham chiếu `_v2*` ở đâu đó thì đó là dấu vết cũ cần dọn.
 
 ---
 
@@ -700,3 +697,37 @@ Tên công trình đã có ở `modal-title` header. Row 0 trong `openCTDetail` 
 - `_migrateChuDauTuFromHopDong()` chỉ chạy khi `project.chuDauTu` rỗng → an toàn khi gọi nhiều lần.
 - `excludeClosed: true` **không** ảnh hưởng đến hành vi của filter/view dropdown, chỉ tab nhập liệu mới truyền flag này.
 
+
+---
+
+### 8.11. Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026)
+
+**Bối cảnh:** Mô hình offline-first (IndexedDB cache rồi merge-on-pull) gây phân kỳ số liệu giữa các máy (vd 4,38 tỷ vs 3,18 tỷ). Nguyên nhân gốc: **merge tích lũy lúc PULL**. Giải pháp: chuyển sang **100% online, cloud là nguồn chân lý**.
+
+**Thay đổi cốt lõi:**
+
+| Hạng mục | Trước | Sau |
+|---|---|---|
+| Mô hình | Offline-first, merge khi pull | Online-only; pull = **REPLACE** local bằng cloud |
+| Khi offline | Vẫn dùng app | `main.js` `_showOfflineBlock()` chặn hẳn, bắt reload khi có mạng lại |
+| Lưu (save) | Debounce 5 phút | Debounce **800ms**, đẩy cloud gần như tức thì; cảnh báo nếu offline |
+| Cấu trúc cloud | 1 doc/năm (nén) + 1 doc danh mục | **Cấu trúc B**: mỗi năm × mỗi hạng mục = 1 doc + 4 doc meta dùng chung, **tên field đầy đủ (không nén)** |
+| Engine V2 subcollection | `sync.v2format.js` + `sync.v2meta.js` | **Đã xóa** |
+
+**Cấu trúc B (collection `cpct_data`):**
+- `meta_cong_trinh` → `{ projects }`
+- `meta_danh_muc` → `{ cats, catItems, cnRoles, ctYears }`
+- `meta_tai_khoan` → `{ users }`
+- `meta_hop_dong` → `{ hopDong, thauPhu }`
+- `y{YYYY}_hoa_don` / `_tien_ung` / `_cham_cong` / `_thiet_bi` / `_thu_tien` → `{ v:4, yr, cat, records:[...] }`
+- Ánh xạ năm×hạng mục: `_YEAR_CATS` trong `core.cloud-cats-ui.js`.
+
+**Vì sao B không tái phát phân kỳ:** pull vẫn REPLACE (không merge), nên dù tách nhiều doc, mỗi lần pull vẫn ghi đè local bằng cloud. Pre-push merge (id-based, tombstone + LWW) chỉ chạy lúc PUSH để tránh 2 máy cùng năm ghi đè nhau — đây KHÔNG phải nguồn gây phân kỳ.
+
+**Module Normalize (`core.normalize.js`):** chuẩn hóa mọi record giao dịch về 6 field tiêu chuẩn (`id`, `createdAt`, `updatedAt`, `deletedAt`, `deviceId`, `projectId`) khi import/restore. `_normalizeImportData` trong `core.state-backup.js` giờ chỉ là wrapper gọi `normalizeImportStore`.
+
+**Reset viết lại (`_doResetAll` trong `datatools.js`):**
+- Push tombstone/rỗng theo cấu trúc B (mỗi năm × hạng mục + 3 meta CT/DM/HD) bằng `fsSet` trực tiếp (không qua `pushChanges` để tránh merge kéo lại bản cũ). `meta_tai_khoan` KHÔNG đụng → giữ tài khoản.
+- `_wipeOrphanCloudDocs()`: liệt kê collection, **xóa hẳn** mọi doc không thuộc B (doc gộp `y2025`/`y2026` đời cũ, `danh_muc`, rác V2...). Dùng `fsDelete` (REST DELETE).
+
+**Dọn code chết:** đã xóa `compressInv/CC/Ung/Tb` + `expandInv/CC/Ung/Tb`, `fbDocYear`, `fbDocCats`, `fbYearPayload`, `fbCatsPayload` (không còn caller). Block push V2 trong `importJSONFull` đã xóa.

@@ -5,72 +5,6 @@
 
 function fbReady() { return FB_CONFIG.apiKey && FB_CONFIG.projectId; }
 
-// ══ NÉN / GIẢI NÉN ═══════════════════════════════════════
-// inv: id→i ngay→d congtrinh→c loai→l nguoi→n ncc→s nd→t tien→p thanhtien→q sl→k ccKey→x source→so
-//      updatedAt→m createdAt→ca deletedAt→da deviceId→dv projectId→pi
-// cc:  id→i fromDate→f toDate→e ct→c updatedAt→a createdAt→ca deletedAt→da deviceId→dv projectId→pi
-// ung: id→i updatedAt→a ngay→d tp→t congtrinh→c tien→p nd→n loai→k
-//      createdAt→ca deletedAt→da deviceId→dv projectId→pi
-// tb:  id→i ct→c ten→t soluong→s tinhtrang→r nguoi→n ghichu→g ngay→d
-//      updatedAt→m createdAt→ca deletedAt→da deviceId→dv projectId→pi
-function compressInv(arr) {
-  return arr.map(o=>{const r={};
-    if(o.id!==undefined)r.i=o.id; if(o.ngay)r.d=o.ngay; if(o.congtrinh)r.c=o.congtrinh;
-    if(o.projectId)r.pi=o.projectId;
-    if(o.source)r.so=o.source;
-    if(o.loai)r.l=o.loai; if(o.nguoi)r.n=o.nguoi; if(o.ncc)r.s=o.ncc; if(o.nd)r.t=o.nd;
-    if(o.tien)r.p=o.tien; if(o.thanhtien&&o.thanhtien!==o.tien)r.q=o.thanhtien;
-    if(o.sl&&o.sl!==1)r.k=o.sl; if(o.ccKey)r.x=o.ccKey;
-    if(o.items&&o.items.length)r.it=o.items;
-    if(o.footerCkStr)r.fck=o.footerCkStr;
-    // Metadata: dùng updatedAt, fallback sang _ts cho record cũ
-    r.m=(o.updatedAt||o._ts)||undefined;
-    if(o.createdAt)r.ca=o.createdAt; if(o.deletedAt)r.da=o.deletedAt;
-    if(o.deviceId)r.dv=o.deviceId; return r;});
-}
-function expandInv(arr) {
-  return (arr||[]).map(o=>({id:o.i,ngay:o.d,congtrinh:o.c,projectId:o.pi||null,loai:o.l,nguoi:o.n||'',ncc:o.s||'',
-    nd:o.t||'',tien:o.p||0,thanhtien:o.q||(o.p||0),sl:o.k||undefined,ccKey:o.x||undefined,
-    source:o.so||undefined,
-    items:o.it||undefined,footerCkStr:o.fck||undefined,
-    updatedAt:o.m||undefined,_ts:o.m||undefined,
-    createdAt:o.ca||undefined,deletedAt:o.da||null,deviceId:o.dv||undefined}));
-}
-function compressCC(arr) {
-  return (arr||[]).map(w=>({i:w.id,f:w.fromDate,e:w.toDate,c:w.ct,
-    ...(w.projectId?{pi:w.projectId}:{}),
-    a:w.updatedAt,ca:w.createdAt,da:w.deletedAt,dv:w.deviceId,
-    w:w.workers.map(wk=>{const r={n:wk.name,d:wk.d,l:wk.luong};
-      if(wk.phucap)r.p=wk.phucap; if(wk.hdmuale)r.h=wk.hdmuale; if(wk.nd)r.t=wk.nd;
-      if(wk.tru)r.u=wk.tru; if(wk.loanAmount)r.lo=wk.loanAmount; return r;})}));
-}
-function expandCC(arr) {
-  return (arr||[]).map(w=>({id:w.i,fromDate:w.f,toDate:w.e,ct:w.c,projectId:w.pi||null,updatedAt:w.a,
-    createdAt:w.ca||undefined,deletedAt:w.da||null,deviceId:w.dv||undefined,
-    workers:(w.w||[]).map(wk=>({name:wk.n,d:wk.d,luong:wk.l||0,phucap:wk.p||0,hdmuale:wk.h||0,nd:wk.t||'',tru:wk.u||0,loanAmount:wk.lo||0}))}));
-}
-function compressUng(arr) {
-  return (arr||[]).map(o=>{const r={i:o.id,a:o.updatedAt,d:o.ngay,t:o.tp||o.ncc||'',c:o.congtrinh,p:o.tien||0,n:o.nd||''};
-    if(o.projectId)r.pi=o.projectId;
-    if(o.loai&&o.loai!=='thauphu')r.k=o.loai;
-    if(o.createdAt)r.ca=o.createdAt; if(o.deletedAt)r.da=o.deletedAt;
-    if(o.deviceId)r.dv=o.deviceId; return r;});
-}
-function expandUng(arr) {
-  return (arr||[]).map(o=>({id:o.i,updatedAt:o.a,ngay:o.d,tp:o.t,loai:o.k||'thauphu',congtrinh:o.c,projectId:o.pi||null,tien:o.p||0,nd:o.n||'',
-    createdAt:o.ca||undefined,deletedAt:o.da||(o.cl?(o.a||Date.now()):null)||null,deviceId:o.dv||undefined}));
-}
-function compressTb(arr) {
-  return (arr||[]).map(o=>({i:o.id,c:o.ct,t:o.ten,s:o.soluong||0,r:o.tinhtrang,n:o.nguoi||'',g:o.ghichu||'',d:o.ngay||'',
-    ...(o.projectId?{pi:o.projectId}:{}),
-    m:o.updatedAt,ca:o.createdAt,da:o.deletedAt,dv:o.deviceId}));
-}
-function expandTb(arr) {
-  return (arr||[]).map(o=>({id:o.i,ct:o.c,ten:o.t,soluong:o.s||0,tinhtrang:o.r||'Đang hoạt động',nguoi:o.n||'',ghichu:o.g||'',ngay:o.d||'',
-    projectId:o.pi||null,
-    updatedAt:o.m||undefined,createdAt:o.ca||undefined,deletedAt:o.da||null,deviceId:o.dv||undefined}));
-}
-
 
 // ══ FIRESTORE DOCUMENT FORMAT ═════════════════════════════
 // Firestore lưu dạng {fields: {key: {stringValue/integerValue/...}}}
@@ -87,10 +21,6 @@ function fsUnwrap(doc) {
 }
 
 // ── Doc ID helpers ─────────────────────────────────────────
-// CŨ (giữ lại cho công cụ reset/legacy datatools.js — Prompt 5 sẽ dọn):
-function fbDocYear(yr)  { return `y${yr}`; }
-function fbDocCats()    { return 'danh_muc'; }
-
 // ── CẤU TRÚC MỚI (B): mỗi hạng mục theo năm = 1 document, + 4 doc danh mục dùng chung ──
 // Tên field bên trong viết ĐẦY ĐỦ (không nén) cho dễ đọc trên Firebase Console.
 //   cpct_data/meta_cong_trinh  → { projects }
@@ -141,33 +71,6 @@ function fbMetaHDPayload() {
   return { v: 4, hopDong: load('hopdong_v1', {}), thauPhu: load('thauphu_v1', []) };
 }
 
-// ── Build payload cho từng loại ───────────────────────────
-function fbYearPayload(yr) {
-  const y = yr || activeYear || new Date().getFullYear();
-  const ys = String(y);
-  return { v:3, yr:y,
-    i: compressInv(load('inv_v3',[]).filter(x=>x.ngay&&x.ngay.startsWith(ys))),
-    u: compressUng(load('ung_v1',[]).filter(x=>x.ngay&&x.ngay.startsWith(ys))),
-    c: compressCC(load('cc_v2',[]).filter(x=>x.fromDate&&x.fromDate.startsWith(ys))),
-    t: compressTb(load('tb_v1',[]).filter(x=>x.ngay&&x.ngay.startsWith(ys))),
-    thu: load('thu_v1',[]).filter(x=>x.ngay&&x.ngay.startsWith(ys)) };
-}
-function fbCatsPayload() {
-  // cat_ct là derived data — rebuild từ projects_v1 — không push lên cloud
-  return { v:3,
-    cats:{loai:load('cat_loai',DEFAULTS.loaiChiPhi),
-      ncc:load('cat_ncc',DEFAULTS.nhaCungCap),nguoi:load('cat_nguoi',DEFAULTS.nguoiTH)},
-    users: load('users_v1', []),
-    // catItems: per-item tracking với isDeleted/updatedAt — source of truth cho danh mục
-    catItems: load('cat_items_v1', {}),
-    cnRoles:  load('cat_cn_roles', {}),  // vai trò công nhân { name: 'C'|'T'|'P' }
-    ctYears:  load('cat_ct_years', {}),  // năm theo công trình { ctName: year }
-    hopDong:  load('hopdong_v1',  {}),  // hợp đồng xuyên suốt, không theo năm
-    thauPhu:  load('thauphu_v1',  []),  // HĐ thầu phụ xuyên suốt, không theo năm
-    projects: load('projects_v1', []),  // danh sách dự án — source of truth cho công trình
-  };
-}
-
 // ── Firestore quota counter ──────────────────────────────────
 let _fsReads = 0, _fsWrites = 0;
 function _fsCountRead()  { _fsReads++;  console.log(`[FS Counter] reads: ${_fsReads}, writes: ${_fsWrites}`); }
@@ -190,6 +93,42 @@ function fsSet(docId, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(fsWrap(payload))
   }).then(r=>r.json());
+}
+// Xóa hẳn 1 doc khỏi Firestore (dùng khi dọn doc rác cấu trúc cũ)
+function fsDelete(docId) {
+  _fsCountWrite();
+  return fetch(`${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`, { method: 'DELETE' })
+    .then(r => r.ok)
+    .catch(() => false);
+}
+
+// ── Dọn doc rác cấu trúc cũ ──────────────────────────────────
+// Liệt kê toàn bộ collection cpct_data, xóa mọi doc KHÔNG thuộc cấu trúc B mới.
+// Giữ lại: meta_*  và  y{YYYY}_{hoa_don|tien_ung|cham_cong|thiet_bi|thu_tien}.
+// Xóa: y2025 / y2026 (doc gộp đời cũ), cats (doc gộp đời cũ), rác V2 lạc...
+// Trả về số doc đã xóa.
+async function _wipeOrphanCloudDocs() {
+  if (!fbReady()) return 0;
+  const validCat = new Set(['hoa_don', 'tien_ung', 'cham_cong', 'thiet_bi', 'thu_tien']);
+  let deleted = 0;
+  try {
+    const res  = await fetch(`${FS_BASE()}?key=${FB_CONFIG.apiKey}&pageSize=300`).then(r => r.json());
+    const docs = (res && res.documents) || [];
+    for (const doc of docs) {
+      const id = doc.name.split('/').pop();
+      let keep = false;
+      if (id.startsWith('meta_')) {
+        keep = true;
+      } else {
+        const m = id.match(/^y(\d{4})_(.+)$/);
+        if (m && validCat.has(m[2])) keep = true;
+      }
+      if (!keep) { await fsDelete(id); deleted++; }
+    }
+  } catch (e) {
+    console.warn('[Cloud] Dọn doc rác lỗi (bỏ qua):', e);
+  }
+  return deleted;
 }
 
 // ── Estimate size ──────────────────────────────────────────

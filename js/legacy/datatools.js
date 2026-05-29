@@ -119,27 +119,14 @@ async function _doResetAll() {
       r.deletedAt ? r : { ...r, deletedAt: now, updatedAt: now, deviceId: devId }
     );
 
-    // 3. Ghi soft-deleted vào _mem (tạm) để fbYearPayload/load() đọc được
-    // Không ghi IDB vì step 8 sẽ clear IDB; chỉ cần _mem cho fbYearPayload đọc
-    ['inv_v3','ung_v1','cc_v2','tb_v1','thu_v1','thauphu_v1'].forEach(k => {
+    // 3. Ghi soft-deleted records giao dịch vào _mem (tạm) để fbYearCatPayload() đọc được.
+    //    Không ghi IDB vì step 8 sẽ clear IDB; chỉ cần _mem cho payload đọc.
+    //    (hopDong / thauPhu / danh mục được xử lý ở phần META-prep bên dưới.)
+    ['inv_v3','ung_v1','cc_v2','tb_v1','thu_v1'].forEach(k => {
       _mem[k] = _softDelArr(k);
     });
 
-    // hopDongData là object, xử lý riêng
-    const existingHd = (typeof load === 'function') ? load('hopdong_v1', {}) : {};
-    const softHd = {};
-    Object.keys(existingHd).forEach(ct => {
-      const hd = existingHd[ct];
-      softHd[ct] = (hd && hd.deletedAt)
-        ? hd
-        : { ...(hd || {}), deletedAt: now, updatedAt: now, deviceId: devId };
-    });
-    _mem['hopdong_v1'] = softHd; // tạm trong _mem để fbYearPayload/fbCatsPayload đọc được
-
-    // Chuẩn bị cats/settings rỗng trước khi push lên cloud
-    const _emptyArrKeys = ['cat_ct','cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb','projects_v1','thauphu_v1'];
-    _emptyArrKeys.forEach(k => { _mem[k] = []; });
-    _mem['hopdong_v1'] = softHd; // đã set ở trên
+    // Reset các global trong bộ nhớ (UI đọc trực tiếp các biến này)
     if (typeof cats !== 'undefined' && cats) {
       cats.congTrinh  = [];
       cats.loaiChiPhi = [];
@@ -152,47 +139,59 @@ async function _doResetAll() {
     if (typeof projects !== 'undefined') projects = [];
     if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = [];
 
-    // 4. Push soft-deleted lên Firebase TRƯỚC KHI xóa localStorage
+    // ── Chuẩn bị _mem rỗng/tombstone cho phần META trước khi push ──
+    // Danh mục dạng mảng-chuỗi không có soft-delete → set [] để cloud xóa sạch.
+    ['cat_ct','cat_loai','cat_ncc','cat_nguoi',
+     'cat_tp','cat_cn','cat_tbteb'].forEach(k => { _mem[k] = []; });
+    _mem['projects_v1'] = [];
+    _mem['thauphu_v1']  = [];
+    _mem['hopdong_v1']  = {};
+    _mem['cat_ct_years'] = {};   // năm theo công trình
+    _mem['cat_cn_roles'] = {};   // vai trò công nhân
+
+    // cat_items_v1 là nguồn gốc khiến danh mục "hồi sinh" sau reset+sync.
+    // Soft-delete từng item (isDeleted:true) để thiết bị khác pull về thấy đã xóa
+    // và không rebuild lại mảng. Sau push sẽ xóa local về {}.
+    const _existCatItems = load('cat_items_v1', {});
+    if (Object.keys(_existCatItems).length) {
+      const _softCatItems = {};
+      Object.entries(_existCatItems).forEach(([type, arr]) => {
+        _softCatItems[type] = (arr || []).map(item =>
+          item.isDeleted ? item : { ...item, isDeleted: true, updatedAt: now }
+        );
+      });
+      _mem['cat_items_v1'] = _softCatItems;
+    } else {
+      _mem['cat_items_v1'] = {};
+    }
+
+    // 4. Push tombstones lên Firebase theo CẤU TRÚC MỚI (B), TRƯỚC KHI xóa local.
+    //    Vì pull đời mới = REPLACE local bằng cloud, nên ghi tombstone/rỗng lên cloud
+    //    sẽ khiến mọi thiết bị khác pull về thành trống. Ghi THẲNG bằng fsSet
+    //    (không qua pushChanges) để tránh merge kéo lại bản ghi cũ từ cloud.
     if (typeof fbReady === 'function' && fbReady() &&
-        typeof fsSet === 'function' && typeof fbYearPayload === 'function') {
+        typeof fsSet === 'function' && typeof fbDocYearCat === 'function') {
       if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang xóa dữ liệu trên Cloud...');
       try {
-        // fbYearPayload(yr) đọc từ _mem → trả về soft-deleted records
+        // 4a. Mỗi năm × mỗi hạng mục — payload đọc soft-deleted records từ _mem
         for (const yr of yearsToWipe) {
-          await fsSet(fbDocYear(parseInt(yr)), fbYearPayload(parseInt(yr)));
-        }
-        if (typeof fbCatsPayload === 'function' && typeof fbDocCats === 'function') {
-          // Xóa cats + projects + contracts trong _mem TRƯỚC khi gọi fbCatsPayload()
-          // Cat string-array không có soft-delete → phải push [] để cloud xóa sạch
-          // (nếu giữ old cats trong _mem, cloud sẽ giữ nguyên danh mục → hồi về sau pull)
-          ['cat_ct','cat_loai','cat_ncc','cat_nguoi',
-           'cat_tp','cat_cn','cat_tbteb'].forEach(k => { _mem[k] = []; });
-          _mem['projects_v1']  = [];
-          _mem['thauphu_v1']   = [];
-          _mem['hopdong_v1']   = {};
-
-          // FIX: cat_items_v1 là nguồn gốc khiến danh mục hồi sinh sau reset+sync.
-          // Phải soft-delete từng item (isDeleted:true) trước khi push lên Firebase,
-          // để thiết bị khác pull về thấy isDeleted=true và không rebuild lại mảng.
-          // Sau push, xóa local về {} — F5 + pull sẽ nhận tombstones và vẫn cho kết quả rỗng.
-          const _existCatItems = load('cat_items_v1', {});
-          if (Object.keys(_existCatItems).length) {
-            const _softCatItems = {};
-            Object.entries(_existCatItems).forEach(([type, arr]) => {
-              _softCatItems[type] = (arr || []).map(item =>
-                item.isDeleted ? item : { ...item, isDeleted: true, updatedAt: now }
-              );
-            });
-            _mem['cat_items_v1'] = _softCatItems; // fbCatsPayload() đọc _mem này
-          } else {
-            _mem['cat_items_v1'] = {};
+          const yi = parseInt(yr);
+          for (const { cat, key, dateField } of _YEAR_CATS) {
+            await fsSet(fbDocYearCat(yi, cat), fbYearCatPayload(yi, key, dateField));
           }
-
-          await fsSet(fbDocCats(), fbCatsPayload());
         }
-        console.log('[ResetAll] ✅ Firebase soft-wiped — years:', yearsToWipe.join(', '));
+        // 4b. Meta công trình / danh mục / hợp đồng (đã set rỗng-tombstone trong _mem)
+        //     meta_tai_khoan KHÔNG đụng tới — giữ nguyên tài khoản đăng nhập.
+        await fsSet(fbDocMetaCT(), fbMetaCTPayload());
+        await fsSet(fbDocMetaDM(), fbMetaDMPayload());
+        await fsSet(fbDocMetaHD(), fbMetaHDPayload());
+
+        // 4c. Dọn doc rác cấu trúc cũ (y2025/y2026 gộp, cats, V2 lạc...)
+        const nDel = (typeof _wipeOrphanCloudDocs === 'function')
+          ? await _wipeOrphanCloudDocs() : 0;
+        console.log('[ResetAll] ✅ Cloud B-wiped, xóa', nDel, 'doc rác — years:', yearsToWipe.join(', '));
       } catch (e) {
-        console.warn('[ResetAll] Firebase wipe lỗi (bỏ qua):', e);
+        console.warn('[ResetAll] Cloud wipe lỗi (bỏ qua):', e);
       }
     }
 
