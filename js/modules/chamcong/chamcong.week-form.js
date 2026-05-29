@@ -566,30 +566,24 @@ function saveCCWeek() {
     ccData = ccData.filter((w) => !matchKey(w));
     ccData.unshift(dups[0]);
   }
-  // Update hoặc tạo mới
+  // Update hoặc tạo mới — dùng mkRecord/mkUpdate để luôn đủ 6 field chuẩn
+  // (id, createdAt, updatedAt, deletedAt, deviceId, projectId)
   const idx = ccData.findIndex((w) => matchKey(w));
   if (idx >= 0) {
-    ccData[idx].workers = workers;
-    ccData[idx].toDate = toDate;
-    ccData[idx].updatedAt = Date.now();
-    // [MODIFIED] — always write projectId + sync ct name
+    // Gom các thay đổi rồi đưa qua mkUpdate: giữ id/createdAt cũ,
+    // tự cập nhật updatedAt + deviceId của thiết bị hiện tại.
+    const changes = { workers, toDate };
     if (ctPid) {
-      ccData[idx].projectId = ctPid;
-      ccData[idx].ctPid = ctPid;
+      changes.projectId = ctPid;
+      changes.ctPid = ctPid;
     }
-    if (ct) ccData[idx].ct = ct;
+    if (ct) changes.ct = ct;
+    ccData[idx] = mkUpdate(ccData[idx], changes);
   } else {
-    // [MODIFIED] — new records always have projectId
-    ccData.unshift({
-      id: crypto.randomUUID(),
-      updatedAt: Date.now(),
-      fromDate,
-      toDate,
-      ct,
-      ctPid,
-      projectId: ctPid || null,
-      workers,
-    });
+    // Tạo record mới: mkRecord tự sinh id/createdAt/updatedAt/deletedAt/deviceId
+    ccData.unshift(
+      mkRecord({ fromDate, toDate, ct, ctPid, projectId: ctPid || null, workers }),
+    );
   }
   save("cc_v2", ccData);
   clearInvoiceCache();

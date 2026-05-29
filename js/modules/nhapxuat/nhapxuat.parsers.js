@@ -333,9 +333,18 @@ function parseSheet1(rows, lookup) {
 }
 
 // ── Sheet 2: HoaDonChiTiet ───────────────────────────────────
-// Col: NGÀY(0) · CÔNG TRÌNH(1) · LOẠI CHI PHÍ(2) · NỘI DUNG(3) · ĐVT(4)
-//      SỐ LƯỢNG(5) · ĐƠN GIÁ(6) · THÀNH TIỀN(7) · NGƯỜI TH(8) · NHÀ CC(9)
+// Col: NGÀY(0) · CÔNG TRÌNH(1) · LOẠI CHI PHÍ(2) · TÊN HÀNG HÓA(3) · ĐVT(4)
+//      SỐ LƯỢNG(5) · ĐƠN GIÁ(6) · CHIẾT KHẤU(7) · THÀNH TIỀN(8)
+//      NGƯỜI TH(9) · NHÀ CC(10) · CK TỔNG HĐ(11) · ID(12)
 // Gộp theo groupKey = ngay+CT+loai+ncc → 1 invoice nhiều items
+// Áp CK tổng HĐ (footerCkStr) cho số tiền: "5%" → giảm %, số → giảm tiền cố định
+function _applyFooterCk(base, ckStr) {
+  const s = String(ckStr || '').trim();
+  if (!s) return Math.round(base);
+  if (s.endsWith('%')) { const p = parseFloat(s) || 0; return Math.round(base * (1 - p / 100)); }
+  const n = _pNum(s) || 0;
+  return Math.round(base - n);
+}
 function parseSheet2(rows, lookup) {
   const groups = new Map(); // groupKey → { header, items }
   const errors = [];
@@ -347,13 +356,15 @@ function parseSheet2(rows, lookup) {
     const ngay        = _parseDate(row[0]);
     const ctRaw       = _str(row[1]);
     const loaiRaw     = _str(row[2]);
-    const nd          = _str(row[3]);
+    const nd          = _str(row[3]);   // TÊN HÀNG HÓA → item.ten
     const dvt         = _str(row[4]);
     const slRaw       = row[5];
     const donGiaRaw   = row[6];
-    const thanhTienRaw = row[7];
-    const nguoiRaw    = _str(row[8]);
-    const nccRaw      = _str(row[9]);
+    const ckStr       = _str(row[7]);   // CHIẾT KHẤU từng dòng
+    const thanhTienRaw = row[8];
+    const nguoiRaw    = _str(row[9]);
+    const nccRaw      = _str(row[10]);
+    const footerCkStr = _str(row[11]);  // CK TỔNG HĐ
 
     if (_isEmptyRow(rows[i])) continue;
 
@@ -403,6 +414,7 @@ function parseSheet2(rows, lookup) {
           loai:      lookup.canon(loaiRaw),
           nguoi:     nguoiRaw ? lookup.canon(nguoiRaw) : '',
           ncc:       nccRaw   ? lookup.canon(nccRaw)   : '',
+          footerCkStr,                 // CK tổng HĐ lấy từ dòng đầu của nhóm
           source:    'detail',
           createdAt: now, updatedAt: now, deletedAt: null, deviceId: dev,
         },
@@ -413,15 +425,19 @@ function parseSheet2(rows, lookup) {
       ten: nd, dv: dvt,
       sl,
       dongia:    Math.round(donGia),
+      ck:        ckStr,                // CK từng dòng
       thanhtien: computed,
     });
   }
 
   const records = [];
   groups.forEach(({ header, items }) => {
-    header.items     = items;
-    header.thanhtien = items.reduce((s, it) => s + it.thanhtien, 0);
-    header.tien      = header.thanhtien;
+    header.items   = items;
+    const sumItems = items.reduce((s, it) => s + it.thanhtien, 0);
+    // Áp CK tổng HĐ lên tổng các dòng (nếu có) → đúng với số tiền form lưu
+    const total    = header.footerCkStr ? _applyFooterCk(sumItems, header.footerCkStr) : sumItems;
+    header.thanhtien = total;
+    header.tien      = total;
     header.nd        = buildNDFromItems(items);
     records.push(header);
   });
@@ -431,7 +447,8 @@ function parseSheet2(rows, lookup) {
 // ── Sheet 3: ChamCong ─────────────────────────────────────────
 // Col: NGÀY ĐẦU TUẦN(0) · CÔNG TRÌNH(1) · TÊN CN(2) · VAI TRÒ(3) ·
 //      LƯƠNG NGÀY(4) · PHỤ CẤP(5) · HD MUA LẺ(6) ·
-//      CN(7)·T2(8)·T3(9)·T4(10)·T5(11)·T6(12)·T7(13) · GHI CHÚ(14)
+//      CN(7)·T2(8)·T3(9)·T4(10)·T5(11)·T6(12)·T7(13) · GHI CHÚ(14) ·
+//      VAY MỚI(15) · TRỪ NỢ(16)
 // Gộp theo (fromDate, ct) → 1 tuần nhiều workers
 // Đặc quyền: worker chưa có trong CN catalog → tự thêm vào
 function _addDays(iso, days){
@@ -459,6 +476,8 @@ function parseSheet3(rows, lookup) {
     const hdmuale  = _pNum(row[6])  ?? 0;
     const d        = [7,8,9,10,11,12,13].map(ci => _pNum(row[ci]) ?? 0);
     const nd       = _str(row[14]);
+    const loanAmount = _pNum(row[15]) ?? 0;  // VAY MỚI
+    const tru        = _pNum(row[16]) ?? 0;  // TRỪ NỢ
 
     if (_isEmptyRow(rows[i])) continue;
 
@@ -505,6 +524,7 @@ function parseSheet3(rows, lookup) {
       grp.workers.push({
         name: canonName, role,
         luong: Math.round(luong), phucap: Math.round(phucap), hdmuale: Math.round(hdmuale),
+        loanAmount: Math.round(loanAmount), tru: Math.round(tru),
         d, nd,
       });
     }
@@ -715,7 +735,7 @@ function parseSheet6(rows) {
 
 // ── Sheet 7: HopDongChinh ─────────────────────────────────────
 // Col: NGÀY(0) · CÔNG TRÌNH(1) · NGƯỜI THỰC HIỆN(2) ·
-//      GIÁ TRỊ HĐ CHÍNH(3) · GIÁ TRỊ HĐ PHỤ(4) · PHÁT SINH(5) · GHI CHÚ(6)
+//      GIÁ TRỊ HĐ CHÍNH(3) · GIÁ TRỊ HĐ PHỤ(4) · PHÁT SINH(5) · GHI CHÚ(6) · KHÁCH HÀNG(7)
 function parseSheet7(rows, lookup) {
   const records = [], errors = [];
 
@@ -728,6 +748,7 @@ function parseSheet7(rows, lookup) {
     const giaTriphu = _pNum(row[4]) ?? 0;
     const phatSinh = _pNum(row[5]) ?? 0;
     const ghichu   = _str(row[6]);
+    const khachHang = _str(row[7]);  // KHÁCH HÀNG / chủ đầu tư
 
     if (_isEmptyRow(rows[i])) continue;
 
@@ -755,13 +776,23 @@ function parseSheet7(rows, lookup) {
       giaTriphu: Math.round(giaTriphu),
       phatSinh:  Math.round(phatSinh),
       ghichu,
+      khachHang,
     });
   }
   return { records, errors };
 }
 
 // ── Sheet 8: ThuTien ──────────────────────────────────────────
-// Col: NGÀY(0) · NGƯỜI THỰC HIỆN(1) · CÔNG TRÌNH(2) · SỐ TIỀN(3) · NỘI DUNG(4) · ID(5)
+// Col: NGÀY(0) · NGƯỜI THỰC HIỆN(1) · CÔNG TRÌNH(2) · SỐ TIỀN(3) · NỘI DUNG(4) · LOẠI THU(5) · ID(6)
+// Nhãn LOẠI THU ("Tạm ứng"/"Giai đoạn"/"Quyết toán") → mã (tamung/giaidoan/quyettoan)
+function _parseLoaiThu(label) {
+  const n = _normStr(label);
+  if (!n) return '';
+  if (n.includes('tam ung'))   return 'tamung';
+  if (n.includes('giai doan')) return 'giaidoan';
+  if (n.includes('quyet toan')) return 'quyettoan';
+  return '';  // không nhận dạng → để trống (không phải lỗi)
+}
 function parseSheet8(rows, lookup) {
   const records = [], errors = [];
   const now = Date.now();
@@ -774,7 +805,8 @@ function parseSheet8(rows, lookup) {
     const ctRaw      = _str(row[2]);
     const tienRaw    = row[3];
     const nd         = _str(row[4]);
-    const existingId = _str(row[5]);
+    const loaiThu    = _parseLoaiThu(_str(row[5]));  // LOẠI THU
+    const existingId = _str(row[6]);
 
     if (_isEmptyRow(rows[i])) continue;
 
@@ -808,6 +840,7 @@ function parseSheet8(rows, lookup) {
       projectId: proj.id,
       tien:      Math.round(tien),
       nd,
+      loaiThu,
       createdAt: now, updatedAt: now, deletedAt: null, deviceId: dev,
     });
   }
@@ -815,9 +848,13 @@ function parseSheet8(rows, lookup) {
 }
 
 // ── Sheet 9: HopDongThauPhu ───────────────────────────────────
-// Col: NGÀY(0) · CÔNG TRÌNH(1) · TÊN THẦU PHỤ(2) · GIÁ TRỊ HĐ(3) · PHÁT SINH(4) · NỘI DUNG(5) · ID(6)
+// Col: NGÀY(0) · CÔNG TRÌNH(1) · TÊN THẦU PHỤ(2) · GIÁ TRỊ HĐ(3) · PHÁT SINH(4) · NỘI DUNG(5) ·
+//      TÊN HẠNG MỤC(6) · ĐVT(7) · SỐ LƯỢNG(8) · ĐƠN GIÁ(9) · ID(10)
+// Mỗi dòng = 1 hạng mục; gộp theo (ID hoặc ngay|CT|thầu phụ) → 1 HĐ nhiều items.
+// Nếu HĐ có items → giaTri = Σ(sl×donGia) (đúng cách app tính), bỏ qua cột GIÁ TRỊ HĐ.
 function parseSheet9(rows, lookup) {
-  const records = [], errors = [];
+  const groups = new Map(); // groupKey → { header, items }
+  const errors = [];
   const now = Date.now();
   const dev = typeof DEVICE_ID !== 'undefined' ? DEVICE_ID : '';
 
@@ -829,7 +866,11 @@ function parseSheet9(rows, lookup) {
     const giaTri     = _pNum(row[3]) ?? 0;
     const phatSinh   = _pNum(row[4]) ?? 0;
     const nd         = _str(row[5]);
-    const existingId = _str(row[6]);
+    const itName     = _str(row[6]);   // TÊN HẠNG MỤC
+    const itDonVi    = _str(row[7]);   // ĐVT
+    const itSl       = _pNum(row[8]);
+    const itDonGia   = _pNum(row[9]);
+    const existingId = _str(row[10]);
 
     if (_isEmptyRow(rows[i])) continue;
 
@@ -852,17 +893,43 @@ function parseSheet9(rows, lookup) {
 
     if (rowErrs.length) { errors.push(...rowErrs); continue; }
 
-    records.push({
-      id:        existingId || crypto.randomUUID(),
-      ngay,
-      congtrinh: proj.name,
-      projectId: proj.id,
-      thauphu:   lookup.canon(tpRaw),
-      giaTri:    Math.round(giaTri),
-      phatSinh:  Math.round(phatSinh),
-      nd,
-      createdAt: now, updatedAt: now, deletedAt: null, deviceId: dev,
-    });
+    // Khóa gộp: ưu tiên ID (nhiều hạng mục cùng 1 HĐ), fallback ngay|CT|thầu phụ
+    const groupKey = existingId || `${ngay}|${_normStr(ctRaw)}|${_normStr(tpRaw)}`;
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        header: {
+          id:        existingId || crypto.randomUUID(),
+          ngay,
+          congtrinh: proj.name,
+          projectId: proj.id,
+          thauphu:   lookup.canon(tpRaw),
+          giaTri:    Math.round(giaTri),
+          phatSinh:  Math.round(phatSinh),
+          nd,
+          createdAt: now, updatedAt: now, deletedAt: null, deviceId: dev,
+        },
+        items: [],
+      });
+    }
+    // Chỉ thêm item nếu dòng có tên hạng mục (HĐ không chi tiết → bỏ qua)
+    if (itName) {
+      groups.get(groupKey).items.push({
+        name:   itName,
+        donVi:  itDonVi,
+        sl:     itSl ?? 1,
+        donGia: Math.round(itDonGia ?? 0),
+      });
+    }
   }
+
+  const records = [];
+  groups.forEach(({ header, items }) => {
+    if (items.length) {
+      header.items  = items;
+      // giaTri = Σ(sl×donGia) — đồng bộ cách calcHopDongValue tính
+      header.giaTri = Math.round(items.reduce((s, it) => s + (it.sl || 0) * (it.donGia || 0), 0));
+    }
+    records.push(header);
+  });
   return { records, errors };
 }

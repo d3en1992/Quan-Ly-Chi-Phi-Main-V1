@@ -110,19 +110,24 @@ function buildHoaDonNhanh() {
 }
 
 // ── Sheet 2: HoaDonChiTiet ──────────────────────────────────
+// Cột (khớp 1-1 với parseSheet2 để import lại được):
+//   NGÀY(0) CÔNG TRÌNH(1) LOẠI CHI PHÍ(2) TÊN HÀNG HÓA(3) ĐVT(4)
+//   SỐ LƯỢNG(5) ĐƠN GIÁ(6) CHIẾT KHẤU(7) THÀNH TIỀN(8)
+//   NGƯỜI TH(9) NHÀ CC(10) CK TỔNG HĐ(11) ID(12)
 function buildHoaDonChiTiet() {
   const hdrs = [
     { label: 'NGÀY',             w: 13 },
     { label: 'CÔNG TRÌNH',       w: 32 },
     { label: 'LOẠI CHI PHÍ',     w: 22 },
-    { label: 'NGƯỜI THỰC HIỆN',  w: 22 },
-    { label: 'NHÀ CUNG CẤP',     w: 24 },
-    { label: 'SỐ HĐ',            w: 16 },
     { label: 'TÊN HÀNG HÓA',     w: 36 },
     { label: 'ĐVT',              w: 10 },
     { label: 'SỐ LƯỢNG',         w: 10, num: true },
     { label: 'ĐƠN GIÁ',          w: 14, num: true },
+    { label: 'CHIẾT KHẤU',       w: 12 },  // CK từng dòng: "5%" hoặc số tiền
     { label: 'THÀNH TIỀN',       w: 15, num: true },
+    { label: 'NGƯỜI THỰC HIỆN',  w: 22 },
+    { label: 'NHÀ CUNG CẤP',     w: 24 },
+    { label: 'CK TỔNG HĐ',       w: 12 },  // CK áp cho cả hóa đơn (footerCkStr)
     { label: 'ID HÓA ĐƠN',       w: 36 },
   ];
   const rows = [];
@@ -130,22 +135,24 @@ function buildHoaDonChiTiet() {
     .filter(i => !i.deletedAt && !i.ccKey && (i.source === 'detail' || (Array.isArray(i.items) && i.items.length)))
     .forEach(i => {
       const itemList = Array.isArray(i.items) ? i.items : [];
+      const projName = resolveProjectName ? resolveProjectName(i) : (i.congtrinh || '');
       itemList.forEach(it => {
         const sl = it.sl != null ? it.sl : (it.soluong != null ? it.soluong : 1);
         const dg = it.dongia || 0;
         const tt = it.thanhtien != null ? it.thanhtien : (sl * dg) || 0;
         rows.push([
           i.ngay       || '',
-          resolveProjectName ? resolveProjectName(i) : (i.congtrinh || ''),
+          projName,
           i.loai       || '',
-          i.nguoi      || '',
-          i.ncc        || '',
-          i.soHD       || '',
           it.ten       || '',
           it.dv        || it.dvt || '',
           sl,
           dg,
+          it.ck        || '',          // CHIẾT KHẤU từng dòng
           tt,
+          i.nguoi      || '',
+          i.ncc        || '',
+          i.footerCkStr || '',         // CK TỔNG HĐ (lặp lại trên mỗi dòng cùng HĐ)
           i.id         || '',
         ]);
       });
@@ -171,6 +178,8 @@ function buildChamCong() {
     { label: 'T6',               w:  6, num: true },
     { label: 'T7',               w:  6, num: true },
     { label: 'GHI CHÚ',          w: 28 },
+    { label: 'VAY MỚI',          w: 12, num: true },  // loanAmount: tạm ứng/vay trong tuần
+    { label: 'TRỪ NỢ',           w: 12, num: true },  // tru: trừ vào nợ cũ
   ];
   const rows = [];
   ccData
@@ -189,6 +198,8 @@ function buildChamCong() {
           d[0] || 0, d[1] || 0, d[2] || 0, d[3] || 0,
           d[4] || 0, d[5] || 0, d[6] || 0,
           wk.nd || '',
+          wk.loanAmount || 0,
+          wk.tru || 0,
         ]);
       });
     });
@@ -286,6 +297,7 @@ function buildHopDongChinh() {
     { label: 'GIÁ TRỊ HĐ PHỤ',         w: 20, num: true },
     { label: 'PHÁT SINH',               w: 15, num: true },
     { label: 'GHI CHÚ',                 w: 32 },
+    { label: 'KHÁCH HÀNG',              w: 28 },  // khachHang / chủ đầu tư
   ];
   const _expProjs = (typeof projects !== 'undefined') ? projects : [];
   const rows = Object.entries(hopDongData)
@@ -293,6 +305,8 @@ function buildHopDongChinh() {
     .map(([keyId, hd]) => {
       const p = _expProjs.find(proj => proj.id === keyId);
       const ctName = p ? p.name : keyId;
+      // Ưu tiên project.chuDauTu (đồng bộ realtime), fallback hd.khachHang
+      const kh = (p && p.chuDauTu) ? p.chuDauTu : (hd.khachHang || '');
       return [
         hd.ngay || '',
         ctName,
@@ -301,6 +315,7 @@ function buildHopDongChinh() {
         hd.giaTriphu || 0,
         hd.phatSinh  || 0,
         hd.nd || '',
+        kh,
       ];
     });
   return _buildSheet(hdrs, rows);
@@ -314,8 +329,11 @@ function buildThuTien() {
     { label: 'CÔNG TRÌNH',       w: 32 },
     { label: 'SỐ TIỀN',          w: 15, num: true },
     { label: 'NỘI DUNG',         w: 36 },
+    { label: 'LOẠI THU',         w: 14 },  // loaiThu: Tạm ứng / Giai đoạn / Quyết toán
     { label: 'ID',               w: 36 },
   ];
+  // Map mã loaiThu → nhãn tiếng Việt để xuất ra (import sẽ map ngược lại)
+  const _thuLabel = { tamung: 'Tạm ứng', giaidoan: 'Giai đoạn', quyettoan: 'Quyết toán' };
   const rows = thuRecords
     .filter(r => !r.deletedAt)
     .map(r => [
@@ -324,12 +342,17 @@ function buildThuTien() {
       r.congtrinh || '',
       r.tien || 0,
       r.nd || '',
+      _thuLabel[r.loaiThu] || '',
       r.id || '',
     ]);
   return _buildSheet(hdrs, rows);
 }
 
 // ── Sheet 9: HopDongThauPhu ─────────────────────────────────
+// Mỗi dòng = 1 hạng mục chi tiết của HĐ (giống sheet 2). HĐ không có chi tiết
+// → vẫn xuất 1 dòng (cột hạng mục để trống). Cột (khớp 1-1 với parseSheet9):
+//   NGÀY(0) CÔNG TRÌNH(1) TÊN THẦU PHỤ(2) GIÁ TRỊ HĐ(3) PHÁT SINH(4) NỘI DUNG(5)
+//   TÊN HẠNG MỤC(6) ĐVT(7) SỐ LƯỢNG(8) ĐƠN GIÁ(9) ID(10)
 function buildHopDongThauPhu() {
   const hdrs = [
     { label: 'NGÀY',              w: 13 },
@@ -338,19 +361,27 @@ function buildHopDongThauPhu() {
     { label: 'GIÁ TRỊ HĐ',       w: 18, num: true },
     { label: 'PHÁT SINH',         w: 15, num: true },
     { label: 'NỘI DUNG',          w: 36 },
+    { label: 'TÊN HẠNG MỤC',     w: 30 },  // item.name
+    { label: 'ĐVT',               w: 10 },  // item.donVi
+    { label: 'SỐ LƯỢNG',          w: 10, num: true },  // item.sl
+    { label: 'ĐƠN GIÁ',           w: 14, num: true },  // item.donGia
     { label: 'ID',                w: 36 },
   ];
-  const rows = thauPhuContracts
+  const rows = [];
+  thauPhuContracts
     .filter(r => !r.deletedAt)
-    .map(r => [
-      r.ngay || '',
-      r.congtrinh || '',
-      r.thauphu || '',
-      r.giaTri   || 0,
-      r.phatSinh || 0,
-      r.nd || '',
-      r.id || '',
-    ]);
+    .forEach(r => {
+      const base = [r.ngay || '', r.congtrinh || '', r.thauphu || '', r.giaTri || 0, r.phatSinh || 0, r.nd || ''];
+      const items = Array.isArray(r.items) ? r.items : [];
+      if (items.length) {
+        items.forEach(it => {
+          rows.push([...base, it.name || '', it.donVi || '', it.sl || 0, it.donGia || 0, r.id || '']);
+        });
+      } else {
+        // HĐ cũ không có chi tiết hạng mục → 1 dòng, cột item để trống
+        rows.push([...base, '', '', '', '', r.id || '']);
+      }
+    });
   return _buildSheet(hdrs, rows);
 }
 
@@ -379,6 +410,11 @@ function buildHuongDan() {
     ['• Sheet 6_DanhMuc: cột LOẠI DANH MỤC phải khớp chính xác tên nhóm'],
     ['• Sheet 6_DanhMuc: cột EXTRA dùng cho VAI TRÒ của Công Nhân (C=Chính, T=Thợ, P=Phụ)'],
     ['• Sheet 3_ChamCong: VAI TRÒ = C (chính), T (thợ), P (phụ) — để trống nếu không có'],
+    ['• Sheet 2_HoaDonChiTiet: CHIẾT KHẤU (từng dòng) và CK TỔNG HĐ nhập "5%" hoặc số tiền (vd 50000)'],
+    ['• Sheet 3_ChamCong: VAY MỚI = tạm ứng/vay trong tuần · TRỪ NỢ = trừ vào nợ cũ (số nguyên)'],
+    ['• Sheet 7_HopDongChinh: KHÁCH HÀNG = tên chủ đầu tư'],
+    ['• Sheet 8_ThuTien: LOẠI THU = Tạm ứng / Giai đoạn / Quyết toán'],
+    ['• Sheet 9_HopDongThauPhu: mỗi hạng mục 1 dòng (lặp lại NGÀY/CÔNG TRÌNH/THẦU PHỤ); GIÁ TRỊ HĐ = tổng SL×ĐƠN GIÁ'],
     ['• Có thể thêm dòng mới, chỉnh sửa dữ liệu, sau đó import lại file qua nút Nhập Excel'],
   ];
   return _buildSheet(hdrs, rows);

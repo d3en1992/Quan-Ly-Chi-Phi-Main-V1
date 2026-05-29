@@ -57,7 +57,12 @@
       "Bash(node --check js/core/core.normalize.js)",
       "Bash(ls -la cpct_snapshot_2026-05-29_11-25.json)",
       "Bash(ls cpct_snapshot*)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(grep -n \"^#\\\\{1,2\\\\} \" AI_CONTEXT.md)",
+      "Bash(node --check js/modules/chamcong/chamcong.week-form.js)",
+      "Bash(node --check js/modules/nhapxuat/nhapxuat.export.js)",
+      "Bash(node --check js/modules/nhapxuat/nhapxuat.parsers.js)",
+      "Bash(node --check js/modules/nhapxuat/nhapxuat.import.js)"
     ]
   }
 }

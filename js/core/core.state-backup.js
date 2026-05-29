@@ -456,9 +456,15 @@ async function renderBackupList() {
 
 // ── Export toàn bộ data ra file JSON (snapshot từ _mem) ──────
 function exportJSON() {
+  // Chuẩn hóa dữ liệu trước khi xuất: đảm bảo mọi record giao dịch đủ 6 field
+  // chuẩn (id, createdAt, updatedAt, deletedAt, deviceId, projectId), bất kể
+  // trạng thái store hiện tại. Dùng chung logic với import (core.normalize.js).
+  const exportData = (typeof normalizeImportStore === 'function')
+    ? normalizeImportStore({ ..._mem })
+    : { ..._mem };
   const snap = {
     meta: { version: DATA_VERSION, exportedAt: Date.now() },
-    data: { ..._mem },
+    data: exportData,
   };
   const json = JSON.stringify(snap, null, 2);
   const blob = new Blob([json], { type: 'application/json' });

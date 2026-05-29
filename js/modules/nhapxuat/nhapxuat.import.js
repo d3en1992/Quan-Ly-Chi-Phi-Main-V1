@@ -565,7 +565,7 @@ function _applyImport() {
           projectId: row.projectId || null,
           giaTri: row.giaTri || 0, giaTriphu: row.giaTriphu || 0,
           phatSinh: row.phatSinh || 0, ghichu: row.ghichu || '',
-          nguoi: row.nguoi || '',
+          nguoi: row.nguoi || '', khachHang: row.khachHang || '',
           ngay: row.ngay || today(), createdAt: now, updatedAt: now, deletedAt: null,
         };
         _log('hd', `✔ Tạo HĐ: ${row.ct}`);
@@ -578,6 +578,7 @@ function _applyImport() {
           phatSinh:  row.phatSinh  || cur.phatSinh  || 0,
           ghichu:    row.ghichu    || cur.ghichu     || '',
           nguoi:     row.nguoi     || cur.nguoi      || '',
+          khachHang: row.khachHang || cur.khachHang  || '',
           updatedAt: now,
         };
         _log('hd', `✔ Cập nhật HĐ: ${row.ct}`);
