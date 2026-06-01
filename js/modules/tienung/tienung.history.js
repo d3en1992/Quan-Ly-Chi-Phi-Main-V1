@@ -7,7 +7,7 @@
 
 function buildUngTpFilters() {
   const active = ungRecords.filter(r => !r.deletedAt && r.loai === 'thauphu');
-  const tps    = [...new Set(active.map(i => i.tp))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
+  const tps    = [...new Set(active.map(i => recCatName(i,'ung','tp')))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
   const ctNames = [...new Set(active.map(i => resolveProjectName(i)))].filter(Boolean);
   const sortedCts = getAllProjects().map(p => p.name).filter(n => ctNames.includes(n));
   const months = [...new Set(active.map(i => i.ngay.slice(0,7)))].filter(Boolean).sort().reverse();
@@ -30,7 +30,7 @@ function buildUngTpFilters() {
 
 function buildUngNccFilters() {
   const active = ungRecords.filter(r => !r.deletedAt && r.loai === 'nhacungcap');
-  const nccs   = [...new Set(active.map(i => i.tp))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
+  const nccs   = [...new Set(active.map(i => recCatName(i,'ung','tp')))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
   const ctNames = [...new Set(active.map(i => resolveProjectName(i)))].filter(Boolean);
   const sortedCts = getAllProjects().map(p => p.name).filter(n => ctNames.includes(n));
   const months = [...new Set(active.map(i => i.ngay.slice(0,7)))].filter(Boolean).sort().reverse();
@@ -70,10 +70,10 @@ function filterAndRenderUngTp() {
   filteredUngTp = ungRecords.filter(r => {
     if (r.deletedAt || r.loai !== 'thauphu') return false;
     if (!inActiveYear(r.ngay)) return false;
-    if (fTp    && r.tp !== fTp)                         return false;
+    if (fTp    && recCatName(r,'ung','tp') !== fTp)     return false;
     if (fCt    && resolveProjectName(r) !== fCt)        return false;
     if (fMonth && !r.ngay.startsWith(fMonth))           return false;
-    if (q) { const t = [r.ngay, r.tp, resolveProjectName(r), r.nd].join(' ').toLowerCase(); if (!t.includes(q)) return false; }
+    if (q) { const t = [r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r), r.nd].join(' ').toLowerCase(); if (!t.includes(q)) return false; }
     return true;
   });
   filteredUngTp.sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
@@ -90,10 +90,10 @@ function filterAndRenderUngNcc() {
   filteredUngNcc = ungRecords.filter(r => {
     if (r.deletedAt || r.loai !== 'nhacungcap') return false;
     if (!inActiveYear(r.ngay)) return false;
-    if (fNcc   && r.tp !== fNcc)                        return false;
+    if (fNcc   && recCatName(r,'ung','tp') !== fNcc)    return false;
     if (fCt    && resolveProjectName(r) !== fCt)        return false;
     if (fMonth && !r.ngay.startsWith(fMonth))           return false;
-    if (q) { const t = [r.ngay, r.tp, resolveProjectName(r), r.nd].join(' ').toLowerCase(); if (!t.includes(q)) return false; }
+    if (q) { const t = [r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r), r.nd].join(' ').toLowerCase(); if (!t.includes(q)) return false; }
     return true;
   });
   filteredUngNcc.sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
@@ -154,7 +154,7 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
           <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer">
         </td>
         <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${fmtISODate(r.ngay)}</td>
-        <td class="ung-sticky-name" style="font-weight:600;font-size:12px;white-space:nowrap">${x(r.tp)}</td>
+        <td class="ung-sticky-name" style="font-weight:600;font-size:12px;white-space:nowrap">${x(recCatName(r,'ung','tp'))}</td>
         <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
         <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
         <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
@@ -225,7 +225,7 @@ function exportUngTpCSV() {
   const src = filteredUngTp.length > 0 ? filteredUngTp
     : ungRecords.filter(r => !r.deletedAt && r.loai === 'thauphu');
   const rows = [['Ngày','Thầu Phụ','Công Trình','Nội Dung','Số Tiền Ứng']];
-  src.forEach(r => rows.push([r.ngay, r.tp, resolveProjectName(r)||'', r.nd||'', r.tien]));
+  src.forEach(r => rows.push([r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r)||'', r.nd||'', r.tien]));
   dlCSV(rows, 'ung_thauphu_' + today() + '.csv');
 }
 
@@ -233,7 +233,7 @@ function exportUngNccCSV() {
   const src = filteredUngNcc.length > 0 ? filteredUngNcc
     : ungRecords.filter(r => !r.deletedAt && r.loai === 'nhacungcap');
   const rows = [['Ngày','Nhà Cung Cấp','Công Trình','Nội Dung','Số Tiền Ứng']];
-  src.forEach(r => rows.push([r.ngay, r.tp, resolveProjectName(r)||'', r.nd||'', r.tien]));
+  src.forEach(r => rows.push([r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r)||'', r.nd||'', r.tien]));
   dlCSV(rows, 'ung_nhacungcap_' + today() + '.csv');
 }
 
@@ -242,6 +242,6 @@ function exportUngAllCSV() {
   const src = filteredUng.length > 0 ? filteredUng
     : ungRecords.filter(r => !r.deletedAt && r.loai !== 'congnhan');
   const rows = [['Ngày','Thầu Phụ / Nhà CC','Công Trình','Nội Dung','Số Tiền Ứng']];
-  src.forEach(r => rows.push([r.ngay, r.tp, resolveProjectName(r)||'', r.nd||'', r.tien]));
+  src.forEach(r => rows.push([r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r)||'', r.nd||'', r.tien]));
   dlCSV(rows, 'tien_ung_' + today() + '.csv');
 }

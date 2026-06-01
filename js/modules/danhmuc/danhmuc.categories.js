@@ -515,47 +515,16 @@ function finishEdit(catId,idx) {
   cats[catId][idx]=newVal;
   // normalizeKey(old) dùng để so sánh — bắt được cả trường hợp cũ sai hoa/thường
   const normOld = normalizeKey(old);
-  const cfg=CATS.find(c=>c.id===catId);
-  if(cfg&&cfg.refField) {
-    // invoices: fix refField (loai, ncc, nguoi...)
-    invoices.forEach(inv=>{
-      if(normalizeKey(inv[cfg.refField]||'')===normOld) inv[cfg.refField]=newVal;
-    });
-    // ungRecords.tp: nguoiTH / nhaCungCap / thauPhu → loai thauphu; congNhan → loai congnhan
-    if(catId==='nguoiTH'||catId==='nhaCungCap'||catId==='thauPhu') {
-      ungRecords.forEach(r=>{
-        if((r.loai||'thauphu')==='thauphu' && normalizeKey(r.tp||'')===normOld) r.tp=newVal;
-      });
-    }
-    if(catId==='congNhan') {
-      ungRecords.forEach(r=>{
-        if(r.loai==='congnhan' && normalizeKey(r.tp||'')===normOld) r.tp=newVal;
-      });
-    }
-  }
-  // tbTen → tbData.ten
-  if(catId==='tbTen' && typeof tbData!=='undefined') {
-    tbData.forEach(t=>{ if(normalizeKey(t.ten||'')===normOld) t.ten=newVal; });
-    save('tb_v1',tbData);
-    try{ tbRefreshNameDl(); tbPopulateSels(); tbRenderList(); renderKhoTong(); tbRenderThongKeVon(); }catch(e){}
-  }
-  // thauPhu → thauPhuContracts.thauphu
-  if(catId==='thauPhu' && typeof thauPhuContracts!=='undefined') {
-    thauPhuContracts.forEach(r=>{ if(normalizeKey(r.thauphu||'')===normOld) r.thauphu=newVal; });
-    save('thauphu_v1',thauPhuContracts);
-  }
-  // nguoiTH → thuRecords.nguoi + hopDongData[].nguoi
-  if(catId==='nguoiTH') {
-    if(typeof thuRecords!=='undefined') {
-      thuRecords.forEach(r=>{ if(normalizeKey(r.nguoi||'')===normOld) r.nguoi=newVal; });
-      save('thu_v1',thuRecords);
-    }
-    if(typeof hopDongData!=='undefined') {
-      Object.values(hopDongData).forEach(hd=>{ if(normalizeKey(hd.nguoi||'')===normOld) hd.nguoi=newVal; });
-      save('hopdong_v1',hopDongData);
-    }
-  }
-  // congNhan → ccData workers + cnRoles key
+
+  // ── Đổi tên item master TẠI CHỖ (giữ nguyên id) ──────────────────────
+  // Toàn bộ record trỏ tới id này tự cập nhật tên qua recCatName()/catName():
+  // hóa đơn (loai/ncc/nguoi), tiền ứng (tp — gồm cả thầu phụ/NCC/công nhân),
+  // thiết bị (ten), HĐ thầu phụ (thauphu), thu tiền (nguoi), HĐ chính (nguoi).
+  // KHÔNG còn quét/sửa text từng record → không phụ thuộc trùng tên.
+  if (typeof renameCatItemInPlace === 'function') renameCatItemInPlace(catId, old, newVal);
+
+  // ── Chấm công: vẫn đọc theo TÊN công nhân (chưa chuyển sang cnId) ─────
+  // → propagate tên vào cc_v2 workers + đổi key cnRoles.
   if(catId==='congNhan') {
     if(typeof ccData!=='undefined') {
       ccData.forEach(week=>{
@@ -573,7 +542,13 @@ function finishEdit(catId,idx) {
       }
     }
   }
-  saveCats(catId); clearInvoiceCache(); save('inv_v3',invoices); save('ung_v1',ungRecords);
+
+  // Thiết bị: refresh UI để áp tên mới (render đọc qua recCatName theo id).
+  if(catId==='tbTen') {
+    try{ tbRefreshNameDl(); tbPopulateSels(); tbRenderList(); renderKhoTong(); tbRenderThongKeVon(); }catch(e){}
+  }
+
+  saveCats(catId); clearInvoiceCache();
   renderSettings(); updateTop();
   try { dtPopulateSels(); } catch(e) {}
   toast('✅ Đã cập nhật "'+newVal+'"','success');

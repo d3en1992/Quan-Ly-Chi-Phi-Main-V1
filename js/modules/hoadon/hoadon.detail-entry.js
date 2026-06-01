@@ -381,7 +381,7 @@ function openDetailEdit(inv) {
     const loaiSel = document.getElementById('detail-loai');
     if(loaiSel) {
       loaiSel.innerHTML = '<option value="">-- Chọn Loại --</option>' +
-        cats.loaiChiPhi.map(v => `<option value="${x(v)}" ${v===(inv.loai||'')?'selected':''}>${x(v)}</option>`).join('');
+        cats.loaiChiPhi.map(v => `<option value="${x(v)}" ${v===(recCatName(inv,'inv','loai')||'')?'selected':''}>${x(v)}</option>`).join('');
     }
 
     const _dCtSel = document.getElementById('detail-ct');
@@ -400,8 +400,8 @@ function openDetailEdit(inv) {
     }
 
     // FIX: NCC/Người TH so khớp linh hoạt (trim + case-insensitive + orphan fallback)
-    _setSelectFlexible(document.getElementById('detail-ncc'),   inv.ncc);
-    _setSelectFlexible(document.getElementById('detail-nguoi'), inv.nguoi);
+    _setSelectFlexible(document.getElementById('detail-ncc'),   recCatName(inv,'inv','ncc'));
+    _setSelectFlexible(document.getElementById('detail-nguoi'), recCatName(inv,'inv','nguoi'));
 
     // Load items — xóa sạch rồi render lại toàn bộ
     const tbody = document.getElementById('detail-tbody');

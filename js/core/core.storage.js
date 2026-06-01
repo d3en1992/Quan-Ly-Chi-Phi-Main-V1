@@ -257,9 +257,21 @@ function load(k, def) {
 // Keys khi thay đổi sẽ làm invoice cache (buildInvoices) stale
 const _INV_CACHE_KEYS = new Set(['inv_v3','cc_v2','projects_v1','hopdong_v1','thauphu_v1','cat_items_v1']);
 
+// Mỗi logical key → "kind" để stampCatIds gắn *Id (id danh mục) vào record trước khi lưu.
+// id là nguồn sự thật; text chỉ là cache hiển thị/tự lành. Đổi tên danh mục → chỉ sửa master item.
+const _CAT_STAMP_KIND = {
+  inv_v3: 'inv', ung_v1: 'ung', cc_v2: 'cc', tb_v1: 'tb',
+  thu_v1: 'thu', thauphu_v1: 'thauphu', hopdong_v1: 'hopdong',
+};
+
 // opts.skipSync = true → ghi local (IDB + _mem) nhưng KHÔNG tăng pending và KHÔNG lên lịch push
 // Dùng cho cập nhật nội bộ như heartbeat session (lastActive) — không phải thay đổi nghiệp vụ
 function save(k, v, opts) {
+  if (typeof stampCatIds === 'function' && _CAT_STAMP_KIND[k] && v) {
+    const kind = _CAT_STAMP_KIND[k];
+    if (Array.isArray(v)) v.forEach(r => r && typeof r === 'object' && stampCatIds(r, kind));
+    else Object.values(v).forEach(r => r && typeof r === 'object' && stampCatIds(r, kind));
+  }
   _mem[k] = v;
   _dbSave(k, v).catch(e => console.warn('[IDB] save lỗi:', k, e));
   if (_INV_CACHE_KEYS.has(k) && typeof clearInvoiceCache === 'function') clearInvoiceCache();

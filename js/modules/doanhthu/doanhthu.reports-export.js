@@ -22,8 +22,9 @@ function renderCongNoThauPhu() {
     )
     .forEach(r => {
       const ctDisplay = _resolveCtName(r);
-      const key = (r.tp || '') + '|||' + ctDisplay;
-      if (!map[key]) map[key] = { thauphu: r.tp || '', congtrinh: ctDisplay, tongUng: 0, count: 0, tongHD: 0 };
+      const tpName = recCatName(r, 'ung', 'tp');
+      const key = tpName + '|||' + ctDisplay;
+      if (!map[key]) map[key] = { thauphu: tpName, congtrinh: ctDisplay, tongUng: 0, count: 0, tongHD: 0 };
       map[key].tongUng += (r.tien || 0);
       map[key].count++;
     });
@@ -33,8 +34,9 @@ function renderCongNoThauPhu() {
     .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchCnProjFilter(r))
     .forEach(r => {
       const ctDisplay = _resolveCtName(r);
-      const key = (r.thauphu || '') + '|||' + ctDisplay;
-      if (!map[key]) map[key] = { thauphu: r.thauphu || '', congtrinh: ctDisplay, tongUng: 0, count: 0, tongHD: 0 };
+      const tpName = recCatName(r, 'thauphu', 'thauphu');
+      const key = tpName + '|||' + ctDisplay;
+      if (!map[key]) map[key] = { thauphu: tpName, congtrinh: ctDisplay, tongUng: 0, count: 0, tongHD: 0 };
       map[key].tongHD += (r.giaTri || 0) + (r.phatSinh || 0);
     });
 
@@ -113,7 +115,7 @@ function renderCongNoNhaCungCap() {
         !r.deletedAt &&
         inActiveYear(r.ngay)
       )
-      .map(r => (r.tp || '').trim())
+      .map(r => recCatName(r, 'ung', 'tp').trim())
       .filter(Boolean)
   );
 
@@ -130,7 +132,7 @@ function renderCongNoNhaCungCap() {
     ungRecords
       .filter(r =>
         r.loai === 'nhacungcap' &&
-        (r.tp || '') === ncc &&
+        recCatName(r, 'ung', 'tp') === ncc &&
         !r.deletedAt &&
         inActiveYear(r.ngay) &&
         (!selProjId || r.projectId === selProjId)
@@ -141,7 +143,7 @@ function renderCongNoNhaCungCap() {
       .filter(inv =>
         !inv.deletedAt &&
         inActiveYear(inv.ngay) &&
-        (inv.ncc || '') === ncc &&
+        recCatName(inv, 'inv', 'ncc') === ncc &&
         (!selProjId || inv.projectId === selProjId)
       )
       .forEach(inv => {
@@ -154,7 +156,7 @@ function renderCongNoNhaCungCap() {
     ungRecords
       .filter(r =>
         r.loai === 'nhacungcap' &&
-        (r.tp || '') === ncc &&
+        recCatName(r, 'ung', 'tp') === ncc &&
         !r.deletedAt &&
         inActiveYear(r.ngay) &&
         (!selProjId || r.projectId === selProjId)
@@ -450,7 +452,7 @@ function exportHdcToImage() {
   document.getElementById('phdc-ct-name').textContent = ctName;
   document.getElementById('phdc-ct-label').textContent = ctName;
   document.getElementById('phdc-date').textContent = hd.ngay || today();
-  document.getElementById('phdc-nguoi').textContent = hd.nguoi || '—';
+  document.getElementById('phdc-nguoi').textContent = recCatName(hd, 'hopdong', 'nguoi') || '—';
   document.getElementById('phdc-giatri').textContent = numFmt(hd.giaTri || 0) + ' đ';
   document.getElementById('phdc-phatsinh').textContent = numFmt((hd.giaTriphu || 0) + (hd.phatSinh || 0)) + ' đ';
   document.getElementById('phdc-tong').textContent = numFmt(total) + ' đ';
@@ -499,7 +501,7 @@ function exportHdtpToImage() {
   document.getElementById('phdtp-ct-name').textContent = ctName;
   document.getElementById('phdtp-ct-label').textContent = ctName;
   document.getElementById('phdtp-date').textContent = r.ngay || today();
-  document.getElementById('phdtp-thauphu').textContent = r.thauphu || '—';
+  document.getElementById('phdtp-thauphu').textContent = recCatName(r, 'thauphu', 'thauphu') || '—';
   document.getElementById('phdtp-nd').textContent = r.nd || '—';
   document.getElementById('phdtp-giatri').textContent = numFmt(r.giaTri || 0) + ' đ';
   document.getElementById('phdtp-phatsinh').textContent = numFmt(r.phatSinh || 0) + ' đ';
@@ -527,7 +529,7 @@ function exportHdtpToImage() {
   html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 800 }).then(canvas => {
     tpl.style.display = 'none';
     const link = document.createElement('a');
-    link.download = 'HDThauPhu_' + removeVietnameseTones(ctName) + '_' + removeVietnameseTones(r.thauphu||'') + '.png';
+    link.download = 'HDThauPhu_' + removeVietnameseTones(ctName) + '_' + removeVietnameseTones(recCatName(r, 'thauphu', 'thauphu')) + '.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
     toast('✅ Đã xuất phiếu HĐ Thầu phụ!', 'success');
@@ -548,7 +550,7 @@ function exportThuToImage() {
   document.getElementById('ppt-ct-name').textContent = ctName;
   document.getElementById('ppt-ct-label').textContent = ctName;
   document.getElementById('ppt-date').textContent = r.ngay || today();
-  document.getElementById('ppt-nguoi').textContent = r.nguoi || '—';
+  document.getElementById('ppt-nguoi').textContent = recCatName(r, 'thu', 'nguoi') || '—';
   document.getElementById('ppt-tien').textContent = numFmt(r.tien || 0) + ' đ';
   document.getElementById('ppt-nd').textContent = r.nd || '—';
 
@@ -576,7 +578,7 @@ function exportHdcRowToImage(keyId) {
   document.getElementById('phdc-ct-name').textContent = ctName;
   document.getElementById('phdc-ct-label').textContent = ctName;
   document.getElementById('phdc-date').textContent = hd.ngay || today();
-  document.getElementById('phdc-nguoi').textContent = hd.nguoi || '—';
+  document.getElementById('phdc-nguoi').textContent = recCatName(hd, 'hopdong', 'nguoi') || '—';
   document.getElementById('phdc-giatri').textContent = numFmt(hd.giaTri || 0) + ' đ';
   document.getElementById('phdc-phatsinh').textContent = numFmt((hd.giaTriphu || 0) + (hd.phatSinh || 0)) + ' đ';
   document.getElementById('phdc-tong').textContent = numFmt(total) + ' đ';
@@ -617,7 +619,7 @@ function exportThuRowToImage(id) {
   document.getElementById('ppt-ct-name').textContent = ctName;
   document.getElementById('ppt-ct-label').textContent = ctName;
   document.getElementById('ppt-date').textContent = r.ngay || today();
-  document.getElementById('ppt-nguoi').textContent = r.nguoi || '—';
+  document.getElementById('ppt-nguoi').textContent = recCatName(r, 'thu', 'nguoi') || '—';
   document.getElementById('ppt-tien').textContent = numFmt(r.tien || 0) + ' đ';
   document.getElementById('ppt-nd').textContent = r.nd || '—';
 
@@ -643,7 +645,7 @@ function exportHdtpRowToImage(id) {
   document.getElementById('phdtp-ct-name').textContent = ctName;
   document.getElementById('phdtp-ct-label').textContent = ctName;
   document.getElementById('phdtp-date').textContent = r.ngay || today();
-  document.getElementById('phdtp-thauphu').textContent = r.thauphu || '—';
+  document.getElementById('phdtp-thauphu').textContent = recCatName(r, 'thauphu', 'thauphu') || '—';
   document.getElementById('phdtp-nd').textContent = r.nd || '—';
   document.getElementById('phdtp-giatri').textContent = numFmt(r.giaTri || 0) + ' đ';
   document.getElementById('phdtp-phatsinh').textContent = numFmt(r.phatSinh || 0) + ' đ';
@@ -670,7 +672,7 @@ function exportHdtpRowToImage(id) {
   html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 800 }).then(canvas => {
     tpl.style.display = 'none';
     const link = document.createElement('a');
-    link.download = 'HDThauPhu_' + removeVietnameseTones(ctName) + '_' + removeVietnameseTones(r.thauphu || '') + '.png';
+    link.download = 'HDThauPhu_' + removeVietnameseTones(ctName) + '_' + removeVietnameseTones(recCatName(r, 'thauphu', 'thauphu')) + '.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
     toast('✅ Đã xuất phiếu HĐ Thầu Phụ!', 'success');

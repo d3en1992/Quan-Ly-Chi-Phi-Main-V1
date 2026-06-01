@@ -69,7 +69,7 @@ function addUngRow(d={}) {
       </select>
     </td>
     <td>
-      <input class="cell-input" data-f="tp" value="${x(d.tp||'')}" placeholder="${tpPlaceholder}" autocomplete="off">
+      <input class="cell-input" data-f="tp" value="${x(recCatName(d,'ung','tp')||'')}" placeholder="${tpPlaceholder}" autocomplete="off">
     </td>
     <td><select class="cell-input" data-f="ct">${ctOpts}</select></td>
     <td><input class="cell-input right tien-input" data-f="tien" data-raw="${d.tien||''}" placeholder="0" value="${d.tien?numFmt(d.tien):''}" inputmode="decimal"></td>

@@ -527,6 +527,31 @@ function _syncCatItems(catId, nameArr) {
 
   allItems[type] = typeItems;
   _memSet('cat_items_v1', allItems);
+  rebuildCatIdMaps();
+}
+
+/**
+ * Đổi tên item master TẠI CHỖ (giữ nguyên id) → mọi record trỏ tới id này tự
+ * cập nhật tên qua recCatName()/catName(), không cần quét/sửa từng record.
+ * oldName so khớp normalized (bắt cả trường hợp tên cũ sai hoa/thường/dấu).
+ * @returns {boolean} true nếu đã đổi tên.
+ */
+function renameCatItemInPlace(catIdOrType, oldName, newName) {
+  const type = _catType(catIdOrType);
+  if (!type || !newName) return false;
+  const allItems = load('cat_items_v1', {});
+  const arr = allItems[type] || [];
+  const normOld = _catNormKey(oldName);
+  let item = arr.find(it => it && !it.isDeleted && _catNormKey(it.name) === normOld);
+  if (!item) item = arr.find(it => it && _catNormKey(it.name) === normOld);
+  if (!item) return false;
+  item.name = newName;
+  item.isDeleted = false;
+  item.updatedAt = Date.now();
+  allItems[type] = arr;
+  _memSet('cat_items_v1', allItems);
+  rebuildCatIdMaps();
+  return true;
 }
 
 /**
@@ -569,6 +594,115 @@ function _rebuildCatArrsFromItems() {
   if (allItems.tp)    { cats.thauPhu    = nameArr(allItems.tp,    'tp');    _memSet('cat_tp',    cats.thauPhu); }
   if (allItems.cn)    { cats.congNhan   = nameArr(allItems.cn,    'cn');    _memSet('cat_cn',    cats.congNhan); }
   if (allItems.tbteb) { cats.tbTen      = nameArr(allItems.tbteb, 'tbteb'); _memSet('cat_tbteb', cats.tbTen); }
+  rebuildCatIdMaps();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CAT ID RESOLUTION LAYER — id là nguồn chân lý, tên là cache hiển thị
+// ══════════════════════════════════════════════════════════════
+// Record nghiệp vụ lưu *Id (loaiId, nccId, nguoiId, tpId, cnId, tenId) trỏ vào
+// cat_items_v1[type][].id. Tên hiển thị luôn resolve từ master qua catName() —
+// nên đổi tên trong Danh mục lan tức thì khắp app, KHÔNG cần quét record.
+// Trường text cũ (loai, ncc, ...) chỉ còn là fallback khi id không resolve được.
+
+// Per-type lookup: { [type]: { byId: Map<id,item>, byNorm: Map<normKey,id> } }
+let _catIdMaps = {};
+
+// Chuẩn hóa catId ('loaiChiPhi') hoặc type ('loai') → type key trong cat_items_v1
+function _catType(catIdOrType) {
+  return _CATITEM_TYPE_MAP[catIdOrType] || catIdOrType;
+}
+
+// Rebuild cache map id↔item từ cat_items_v1. Gọi sau mọi thay đổi items.
+function rebuildCatIdMaps() {
+  const allItems = load('cat_items_v1', {});
+  const maps = {};
+  Object.keys(allItems || {}).forEach(type => {
+    const byId = new Map();
+    const byNorm = new Map();
+    (allItems[type] || []).forEach(item => {
+      if (!item || !item.id) return;
+      byId.set(item.id, item);
+      // Ưu tiên item active khi 2 item cùng normKey (item xóa mềm không ghi đè active)
+      const k = _catNormKey(item.name);
+      if (k && (!byNorm.has(k) || !item.isDeleted)) byNorm.set(k, item.id);
+    });
+    maps[type] = { byId, byNorm };
+  });
+  _catIdMaps = maps;
+}
+
+// Resolve id → tên hiển thị (kể cả item đã xóa mềm — tên vẫn giữ trong master).
+// Fallback về text cũ nếu id rỗng/không tìm thấy.
+function catName(catIdOrType, id, fallback) {
+  if (id) {
+    const m = _catIdMaps[_catType(catIdOrType)];
+    const item = m && m.byId.get(id);
+    if (item) return item.name;
+  }
+  return fallback || '';
+}
+
+// Resolve tên → id (so khớp normalized). null nếu không có trong danh mục.
+function catIdByName(catIdOrType, name) {
+  if (!name) return null;
+  const m = _catIdMaps[_catType(catIdOrType)];
+  if (!m) return null;
+  return m.byNorm.get(_catNormKey(name)) || null;
+}
+
+// Map field text → field id + type danh mục, theo từng loại record.
+// ung dùng discriminator r.loai để chọn type cho field `tp`.
+const _CAT_ID_FIELDS = {
+  inv:     [['loai', 'loaiId', 'loai'], ['ncc', 'nccId', 'ncc'], ['nguoi', 'nguoiId', 'nguoi']],
+  thu:     [['nguoi', 'nguoiId', 'nguoi']],
+  hopdong: [['nguoi', 'nguoiId', 'nguoi']],
+  thauphu: [['thauphu', 'thauphuId', 'tp']],
+  tb:      [['ten', 'tenId', 'tbteb']],
+};
+const _UNG_LOAI_TYPE = { thauphu: 'tp', nhacungcap: 'ncc', congnhan: 'cn' };
+
+/**
+ * Gắn *Id vào record từ giá trị text, dùng cat_items_v1 làm nguồn chân lý.
+ * Idempotent. id=null nếu text không khớp danh mục (vẫn giữ text làm fallback).
+ * @param {Object} rec   Record cần stamp (mutate tại chỗ)
+ * @param {string} kind  'inv' | 'thu' | 'hopdong' | 'thauphu' | 'tb' | 'ung' | 'cc'
+ */
+function stampCatIds(rec, kind) {
+  if (!rec) return rec;
+  if (kind === 'ung') {
+    const type = _UNG_LOAI_TYPE[rec.loai || 'thauphu'] || 'tp';
+    rec.tpId = catIdByName(type, rec.tp);
+    return rec;
+  }
+  if (kind === 'cc') {
+    (rec.workers || []).forEach(wk => { wk.cnId = catIdByName('cn', wk.name); });
+    return rec;
+  }
+  const fields = _CAT_ID_FIELDS[kind];
+  if (fields) fields.forEach(([tf, idf, type]) => { rec[idf] = catIdByName(type, rec[tf]); });
+  return rec;
+}
+
+// Resolve tên hiển thị cho field danh mục của record (id ưu tiên, text fallback).
+// Dùng ở mọi nơi render/export thay cho đọc rec[textField] trực tiếp.
+function recCatName(rec, kind, which) {
+  if (!rec) return '';
+  if (kind === 'ung' && which === 'tp') {
+    const type = _UNG_LOAI_TYPE[rec.loai || 'thauphu'] || 'tp';
+    return catName(type, rec.tpId, rec.tp);
+  }
+  const map = {
+    inv:     { loai: ['loaiId', 'loai', 'loai'], ncc: ['nccId', 'ncc', 'ncc'], nguoi: ['nguoiId', 'nguoi', 'nguoi'] },
+    thu:     { nguoi: ['nguoiId', 'nguoi', 'nguoi'] },
+    hopdong: { nguoi: ['nguoiId', 'nguoi', 'nguoi'] },
+    thauphu: { thauphu: ['thauphuId', 'thauphu', 'tp'] },
+    tb:      { ten: ['tenId', 'ten', 'tbteb'] },
+  };
+  const spec = map[kind] && map[kind][which];
+  if (!spec) return '';
+  const [idf, tf, type] = spec;
+  return catName(type, rec[idf], rec[tf]);
 }
 
 /**

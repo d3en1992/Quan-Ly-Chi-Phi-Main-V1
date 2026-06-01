@@ -155,8 +155,8 @@ function tbPopulateSels() {
   const khoFSel = document.getElementById('kho-filter-ten');
   if (khoFSel) {
     const khoNames = [...new Set(
-      tbData.filter(r => !r.deletedAt && isKhoTong(r) && r.ten && validNames.has(r.ten.toLowerCase()))
-            .map(r => r.ten)
+      tbData.filter(r => !r.deletedAt && isKhoTong(r) && recCatName(r,'tb','ten') && validNames.has(recCatName(r,'tb','ten').toLowerCase()))
+            .map(r => recCatName(r,'tb','ten'))
     )].sort((a,b) => a.localeCompare(b,'vi'));
     const khoFCur = khoFSel.value;
     khoFSel.innerHTML = '<option value="">Tất cả thiết bị</option>' +
@@ -336,7 +336,7 @@ function tbRenderList() {
     // [MODIFIED] — filter by projectId or ct
     if (fCt && !(r.projectId === fCt || r.ct === fCt)) return false;
     if (fTt && r.tinhtrang !== fTt) return false;
-    if (fQ && !(r.ten||'').toLowerCase().includes(fQ) && !(r.nguoi||'').toLowerCase().includes(fQ) && !(r.ghichu||'').toLowerCase().includes(fQ)) return false;
+    if (fQ && !recCatName(r,'tb','ten').toLowerCase().includes(fQ) && !(r.nguoi||'').toLowerCase().includes(fQ) && !(r.ghichu||'').toLowerCase().includes(fQ)) return false;
     if (typeof activeYears !== 'undefined' ? activeYears.size > 0 : activeYear !== 0) {
       const ctActive = _entityInYear(r.ct, 'ct') || inActiveYear(r.ngay);
       const isRunning = r.tinhtrang === 'Đang hoạt động';
@@ -356,7 +356,7 @@ function tbRenderList() {
     const ctA = _resolveCtName(a);
     const ctB = _resolveCtName(b);
     if (ctA !== ctB) return getProjIdx(ctA) - getProjIdx(ctB);
-    return (a.ten||'').localeCompare(b.ten||'', 'vi');
+    return recCatName(a,'tb','ten').localeCompare(recCatName(b,'tb','ten'), 'vi');
   });
 
   const tbody = document.getElementById('tb-list-tbody');
@@ -377,7 +377,7 @@ function tbRenderList() {
     const ctDisplay = _resolveCtName(r); // [MODIFIED] resolve from projectId
     return `<tr data-tbid="${r.id}">
       <td class="tb-ct-col" title="${x(ctDisplay)}">${x(ctDisplay)}</td>
-      <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(r.ten)}</span></td>
+      <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(recCatName(r,'tb','ten'))}</span></td>
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td>
         <select onchange="tbUpdateField('${r.id}','tinhtrang',this.value)"
@@ -467,7 +467,7 @@ function tbLuanChuyen(id) {
     <div style="display:grid;gap:10px">
       <div style="background:#f8f8f5;border-radius:8px;padding:10px;font-size:12px">
         <span style="color:#888">Từ:</span> <b>${srcLabel}</b> &nbsp;·&nbsp;
-        <span style="color:#888">Tên:</span> <b>${x(r.ten)}</b> &nbsp;·&nbsp;
+        <span style="color:#888">Tên:</span> <b>${x(recCatName(r,'tb','ten'))}</b> &nbsp;·&nbsp;
         <span style="color:#888">SL hiện tại:</span> <b>${r.soluong||0}</b>
       </div>
       <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Chuyển đến Công Trình</label>
@@ -578,7 +578,7 @@ function tbExportCSV() {
     return true;
   });
   const rows = [['Công Trình','Tên Thiết Bị','Số Lượng','Tình Trạng','Người TH','Ghi Chú','Cập Nhật']];
-  data.forEach(r=>rows.push([_resolveCtName(r),r.ten,r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',r.ngay||''])); // [MODIFIED]
+  data.forEach(r=>rows.push([_resolveCtName(r),recCatName(r,'tb','ten'),r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',r.ngay||''])); // [MODIFIED]
   dlCSV(rows, 'thiet_bi_'+today()+'.csv');
 }
 
@@ -596,12 +596,12 @@ function renderKhoTong() {
   let filtered = tbData.filter(r => {
     if (r.deletedAt) return false;
     if (!isKhoTong(r)) return false;
-    if (fTen && r.ten !== fTen) return false;
+    if (fTen && recCatName(r,'tb','ten') !== fTen) return false;
     if (fTt && r.tinhtrang !== fTt) return false;
     return true;
   });
 
-  filtered.sort((a,b) => (a.ten||'').localeCompare(b.ten,'vi'));
+  filtered.sort((a,b) => recCatName(a,'tb','ten').localeCompare(recCatName(b,'tb','ten'),'vi'));
 
   const start = (khoPage-1)*KHO_PG;
   const paged = filtered.slice(start, start+KHO_PG);
@@ -615,7 +615,7 @@ function renderKhoTong() {
   tbody.innerHTML = paged.map(r => {
     const ttStyle = TB_STATUS_STYLE[r.tinhtrang] || '';
     return `<tr data-tbid="${r.id}">
-      <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(r.ten)}</span></td>
+      <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(recCatName(r,'tb','ten'))}</span></td>
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
@@ -655,7 +655,7 @@ function tbRenderThongKeVon() {
     const ctDisplay = _resolveCtName(r);
     if (!map[gKey]) map[gKey] = { ct: ctDisplay, total: 0, types: new Set() };
     map[gKey].total += (r.soluong || 0);
-    if (r.ten) map[gKey].types.add(r.ten);
+    const _tn = recCatName(r,'tb','ten'); if (_tn) map[gKey].types.add(_tn);
   });
 
   const items = Object.values(map).sort((a, b) => a.ct.localeCompare(b.ct, 'vi'));

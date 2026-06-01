@@ -98,11 +98,11 @@ function buildHoaDonNhanh() {
     .map(i => [
       i.ngay || '',
       i.congtrinh || '',
-      i.loai || '',
+      recCatName(i, 'inv', 'loai'),
       i.nd || '',
       i.tien || 0,
-      i.nguoi || '',
-      i.ncc || '',
+      recCatName(i, 'inv', 'nguoi'),
+      recCatName(i, 'inv', 'ncc'),
       i.soHD || '',
       i.id || '',
     ]);
@@ -143,15 +143,15 @@ function buildHoaDonChiTiet() {
         rows.push([
           i.ngay       || '',
           projName,
-          i.loai       || '',
+          recCatName(i, 'inv', 'loai'),
           it.ten       || '',
           it.dv        || it.dvt || '',
           sl,
           dg,
           it.ck        || '',          // CHIẾT KHẤU từng dòng
           tt,
-          i.nguoi      || '',
-          i.ncc        || '',
+          recCatName(i, 'inv', 'nguoi'),
+          recCatName(i, 'inv', 'ncc'),
           i.footerCkStr || '',         // CK TỔNG HĐ (lặp lại trên mỗi dòng cùng HĐ)
           i.id         || '',
         ]);
@@ -226,7 +226,7 @@ function buildTienUng() {
     .map(u => [
       u.ngay || '',
       _ungLoaiLabel(u.loai || 'thauphu'),
-      u.tp || '',
+      recCatName(u, 'ung', 'tp'),
       resolveProjectName ? resolveProjectName(u) : (u.congtrinh || ''),
       u.tien || 0,
       u.nd || '',
@@ -251,7 +251,7 @@ function buildThietBi() {
     .map(t => [
       t.ngay || '',
       t.ct || '',
-      t.ten || '',
+      recCatName(t, 'tb', 'ten'),
       t.soluong != null ? t.soluong : 1,
       t.tinhtrang || '',
       t.ghichu || '',
@@ -310,7 +310,7 @@ function buildHopDongChinh() {
       return [
         hd.ngay || '',
         ctName,
-        hd.nguoi || '',
+        recCatName(hd, 'hopdong', 'nguoi'),
         hd.giaTri    || 0,
         hd.giaTriphu || 0,
         hd.phatSinh  || 0,
@@ -338,7 +338,7 @@ function buildThuTien() {
     .filter(r => !r.deletedAt)
     .map(r => [
       r.ngay || '',
-      r.nguoi || '',
+      recCatName(r, 'thu', 'nguoi'),
       r.congtrinh || '',
       r.tien || 0,
       r.nd || '',
@@ -371,7 +371,7 @@ function buildHopDongThauPhu() {
   thauPhuContracts
     .filter(r => !r.deletedAt)
     .forEach(r => {
-      const base = [r.ngay || '', r.congtrinh || '', r.thauphu || '', r.giaTri || 0, r.phatSinh || 0, r.nd || ''];
+      const base = [r.ngay || '', r.congtrinh || '', recCatName(r, 'thauphu', 'thauphu'), r.giaTri || 0, r.phatSinh || 0, r.nd || ''];
       const items = Array.isArray(r.items) ? r.items : [];
       if (items.length) {
         items.forEach(it => {
@@ -481,7 +481,7 @@ function exportAllCSV() {
   const src = (typeof filteredInvs !== 'undefined') ? filteredInvs : getInvoicesCached().filter(i => !i.deletedAt);
   const rows = [['Ngày','Công Trình','Loại Chi Phí','Người TH','Nhà Cung Cấp','Nội Dung','Số Tiền']];
   src.filter(i => !i.deletedAt).forEach(i =>
-    rows.push([i.ngay, resolveProjectName(i), i.loai, i.nguoi||'', i.ncc||'', i.nd||'', i.thanhtien||i.tien||0])
+    rows.push([i.ngay, resolveProjectName(i), recCatName(i,'inv','loai'), recCatName(i,'inv','nguoi'), recCatName(i,'inv','ncc'), i.nd||'', i.thanhtien||i.tien||0])
   );
   dlCSV(rows, 'thong_ke_cphd_' + today() + '.csv');
 }

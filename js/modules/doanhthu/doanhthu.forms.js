@@ -129,7 +129,7 @@ function editHopDongChinh(keyId) {
   const ngayEl = document.getElementById('hdc-ngay');
   if (ngayEl) ngayEl.value = hd.ngay || '';
   const nguoiSel = document.getElementById('hdc-nguoi');
-  if (nguoiSel) nguoiSel.value = hd.nguoi || '';
+  if (nguoiSel) nguoiSel.value = recCatName(hd,'hopdong','nguoi') || '';
   // Hiển thị Chủ Đầu Tư (read-only) — ưu tiên project.chuDauTu, fallback hd.khachHang legacy
   const khEl = document.getElementById('hdc-khachhang');
   if (khEl) {
@@ -197,7 +197,7 @@ function renderHdcTable(page) {
     const q = _dtSearch;
     entries = entries.filter(([keyId, v]) =>
       (_resolveCtName(keyId) || '').toLowerCase().includes(q) ||
-      (v.nguoi || '').toLowerCase().includes(q)
+      recCatName(v,'hopdong','nguoi').toLowerCase().includes(q)
     );
   }
 
@@ -317,7 +317,7 @@ function editThuRecord(id) {
   const ngayEl = document.getElementById('thu-ngay');
   if (ngayEl) ngayEl.value = r.ngay || '';
   const nguoiSel = document.getElementById('thu-nguoi');
-  if (nguoiSel) nguoiSel.value = r.nguoi || '';
+  if (nguoiSel) nguoiSel.value = recCatName(r,'thu','nguoi') || '';
   const ndEl = document.getElementById('thu-nd');
   if (ndEl) ndEl.value = r.nd || '';
   const loaiThuEl = document.getElementById('thu-loaithu');
@@ -407,7 +407,7 @@ function renderThuTable(page) {
     const q = _dtSearch;
     filtered = filtered.filter(r =>
       (_resolveCtName(r) || '').toLowerCase().includes(q) ||
-      (r.nguoi || '').toLowerCase().includes(q) ||
+      recCatName(r,'thu','nguoi').toLowerCase().includes(q) ||
       (r.nd || '').toLowerCase().includes(q) ||
       (r.loaiThu || '').toLowerCase().includes(q)
     );
@@ -435,7 +435,7 @@ function renderThuTable(page) {
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td style="white-space:nowrap">${loaiBadge}</td>
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
-      <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
+      <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r,'thu','nguoi') || '—')}</td>
       <td class="text-body-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
@@ -541,7 +541,7 @@ function editHopDongThauPhu(id) {
   const ctSel = document.getElementById('hdtp-ct-input');
   if (ctSel) ctSel.value = ctName;
   const tpSel = document.getElementById('hdtp-thauphu');
-  if (tpSel) tpSel.value = r.thauphu || '';
+  if (tpSel) tpSel.value = recCatName(r,'thauphu','thauphu') || '';
   const ngayEl = document.getElementById('hdtp-ngay');
   if (ngayEl) ngayEl.value = r.ngay || '';
   const ndInput = document.getElementById('hdtp-nd');
@@ -597,7 +597,7 @@ function renderHdtpTable(page) {
     const q = _dtSearch;
     filtered = filtered.filter(r =>
       (_resolveCtName(r) || '').toLowerCase().includes(q) ||
-      (r.thauphu || '').toLowerCase().includes(q) ||
+      (recCatName(r,'thauphu','thauphu') || '').toLowerCase().includes(q) ||
       (r.nd || '').toLowerCase().includes(q)
     );
   }
@@ -619,7 +619,7 @@ function renderHdtpTable(page) {
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdtp-row-chk" data-id="${r.id}"></td>
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
-      <td style="white-space:nowrap">${x(r.thauphu)}</td>
+      <td style="white-space:nowrap">${x(recCatName(r,'thauphu','thauphu'))}</td>
       <td class="text-secondary hdtp-nd-cell"><span class="hdtp-nd-clamp">${x(r.nd || '—')}</span></td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
       <td class="action-col">

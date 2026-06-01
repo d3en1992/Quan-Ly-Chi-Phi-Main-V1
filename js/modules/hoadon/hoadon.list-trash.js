@@ -39,14 +39,14 @@ function buildFilters() {
   const relevantInvs = cv ? yearInvs.filter(i => resolveProjectName(i) === cv) : yearInvs;
 
   // Loại CP dropdown — chỉ hiển thị loại có trong CT đang chọn
-  const loais = [...new Set(relevantInvs.map(i=>i.loai))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
+  const loais = [...new Set(relevantInvs.map(i=>recCatName(i,'inv','loai')))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
   const lSel=document.getElementById('f-loai'); const lv=lSel.value;
   lSel.innerHTML='<option value="">Tất cả loại</option>'+loais.map(l=>`<option ${l===lv?'selected':''} value="${x(l)}">${x(l)}</option>`).join('');
 
   // NCC dropdown — chỉ hiển thị NCC có trong CT đang chọn
   const nccSel=document.getElementById('f-ncc');
   if(nccSel) {
-    const nccs=[...new Set(relevantInvs.map(i=>i.ncc))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
+    const nccs=[...new Set(relevantInvs.map(i=>recCatName(i,'inv','ncc')))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
     const nv=nccSel.value;
     nccSel.innerHTML='<option value="">Tất cả NCC</option>'+nccs.map(n=>`<option ${n===nv?'selected':''} value="${x(n)}">${x(n)}</option>`).join('');
   }
@@ -68,10 +68,10 @@ function filterAndRender() {
   filteredInvs = getInvoicesCached().filter(inv => {
     if(!inActiveYear(inv.ngay)) return false;
     if(fCt && resolveProjectName(inv)!==fCt) return false;
-    if(fLoai && inv.loai!==fLoai) return false;
-    if(fNcc && (inv.ncc||'')!==fNcc) return false;
+    if(fLoai && recCatName(inv,'inv','loai')!==fLoai) return false;
+    if(fNcc && (recCatName(inv,'inv','ncc')||'')!==fNcc) return false;
     if(fMonth && !inv.ngay.startsWith(fMonth)) return false;
-    if(q) { const t=[inv.ngay,resolveProjectName(inv),inv.loai,inv.nguoi,inv.ncc,inv.nd,String(inv.thanhtien||inv.tien||0)].join(' ').toLowerCase(); if(!t.includes(q)) return false; }
+    if(q) { const t=[inv.ngay,resolveProjectName(inv),recCatName(inv,'inv','loai'),recCatName(inv,'inv','nguoi'),recCatName(inv,'inv','ncc'),inv.nd,String(inv.thanhtien||inv.tien||0)].join(' ').toLowerCase(); if(!t.includes(q)) return false; }
     return true;
   });
   // Sort: Newest → Oldest based on ngay
@@ -107,9 +107,9 @@ function renderTable() {
     return `<tr class="${rowClass}">
     <td class="font-monospace text-secondary" style="font-size:11px">${displayDate}</td>
     <td style="font-weight:600;font-size:12px;max-width:220px">${x(resolveProjectName(inv))}</td>
-    <td><span class="tag tag-gold">${x(inv.loai)}</span></td>
-    <td class="hide-mobile text-secondary">${x(inv.nguoi||'—')}</td>
-    <td class="hide-mobile text-secondary">${x(inv.ncc||'—')}</td>
+    <td><span class="tag tag-gold">${x(recCatName(inv,'inv','loai'))}</span></td>
+    <td class="hide-mobile text-secondary">${x(recCatName(inv,'inv','nguoi')||'—')}</td>
+    <td class="hide-mobile text-secondary">${x(recCatName(inv,'inv','ncc')||'—')}</td>
     <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${x(inv.nd||'—')}</td>
     <td class="text-end font-monospace fw-semibold text-success" title="Đơn giá: ${numFmt(inv.tien||0)}${inv.sl&&inv.sl!==1?' × '+inv.sl:''}">${numFmt(inv.thanhtien||inv.tien||0)}</td>
     <td style="white-space:nowrap">${actionBtn}</td>
@@ -349,12 +349,12 @@ function renderTodayInvoices() {
   const mono = "font-family:'IBM Plex Mono',monospace";
   tbody.innerHTML = todayInvs.map(inv => {
     return `<tr>
-      <td><span class="tag tag-gold">${x(inv.loai||'—')}</span></td>
-      <td style="font-size:12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.congtrinh||'—')}</td>
+      <td><span class="tag tag-gold">${x(recCatName(inv,'inv','loai')||'—')}</span></td>
+      <td style="font-size:12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(resolveProjectName(inv)||'—')}</td>
       <td class="text-end font-monospace fw-bold text-success">${inv.tien?numFmt(inv.tien):'—'}</td>
-      <td class="text-secondary" style="font-size:11px">${x(inv.nguoi||'—')}</td>
+      <td class="text-secondary" style="font-size:11px">${x(recCatName(inv,'inv','nguoi')||'—')}</td>
       <td class="text-secondary" style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
-      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(inv.ncc||'—')}</td>
+      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(recCatName(inv,'inv','ncc')||'—')}</td>
     </tr>`;
   }).join('');
 
