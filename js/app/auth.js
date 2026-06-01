@@ -198,6 +198,16 @@ async function migrateUsersToHash() {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  DEFAULT ACCOUNTS — nguồn duy nhất cho tài khoản + mật khẩu mặc định
+//  (dùng cho tạo mới lần đầu VÀ cho chức năng reset mật khẩu)
+// ══════════════════════════════════════════════════════════════
+const DEFAULT_ACCOUNTS = [
+  { role: 'admin',   username: 'ADMIN',   password: 'tinhden@' },
+  { role: 'giamdoc', username: 'GIAMDOC', password: '12345' },
+  { role: 'ketoan',  username: 'KETOAN',  password: '123' }
+];
+
+// ══════════════════════════════════════════════════════════════
 //  DEFAULT USERS — chỉ tạo khi users_v1 thật sự trống
 // ══════════════════════════════════════════════════════════════
 async function ensureDefaultUsers() {
@@ -210,17 +220,98 @@ async function ensureDefaultUsers() {
   }
 
   const now = Date.now();
-  const h123 = await hashPassword('123');
-  const defaults = normalizeUsersArray([
-    { username: 'admin',   passwordHash: h123, role: 'admin',   updatedAt: now, sessionVersion: 1, sessions: [] },
-    { username: 'giamdoc', passwordHash: h123, role: 'giamdoc', updatedAt: now, sessionVersion: 1, sessions: [] },
-    { username: 'ketoan',  passwordHash: h123, role: 'ketoan',  updatedAt: now, sessionVersion: 1, sessions: [] }
-  ]);
-  saveUsers(defaults);
+  const built = await Promise.all(DEFAULT_ACCOUNTS.map(async (acc) => ({
+    username: acc.username,
+    passwordHash: await hashPassword(acc.password),
+    passwordUpdatedAt: now,
+    role: acc.role,
+    updatedAt: now,
+    sessionVersion: 1,
+    sessions: []
+  })));
+  saveUsers(normalizeUsersArray(built));
   console.log('[Auth] Default users đã được tạo (passwordHash)');
 
   if (typeof manualSync === 'function' && typeof fbReady === 'function' && fbReady()) {
     setTimeout(() => { try { manualSync(); } catch {} }, 500);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RESET PASSWORD — đặt lại tài khoản + mật khẩu về mặc định
+//  Dùng khi quên mật khẩu. Yêu cầu gõ đúng "RESETMATKHAU" để xác nhận.
+//  Reset CẢ tên hiển thị lẫn mật khẩu, giữ nguyên id cũ (theo role),
+//  rồi đẩy lên cloud để các máy khác cũng nhận bản reset.
+// ══════════════════════════════════════════════════════════════
+const RESET_CONFIRM_WORD = 'RESETMATKHAU';
+
+async function doResetDefaultPasswords() {
+  if (!window.crypto?.subtle) {
+    showLoginError('Trình duyệt không hỗ trợ xác thực bảo mật (Web Crypto API thiếu)');
+    return false;
+  }
+
+  const now = Date.now();
+  const existing = loadUsers();
+  const out = [];
+
+  for (const acc of DEFAULT_ACCOUNTS) {
+    const prev = existing.find(u => u.role === acc.role);
+    const hash = await hashPassword(acc.password);
+    out.push(normalizeUserRecord({
+      id: prev?.id, // giữ id cũ nếu có để merge theo id với cloud
+      username: acc.username,
+      passwordHash: hash,
+      passwordUpdatedAt: now,
+      role: acc.role,
+      updatedAt: now,
+      sessionVersion: (prev?.sessionVersion || 1) + 1, // vô hiệu hóa mọi phiên cũ
+      sessions: []
+    }, out.length));
+  }
+
+  // Giữ lại các tài khoản khác (nếu có role lạ ngoài 3 role mặc định)
+  existing.forEach(u => {
+    if (!DEFAULT_ACCOUNTS.some(a => a.role === u.role)) out.push(u);
+  });
+
+  saveUsers(out);
+
+  // Đẩy thẳng lên cloud với skipPull:true.
+  // KHÔNG dùng manualSync()/push thường vì chúng pull (THAY THẾ) users từ cloud
+  // trước khi ghi → sẽ kéo bản cũ về đè mất bản reset rồi đẩy ngược bản cũ lên.
+  if (typeof pushChanges === 'function' && typeof fbReady === 'function' && fbReady()) {
+    try { await pushChanges({ silent: true, skipPull: true }); } catch {}
+  }
+
+  return true;
+}
+
+// UI: hỏi xác nhận bằng cách gõ đúng từ khóa, rồi reset
+async function promptResetPasswords() {
+  const answer = prompt(
+    'ĐẶT LẠI MẬT KHẨU MẶC ĐỊNH\n\n' +
+    'Thao tác này sẽ đặt lại TÊN ĐĂNG NHẬP và MẬT KHẨU của tất cả tài khoản về mặc định, ' +
+    'và đăng xuất mọi thiết bị.\n\n' +
+    'Gõ chính xác "' + RESET_CONFIRM_WORD + '" để xác nhận:'
+  );
+  if (answer === null) return; // người dùng bấm Hủy
+
+  if (String(answer).trim() !== RESET_CONFIRM_WORD) {
+    showLoginError('Mã xác nhận không đúng. Mật khẩu chưa được đặt lại.');
+    return;
+  }
+
+  const ok = await doResetDefaultPasswords();
+  if (ok) {
+    clearLoginError();
+    if (typeof toast === 'function') {
+      toast('✅ Đã đặt lại mật khẩu mặc định. Vui lòng đăng nhập lại.', 'success');
+    } else {
+      alert('Đã đặt lại mật khẩu mặc định. Vui lòng đăng nhập lại.');
+    }
+    syncAuthUI();
+    toggleUserDropdown(true);
   }
 }
 
@@ -755,34 +846,32 @@ function afterSync() {
   syncAuthUI();
 }
 
-// Thử pull cloud trước khi auth — dùng khi users_v1 rỗng
+// Pull cloud trước khi auth — INTERNAL / ONLINE-FIRST.
+// Cloud là nguồn chuẩn cho tài khoản: nếu đã cấu hình Firebase thì LUÔN pull users
+// từ cloud trước khi đăng nhập, kể cả khi local đã có sẵn users. Nhờ vậy tài khoản
+// mới tạo / mật khẩu vừa đổi ở máy khác sẽ lan tới máy này, tránh bị kẹt ở bản local cũ.
 async function trySyncUsersBeforeAuth() {
   await migrateUsersToHash();
 
+  const canCloud = (typeof fbReady === 'function' && fbReady()
+                    && typeof pullChanges === 'function');
+
+  // Đã cấu hình cloud → luôn đồng bộ tài khoản từ cloud (KHÔNG early-return theo local)
+  if (canCloud) {
+    await new Promise(resolve => pullChanges(null, () => resolve(), { silent: true }));
+    if (typeof _reloadGlobals === 'function') _reloadGlobals();
+    await migrateUsersToHash(); // cloud có thể gửi về user dạng cũ
+  }
+
   const users = loadUsers();
-  if (users && users.length > 0) return;
-
-  // Không có cloud → tạo default users ngay
-  if (typeof fbReady !== 'function' || !fbReady() || typeof pullChanges !== 'function') {
-    await ensureDefaultUsers();
+  if (users && users.length > 0) {
+    // Đã có tài khoản (vừa pull từ cloud hoặc đang dùng bản local khi chưa có cloud)
+    if (canCloud && typeof afterSync === 'function') afterSync();
     return;
   }
 
-  // Thử pull từ cloud
-  await new Promise(resolve => pullChanges(null, () => resolve(), { silent: true }));
-  if (typeof _reloadGlobals === 'function') _reloadGlobals();
-
-  // Migration sau pull (cloud có thể gửi về user dạng cũ)
-  await migrateUsersToHash();
-
-  const usersAfterPull = loadUsers();
-  if (!usersAfterPull || usersAfterPull.length === 0) {
-    // Pull không có gì → tạo default
-    await ensureDefaultUsers();
-    return;
-  }
-
-  afterSync();
+  // Local + cloud đều trống → lần khởi tạo đầu tiên: tạo bộ tài khoản mặc định
+  await ensureDefaultUsers();
 }
 
 // Bọc manualSync để afterSync() luôn được gọi sau mỗi lần sync

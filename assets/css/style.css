@@ -1727,6 +1727,24 @@ td.action-col > div {
   font-weight: 500;
 }
 
+/* Link "Quên mật khẩu? Đặt lại mặc định" trong form đăng nhập */
+.ud-reset-link {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+.ud-reset-link:hover {
+  color: #f0b429;
+  text-decoration: underline;
+}
+
 /* =========================================================
    UI/UX Phase 3 (24/05/2026) — Year dropdown, hide Cloud desktop,
    Tiền Ứng entry sticky, HDTP layout, Dashboard weekly fixes
