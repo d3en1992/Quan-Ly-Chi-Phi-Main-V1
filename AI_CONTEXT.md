@@ -2,7 +2,45 @@
 
 Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project **App Quản Lý Chi Phí Công Trình**.
 
+> **Cách dùng tài liệu này:** Phần **I — THAM CHIẾU HIỆN HÀNH** (mục 1–7) luôn phản ánh **trạng thái code thực tế hiện tại**. Phần **II — QUY TẮC UI & BẢO TRÌ** (mục 8) là quy ước phải tuân theo. Phần **III — LỊCH SỬ THAY ĐỔI** (mục 9) là changelog theo thời gian; một số mục trong đây mô tả kiến trúc cũ (V2 subcollection) đã bị thay thế — đọc để hiểu bối cảnh, KHÔNG dùng làm tham chiếu hiện hành. **Phụ lục A** lưu di sản V2 đã xóa khỏi code để nhận diện dấu vết khi dọn dẹp.
+
 ---
+
+## Mục lục
+
+**Phần I — Tham chiếu hiện hành**
+1. [Tổng quan ứng dụng](#1-tổng-quan-ứng-dụng-project-overview)
+2. [Thứ tự nạp Script](#2-thứ-tự-nạp-script-script-load-order)
+3. [Sơ đồ thư mục](#3-sơ-đồ-thư-mục-directory-structure)
+4. [Kiến trúc lưu trữ & đồng bộ](#4-kiến-trúc-lưu-trữ--đồng-bộ-storage--sync-architecture)
+5. [Sơ đồ dữ liệu](#5-sơ-đồ-dữ-liệu-data-model)
+6. [Hàm & Biến Global quan trọng](#6-hàm--biến-global-quan-trọng-key-functions--globals)
+7. [Quy tắc lập trình](#7-quy-tắc-lập-trình-coding-rules)
+
+**Phần II — Quy tắc UI & bảo trì**
+
+8. [Bootstrap migration & quy tắc UI](#8-bootstrap-migration--quy-tắc-ui)
+
+**Phần III — Lịch sử thay đổi (Changelog)**
+
+9. [Lịch sử thay đổi theo thời gian](#9-lịch-sử-thay-đổi-theo-thời-gian-changelog)
+   - [9.1 Bootstrap migration + cleanup (20–22/05/2026)](#91-bootstrap-migration--cleanup-202205-2026)
+   - [9.2 V2 Quota Optimization — Phase 1+2+3+4 (23/05/2026)](#92-v2-quota-optimization--phase-1234-23052026--lịch-sử)
+   - [9.3 Sync Reliability & Quota Fix — Phase 5 (24/05/2026)](#93-sync-reliability--quota-fix--phase-5-24052026)
+   - [9.4 Cải tiến UI/UX — Tasks 7–14 (24/05/2026)](#94-cải-tiến-uiux--tasks-714-24052026)
+   - [9.5 Điểm kiểm tra sau cleanup](#95-điểm-kiểm-tra-sau-cleanup)
+   - [9.6 UI/UX Phase 2 — Sticky + Dropdown + Layout (24/05/2026)](#96-uiux-phase-2--sticky--dropdown--layout-24052026)
+   - [9.7 UI/UX Phase 3 — Sticky + dropdown + dashboard fixes (24/05/2026)](#97-uiux-phase-3--sticky--dropdown--dashboard-fixes-24052026)
+   - [9.8 Chủ Đầu Tư + Hide Closed Projects (24/05/2026)](#98-chủ-đầu-tư--hide-closed-projects-24052026)
+   - [9.9 Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026)](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)
+
+**Phụ lục**
+
+- [Phụ lục A — Di sản V2 đã xóa khỏi code](#phụ-lục-a--di-sản-v2-đã-xóa-khỏi-code)
+
+---
+
+# PHẦN I — THAM CHIẾU HIỆN HÀNH
 
 ## 1. Tổng quan ứng dụng (Project Overview)
 
@@ -14,17 +52,18 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
 | UI language | Tiếng Việt, domain text dùng thuật ngữ xây dựng/kế toán Việt Nam |
 | Core tech | HTML, CSS, Vanilla JavaScript, IndexedDB qua Dexie, Firebase/Firestore REST sync, XLSX import/export, html2canvas export image |
 | Runtime style | Global mutable state trên `window`/global scope; file sau gọi trực tiếp biến/hàm của file trước |
+| Mô hình sync | **Online-only, cloud là nguồn chân lý** (từ 29/05/2026). Pull = REPLACE local bằng cloud. Khi offline → chặn dùng app. |
 
 Kiến trúc tổng thể:
 
 ```mermaid
 flowchart TD
   UI["index.html UI: tabs, forms, tables, dashboards"] --> JS["Global JS runtime"]
-  JS --> Core["core.*.js: load/save, Dexie, migrations, categories (3 files)"]
-  JS --> Domain["Domain modules: projects, hoadon, chamcong, thietbi, doanhthu, danhmuc"]
-  JS --> Tools["nhapxuat.js + datatools.js"]
+  JS --> Core["core.*.js: storage, normalize, state-backup, cloud-cats-ui (4 files)"]
+  JS --> Domain["Domain modules: projects, hoadon, chamcong, thietbi, doanhthu, danhmuc, tienung"]
+  JS --> Tools["nhapxuat.* + datatools.js"]
   Core --> IDB[("IndexedDB / Dexie: qlct")]
-  Sync["sync.js"] --> Cloud[("Firebase Firestore REST")]
+  Sync["sync.js"] --> Cloud[("Firebase Firestore REST — Cấu trúc B")]
   Core --> Sync
   Sync --> Core
 ```
@@ -42,39 +81,40 @@ Thứ tự chính xác trong `index.html`:
 | 3 | `https://unpkg.com/dexie@4/dist/dexie.min.js` | IndexedDB wrapper |
 | 4 | `js/core/core.storage.js` | Lớp nền thấp nhất: `DEFAULTS`, `CATS`, `FB_CONFIG`, Dexie `db`, `DB_KEY_MAP`, `_mem`, `load/save`, pending sync counter (`_pendingChanges`, `_SYNC_DATA_KEYS`, `_incPending`, `_resetPending`, `_updateSyncBtnBadge`), `LAST_SYNC_KEY`, `mkRecord`, `mkUpdate`, autocomplete |
 | 5 | `js/core/core.normalize.js` | Module chuẩn hóa record về 6 field tiêu chuẩn (`id`, `createdAt`, `updatedAt`, `deletedAt`, `deviceId`, `projectId`) dùng cho import/restore: `normalizeRecord`, `normalizeDataset`, `normalizeImportStore`, `_NORM_CT_FIELD`. Nạp sau `core.storage.js`, trước `core.state-backup.js`. |
-| 5b | `js/core/core.state-backup.js` | State orchestration: `DATA_VERSION`, `migrateData`, `_migrateHopDongKeys`, project lookup helpers, `BACKUP_KEYS`, backup/restore (`_snapshotNow`, `restoreFromBackup`, `renderBackupList`), `exportJSON`, `importJSON`, `importJSONFull` (push cloud cấu trúc B), `_normalizeImportData` (wrapper gọi `normalizeImportStore`), `clearAllCache`, `afterDataChange`, `_reloadGlobals`, khởi tạo global `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` |
-| 6 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, `fsWrap/fsUnwrap`, Firebase REST (`fsGet/fsSet/fsDelete`), cấu trúc B (`fbDocYearCat`, `fbDocMetaCT/DM/TK/HD`, `_YEAR_CATS`, `fbYearCatPayload`, `fbMetaCT/DM/TK/HDPayload`), `_wipeOrphanCloudDocs` (dọn doc rác cấu trúc cũ), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `showSyncBanner`, `_setSyncState` |
-| 7 | `js/modules/projects/projects.model.js` | Domain model công trình: `PROJECT_STATUS`, `PROJECT_COMPANY`, `let projects = []`, `_saveProjects`, `rebuildCatCTFromProjects`, `createProject`, `updateProject`, `getProjectById`, `findProjectIdByName`, `getSortedProjects`, `getAllProjects`, `getProjectOptions`, `getProjectDays/Factor/Weight`, `getCompanyCost`, `allocateCompanyCost`, `canDeleteProject`, `resolveProjectName` |
-| 8 | `js/modules/projects/projects.migration-selects.js` | Migration linking + shared select helpers: `migrateProjectLinks`, `deduplicateProjects`, `_buildProjOpts`, `_buildProjFilterOpts`, `_readPidFromSel`, `_checkProjectClosed` |
-| 9 | `js/modules/projects/projects.ui.js` | Full UI tab Công Trình: `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_goTabWithCT`, `renderProjectsPage`, `renderCTOverview`, `_ctApply`, `_ctRenderGrid`, `openCTDetail`, `openCTCreateModal`, `saveCTCreate`, `openCTEditModal`, `saveCTEdit`, `quickCloseCT`, `confirmQuickClose`, `quickCompleteCT`, `confirmQuickComplete`, `confirmDeleteCT` |
-| 10 | `js/legacy/tienich.js` | Utility, formatter, `buildInvoices()`, invoice cache |
-| 11 | `js/modules/hoadon/hoadon.quick-entry.js` | Nhập hóa đơn nhanh, duplicate check, shared row/money helpers: `initTable`, `addRows`, `addRow`, `delRow`, `renumber`, `calcSummary`, `clearTable`, `saveAllRows`, `_showDupModal`, `closeDupModal`, `forceSaveAll`, `_ensureInvRef`, `_doSaveRows`, `calcRowMoney`, `getRowData` |
-| 12 | `js/modules/hoadon/hoadon.sheet-grid.js` | Engine lưới nhập liệu giống Excel cho hóa đơn nhanh: selection, copy/paste vùng, keyboard navigation, autocomplete trực tiếp trong bảng |
-| 13 | `js/modules/hoadon/hoadon.detail-entry.js` | Hóa đơn chi tiết nhiều dòng vật tư/nội dung: `goInnerSub`, `_initDetailFormSelects`, `renderDetailRowHTML`, `addDetailRow`, `delDetailRow`, `calcDetailRow`, `calcDetailTotals`, `generateDetailNd`, `saveDetailInvoice`, `clearDetailForm`, `_setSelectFlexible`, `openDetailEdit`, `getDetailRows` |
-| 14 | `js/modules/hoadon/hoadon.list-trash.js` | Filter/render danh sách, sửa/xóa, thùng rác, hóa đơn trong ngày: `switchTatCaView`, `buildFilters`, `filterAndRender`, `renderTable`, `goTo`, `delInvoice`, `editCCInvoice`, `openEntryEdit`, `_resolveInvSource`, `editManualInvoice`, `trash` (global), `trashAdd`, `trashRestore`, `trashDeletePermanent`, `trashClearAll`, `renderTrash`, `renderTodayInvoices`, `refreshHoadonCtDropdowns` |
-| 15 | `js/modules/danhmuc/danhmuc.categories.js` | Danh mục/settings: normalize, render settings, CT page, CN role, tbTen, rebuild selects, dedup cat arrays |
-| 16 | `js/modules/tienung/tienung.core.js` | Tiền Ứng core: `ungRecords`, migration/normalize deletedAt/projectId, shared state cho entry/history |
-| 17 | `js/modules/tienung/tienung.entry.js` | Form nhập tiền ứng nhiều dòng, đổi loại ứng, lưu/xóa dòng, rebuild selects |
-| 18 | `js/modules/tienung/tienung.history.js` | Lịch sử tiền ứng, lọc/tìm kiếm, phân trang, xuất CSV/ảnh phiếu ứng |
-| 19 | `js/modules/danhmuc/danhmuc.tools.js` | Wrapper backup/restore (`toolBackupNow`, `toolRestoreBackup`) |
-| 20 | `js/modules/nhapxuat/nhapxuat.parsers.js` | Helper parse/normalize Excel + parser sheet 1–9: `_normStr`, `_parseDate`, `_pNum`, `_str`, `_sheetRows`, `_hasDiacritics`, `_deduplicateCatNames`, `_buildCanonMap`, `_dayOfWeek`, `_isEmptyRow`, `_formatCatName`, `_markDuplicateInBatch`, `_makeCatLookup`, `_makeCatLookupWithExtra`, `_resolveProvisionalProjectIds`, `_mkErr`, `_fmtErr`, `parseSheet1`–`parseSheet9`, `_DANHMUC_GROUP_MAP` |
-| 21 | `js/modules/nhapxuat/nhapxuat.import.js` | Import session, detect sheet, preview, apply import, log: `_isDupInvQ/D/Ung/Thu/Tb/Tp/CC`, `_detectSheetType`, `_importSession`, `_doImportParse`, `_markDuplicates`, `_showImportPreviewNew`, `_toggleAllImportSheets`, `_applyImport`, `_generateImportLog`, `openImportModal`, `handleImportFile` |
-| 22 | `js/modules/nhapxuat/nhapxuat.export.js` | Export modal, Excel sheet builders, CSV exports: `openExportModal`, `_buildSheet`, `buildHoaDonNhanh/ChiTiet/ChamCong/TienUng/ThietBi/DanhMuc/HopDongChinh/ThuTien/HopDongThauPhu/HuongDan`, `exportExcel`, `_doExport`, `exportEntryCSV`, `exportAllCSV`, `toolImportExcel`, `toolExportExcel` |
-| 23 | `js/legacy/datatools.js` | Dashboard, reset/delete-year, data health, migration tools |
-| 24 | `js/modules/chamcong/chamcong.core.js` | Global data (`ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`), constants (`CC_DAY_LABELS`, `CC_DATE_OFFSETS`), date/week helpers, normalize/category helpers, CT selector helpers: `_dedupCC`, `round1`, `toggleCCDebtCols`, `_calcDebtBefore`, `isoFromParts`, `ccSundayISO`, `ccSaturdayISO`, `snapToSunday`, `weekLabel`, `ccAllNames`, `rebuildCCNameList`, `normalizeAllChamCong`, `rebuildCCCategories`, `updateTopFromCC`, `populateCCCtSel`, `updateCCSaveBtn`, `onCCCtSelChange`, `_fmtDate` |
-| 25 | `js/modules/chamcong/chamcong.week-form.js` | Form nhập tuần, build table, row handlers, lưu/copy/paste: `initCC`, `ccGoToWeek`, `ccPrevWeek`, `ccNextWeek`, `onCCFromChange`, `loadCCWeekForm`, `buildCCTable`, `addCCWorker`, `addCCRow`, `buildCCRow`, `onCCNameInput`, `onCCDayKey`, `onCCWageKey`, `onCCMoneyKey`, `calcCCRow`, `delCCRow`, `renumberCC`, `updateCCSumRow`, `saveCCWeek`, `clearCCWeek`, `copyCCWeek`, `pasteCCWeek`; global `ccClipboard` |
-| 26 | `js/modules/chamcong/chamcong.history-reports.js` | Lịch sử, tổng lương tuần, load/delete, CSV exports, phiếu lương/ảnh: `buildCCHistFilters`, `renderCCHistory`, `ccHistGoTo`, `renderCCTLT`, `fmtK`, `updateTLTSelectedSum`, `exportCCTLTCSV`, `ccTltGoTo`, `loadCCWeekById`, `delCCWeekById`, `delCCWorker`, `exportCCWeekCSV`, `exportCCHistCSV`, `removeVietnameseTones`, `xuatPhieuLuong`, `exportUngToImage` |
-| 27 | `js/legacy/thietbi.js` | Quản lý thiết bị/kho tổng |
-| 28 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
-| 29 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
-| 30 | `js/modules/doanhthu/doanhthu.reports-export.js` | Công nợ, Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderCongNoThauPhu`, `_renderCongNoTable`, `renderCongNoNhaCungCap`, `renderLaiLo`, `initDoanhThu`, `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub` |
-| 31 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 4 meta doc), `pullChanges` (REPLACE local bằng cloud), `_pullMeta`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
-| 32 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
-| 33 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`) |
+| 6 | `js/core/core.state-backup.js` | State orchestration: `DATA_VERSION`, `migrateData`, `_migrateHopDongKeys`, project lookup helpers, `BACKUP_KEYS`, backup/restore (`_snapshotNow`, `restoreFromBackup`, `renderBackupList`), `exportJSON`, `importJSON`, `importJSONFull` (push cloud cấu trúc B), `_normalizeImportData` (wrapper gọi `normalizeImportStore`), `clearAllCache`, `afterDataChange`, `_reloadGlobals`, khởi tạo global `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` |
+| 7 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, `fsWrap/fsUnwrap`, Firebase REST (`fsGet/fsSet/fsDelete`), cấu trúc B (`fbDocYearCat`, `fbDocMetaCT/DM/TK/HD`, `_YEAR_CATS`, `fbYearCatPayload`, `fbMetaCT/DM/TK/HDPayload`), `_wipeOrphanCloudDocs` (dọn doc rác cấu trúc cũ), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `normalizeCatDisplayName`, `showSyncBanner`, `_setSyncState` |
+| 8 | `js/modules/projects/projects.model.js` | Domain model công trình: `PROJECT_STATUS`, `PROJECT_COMPANY`, `let projects = []`, `_saveProjects`, `rebuildCatCTFromProjects`, `createProject`, `updateProject`, `getProjectById`, `findProjectIdByName`, `getSortedProjects`, `getAllProjects`, `getProjectOptions`, `getProjectDays/Factor/Weight`, `getCompanyCost`, `allocateCompanyCost`, `canDeleteProject`, `resolveProjectName` |
+| 9 | `js/modules/projects/projects.migration-selects.js` | Migration linking + shared select helpers: `migrateProjectLinks`, `deduplicateProjects`, `_buildProjOpts`, `_buildProjFilterOpts`, `_readPidFromSel`, `_checkProjectClosed` |
+| 10 | `js/modules/projects/projects.ui.js` | Full UI tab Công Trình: `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_goTabWithCT`, `renderProjectsPage`, `renderCTOverview`, `_ctApply`, `_ctRenderGrid`, `openCTDetail`, `openCTCreateModal`, `saveCTCreate`, `openCTEditModal`, `saveCTEdit`, `quickCloseCT`, `confirmQuickClose`, `quickCompleteCT`, `confirmQuickComplete`, `confirmDeleteCT` |
+| 11 | `js/legacy/tienich.js` | Utility, formatter, `buildInvoices()`, invoice cache |
+| 12 | `js/modules/hoadon/hoadon.quick-entry.js` | Nhập hóa đơn nhanh, duplicate check, shared row/money helpers: `initTable`, `addRows`, `addRow`, `delRow`, `renumber`, `calcSummary`, `clearTable`, `saveAllRows`, `_showDupModal`, `closeDupModal`, `forceSaveAll`, `_ensureInvRef`, `_doSaveRows`, `calcRowMoney`, `getRowData` |
+| 13 | `js/modules/hoadon/hoadon.sheet-grid.js` | Engine lưới nhập liệu giống Excel cho hóa đơn nhanh: selection, copy/paste vùng, keyboard navigation, autocomplete trực tiếp trong bảng |
+| 14 | `js/modules/hoadon/hoadon.detail-entry.js` | Hóa đơn chi tiết nhiều dòng vật tư/nội dung: `goInnerSub`, `_initDetailFormSelects`, `renderDetailRowHTML`, `addDetailRow`, `delDetailRow`, `calcDetailRow`, `calcDetailTotals`, `generateDetailNd`, `saveDetailInvoice`, `clearDetailForm`, `_setSelectFlexible`, `openDetailEdit`, `getDetailRows` |
+| 15 | `js/modules/hoadon/hoadon.list-trash.js` | Filter/render danh sách, sửa/xóa, thùng rác, hóa đơn trong ngày: `switchTatCaView`, `buildFilters`, `filterAndRender`, `renderTable`, `goTo`, `delInvoice`, `editCCInvoice`, `openEntryEdit`, `_resolveInvSource`, `editManualInvoice`, `trash` (global), `trashAdd`, `trashRestore`, `trashDeletePermanent`, `trashClearAll`, `renderTrash`, `renderTodayInvoices`, `refreshHoadonCtDropdowns` |
+| 16 | `js/modules/danhmuc/danhmuc.categories.js` | Danh mục/settings: normalize, render settings, CT page, CN role, tbTen, rebuild selects, dedup cat arrays |
+| 17 | `js/modules/tienung/tienung.core.js` | Tiền Ứng core: `ungRecords`, migration/normalize deletedAt/projectId, shared state cho entry/history |
+| 18 | `js/modules/tienung/tienung.entry.js` | Form nhập tiền ứng nhiều dòng, đổi loại ứng, lưu/xóa dòng, rebuild selects |
+| 19 | `js/modules/tienung/tienung.history.js` | Lịch sử tiền ứng, lọc/tìm kiếm, phân trang, xuất CSV/ảnh phiếu ứng |
+| 20 | `js/modules/danhmuc/danhmuc.tools.js` | Wrapper backup/restore (`toolBackupNow`, `toolRestoreBackup`) |
+| 21 | `js/modules/nhapxuat/nhapxuat.parsers.js` | Helper parse/normalize Excel + parser sheet 1–9: `_normStr`, `_parseDate`, `_pNum`, `_str`, `_sheetRows`, `_hasDiacritics`, `_deduplicateCatNames`, `_buildCanonMap`, `_dayOfWeek`, `_isEmptyRow`, `_formatCatName`, `_markDuplicateInBatch`, `_makeCatLookup`, `_makeCatLookupWithExtra`, `_resolveProvisionalProjectIds`, `_mkErr`, `_fmtErr`, `parseSheet1`–`parseSheet9`, `_DANHMUC_GROUP_MAP` |
+| 22 | `js/modules/nhapxuat/nhapxuat.import.js` | Import session, detect sheet, preview, apply import, log: `_isDupInvQ/D/Ung/Thu/Tb/Tp/CC`, `_detectSheetType`, `_importSession`, `_doImportParse`, `_markDuplicates`, `_showImportPreviewNew`, `_toggleAllImportSheets`, `_applyImport`, `_generateImportLog`, `openImportModal`, `handleImportFile` |
+| 23 | `js/modules/nhapxuat/nhapxuat.export.js` | Export modal, Excel sheet builders, CSV exports: `openExportModal`, `_buildSheet`, `buildHoaDonNhanh/ChiTiet/ChamCong/TienUng/ThietBi/DanhMuc/HopDongChinh/ThuTien/HopDongThauPhu/HuongDan`, `exportExcel`, `_doExport`, `exportEntryCSV`, `exportAllCSV`, `toolImportExcel`, `toolExportExcel` |
+| 24 | `js/legacy/datatools.js` | Dashboard, reset/delete-year, data health, migration tools |
+| 25 | `js/modules/chamcong/chamcong.core.js` | Global data (`ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`), constants (`CC_DAY_LABELS`, `CC_DATE_OFFSETS`), date/week helpers, normalize/category helpers, CT selector helpers: `_dedupCC`, `round1`, `toggleCCDebtCols`, `_calcDebtBefore`, `isoFromParts`, `ccSundayISO`, `ccSaturdayISO`, `snapToSunday`, `weekLabel`, `ccAllNames`, `rebuildCCNameList`, `normalizeAllChamCong`, `rebuildCCCategories`, `updateTopFromCC`, `populateCCCtSel`, `updateCCSaveBtn`, `onCCCtSelChange`, `_fmtDate` |
+| 26 | `js/modules/chamcong/chamcong.week-form.js` | Form nhập tuần, build table, row handlers, lưu/copy/paste: `initCC`, `ccGoToWeek`, `ccPrevWeek`, `ccNextWeek`, `onCCFromChange`, `loadCCWeekForm`, `buildCCTable`, `addCCWorker`, `addCCRow`, `buildCCRow`, `onCCNameInput`, `onCCDayKey`, `onCCWageKey`, `onCCMoneyKey`, `calcCCRow`, `delCCRow`, `renumberCC`, `updateCCSumRow`, `saveCCWeek`, `clearCCWeek`, `copyCCWeek`, `pasteCCWeek`; global `ccClipboard` |
+| 27 | `js/modules/chamcong/chamcong.history-reports.js` | Lịch sử, tổng lương tuần, load/delete, CSV exports, phiếu lương/ảnh: `buildCCHistFilters`, `renderCCHistory`, `ccHistGoTo`, `renderCCTLT`, `fmtK`, `updateTLTSelectedSum`, `exportCCTLTCSV`, `ccTltGoTo`, `loadCCWeekById`, `delCCWeekById`, `delCCWorker`, `exportCCWeekCSV`, `exportCCHistCSV`, `removeVietnameseTones`, `xuatPhieuLuong`, `exportUngToImage` |
+| 28 | `js/legacy/thietbi.js` | Quản lý thiết bị/kho tổng |
+| 29 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
+| 30 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
+| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Công nợ, Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderCongNoThauPhu`, `_renderCongNoTable`, `renderCongNoNhaCungCap`, `renderLaiLo`, `initDoanhThu`, `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub` |
+| 32 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 4 meta doc), `pullChanges` (REPLACE local bằng cloud), `_pullMeta`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
+| 33 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
+| 34 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`) |
+| 35 | `https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js` | Bootstrap bundle (nạp ở cuối body, sau toàn bộ JS app) |
 
 Thứ tự này quan trọng vì code không dùng module system. Nhóm `core.*.js` **bắt buộc nạp trước tất cả module nghiệp vụ**. Các file dùng chung biến/hàm global như `load`, `save`, `cats`, `projects`, `invoices`, `ccData`, `hopDongData`, `buildInvoices`, `pullChanges`, `manualSync`. Nếu đổi thứ tự, module có thể đọc biến chưa khai báo hoặc render trước khi `dbInit()` populate `_mem`.
 
-> **Hai file V2 (`sync.v2format.js`, `sync.v2meta.js`) đã bị XÓA** trong đợt chuyển sang online-only + cấu trúc B. `sync.js` không còn phụ thuộc engine subcollection V2. Nếu thấy tham chiếu `_v2*` ở đâu đó thì đó là dấu vết cũ cần dọn.
+> **Hai file V2 (`sync.v2format.js`, `sync.v2meta.js`) đã bị XÓA** trong đợt chuyển sang online-only + cấu trúc B. `sync.js` không còn phụ thuộc engine subcollection V2. Nếu thấy tham chiếu `_v2*` ở đâu đó thì đó là dấu vết cũ cần dọn (xem [Phụ lục A](#phụ-lục-a--di-sản-v2-đã-xóa-khỏi-code)).
 
 ---
 
@@ -90,6 +130,7 @@ assets/
 js/
   core/                       ← Nạp đầu tiên, nền tảng toàn app
     core.storage.js
+    core.normalize.js
     core.state-backup.js
     core.cloud-cats-ui.js
 
@@ -125,14 +166,11 @@ js/
 
   legacy/                     ← File chưa tách module, vẫn ở dạng đơn khối
     tienich.js
-    hoadon.js
     datatools.js
     thietbi.js
 
   sync/
-    sync.v2format.js          ← V2 Firestore format helpers (push year + meta, pull year)
-    sync.v2meta.js            ← V2 Meta Pull Module (pull projects/users/catItems/hopDong)
-    sync.js                   ← Sync engine Firestore
+    sync.js                   ← Sync engine Firestore (cấu trúc B, online-only)
 
   app/
     auth.js
@@ -143,18 +181,20 @@ js/
 - Thư mục chỉ là tổ chức **vật lý** — không phải module system, không dùng `import/export`.
 - Toàn bộ file vẫn chạy global scope qua `<script>` tuần tự trong `index.html`.
 - `js/legacy/` chứa các file chưa được tách module; có thể tách thêm trong tương lai theo cùng pattern.
-- Khi thêm file mới: phải thêm `<script src="...">` vào `index.html` đúng thứ tự và cập nhật `AI_CONTEXT.md`.
+- File cũ `js/legacy/hoadon.js` đã được tách thành nhóm `js/modules/hoadon/*.js` — **không còn tồn tại**, không nạp lại.
+- Hai file V2 cũ `js/sync/sync.v2format.js` và `js/sync/sync.v2meta.js` đã bị **xóa** khi chuyển sang online-only + cấu trúc B; thư mục `js/sync/` chỉ còn `sync.js`.
+- Khi thêm file mới: phải thêm `<script src="...">` vào `index.html` đúng thứ tự và cập nhật `AI_CONTEXT.md` (mục 2 và mục 6).
 
 ---
 
-## 4. Kiến trúc lưu trữ (Storage Architecture)
+## 4. Kiến trúc lưu trữ & đồng bộ (Storage & Sync Architecture)
 
 | Layer | Thành phần | Vai trò |
 |---|---|---|
-| Source of truth local | IndexedDB qua Dexie DB `qlct` | Nguồn dữ liệu gốc khi app chạy offline-first |
-| Memory snapshot | `_mem` trong `core.js` | Cache runtime; `load(k, def)` chỉ đọc từ `_mem` sau `dbInit()` |
-| Write path | `save(k, v)` | Cập nhật `_mem`, ghi Dexie bằng `_dbSave()`, invalidate invoice cache, đánh dấu pending, debounce sync |
-| Sync cloud | `sync.js` + Firebase/Firestore REST | Pull/merge/push dữ liệu theo năm và document categories |
+| Source of truth local | IndexedDB qua Dexie DB `qlct` | Cache dữ liệu khi app chạy (online-only — pull REPLACE từ cloud) |
+| Memory snapshot | `_mem` trong `core.storage.js` | Cache runtime; `load(k, def)` chỉ đọc từ `_mem` sau `dbInit()` |
+| Write path | `save(k, v, opts)` | Cập nhật `_mem`, ghi Dexie bằng `_dbSave()`, invalidate invoice cache, đánh dấu pending, debounce sync. `opts.skipSync=true` → bỏ qua pending + push |
+| Sync cloud | `sync.js` + Firebase/Firestore REST | Pull (REPLACE local) / pre-push merge / push dữ liệu theo cấu trúc B |
 | LocalStorage | Config/session only | Lưu Firebase config, `deviceId`, session user, pending marker, block-pull marker; không là nguồn dữ liệu nghiệp vụ |
 
 Dexie physical schema:
@@ -168,7 +208,7 @@ Dexie physical schema:
 | `revenue` | `id, updatedAt` | `thu_v1` |
 | `settings` | `id` | `projects_v1`, `hopdong_v1`, `thauphu_v1`, `trash_v1`, `users_v1`, `cat_ct_years`, `cat_cn_roles`, `cat_items_v1` |
 
-Offline-first data flow:
+Online-only data flow (cloud-authoritative):
 
 ```mermaid
 sequenceDiagram
@@ -177,31 +217,48 @@ sequenceDiagram
   participant Mem as _mem
   participant IDB as IndexedDB/Dexie
   participant Sync as sync.js
-  participant Cloud as Firestore
+  participant Cloud as Firestore (Cấu trúc B)
 
   User->>UI: create/edit/delete
   UI->>Mem: save(key, value)
   Mem->>IDB: _dbSave(key, value)
-  Mem->>Sync: schedulePush() debounce
-  Sync->>Cloud: pushChanges()
+  Mem->>Sync: schedulePush() debounce 800ms
+  Sync->>Cloud: pushChanges() (pre-push merge id-based)
+  Note over Sync,Cloud: Pull = REPLACE local bằng cloud
   Sync->>Cloud: pullChanges()
-  Cloud-->>Sync: year/categories docs
-  Sync->>Mem: mergeDatasets()/normalizeCC()
-  Mem->>IDB: _memSet()
+  Cloud-->>Sync: year×cat docs + 4 meta docs
+  Sync->>Mem: _replaceYearData() / _pullMeta()
+  Mem->>IDB: _dbSave()
   UI->>Mem: load(key, default)
 ```
 
-Sync rules:
+### Cấu trúc B (collection `cpct_data`)
+
+Mỗi **năm × hạng mục = 1 doc** + **4 doc meta dùng chung**, tên field **đầy đủ (không nén)**:
+
+- `meta_cong_trinh` → `{ projects }`
+- `meta_danh_muc` → `{ cats, catItems, cnRoles, ctYears }`
+- `meta_tai_khoan` → `{ users }`
+- `meta_hop_dong` → `{ hopDong, thauPhu }`
+- `y{YYYY}_hoa_don` / `_tien_ung` / `_cham_cong` / `_thiet_bi` / `_thu_tien` → `{ v:4, yr, cat, records:[...] }`
+- Ánh xạ năm×hạng mục: `_YEAR_CATS` trong `core.cloud-cats-ui.js`.
+
+### Sync rules (hiện hành)
 
 | Rule | Mô tả |
 |---|---|
+| Mô hình | **Online-only, cloud-authoritative.** Pull = **REPLACE** local bằng cloud (không merge tích lũy). Pre-push merge (id-based, tombstone + LWW) chỉ chạy lúc PUSH để tránh 2 máy cùng năm ghi đè nhau. |
 | Conflict resolution | `resolveConflict(local, cloud)`: tombstone (`deletedAt`) ưu tiên, sau đó `updatedAt` mới hơn thắng |
-| Multi-year sync | `_getAllLocalYears()` gom năm từ `inv_v3`, `ung_v1`, `cc_v2`, `tb_v1`, `thu_v1`; push/pull theo year document |
-| Categories sync | Document categories chứa: <br> - `cat_items_v1`: { [type]: { id, name, isDeleted, updatedAt }[] } (Master category storage) <br> - `cat_ct`: string[] (Derived from projects_v1) <br> - `cat_ct_years`: { [ctName]: number } <br> - `cat_loai`, `cat_ncc`, `cat_nguoi`, `cat_tp`, `cat_cn`, `cat_tbteb`: string[] (Derived from cat_items_v1) |
+| Multi-year sync | `_getAllLocalYears()` gom năm từ `inv_v3`, `ung_v1`, `cc_v2`, `tb_v1`, `thu_v1`; push/pull theo từng doc `y{YYYY}_<cat>` |
+| Categories sync | Doc `meta_danh_muc` chứa: <br> - `catItems` (`cat_items_v1`): { [type]: { id, name, isDeleted, updatedAt }[] } (Master category storage) <br> - `cats` (các mảng `cat_loai`, `cat_ncc`, `cat_nguoi`, `cat_tp`, `cat_cn`, `cat_tbteb` — derived từ `catItems`) <br> - `cnRoles` (`cat_cn_roles`) <br> - `ctYears` (`cat_ct_years`) |
 | Pull guard | `_blockPullUntil`/`localStorage._blockPullUntil` chặn pull sau reset/import để tránh cloud cũ ghi đè local mới |
-| Pending | `_pendingChanges` và `_PENDING_KEY` giúp hiển thị trạng thái còn thay đổi chưa sync |
-| **V2 Firestore Subcollection** | Cấu trúc: parent document chứa summary fields (tiếng Việt, typed) + subcollection `ban_ghi/` chứa từng record riêng lẻ với human-readable document ID (`{ngay}_{slug}_{tien}_{uid6}`). **Push** (`sync.v2format.js`): chạy sau manual sync hoặc auto-debounce (đã tăng 30s → 5 phút). Incremental: lần đầu full write, lần sau chỉ ghi record `updatedAt > lastPush`, xóa `deletedAt > lastPush`. Timestamp `lastPush` ở localStorage `_v2SubcollLastPush`. **Pull year** (`sync.v2format.js`): `_v2PullYearFull(yr)` đọc 5 loại năm từ V2 subcollections. **Pull meta** (`sync.v2meta.js`): `_v2PullMetaFull()` đọc 4 loại meta song song — V2 là **primary read source** cho cả year data và meta data; V1 cats/year docs chỉ còn là fallback khi V2 chưa có data. `_mergeUsersV2` đảm bảo password không bị mất khi merge (V2 không lưu password). `meta_danh_muc` parent document lưu thêm `cn_roles` + `ct_years` để pull về được. **V1 cats push đã XÓA hoàn toàn** trong pushChanges. |
-| **V2 Quota Optimization (Phase 1+2+3+4)** | Tối ưu giảm reads ~99% và writes ~99% cho idle sync. **Phase 1 — Last-Modified Guard:** mỗi parent doc lưu field `last_modified_ms = max(updatedAt, deletedAt)`. Pull đọc parent trước (1 read), nếu `cloud.last_modified_ms <= localStorage._v2SubcollLastPull[docId]` → skip subcollection read (tiết kiệm hàng trăm reads/sync). Helpers: `_v2GetLastPull`, `_v2SetLastPull`, `_v2CheckLastModified`, `_v2ResetAllLastPull`. **Phase 2 — Skip-when-unchanged:** `_v2PushSubcoll` skip cả summary PATCH + writes khi `lastPush>0 && writes.length===0`. `_v2PushSubcollFull` (cho danh_muc/hop_dong) dùng **hash-skip**: tính hash `id:updatedAt` từ active records, lưu `localStorage._v2HashFull_<docId>`; nếu hash trùng → skip toàn bộ (tránh full rewrite 163 writes/sync vô ích). **Phase 3 — Skip summary PATCH:** gộp vào Phase 2 — khi writes=0 thì cũng không PATCH parent summary. **Phase 4 — Frequency + Cleanup:** debounce auto-sync `30_000` → `300_000` ms (5 phút). Pre-push pull skip nếu `Date.now() - localStorage._lastPullTs < 60_000` (vừa pull gần đây). Users pre-push merge chuyển từ `fsGet(fbDocCats())` sang `_v2PullUsers()` (rẻ với guard). **localStorage keys mới:** `_v2SubcollLastPull` (map docId→ts), `_v2HashFull_<docId>` (hash per doc), `_v2Initialized` ('1' sau lần `_v2PushMeta` đầu tiên — pull dùng làm V2-ready signal thay vì check data.length), `_lastPullTs` (timestamp pullChanges xong). |
+| Pending | `_pendingChanges` và `_PENDING_KEY` giúp hiển thị trạng thái còn thay đổi chưa sync; `save(k,v,{skipSync:true})` ghi mà không tăng pending |
+| Offline | `main.js` `_showOfflineBlock()` chặn hẳn app khi mất mạng, bắt reload khi có mạng lại |
+| Flush on hide | IIFE trong `sync.js` lắng nghe `visibilitychange`(hidden)/`pagehide`: nếu `_pendingChanges>0` → `pushChanges({silent:true, skipPull:true})` (chống mất dữ liệu mobile) |
+| Có mạng lại | `window.addEventListener('online', ...)`: nếu `_pendingChanges>0` → `schedulePush()` |
+| Reset/delete-year | Push tombstone/rỗng theo cấu trúc B bằng `fsSet` trực tiếp (không qua `pushChanges`); `_wipeOrphanCloudDocs()` xóa hẳn doc không thuộc B bằng `fsDelete` |
+
+> **Lưu ý:** Kiến trúc V2 Firestore Subcollection (parent doc + subcollection `ban_ghi/`, các phase quota optimization) **đã bị thay thế hoàn toàn** bởi Cấu trúc B. Mô tả V2 được lưu ở [mục 9.2](#92-v2-quota-optimization--phase-1234-23052026--lịch-sử) và [Phụ lục A](#phụ-lục-a--di-sản-v2-đã-xóa-khỏi-code) chỉ để tham khảo lịch sử.
 
 ---
 
@@ -209,17 +266,17 @@ Sync rules:
 
 | Logical key | Kiểu | Object chính | Fields quan trọng |
 |---|---|---|---|
-| `inv_v3` | `Array<Object>` | Hóa đơn | `id:string`, `ngay:YYYY-MM-DD`, `congtrinh:string`, `projectId:string|null`, `loai:string`, `nguoi:string`, `ncc:string`, `nd:string`, `tien:number`, `thanhtien:number`, `sl:number`, `items:array?`, `source:string?`, `ccKey:string?`, `createdAt:number`, `updatedAt:number`, `deletedAt:number|null`, `deviceId:string` |
-| `cc_v2` | `Array<Object>` | Chấm công tuần | `id:string`, `fromDate:YYYY-MM-DD`, `toDate:YYYY-MM-DD`, `ct:string`, `projectId:string|null`, `ctPid:string?`, `workers:array`, `createdAt:number`, `updatedAt:number`, `deletedAt:number|null`, `deviceId:string` |
+| `inv_v3` | `Array<Object>` | Hóa đơn | `id:string`, `ngay:YYYY-MM-DD`, `congtrinh:string`, `projectId:string\|null`, `loai:string`, `nguoi:string`, `ncc:string`, `nd:string`, `tien:number`, `thanhtien:number`, `sl:number`, `items:array?`, `source:string?`, `ccKey:string?`, `createdAt:number`, `updatedAt:number`, `deletedAt:number\|null`, `deviceId:string` |
+| `cc_v2` | `Array<Object>` | Chấm công tuần | `id:string`, `fromDate:YYYY-MM-DD`, `toDate:YYYY-MM-DD`, `ct:string`, `projectId:string\|null`, `ctPid:string?`, `workers:array`, `createdAt:number`, `updatedAt:number`, `deletedAt:number\|null`, `deviceId:string` |
 | `cc_v2.workers[]` | `Array<Object>` | Dòng công nhân | `name:string`, `d:number[7]`, `luong:number`, `phucap:number`, `hdmuale:number`, `tru:number`, `loanAmount:number`, `nd:string`, `role:string?` |
-| `tb_v1` | `Array<Object>` | Thiết bị | `id:string`, `ct:string`, `projectId:string|null`, `ten:string`, `soluong:number`, `tinhtrang:string`, `nguoi:string`, `ghichu:string`, `ngay:string`, metadata |
-| `ung_v1` | `Array<Object>` | Tiền ứng | `id:string`, `ngay:string`, `loai:'thauphu'|'nhacungcap'|'congnhan'`, `tp:string`, `congtrinh:string`, `projectId:string|null`, `tien:number`, `nd:string`, metadata |
-| `thu_v1` | `Array<Object>` | Thu tiền | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string|null`, `tien:number`, `nguoi:string`, `nd:string`, metadata |
-| `projects_v1` | `Array<Object>` | Master công trình | `projects_v1`: { id, name, type, status, startDate, endDate, closedDate, note, createdYear, createdAt, updatedAt, deletedAt } <br> - Special ID: `COMPANY` (CÔNG TY) for overhead costs. <br> - Statuses: `planning`, `active`, `completed`, `closed`. <br> - Types: `CT` (Công trình), `SC` (Sửa chữa), `OTHER`. |
-| `hopdong_v1` | `Object map` | Hợp đồng chính | Key ưu tiên là `projectId`, legacy fallback là tên CT. Value: `giaTri:number`, `giaTriphu:number`, `phatSinh:number`, `nguoi:string`, `ngay:string`, `projectId:string`, `items:array?`, `updatedAt:number`, `deletedAt:number|null` |
-| `thauphu_v1` | `Array<Object>` | Hợp đồng thầu phụ | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string|null`, `thauphu:string`, `giaTri:number`, `phatSinh:number`, `nd:string`, `items:array?`, metadata |
+| `tb_v1` | `Array<Object>` | Thiết bị | `id:string`, `ct:string`, `projectId:string\|null`, `ten:string`, `soluong:number`, `tinhtrang:string`, `nguoi:string`, `ghichu:string`, `ngay:string`, metadata |
+| `ung_v1` | `Array<Object>` | Tiền ứng | `id:string`, `ngay:string`, `loai:'thauphu'\|'nhacungcap'\|'congnhan'`, `tp:string`, `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nd:string`, metadata |
+| `thu_v1` | `Array<Object>` | Thu tiền | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nguoi:string`, `nd:string`, metadata |
+| `projects_v1` | `Array<Object>` | Master công trình | `{ id, name, type, status, startDate, endDate, closedDate, note, chuDauTu, createdYear, createdAt, updatedAt, deletedAt }` <br> - Special ID: `COMPANY` (CÔNG TY) for overhead costs. <br> - Statuses: `planning`, `active`, `completed`, `closed`. <br> - Types: `CT` (Công trình), `SC` (Sửa chữa), `OTHER`. |
+| `hopdong_v1` | `Object map` | Hợp đồng chính | Key ưu tiên là `projectId`, legacy fallback là tên CT. Value: `giaTri:number`, `giaTriphu:number`, `phatSinh:number`, `nguoi:string`, `ngay:string`, `projectId:string`, `khachHang:string` (legacy fallback cho Chủ Đầu Tư), `items:array?`, `updatedAt:number`, `deletedAt:number\|null` |
+| `thauphu_v1` | `Array<Object>` | Hợp đồng thầu phụ | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string\|null`, `thauphu:string`, `giaTri:number`, `phatSinh:number`, `nd:string`, `items:array?`, metadata |
 | `trash_v1` | `Array/Object` | Thùng rác hóa đơn | Lưu record bị đưa vào trash; vẫn cần giữ metadata để phục hồi/đối chiếu |
-| `users_v1` | `Array<Object>` | User/auth | `id:string`, `username:string`, `password:string`, `role:'admin'|'giamdoc'|'ketoan'`, `updatedAt:number`, `sessionVersion:number`, `sessions:array` |
+| `users_v1` | `Array<Object>` | User/auth | `id:string`, `username:string`, `password:string`, `role:'admin'\|'giamdoc'\|'ketoan'`, `updatedAt:number`, `sessionVersion:number`, `sessions:array` |
 | `cat_items_v1` | `Object<string, Array>` | Danh mục có soft delete | Type keys: `loai`, `ncc`, `nguoi`, `tp`, `cn`, `tbteb`; item gồm `id:string`, `name:string`, `isDeleted:boolean`, `updatedAt:number` |
 | `cat_cn_roles` | `Object` | Vai trò công nhân | `{ [workerName:string]: string }` |
 | `cat_ct_years` | `Object` | Năm công trình | `{ [projectName:string]: number }` |
@@ -231,7 +288,7 @@ Metadata chuẩn cho record nghiệp vụ:
 | `id` | `string` | UUID từ `crypto.randomUUID()`; legacy id có migration trong Data Tools |
 | `createdAt` | `number` | Unix ms khi tạo; giữ nguyên khi edit |
 | `updatedAt` | `number` | Unix ms khi sửa/import/apply; dùng cho LWW |
-| `deletedAt` | `number|null` | Soft delete/tombstone cho record nghiệp vụ |
+| `deletedAt` | `number\|null` | Soft delete/tombstone cho record nghiệp vụ |
 | `deviceId` | `string` | Sinh một lần trong `sync.js`, lưu localStorage |
 
 ---
@@ -240,38 +297,37 @@ Metadata chuẩn cho record nghiệp vụ:
 
 | File | Globals quan trọng | Hàm xương sống |
 |---|---|---|
-| `js/core/core.storage.js` | `DEFAULTS`, `CATS`, `FB_CONFIG`, `FS_BASE`, `FB_CFG_KEY`, `db`, `DB_KEY_MAP`, `_mem`, `_pendingChanges`, `_blockPullUntil`, `LAST_SYNC_KEY`, `_SYNC_DATA_KEYS` | `_loadLS()`, `_saveLS()`, `_memSet()`, `dedupById()`, `mergeUnique()`, `_dbSave()`, `dbInit()`, `_incPending()`, `_resetPending()`, `_updateSyncBtnBadge()`, `load()`, `save()`, `mkRecord()`, `mkUpdate()`, `buildNDFromItems()`, `_normViStr()`, `_acHide()`, `_acShow()` |
-| `js/core/core.state-backup.js` | `DATA_VERSION`, `DATA_VERSION_KEY`, `BACKUP_KEYS`, `BACKUP_KEY`, `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` | `migrateData()`, `_migrateHopDongKeys()`, `_hdLookup()`, `_hdKeyOf()`, `_getProjectById()`, `_getProjectNameById()`, `_resolveCtName()`, `_restoreStore()`, `clearAllCache()`, `getState()`, `afterDataChange()`, `_reloadGlobals()`, `_snapshotNow()`, `getBackupList()`, `restoreFromBackup()`, `renderBackupList()`, `exportJSON()`, `importJSON()`, `importJSONFull()` |
-| `js/core/core.cloud-cats-ui.js` | `lastSyncUI`, `_CATITEM_TYPE_MAP` | `fbReady()`, `compressInv()`, `expandInv()`, `compressCC()`, `expandCC()`, `compressUng()`, `expandUng()`, `compressTb()`, `expandTb()`, `fsWrap()`, `fsUnwrap()`, `fbDocYear()`, `fbDocCats()`, `fbYearPayload()`, `fbCatsPayload()`, `fsUrl()`, `fsGet()`, `fsSet()`, `estimateYearKb()`, `gsLoadAll()`, `updateJbBtn()`, `openBinModal()`, `closeBinModal()`, `fbSaveConfig()`, `fbDisconnect()`, `reloadFromCloud()`, `syncNow()`, `buildYearSelect()`, `saveCats()`, `_catNormKey()`, `_dedupCatItemsNow()`, `_syncCatItems()`, `_rebuildCatArrsFromItems()`, `_migrateCatItemsIfNeeded()`, `showSyncBanner()`, `hideSyncBanner()`, `_setSyncState()` |
-| `js/app/main.js` | `activeYears`, `activeYear`, `currentUser`, `_roleObserver`, `_userHeartbeatTimer`, `window._dataReady` | `init()`, `initAuth()`, `goPage()`, `renderActiveTab()`, `buildYearSelect()`, `onYearChange()`, `applyRoleUI()`, `loadUsers()`, `saveUsers()` |
-| `js/modules/projects/projects.model.js` | `PROJECT_STATUS`, `PROJECT_COMPANY`, `projects`, `_PROJ_DATE_RE`, `_VALID_STATUSES`, `_PROJ_VALID_TYPES`, `_PROJ_FACTORS` | `_projTypeByName()`, `_isValidProject()`, `cleanupInvalidProjects()`, `_saveProjects()`, `rebuildCatCTFromProjects()`, `_migrateProjectDates()`, `getProjectAutoStartDate()`, `createProject()`, `updateProject()`, `getProjectById()`, `findProjectIdByName()`, `getSortedProjects()`, `getAllProjects()`, `getProjectOptions()`, `getProjectDays()`, `getProjectFactor()`, `getProjectWeight()`, `getCompanyCost()`, `allocateCompanyCost()`, `canDeleteProject()`, `resolveProjectName()` |
-| `js/modules/projects/projects.migration-selects.js` | _(không có global riêng)_ | `migrateProjectLinks()`, `deduplicateProjects()`, `_buildProjOpts()`, `_buildProjFilterOpts()`, `_readPidFromSel()`, `_checkProjectClosed()` |
+| `js/core/core.storage.js` | `DEFAULTS`, `CATS`, `FB_CONFIG`, `FS_BASE`, `FB_CFG_KEY`, `db`, `DB_KEY_MAP`, `_mem`, `_pendingChanges`, `_blockPullUntil`, `LAST_SYNC_KEY`, `_SYNC_DATA_KEYS` | `_loadLS()`, `_saveLS()`, `_memSet()`, `dedupById()`, `mergeUnique()`, `_dbSave()`, `dbInit()`, `_incPending()`, `_resetPending()`, `_updateSyncBtnBadge()`, `load()`, `save(k,v,opts)` (hỗ trợ `opts.skipSync`), `mkRecord()`, `mkUpdate()`, `buildNDFromItems()`, `_normViStr()`, `_acHide()`, `_acShow()` |
+| `js/core/core.normalize.js` | `_NORM_CT_FIELD`, `_NORM_UUID_RE` | `_normIsUUID()`, `_normDeviceId()`, `normalizeRecord(rec, key, ctByName)`, `normalizeDataset(key, arr, ctByName)`, `normalizeImportStore(data)` |
+| `js/core/core.state-backup.js` | `DATA_VERSION`, `DATA_VERSION_KEY`, `BACKUP_KEYS`, `BACKUP_KEY`, `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` | `migrateData()`, `_migrateHopDongKeys()`, `_hdLookup()`, `_hdKeyOf()`, `_getProjectById()`, `_getProjectNameById()`, `_resolveCtName()`, `_restoreStore()`, `clearAllCache()`, `getState()`, `afterDataChange()`, `_reloadGlobals()`, `_snapshotNow()`, `getBackupList()`, `restoreFromBackup()`, `renderBackupList()`, `exportJSON()`, `importJSON()`, `importJSONFull()`, `_normalizeImportData()` (wrapper gọi `normalizeImportStore`) |
+| `js/core/core.cloud-cats-ui.js` | `lastSyncUI`, `_CATITEM_TYPE_MAP`, `_YEAR_CATS`, `_fsReads`, `_fsWrites` | `fbReady()`, `fsWrap()`, `fsUnwrap()`, `fbDocYearCat(yr,cat)`, `fbDocMetaCT()`, `fbDocMetaDM()`, `fbDocMetaTK()`, `fbDocMetaHD()`, `fbYearCatPayload(yr,key,dateField)`, `fbMetaCTPayload()`, `fbMetaDMPayload()`, `fbMetaTKPayload()`, `fbMetaHDPayload()`, `_fsCountRead()`, `_fsCountWrite()`, `getFsCounter()`, `fsUrl()`, `fsGet()`, `fsSet()`, `fsDelete()`, `_wipeOrphanCloudDocs()`, `estimateYearKb()`, `gsLoadAll()`, `updateJbBtn()`, `_ensureSyncDot()`, `_setSyncDot()`, `openBinModal()`, `closeBinModal()`, `renderBinModal()`, `_createModalOverlay()`, `fbSaveConfig()`, `fbDisconnect()`, `reloadFromCloud()`, `syncNow()`, `buildYearSelect()`, `_renderYearSelect()`, `_updateYearBtn()`, `saveCats()`, `_catNormKey()`, `_dedupCatItemsNow()`, `normalizeCatDisplayName(catIdOrType,name)`, `_syncCatItems()`, `_rebuildCatArrsFromItems()`, `_migrateCatItemsIfNeeded()`, `showSyncBanner()`, `hideSyncBanner()`, `_setSyncState()` |
+| `js/app/main.js` | `activeYears`, `activeYear`, `currentUser`, `_roleObserver`, `_userHeartbeatTimer`, `window._dataReady` | `init()`, `initAuth()`, `goPage()`, `renderActiveTab()`, `buildYearSelect()`, `onYearChange()`, `applyRoleUI()`, `loadUsers()`, `saveUsers()`, `_showOfflineBlock()`, `_migrateProjectDates()`, `_migrateChuDauTuFromHopDong()` |
+| `js/modules/projects/projects.model.js` | `PROJECT_STATUS`, `PROJECT_COMPANY`, `projects`, `_PROJ_DATE_RE`, `_VALID_STATUSES`, `_PROJ_VALID_TYPES`, `_PROJ_FACTORS` | `_projTypeByName()`, `_isValidProject()`, `cleanupInvalidProjects()`, `_saveProjects()`, `rebuildCatCTFromProjects()`, `_migrateProjectDates()`, `getProjectAutoStartDate()`, `createProject()`, `updateProject()`, `_syncChuDauTuToHopDong()`, `getProjectById()`, `findProjectIdByName()`, `getSortedProjects()`, `getAllProjects()`, `getProjectOptions()`, `getProjectDays()`, `getProjectFactor()`, `getProjectWeight()`, `getCompanyCost()`, `allocateCompanyCost()`, `canDeleteProject()`, `resolveProjectName()` |
+| `js/modules/projects/projects.migration-selects.js` | _(không có global riêng)_ | `migrateProjectLinks()`, `deduplicateProjects()`, `_buildProjOpts(selected, placeholder, { includeCompany, excludeClosed })`, `_buildProjFilterOpts()`, `_readPidFromSel()`, `_checkProjectClosed()` |
 | `js/modules/projects/projects.ui.js` | `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_ctSearch`, `_ctFStatus`, `_ctFType`, `_ctFLaiLo` | `_goTabWithCT()`, `renderProjectsPage()`, `_ctGetCosts()`, `_buildInvoiceMap()`, `_ctGetCostsFromMap()`, `_ptDuration()`, `_ptStatusBadge()`, `_ptStatBox()`, `_ptDurationDays()`, `renderCTOverview()`, `_ctApply()`, `_ctRenderGrid()`, `openCTDetail()`, `openCTCreateModal()`, `saveCTCreate()`, `openCTEditModal()`, `saveCTEdit()`, `quickCloseCT()`, `confirmQuickClose()`, `quickCompleteCT()`, `confirmQuickComplete()`, `confirmDeleteCT()` |
-| `js/legacy/tienich.js` | `invoiceCache`, numeric keypad state | `buildInvoices()`, `getInvoicesCached()`, `clearInvoiceCache()`, format/date utilities |
+| `js/legacy/tienich.js` | `invoiceCache`, numeric keypad state | `buildInvoices()`, `getInvoicesCached()`, `clearInvoiceCache()`, `updateTop()`, format/date utilities |
 | `js/modules/hoadon/hoadon.quick-entry.js` | _(không có global riêng ngoài scope của module)_ | `initTable()`, `addRows()`, `refreshEntryDropdowns()`, `addRow()`, `delRow()`, `renumber()`, `calcSummary()`, `clearTable()`, `saveAllRows()`, `_showDupModal()`, `closeDupModal()`, `forceSaveAll()`, `_ensureInvRef()`, `_doSaveRows()`, `calcRowMoney()`, `getRowData()` |
 | `js/modules/hoadon/hoadon.sheet-grid.js` | Sheet/grid interaction state | Excel-like selection, copy/paste vùng, keyboard navigation, autocomplete trong bảng nhập nhanh |
 | `js/modules/hoadon/hoadon.detail-entry.js` | _(không có global riêng)_ | `goInnerSub()`, `_initDetailFormSelects()`, `renderDetailRowHTML()`, `addDetailRow()`, `delDetailRow()`, `calcDetailRow()`, `calcDetailTotals()`, `generateDetailNd()`, `saveDetailInvoice()`, `clearDetailForm()`, `_setSelectFlexible()`, `openDetailEdit()`, `getDetailRows()` |
 | `js/modules/hoadon/hoadon.list-trash.js` | `trash` (global shared state — gán lại bởi `_reloadGlobals()`) | `switchTatCaView()`, `buildFilters()`, `filterAndRender()`, `renderTable()`, `goTo()`, `delInvoice()`, `editCCInvoice()`, `openEntryEdit()`, `_resolveInvSource()`, `editManualInvoice()`, `trashAdd()`, `trashRestore()`, `trashDeletePermanent()`, `trashClearAll()`, `renderTrash()`, `renderTodayInvoices()`, `refreshHoadonCtDropdowns()` |
 | `js/modules/danhmuc/danhmuc.categories.js` | `_catNamesMigrated`, `normalizeName`, `normalizeKey` | `renderCtPage()`, `showCtModal()`, `closeModal()`, `normalizeName()`, `normalizeKey()`, `_isDmItemUsedInYear()`, `_isDmItemUsedAnytime()`, `scanAndFixAllDataFormats()`, `_migrateCatNamesFormat()`, `renderSettings()`, `_dmFilterCard()`, `renderCTItem()`, `renderItem()`, `renderCNItem()`, `updateCNRole()`, `renderTbTenItem()`, `syncCNRoles()`, `startEdit()`, `cancelEdit()`, `finishEdit()`, `addItem()`, `isItemInUse()`, `delItem()`, `_dedupCatArr()`, `rebuildEntrySelects()` |
 | `js/modules/danhmuc/danhmuc.tools.js` | _(không có global riêng)_ | `toolBackupNow()`, `toolRestoreBackup()` |
-| `js/modules/tienung/tienung.core.js` | `ungRecords`, `filteredUng`, `ungPage`, `UNG_TP_PG`, `ungTpPage`, `_editingUngId` | `_normalizeUngDeletedAt()`, `_normalizeUngProjectIds()`, shared Tiền Ứng state/migration helpers |
+| `js/modules/tienung/tienung.core.js` | `ungRecords`, `filteredUng`, `filteredUngTp`, `filteredUngNcc`, `ungPage`, `ungNccPage`, `UNG_TP_PG`, `ungTpPage`, `_editingUngId` | `_normalizeUngDeletedAt()`, `_normalizeUngProjectIds()`, `_syncFilteredUng()`, shared Tiền Ứng state/migration helpers |
 | `js/modules/tienung/tienung.entry.js` | _(không có global riêng)_ | `renderUngPage()`, entry row builders, `saveAllUngRows()`, add/delete/clear tiền ứng rows, rebuild selects |
-| `js/modules/tienung/tienung.history.js` | _(không có global riêng)_ | `renderUngTable()`, `renderUngThauPhuPage()`, `editUngRecord()`, history filter/pagination, CSV/export image helpers |
+| `js/modules/tienung/tienung.history.js` | _(không có global riêng)_ | `buildUngTpFilters()`, `buildUngNccFilters()`, `renderUngTpSection()`, `renderUngNccSection()`, `filterAndRenderUngTp()`, `filterAndRenderUngNcc()`, `_ungTableHTML()`, `renderUngTable()` (backward-compat), `renderUngThauPhuPage()`, `editUngRecord()`, history filter/pagination, CSV/export image helpers |
 | `js/modules/nhapxuat/nhapxuat.parsers.js` | `_DANHMUC_GROUP_MAP` | `_normStr()`, `_parseDate()`, `_pNum()`, `_str()`, `_sheetRows()`, `_hasDiacritics()`, `_deduplicateCatNames()`, `_buildCanonMap()`, `_dayOfWeek()`, `_isEmptyRow()`, `_formatCatName()`, `_markDuplicateInBatch()`, `_makeCatLookup()`, `_makeCatLookupWithExtra()`, `_resolveProvisionalProjectIds()`, `_mkErr()`, `_fmtErr()`, `parseSheet1()`–`parseSheet9()` |
 | `js/modules/nhapxuat/nhapxuat.import.js` | `_importSession` | `_isDupInvQ()`, `_isDupInvD()`, `_isDupUng()`, `_isDupThu()`, `_isDupTb()`, `_isDupTp()`, `_isDupCC()`, `_detectSheetType()`, `_doImportParse()`, `_markDuplicates()`, `_showImportPreviewNew()`, `_toggleAllImportSheets()`, `_applyImport()`, `_generateImportLog()`, `openImportModal()`, `handleImportFile()` |
 | `js/modules/nhapxuat/nhapxuat.export.js` | _(không có global riêng)_ | `openExportModal()`, `_buildSheet()`, `buildHoaDonNhanh()`, `buildHoaDonChiTiet()`, `buildChamCong()`, `buildTienUng()`, `buildThietBi()`, `buildDanhMuc()`, `buildHopDongChinh()`, `buildThuTien()`, `buildHopDongThauPhu()`, `buildHuongDan()`, `exportExcel()`, `_doExport()`, `exportEntryCSV()`, `exportAllCSV()`, `toolImportExcel()`, `toolExportExcel()` |
+| `js/legacy/datatools.js` | `selectedCT`, migration dry-run reports | `renderDashboard()`, `_dbBarChart()`, `_dbBarChartWeekly()`, `_dbCalcWeeklyData()`, `_dbSelectWeek()`, `toolDeleteYear()`, `_doDeleteYear()`, `toolResetAll()`, `_doResetAll()`, `scanDataHealth()`, `normalizeProjectLinks()`, `migrateIdsToUUID()` |
 | `js/modules/chamcong/chamcong.core.js` | `ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`, `CC_PG_HIST`, `CC_PG_TLT`, `CC_DAY_LABELS`, `CC_DATE_OFFSETS`, `_ccDebtColsHidden` | `_dedupCC()`, `round1()`, `toggleCCDebtCols()`, `_applyCCDebtColsVisibility()`, `_calcDebtBefore()`, `isoFromParts()`, `ccSundayISO()`, `ccSaturdayISO()`, `snapToSunday()`, `viShort()`, `weekLabel()`, `iso()`, `ccAllNames()`, `rebuildCCNameList()`, `normalizeAllChamCong()`, `rebuildCCCategories()`, `updateTopFromCC()`, `populateCCCtSel()`, `updateCCSaveBtn()`, `onCCCtSelChange()`, `_fmtDate` |
 | `js/modules/chamcong/chamcong.week-form.js` | `ccClipboard` | `initCC()`, `ccGoToWeek()`, `ccPrevWeek()`, `ccNextWeek()`, `onCCFromChange()`, `loadCCWeekForm()`, `buildCCTable()`, `addCCWorker()`, `addCCRow()`, `buildCCRow()`, `onCCNameInput()`, `onCCDayKey()`, `onCCWageKey()`, `onCCMoneyKey()`, `calcCCRow()`, `delCCRow()`, `renumberCC()`, `updateCCSumRow()`, `saveCCWeek()`, `clearCCWeek()`, `copyCCWeek()`, `pasteCCWeek()` |
 | `js/modules/chamcong/chamcong.history-reports.js` | _(không có global riêng)_ | `buildCCHistFilters()`, `renderCCHistory()`, `ccHistGoTo()`, `renderCCTLT()`, `fmtK()`, `updateTLTSelectedSum()`, `exportCCTLTCSV()`, `ccTltGoTo()`, `loadCCWeekById()`, `delCCWeekById()`, `delCCWorker()`, `exportCCWeekCSV()`, `exportCCHistCSV()`, `removeVietnameseTones()`, `xuatPhieuLuong()`, `exportUngToImage()` |
 | `js/legacy/thietbi.js` | `tbData`, `tbPage`, `khoPage` | `migrateTbData()`, `tbSaveRows()`/device save helpers, `tbRenderList()`, `renderKhoTong()` |
-| `js/modules/doanhthu/doanhthu.core.js` | `hopDongData`, `thuRecords`, `thauPhuContracts`, `_hdcItems`, `_hdtpItems`, `_hdcPage`, `_hdtpPage`, `_thuPage`, `DT_PG`, `_dtCtFilter` | `calcHopDongValue()`, `_migrateHopDongSL()`, `_normalizeThuProjectIds()`, `_initDoanhThuAddons()`, `updateGlobalTotals()`, `bindItemsToTable()`, `fmtInputMoney()`, `_readMoneyInput()`, `_dtInYear()`, `_dtPaginationHtml()`, `_dtMatchProjFilter()`, `_dtMatchHDCFilter()`, `dtPopulateCtFilter()`, `dtSetCtFilter()`, `dtGoSub()`, `dtEnsureCongNoSubtab()`, `dtPopulateSels()`, `_dtAddCT()`, `_dtAddTP()` |
-| `js/modules/doanhthu/doanhthu.forms.js` | _(không có global riêng)_ | `hdcUpdateTotal()`, `saveHopDongChinh()`, `_hdcResetForm()`, `editHopDongChinh()`, `delHopDongChinh()`, `renderHdcTable()`, `saveThuRecord()`, `editThuRecord()`, `_thuCancelEdit()`, `_thuResetForm()`, `delThuRecord()`, `renderThuTable()`, `hdtpUpdateTotal()`, `saveHopDongThauPhu()`, `_hdtpResetForm()`, `editHopDongThauPhu()`, `delHopDongThauPhu()`, `renderHdtpTable()` |
+| `js/modules/doanhthu/doanhthu.core.js` | `hopDongData`, `thuRecords`, `thauPhuContracts`, `_hdcItems`, `_hdtpItems`, `_hdcPage`, `_hdtpPage`, `_thuPage`, `DT_PG`, `_dtCtFilter` | `calcHopDongValue()`, `_migrateHopDongSL()`, `_normalizeThuProjectIds()`, `_initDoanhThuAddons()`, `updateGlobalTotals()`, `bindItemsToTable()`, `fmtInputMoney()`, `_readMoneyInput()`, `_dtInYear()`, `_dtPaginationHtml()`, `_dtMatchProjFilter()`, `_dtMatchHDCFilter()`, `dtPopulateCtFilter()`, `dtSetCtFilter()`, `dtGoSub()`, `dtEnsureCongNoSubtab()`, `dtPopulateSels()`, `openDtModal()`, `closeDtModal()`, `_dtAddCT()`, `_dtAddTP()` |
+| `js/modules/doanhthu/doanhthu.forms.js` | _(không có global riêng)_ | `hdcUpdateTotal()`, `saveHopDongChinh()`, `hdcSyncChuDauTu()`, `_hdcResetForm()`, `editHopDongChinh()`, `delHopDongChinh()`, `renderHdcTable()`, `saveThuRecord()`, `editThuRecord()`, `_thuCancelEdit()`, `_thuResetForm()`, `delThuRecord()`, `renderThuTable()`, `hdtpUpdateTotal()`, `saveHopDongThauPhu()`, `_hdtpResetForm()`, `editHopDongThauPhu()`, `delHopDongThauPhu()`, `renderHdtpTable()` |
 | `js/modules/doanhthu/doanhthu.reports-export.js` | `window.initDoanhThu`, `window.dtGoSub` (top-level assignments) | `renderCongNoThauPhu()`, `_renderCongNoTable()`, `renderCongNoNhaCungCap()`, `renderLaiLo()`, `initDoanhThu()`, `copyKLCT()`, `pasteKLCT()`, `exportHdcToImage()`, `exportHdtpToImage()`, `exportThuToImage()` |
-| `js/sync/sync.v2format.js` | `_V2_YEAR_TYPES`, `_V2_META_TYPES`, `_V2_YEAR_KEY_MAP`, `_V2_FIELD_MAPS`, `_V2_SUBCOLL_NAME`, `_V2_LAST_PUSH_KEY`, `_V2_LAST_PULL_KEY`, `_V2_ID_SCHEMA_VER` | **Formatters:** `_v2FmtMoney(n)`, `_v2FmtDateTime(ts)`, `_v2FmtCtList(records,ctField)`, `_v2TypeLabel(type)` — **ID helpers:** `_v2Slug(s,maxLen)`, `_v2FmtMoneyShort(n)`, `_v2MakeDocId(type,rec)`, `_v2DocYearId(type,yr)`, `_v2DocMetaId(type)` — **Converters (to FS):** `_v2ToFsValue(v)`, `_v2ToFsFields(obj)`, `_v2ApplyFieldMap(rec,map,exclude)` — **Converters (from FS):** `_v2FromFsValue(v)`, `_v2FromFsFields(fields)`, `_v2ReverseApplyFieldMap(fsObj,map)` — **REST helpers:** `_v2FsPatchDoc(path,fields)`, `_v2FsListIds(parentId,coll)`, `_v2FsBatchWrite(writes[])`, `_v2FsGetSubcollDocs(parentDocId,collName)` — **Push:** `_v2GetLastPush(id)`, `_v2SetLastPush(id,ts)`, `_v2ResetLastPush(id)`, `_v2ResetAllLastPush()` (clear cả `_v2HashFull_*`, `_v2SubcollLastPull`, `_v2Initialized`), `_v2PushSubcoll(parentId,records,map,summary,idFn?)` (skip-when-unchanged + ghi `last_modified_ms`), `_v2PushSubcollFull(parentId,records,map,summary,idField?)` (hash-skip + ghi `last_modified_ms`), `_v2PushYear(yr)`, `_v2PushMeta()` (set `_v2Initialized='1'`) — **Pull guard (Phase 1):** `_v2GetLastPull(id)`, `_v2SetLastPull(id,ts)`, `_v2ResetAllLastPull()`, `_v2CheckLastModified(parentDocId)` → `{ exists, unchanged, parentFields, cloudLastMod }` — **Pull year:** `_v2PullSubcoll(parentDocId,fieldMap)` → `{ status:'absent'|'unchanged'|'empty'|'fresh', records, parentFields }`, `_v2PullYearFull(yr)` → `{ _v2Initialized, _yearChanged, [localKey]: records? }` — **Debug:** `debugV2(filter?)` |
-| `js/sync/sync.v2meta.js` | _(không có global state — set `localStorage._v2Initialized='1'` khi pull phát hiện parent docs)_ | **Pull meta từ V2 subcollections (Phase 1 — guarded):** `_v2PullProjects()` → `{status, records, parentFields}` (delegate `_v2PullSubcoll`), `_v2PullUsers()` → same shape (records không có password), `_mergeUsersV2(localUsers,cloudUsers)` (restore password từ local cache trước khi merge), `_v2PullDanhMuc()` → `{ status, catItems?, cnRoles?, ctYears? }` (items từ subcoll + cnRoles/ctYears từ parentFields), `_v2PullHopDong()` → `{ status, hopDong?, thauPhu? }` (dùng `_v2CheckLastModified` trực tiếp vì cần raw fields), `_v2PullMetaFull()` → `{ _v2Initialized, projects?, users?, catItems?, cnRoles?, ctYears?, hopDong?, thauPhu? }` qua `Promise.allSettled` |
-| `js/sync/sync.js` | `DEVICE_ID`, `_syncPulling`, `_syncPushing`, `_pushTimer` | `mkRecord()`, `stampEdit()`, `softDeleteById()`, `resolveConflict()`, `mergeDatasets()`, `normalizeCC()`, `pullChanges()` (lưu `localStorage._lastPullTs` cuối hàm, V2-ready check dùng `_v2Initialized` flag thay vì `data.length>0`), `pushChanges()` (Phase 4: skip pre-push pull nếu `_lastPullTs<60s`; users merge dùng `_v2PullUsers` thay vì cats; **đã XÓA** `fsSet(fbDocCats())`), `schedulePush()` (debounce 30s → 5 phút = 300_000ms), `manualSync()`, `startAutoSync()`, `stampNew()` |
-| `js/app/auth.js` | `currentUser`, role/session helpers | `initAuth()`, login/logout/account settings, user/session persistence, role UI helpers |
-| `js/legacy/datatools.js` | `selectedCT`, migration dry-run reports | `renderDashboard()`, `toolDeleteYear()`, `_doDeleteYear()`, `toolResetAll()`, `_doResetAll()`, `scanDataHealth()`, `normalizeProjectLinks()`, `migrateIdsToUUID()` |
+| `js/sync/sync.js` | `DEVICE_ID`, `_syncPushing`, `_syncPulling`, `_pushTimer`, `_lastFlushTs`, `_YEAR_FIELD`, `_TS_EPOCH` | `softDeleteRecord()`, `resolveConflict()`, `mergeDatasets()`, `_mergeUsersSafe()`, `_getAllLocalYears()`, `_safeTs()`, `_fillCCProjectId()`, `normalizeCC()`, `isSyncing()`, `_mergeKey()`, `_replaceYearData()`, `_mergeHopDong()`, `_mergeCatItems()`, `_applyCatItemArrays()`, `pushChanges(opts)`, `_pullMeta()`, `pullChanges(yr, callback, opts)`, `cancelScheduledPush()`, `schedulePush()`, `manualSync()`, `processQueue()` + IIFE flush-on-hide (`visibilitychange`/`pagehide`) + listener `online` |
+| `js/app/auth.js` | `currentUser`, role/session helpers | `initAuth()`, login/logout/account settings, `saveUsers(arr, opts)` (propagate `skipSync`), `_startSessionHeartbeat()` (dùng `saveUsers(users,{skipSync:true})`), user/session persistence, role UI helpers |
 
 Lưu ý đặc biệt: `buildInvoices()` không chỉ đọc `inv_v3`; nó tạo hóa đơn tổng hợp từ hóa đơn manual và dữ liệu chấm công (`cc_v2`) gồm `hdmuale` và tiền công nhân. Các render/report hóa đơn nên dùng `getInvoicesCached()` hoặc `buildInvoices()` thay vì chỉ đọc `invoices`.
 
@@ -282,39 +338,42 @@ Lưu ý đặc biệt: `buildInvoices()` không chỉ đọc `inv_v3`; nó tạo
 | Quy tắc | Cách áp dụng trong code |
 |---|---|
 | Giữ Vanilla JS/global style | Classic script, global scope — **không dùng ES module `import/export`**. Hàm cần gọi từ HTML inline phải ở global scope hoặc gán `window.fn = fn`. |
-| Nhóm `hoadon.*.js` nạp sau tienich.js, trước danhmuc.*.js | `hoadon.quick-entry.js` → `hoadon.sheet-grid.js` → `hoadon.detail-entry.js` → `hoadon.list-trash.js`. File cũ `js/legacy/hoadon.js` đã tách thành nhóm này — không nạp lại. `hoadon.quick-entry.js` nạp trước vì chứa shared helpers `calcRowMoney()`, `getRowData()`, `_ensureInvRef()`, `_doSaveRows()` mà `detail-entry.js` dùng. `hoadon.sheet-grid.js` phụ trách thao tác Excel-like trong bảng nhập nhanh, nên phải nạp sau quick-entry DOM/row helpers và trước các thao tác UI phụ thuộc. `trash` là global shared state (`let trash = load('trash_v1', [])`) trong `list-trash.js` — có thể được reassign bởi `_reloadGlobals()`. `DEVICE_ID` (từ `sync.js`) chỉ dùng trong body của `delInvoice()` và `trashRestore()` trong list-trash — an toàn vì chỉ gọi sau khi app load đầy đủ. |
-| Nhóm `core.*.js` nạp trước tất cả | `core.storage.js` → `core.state-backup.js` → `core.cloud-cats-ui.js` phải nạp trước mọi module nghiệp vụ. File cũ `core.js` đã được tách thành 3 file này — không nạp lại `core.js`. |
+| Nhóm `core.*.js` nạp trước tất cả | `core.storage.js` → `core.normalize.js` → `core.state-backup.js` → `core.cloud-cats-ui.js` phải nạp trước mọi module nghiệp vụ. File cũ `core.js` đã được tách — không nạp lại `core.js`. `core.normalize.js` nạp sau `core.storage.js` (cần `mkRecord`/`_normDeviceId` helpers) và trước `core.state-backup.js` (vì `_normalizeImportData` là wrapper gọi `normalizeImportStore`). |
 | Nhóm `projects.*.js` nạp sau core, trước tienich | `projects.model.js` → `projects.migration-selects.js` → `projects.ui.js`. File cũ `projects.js` đã tách thành 3 file này — không nạp lại `projects.js`. Thứ tự nội bộ quan trọng: model trước vì migration và UI đều phụ thuộc `projects[]`, `getProjectById`, v.v. |
+| Nhóm `hoadon.*.js` nạp sau tienich.js, trước danhmuc.*.js | `hoadon.quick-entry.js` → `hoadon.sheet-grid.js` → `hoadon.detail-entry.js` → `hoadon.list-trash.js`. File cũ `js/legacy/hoadon.js` đã tách thành nhóm này — không nạp lại. `hoadon.quick-entry.js` nạp trước vì chứa shared helpers `calcRowMoney()`, `getRowData()`, `_ensureInvRef()`, `_doSaveRows()` mà `detail-entry.js` dùng. `hoadon.sheet-grid.js` phụ trách thao tác Excel-like trong bảng nhập nhanh, nên phải nạp sau quick-entry DOM/row helpers và trước các thao tác UI phụ thuộc. `trash` là global shared state (`let trash = load('trash_v1', [])`) trong `list-trash.js` — có thể được reassign bởi `_reloadGlobals()`. `DEVICE_ID` (từ `sync.js`) chỉ dùng trong body của `delInvoice()` và `trashRestore()` trong list-trash — an toàn vì chỉ gọi sau khi app load đầy đủ. |
 | Nhóm `danhmuc.*.js` và `tienung.*.js` nạp sau hoadon.js, trước nhapxuat.js | `danhmuc.categories.js` → `tienung.core.js` → `tienung.entry.js` → `tienung.history.js` → `danhmuc.tools.js`. File cũ `danhmuc.js` đã tách; file cũ `danhmuc.ung.js` không còn tồn tại. `tienung.*.js` dùng normalize/category helpers từ `danhmuc.categories.js`, nên categories phải nạp trước. `ungRecords` là global shared state — được reassign bởi `_reloadGlobals()` và các thao tác tiền ứng; `DEVICE_ID` từ `sync.js` chỉ dùng trong function body, không ở top-level. |
 | Nhóm `nhapxuat.*.js` nạp sau danhmuc.tools.js, trước datatools.js | `nhapxuat.parsers.js` → `nhapxuat.import.js` → `nhapxuat.export.js`. File cũ `nhapxuat.js` đã tách thành 3 file này — không nạp lại `nhapxuat.js`. `nhapxuat.parsers.js` phải nạp trước vì `nhapxuat.import.js` dùng mọi parser và helper. `nhapxuat.export.js` không được gọi ở top-level vì `hopDongData`/`thuRecords`/`thauPhuContracts` (từ `doanhthu.core.js`) nạp cùng lúc — hàm export chỉ chạy khi user click. Import phải tiếp tục dùng `save()` để IndexedDB, cache, pending sync và cloud sync nhất quán. |
 | Nhóm `chamcong.*.js` nạp sau datatools.js, trước thietbi.js | `chamcong.core.js` → `chamcong.week-form.js` → `chamcong.history-reports.js`. File cũ `chamcong.js` đã tách thành 3 file này — không nạp lại `chamcong.js`. `chamcong.core.js` phải nạp trước vì chứa global shared state (`ccData` khởi tạo parse-time qua `_dedupCC(load('cc_v2',[]))`, `ccOffset`, `ccHistPage`, `ccTltPage`, `CC_DAY_LABELS`, `CC_DATE_OFFSETS`) và tất cả date/week helpers, normalize helpers mà week-form và history-reports đều phụ thuộc. `_dedupCC` có standalone fallback: nếu `sync.js` chưa load (parse-time), nó dùng logic inline; nếu `sync.js` đã load, nó delegate sang `normalizeCC()` canonical. Split là NON-LINEAR: các hàm core (`normalizeAllChamCong`, `rebuildCCCategories`, `updateTopFromCC`, `populateCCCtSel`, `updateCCSaveBtn`, `onCCCtSelChange`) nằm xen kẽ trong file gốc nhưng được gom đúng vào `chamcong.core.js`. `DEVICE_ID` (từ `sync.js`) chỉ dùng trong body của `delCCWeekById()` trong history-reports — an toàn vì hàm chỉ gọi sau khi app load đầy đủ. |
-| Nhóm `doanhthu.*.js` nạp sau thietbi.js, trước sync.v2format.js | `doanhthu.core.js` → `doanhthu.forms.js` → `doanhthu.reports-export.js`. File cũ `doanhthu.js` đã tách thành 3 file này — không nạp lại `doanhthu.js`. `doanhthu.core.js` phải nạp trước vì chứa global data (`hopDongData`, `thuRecords`, `thauPhuContracts`, `_hdcItems`, `_hdtpItems`) và các top-level migration calls (`_normalizeThuProjectIds()`, `_migrateHopDongSL()`, `bindItemsToTable('hdc',...)`, `bindItemsToTable('hdtp',...)`) mà forms.js và reports-export.js đều phụ thuộc. `window.initDoanhThu` và `window.dtGoSub` được gán ở top-level trong `doanhthu.reports-export.js` — không gọi bất kỳ hàm export nào ở top-level vì chúng chỉ chạy khi user tương tác. `DEVICE_ID` (từ `sync.js`) chỉ được dùng trong body của `delThuRecord()` trong forms.js — an toàn vì hàm chỉ gọi sau khi app load đầy đủ. |
-| Nhóm `sync.*.js` nạp sau doanhthu.*.js, trước auth.js | `sync.v2format.js` → `sync.v2meta.js` → `sync.js`. Thứ tự bắt buộc: v2format phải trước v2meta (v2meta dùng helpers từ v2format), v2meta phải trước sync.js (`pullChanges` gọi `_v2PullMetaFull`). Không nạp lại thứ tự nào khác. |
-| Không đổi script order tùy tiện | File sau phụ thuộc biến/hàm file trước. `main.js` phải chạy cuối sau `sync.js`. |
-| IndexedDB là nguồn dữ liệu nghiệp vụ | Đọc bằng `load()`, ghi bằng `save()`. Không ghi nghiệp vụ trực tiếp vào `localStorage`. |
-| `save()` là write path chuẩn | Khi sửa dataset phải cập nhật global hiện hành nếu cần, rồi gọi `save(logicalKey, value)` để `_mem`, Dexie, cache và sync cùng nhất quán. |
+| Nhóm `doanhthu.*.js` nạp sau thietbi.js, trước sync.js | `doanhthu.core.js` → `doanhthu.forms.js` → `doanhthu.reports-export.js`. File cũ `doanhthu.js` đã tách thành 3 file này — không nạp lại `doanhthu.js`. `doanhthu.core.js` phải nạp trước vì chứa global data (`hopDongData`, `thuRecords`, `thauPhuContracts`, `_hdcItems`, `_hdtpItems`) và các top-level migration calls (`_normalizeThuProjectIds()`, `_migrateHopDongSL()`, `bindItemsToTable('hdc',...)`, `bindItemsToTable('hdtp',...)`) mà forms.js và reports-export.js đều phụ thuộc. `window.initDoanhThu` và `window.dtGoSub` được gán ở top-level trong `doanhthu.reports-export.js` — không gọi bất kỳ hàm export nào ở top-level vì chúng chỉ chạy khi user tương tác. `DEVICE_ID` (từ `sync.js`) chỉ được dùng trong body của `delThuRecord()` trong forms.js — an toàn vì hàm chỉ gọi sau khi app load đầy đủ. |
+| `sync.js` nạp sau doanhthu.*.js, trước auth.js | Thư mục `js/sync/` chỉ còn **một file `sync.js`** (engine cấu trúc B, online-only). Hai file V2 cũ (`sync.v2format.js`, `sync.v2meta.js`) đã bị **xóa** — không nạp lại bất kỳ file `_v2*` nào. `pullChanges` đọc cloud (REPLACE local), `pushChanges` ghi theo cấu trúc B. |
+| Không đổi script order tùy tiện | File sau phụ thuộc biến/hàm file trước. `main.js` phải chạy cuối cùng (sau `sync.js`, `auth.js`). |
+| IndexedDB là cache dữ liệu nghiệp vụ | Đọc bằng `load()`, ghi bằng `save()`. Không ghi nghiệp vụ trực tiếp vào `localStorage`. (Online-only: cloud là nguồn chân lý, IDB là cache cục bộ.) |
+| `save()` là write path chuẩn | Khi sửa dataset phải cập nhật global hiện hành nếu cần, rồi gọi `save(logicalKey, value)` để `_mem`, Dexie, cache và sync cùng nhất quán. Ghi internal không phải thay đổi nghiệp vụ (heartbeat, migration idempotent) dùng `save(k, v, { skipSync: true })`. |
 | Soft Delete | Record nghiệp vụ dùng `deletedAt` thay vì xóa cứng để sync tombstone. Category item dùng `isDeleted`. UI/report thường filter `!deletedAt` hoặc `!isDeleted`. |
 | ID chuẩn | - `mkRecord(fields)` — Creates record with `id` (UUID), `createdAt`, `updatedAt`, `deletedAt: null`, `deviceId`. <br> - `mkUpdate(existing, changes)` — Returns updated record (preserves `id`, `createdAt`). <br> - `load(key, default)` / `save(key, val)` — IndexedDB + Memory sync. <br> - `dbInit()` — Critical async bootstrap. |
-| Conflict sync | LWW theo `updatedAt`; nếu một bản có `deletedAt`, tombstone thắng để tránh dữ liệu bị sống lại. |
+| Conflict sync | LWW theo `updatedAt`; nếu một bản có `deletedAt`, tombstone thắng để tránh dữ liệu bị sống lại. Áp dụng ở pre-push merge (lúc PUSH); pull luôn REPLACE. |
 | Project linking | `projectId` là khóa chuẩn; `congtrinh`/`ct` là text hiển thị legacy/fallback. Khi thêm record theo công trình, cố gắng resolve `projectId`. |
 | Hợp đồng chính | `hopdong_v1` đang hỗ trợ cả key `projectId` và legacy key tên CT; code mới nên ưu tiên `projectId` và dùng `_hdLookup()`/helper tương ứng. |
+| Chủ Đầu Tư | `projects_v1[].chuDauTu` là **nguồn duy nhất**. `hopdong_v1[k].khachHang` chỉ là legacy fallback, được auto-sync qua `_syncChuDauTuToHopDong()`. Tên CĐT chỉ sửa ở tab CÔNG TRÌNH; form HĐ Chính read-only. |
 | Chấm công dedup | `cc_v2` dedup theo logical key `fromDate + projectId` qua `normalizeCC()`/`normalizeAllChamCong()`, không chỉ theo `id`. |
-| Import Excel | Parser strict theo sheet/cột định nghĩa; khi apply import, stamp `updatedAt` mới để local thắng cloud cũ. |
+| Import Excel | Parser strict theo sheet/cột định nghĩa; khi apply import, stamp `updatedAt` mới để local thắng cloud cũ. Mọi record qua `normalizeImportStore` (6 field tiêu chuẩn) trước khi save. |
 | UI tiếng Việt | Text hiển thị, toast, confirm, label dùng Tiếng Việt; technical identifier giữ English/Vietnamese mixed theo code hiện tại. |
 | Normalize tên | So sánh tên thường bỏ dấu, lowercase, trim space (`normalize('NFD')`, remove diacritics); không dùng so sánh raw khi dedup danh mục/công trình. |
 | Render sau sync | Sau `pullChanges()` hoặc tab switch, gọi `_reloadGlobals()` rồi render tab hiện hành để global state không cũ. |
 | Data ready guard | Một số render kiểm tra `window._dataReady`; không render dữ liệu trước khi `dbInit()` hoàn tất. |
-| Không hard delete khi reset/delete-year | Các tools ưu tiên tombstone/block pull/push để cloud nhận trạng thái xóa; nếu cần xóa cứng phải hiểu sync fallout. |
-| Cấu trúc thư mục chỉ là tổ chức vật lý | `js/core/`, `js/modules/*/`, `js/legacy/`, `js/sync/`, `js/app/`, `assets/css/` là phân vùng vật lý — không phải module system. Không dùng `import/export`. Thứ tự nạp script trong `index.html` là nguồn quyết định duy nhất. Khi thêm file mới: (1) tạo file đúng thư mục phù hợp, (2) thêm `<script src="...">` vào `index.html` đúng vị trí thứ tự, (3) cập nhật bảng Script Load Order và Key Functions & Globals trong `AI_CONTEXT.md`. |
+| Không hard delete khi reset/delete-year | Các tools ưu tiên tombstone/block pull/push để cloud nhận trạng thái xóa; `_doResetAll` push tombstone theo cấu trúc B + `_wipeOrphanCloudDocs()` xóa doc rác. Nếu cần xóa cứng phải hiểu sync fallout. |
+| Cấu trúc thư mục chỉ là tổ chức vật lý | `js/core/`, `js/modules/*/`, `js/legacy/`, `js/sync/`, `js/app/`, `assets/css/` là phân vùng vật lý — không phải module system. Không dùng `import/export`. Thứ tự nạp script trong `index.html` là nguồn quyết định duy nhất. Khi thêm file mới: (1) tạo file đúng thư mục phù hợp, (2) thêm `<script src="...">` vào `index.html` đúng vị trí thứ tự, (3) cập nhật bảng Script Load Order (mục 2) và Key Functions & Globals (mục 6) trong `AI_CONTEXT.md`. |
 | **Format tên danh mục (canonical)** | Helper duy nhất: `normalizeCatDisplayName(catIdOrType, name)` trong `core.cloud-cats-ui.js`. Rule: `loaiChiPhi`/`loai`/`tbTen`/`tbteb` → **Title Case** (chữ đầu mỗi từ). `nhaCungCap`/`ncc`/`nguoiTH`/`nguoi`/`thauPhu`/`tp`/`congNhan`/`cn` → **UPPERCASE**. Hàm `normalizeName(catId, val)` trong `danhmuc.categories.js` là wrapper của helper này. `normalizeKey(val)` / `_catNormKey(s)` dùng **chỉ để so sánh trùng** (bỏ dấu + lowercase), không dùng làm display name. |
 | **cat_items_v1 là nguồn master danh mục** | Mọi `item.name` trong `cat_items_v1` phải ở canonical format. Canonicalization được áp dụng nhất quán ở: (1) `_rebuildCatArrsFromItems()` — sau `_reloadGlobals()`; (2) `_syncCatItems()` — sau mỗi `saveCats()`; (3) `pullChanges()` catItems merge — sau pull từ cloud; (4) `_mergeCatArr()` trong `_applyImport()` — sau import Excel; (5) `_formatCatName()` trong parsers. Nếu canonicalize làm đổi item.name → dùng `save('cat_items_v1', ...)` (không `_memSet`) để pending được tăng và cloud nhận bản canonical trong lần push tiếp theo. `cat_items_v1` đã có trong `_SYNC_DATA_KEYS`. |
 | **Không rebuild cat string arrays từ raw item.name** | Mọi đường rebuild `cat_loai`, `cat_tbteb`, v.v. từ `cat_items_v1` phải gọi `normalizeCatDisplayName(type, item.name)`. Tuyệt đối không lấy `item.name` trực tiếp vào string array mà không qua canonical helper. |
 
 ---
 
-## 8. Cập nhật gần đây (Bootstrap Migration + Cleanup, 20-22/05/2026)
+# PHẦN II — QUY TẮC UI & BẢO TRÌ
 
-Các tài liệu tạm `BOOTSTRAP_MIGRATION_REPORT.md`, `BOOTSTRAP_POST_MIGRATION_AUDIT.md`, `BOOTSTRAP_CLEANUP_REPORT.md`, `BAO_CAO_CHI_TIET_UNG_DUNG.md`, `analysis_results.md` đã được đọc và gộp vào file này. Sau khi cập nhật, chỉ giữ lại `AI_CONTEXT.md` làm nguồn ngữ cảnh duy nhất.
+## 8. Bootstrap migration & quy tắc UI
+
+> Các tài liệu tạm `BOOTSTRAP_MIGRATION_REPORT.md`, `BOOTSTRAP_POST_MIGRATION_AUDIT.md`, `BOOTSTRAP_CLEANUP_REPORT.md`, `BAO_CAO_CHI_TIET_UNG_DUNG.md`, `analysis_results.md` đã được đọc và gộp vào file này. Sau khi cập nhật, chỉ giữ lại `AI_CONTEXT.md` làm nguồn ngữ cảnh duy nhất.
 
 ### 8.1. Thay đổi cấu trúc/module đã xác nhận
 
@@ -366,7 +425,21 @@ Với UI chính mới hoặc khi refactor tiếp, ưu tiên chuyển dần sang:
 - `text-success`, `text-danger`, `text-warning`, `text-primary`, `text-secondary`
 - `bg-success-subtle`, `bg-danger-subtle`, `bg-warning-subtle`, `bg-primary-subtle`
 
-### 8.5. V2 Quota Optimization (23/05/2026) — Phase 1+2+3+4
+---
+
+# PHẦN III — LỊCH SỬ THAY ĐỔI (CHANGELOG)
+
+## 9. Lịch sử thay đổi theo thời gian (Changelog)
+
+> Mục này ghi nhận các đợt thay đổi theo thời gian để hiểu bối cảnh. **Lưu ý:** kiến trúc hiện hành (mục 1–7) là Online-only + Cấu trúc B (xem 9.9). Các mục 9.2 mô tả engine V2 subcollection **đã bị thay thế** — đọc để hiểu lịch sử, không dùng làm tham chiếu hiện hành.
+
+### 9.1. Bootstrap migration + cleanup (20–22/05/2026)
+
+Nội dung chi tiết đã được chuẩn hóa thành quy ước thường trực ở [mục 8](#8-bootstrap-migration--quy-tắc-ui) (Bootstrap migration & quy tắc UI). Tóm tắt đợt này: nạp Bootstrap 5.3.3 + Bootstrap Icons 1.11.3, chuyển phần lớn button/form/card/table/nav sang component Bootstrap, tách `auth.js` riêng, dọn marker migration tạm khỏi runtime sau lỗi Danh Mục.
+
+### 9.2. V2 Quota Optimization — Phase 1+2+3+4 (23/05/2026) — *lịch sử*
+
+> ⚠️ **Engine V2 subcollection đã bị xóa hoàn toàn (xem 9.9).** Mục này giữ lại để hiểu vì sao có các localStorage key `_v2*` cũ và cách nhận diện dấu vết. Xem thêm [Phụ lục A](#phụ-lục-a--di-sản-v2-đã-xóa-khỏi-code).
 
 Sau khi V2 migration hoàn tất, app chạm giới hạn Firestore Spark (50K reads/day) do mỗi sync đọc lại toàn bộ ~1,500 docs subcollection ngay cả khi không có thay đổi, và `meta_danh_muc`/`meta_hop_dong` rewrite full mỗi sync. Đã triển khai 4 phase tối ưu:
 
@@ -379,7 +452,7 @@ Sau khi V2 migration hoàn tất, app chạm giới hạn Firestore Spark (50K r
 
 **Tổng kết:** Sync idle: **1,500 reads / 200 writes → ~19 reads / 0 writes** (~99% giảm). Sync sau 1 edit: ~70 reads / 1-2 writes.
 
-**localStorage keys mới phải biết:**
+**localStorage keys V2 (đã bỏ — chỉ còn dấu vết cần dọn):**
 - `_v2SubcollLastPull` — JSON map `{ docId: cloudLastModMs }`, cập nhật sau mỗi lần pull subcoll thành công
 - `_v2HashFull_<docId>` — string hash, cập nhật sau `_v2PushSubcollFull` thành công
 - `_v2Initialized` — `'1'` sau `_v2PushMeta` thành công đầu tiên; pullChanges dùng làm V2-ready signal (thay cho check `data.length>0` cũ)
@@ -389,7 +462,7 @@ Sau khi V2 migration hoàn tất, app chạm giới hạn Firestore Spark (50K r
 
 **Sau khi deploy code này lần đầu:** sync đầu tiên vẫn đọc toàn bộ (~1,500 reads) vì parent docs chưa có `last_modified_ms`. Sau lần push đầu tiên, các sync tiếp theo bắt đầu skip.
 
-### 8.6b. Sync Reliability & Quota Fix (24/05/2026) — Phase 5
+### 9.3. Sync Reliability & Quota Fix — Phase 5 (24/05/2026)
 
 Ba lỗi nghiêm trọng được sửa trong phiên này:
 
@@ -425,12 +498,14 @@ Ba lỗi nghiêm trọng được sửa trong phiên này:
 
 **Kết quả:** Khi user khóa màn hình hoặc đóng tab, trình duyệt vẫn hoàn thành việc gửi data lên Firebase nhờ `keepalive: true`. Dữ liệu không bị kẹt local.
 
-**Lưu ý cho AI:**
-- `save(k, v, { skipSync: true })` là pattern chuẩn cho bất kỳ ghi internal nào không phải thay đổi nghiệp vụ (heartbeat, migration idempotent không có thay đổi thực sự).
-- `_syncKeepAlive` được khai báo trong `sync.js` — `sync.v2format.js` đọc nó qua global scope (không cần truyền tham số vì cả hai đều chạy trong cùng page scope).
-- `schedulePush()` debounce giờ là **30s** (không phải 5 phút nữa).
+> **Cập nhật về sau (9.9):** cơ chế flush-on-hide vẫn còn trong `sync.js` (IIFE `visibilitychange`/`pagehide`), nhưng phần `_v2*` và `keepalive` trong v2format đã bị xóa cùng engine V2; debounce hiện là **800ms** (online-only).
 
-### 8.7. Cải tiến UI/UX (24/05/2026) — Tasks 7–14
+**Lưu ý (theo thời điểm Phase 5):**
+- `save(k, v, { skipSync: true })` là pattern chuẩn cho bất kỳ ghi internal nào không phải thay đổi nghiệp vụ (heartbeat, migration idempotent không có thay đổi thực sự). **(Vẫn áp dụng.)**
+- `_syncKeepAlive` được khai báo trong `sync.js` — `sync.v2format.js` đọc nó qua global scope.
+- `schedulePush()` debounce ở Phase 5 là **30s** (sau 9.9 đổi thành 800ms).
+
+### 9.4. Cải tiến UI/UX — Tasks 7–14 (24/05/2026)
 
 #### Task 7 — Tiền Ứng: tách 2 bảng độc lập
 
@@ -510,9 +585,7 @@ Ba lỗi nghiêm trọng được sửa trong phiên này:
 - Hàng 1: `col-6` × "+ Khai Báo HĐ Chính" + `col-6` × "+ Ghi Nhận Thu Tiền" (50/50 mọi breakpoint, dùng `w-100`).
 - Hàng 2: `col-12` × "+ HĐ Thầu Phụ" (full width đơn độc).
 
----
-
-### 8.6. Điểm kiểm tra sau cleanup
+### 9.5. Điểm kiểm tra sau cleanup
 
 Sau cleanup gần nhất:
 
@@ -528,7 +601,7 @@ rg -n -- "<!-- Sprint|/\\* Sprint|REMOVED Sprint|btn-gold|btn-green|records-tabl
 
 Nếu có output mới, cần phân loại là comment mô tả hợp lệ hay code cũ cần xóa.
 
-### 8.8. Cải tiến UI/UX Phase 2 (24/05/2026) — Sticky col + Dropdown + Layout
+### 9.6. UI/UX Phase 2 — Sticky + Dropdown + Layout (24/05/2026)
 
 #### Task A — Tiền Ứng: sticky column ổn định khi cuộn ngang
 
@@ -578,7 +651,7 @@ Nếu có output mới, cần phân loại là comment mô tả hợp lệ hay c
 - Nút Cloud (`#jb-btn`) chỉ ẩn trên mobile (via CSS), vẫn còn trong DOM để `updateJbBtn()` cập nhật được nếu desktop.
 - `openBinModal()` dùng chung từ cả 3 entry points: jb-btn, ud-cloud-btn (guest), ud-action-btn (auth).
 
-### 8.9. UI/UX Phase 3 (24/05/2026) — Sticky + dropdown + dashboard fixes
+### 9.7. UI/UX Phase 3 — Sticky + dropdown + dashboard fixes (24/05/2026)
 
 #### Task A — Year dropdown bị che (mobile)
 **Vấn đề:** Sau khi đẩy `topbar-year-wrap` sang góc phải (Phase 2), dropdown anchored `left:0` tràn ra ngoài viewport → bị clip.
@@ -642,7 +715,7 @@ Phase 2 đã thêm sticky cho cả 2 cột chk + tên (left:0, left:32px). Phase
 - Khi ẩn cột bằng `display:none`, `nth-of-type` / `nth-child` vẫn ám chỉ thứ tự DOM ban đầu (không tính lại) — đây là behavior cần thiết để CSS selector ổn định.
 - `_dbSelectWeek` không tự render full dashboard — chỉ re-render bar chart + pie chart từ cached data. Scroll preservation chỉ cần cover 2 element này.
 
-### 8.10. Chủ Đầu Tư + Hide Closed Projects (24/05/2026)
+### 9.8. Chủ Đầu Tư + Hide Closed Projects (24/05/2026)
 
 #### Task 1 — Field `chuDauTu` trên project (single source of truth)
 
@@ -697,10 +770,9 @@ Tên công trình đã có ở `modal-title` header. Row 0 trong `openCTDetail` 
 - `_migrateChuDauTuFromHopDong()` chỉ chạy khi `project.chuDauTu` rỗng → an toàn khi gọi nhiều lần.
 - `excludeClosed: true` **không** ảnh hưởng đến hành vi của filter/view dropdown, chỉ tab nhập liệu mới truyền flag này.
 
+### 9.9. Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026) — *kiến trúc hiện hành*
 
----
-
-### 8.11. Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026)
+> Đây là **kiến trúc đồng bộ hiện hành**, đã được phản ánh ở mục 1, 2, 3, 4, 6, 7. Mục này giữ lại để ghi nhận bối cảnh chuyển đổi.
 
 **Bối cảnh:** Mô hình offline-first (IndexedDB cache rồi merge-on-pull) gây phân kỳ số liệu giữa các máy (vd 4,38 tỷ vs 3,18 tỷ). Nguyên nhân gốc: **merge tích lũy lúc PULL**. Giải pháp: chuyển sang **100% online, cloud là nguồn chân lý**.
 
@@ -731,3 +803,41 @@ Tên công trình đã có ở `modal-title` header. Row 0 trong `openCTDetail` 
 - `_wipeOrphanCloudDocs()`: liệt kê collection, **xóa hẳn** mọi doc không thuộc B (doc gộp `y2025`/`y2026` đời cũ, `danh_muc`, rác V2...). Dùng `fsDelete` (REST DELETE).
 
 **Dọn code chết:** đã xóa `compressInv/CC/Ung/Tb` + `expandInv/CC/Ung/Tb`, `fbDocYear`, `fbDocCats`, `fbYearPayload`, `fbCatsPayload` (không còn caller). Block push V2 trong `importJSONFull` đã xóa.
+
+---
+
+## Phụ lục A — Di sản V2 đã xóa khỏi code
+
+> Hai file `js/sync/sync.v2format.js` và `js/sync/sync.v2meta.js` **đã bị xóa** (xem [9.9](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)). Phần dưới lưu lại **toàn bộ inventory hàm/biến/localStorage key của engine V2** để khi quét code thấy dấu vết `_v2*` thì biết đó là code/dữ liệu cũ cần dọn. **KHÔNG dùng làm tham chiếu hiện hành.**
+
+### A.1. Inventory `sync.v2format.js` (đã xóa)
+
+**Globals:** `_V2_YEAR_TYPES`, `_V2_META_TYPES`, `_V2_YEAR_KEY_MAP`, `_V2_FIELD_MAPS`, `_V2_SUBCOLL_NAME`, `_V2_LAST_PUSH_KEY`, `_V2_LAST_PULL_KEY`, `_V2_ID_SCHEMA_VER`
+
+- **Formatters:** `_v2FmtMoney(n)`, `_v2FmtDateTime(ts)`, `_v2FmtCtList(records,ctField)`, `_v2TypeLabel(type)`
+- **ID helpers:** `_v2Slug(s,maxLen)`, `_v2FmtMoneyShort(n)`, `_v2MakeDocId(type,rec)`, `_v2DocYearId(type,yr)`, `_v2DocMetaId(type)`
+- **Converters (to FS):** `_v2ToFsValue(v)`, `_v2ToFsFields(obj)`, `_v2ApplyFieldMap(rec,map,exclude)`
+- **Converters (from FS):** `_v2FromFsValue(v)`, `_v2FromFsFields(fields)`, `_v2ReverseApplyFieldMap(fsObj,map)`
+- **REST helpers:** `_v2FsPatchDoc(path,fields)`, `_v2FsListIds(parentId,coll)`, `_v2FsBatchWrite(writes[])`, `_v2FsGetSubcollDocs(parentDocId,collName)`
+- **Push:** `_v2GetLastPush(id)`, `_v2SetLastPush(id,ts)`, `_v2ResetLastPush(id)`, `_v2ResetAllLastPush()` (clear cả `_v2HashFull_*`, `_v2SubcollLastPull`, `_v2Initialized`), `_v2PushSubcoll(parentId,records,map,summary,idFn?)` (skip-when-unchanged + ghi `last_modified_ms`), `_v2PushSubcollFull(parentId,records,map,summary,idField?)` (hash-skip + ghi `last_modified_ms`), `_v2PushYear(yr)`, `_v2PushMeta()` (set `_v2Initialized='1'`)
+- **Pull guard (Phase 1):** `_v2GetLastPull(id)`, `_v2SetLastPull(id,ts)`, `_v2ResetAllLastPull()`, `_v2CheckLastModified(parentDocId)` → `{ exists, unchanged, parentFields, cloudLastMod }`
+- **Pull year:** `_v2PullSubcoll(parentDocId,fieldMap)` → `{ status:'absent'|'unchanged'|'empty'|'fresh', records, parentFields }`, `_v2PullYearFull(yr)` → `{ _v2Initialized, _yearChanged, [localKey]: records? }`
+- **Debug:** `debugV2(filter?)`
+
+### A.2. Inventory `sync.v2meta.js` (đã xóa)
+
+Không có global state — set `localStorage._v2Initialized='1'` khi pull phát hiện parent docs.
+
+**Pull meta từ V2 subcollections (Phase 1 — guarded):** `_v2PullProjects()` → `{status, records, parentFields}` (delegate `_v2PullSubcoll`), `_v2PullUsers()` → same shape (records không có password), `_mergeUsersV2(localUsers,cloudUsers)` (restore password từ local cache trước khi merge), `_v2PullDanhMuc()` → `{ status, catItems?, cnRoles?, ctYears? }` (items từ subcoll + cnRoles/ctYears từ parentFields), `_v2PullHopDong()` → `{ status, hopDong?, thauPhu? }` (dùng `_v2CheckLastModified` trực tiếp vì cần raw fields), `_v2PullMetaFull()` → `{ _v2Initialized, projects?, users?, catItems?, cnRoles?, ctYears?, hopDong?, thauPhu? }` qua `Promise.allSettled`
+
+### A.3. Mô tả kiến trúc V2 (sync rules cũ — đã thay bằng Cấu trúc B)
+
+> Hai dòng sync rule dưới đây trước nằm trong bảng Sync rules; giữ lại nguyên văn để tham khảo lịch sử.
+
+**V2 Firestore Subcollection:** Cấu trúc: parent document chứa summary fields (tiếng Việt, typed) + subcollection `ban_ghi/` chứa từng record riêng lẻ với human-readable document ID (`{ngay}_{slug}_{tien}_{uid6}`). **Push** (`sync.v2format.js`): chạy sau manual sync hoặc auto-debounce. Incremental: lần đầu full write, lần sau chỉ ghi record `updatedAt > lastPush`, xóa `deletedAt > lastPush`. Timestamp `lastPush` ở localStorage `_v2SubcollLastPush`. **Pull year** (`sync.v2format.js`): `_v2PullYearFull(yr)` đọc 5 loại năm từ V2 subcollections. **Pull meta** (`sync.v2meta.js`): `_v2PullMetaFull()` đọc 4 loại meta song song — V2 là **primary read source** cho cả year data và meta data; V1 cats/year docs chỉ còn là fallback khi V2 chưa có data. `_mergeUsersV2` đảm bảo password không bị mất khi merge (V2 không lưu password). `meta_danh_muc` parent document lưu thêm `cn_roles` + `ct_years` để pull về được. **V1 cats push đã XÓA hoàn toàn** trong pushChanges.
+
+**V2 Quota Optimization (Phase 1+2+3+4):** Tối ưu giảm reads ~99% và writes ~99% cho idle sync. **Phase 1 — Last-Modified Guard:** mỗi parent doc lưu field `last_modified_ms = max(updatedAt, deletedAt)`. Pull đọc parent trước (1 read), nếu `cloud.last_modified_ms <= localStorage._v2SubcollLastPull[docId]` → skip subcollection read. Helpers: `_v2GetLastPull`, `_v2SetLastPull`, `_v2CheckLastModified`, `_v2ResetAllLastPull`. **Phase 2 — Skip-when-unchanged:** `_v2PushSubcoll` skip cả summary PATCH + writes khi `lastPush>0 && writes.length===0`. `_v2PushSubcollFull` (cho danh_muc/hop_dong) dùng **hash-skip**: tính hash `id:updatedAt` từ active records, lưu `localStorage._v2HashFull_<docId>`; nếu hash trùng → skip toàn bộ. **Phase 3 — Skip summary PATCH:** gộp vào Phase 2. **Phase 4 — Frequency + Cleanup:** debounce auto-sync `30_000` → `300_000` ms (5 phút). Pre-push pull skip nếu `Date.now() - localStorage._lastPullTs < 60_000`. Users pre-push merge chuyển từ `fsGet(fbDocCats())` sang `_v2PullUsers()`. **localStorage keys:** `_v2SubcollLastPull` (map docId→ts), `_v2HashFull_<docId>` (hash per doc), `_v2Initialized` ('1' sau lần `_v2PushMeta` đầu tiên), `_lastPullTs` (timestamp pullChanges xong).
+
+### A.4. localStorage keys V2 cần dọn nếu còn sót
+
+`_v2SubcollLastPush`, `_v2SubcollLastPull`, `_v2HashFull_<docId>`, `_v2Initialized`, `_lastPullTs` (V2-era), `_syncKeepAlive` (flag V2 keepalive). Mô hình online-only hiện hành không sinh các key này nữa.

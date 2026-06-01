@@ -77,8 +77,37 @@ function _applyCCDebtColsVisibility() {
 
 // Tính tổng nợ lũy kế của công nhân trước tuần fromDate
 // debt = sum(loanAmount - tru) cho mọi tuần đã lưu có fromDate < ngày truyền vào
-function _calcDebtBefore(workerName, fromDate) {
+//
+// [SYNC-SAFE] NỢ CŨ là giá trị tính lũy kế từ toàn bộ lịch sử local. Nếu thiết bị
+// chưa tải đủ các năm trước (pull chỉ lấy các năm đã có ở local), số tính tại chỗ sẽ
+// thiếu → lệch giữa thiết bị. Khắc phục: khi lưu tuần, ta đóng băng (snapshot) giá trị
+// này vào từng công nhân (wk.debtBefore) — snapshot đi theo record cc_v2 lên cloud.
+// Khi hiển thị, ưu tiên snapshot đã đồng bộ; chỉ tính lũy kế tại chỗ khi:
+//   - forceLive = true (lúc lưu, cần tính lại số mới nhất để đóng băng), hoặc
+//   - record cũ chưa có snapshot (tương thích ngược).
+function _calcDebtBefore(workerName, fromDate, forceLive) {
   if (!workerName || !fromDate) return 0;
+
+  // (a) Ưu tiên snapshot đã lưu & đồng bộ — giữ NỢ CŨ giống nhau trên mọi thiết bị
+  if (!forceLive) {
+    let snap = null, snapTs = -1;
+    const safeTs = (typeof _safeTs === 'function')
+      ? _safeTs
+      : (ts => (typeof ts === 'number' ? ts : parseInt(ts) || 0));
+    ccData.forEach(w => {
+      if (w.deletedAt) return;
+      if ((w.fromDate || '') !== fromDate) return;
+      (w.workers || []).forEach(wk => {
+        if (wk.name !== workerName) return;
+        if (typeof wk.debtBefore !== 'number') return;
+        const ts = safeTs(w.updatedAt || w.createdAt || 0);
+        if (ts >= snapTs) { snapTs = ts; snap = wk.debtBefore; }
+      });
+    });
+    if (snap !== null) return snap;
+  }
+
+  // (b) Fallback: tính lũy kế từ dữ liệu local (lúc lưu, hoặc record cũ chưa có snapshot)
   let debt = 0;
   ccData.forEach(w => {
     if (w.deletedAt) return;

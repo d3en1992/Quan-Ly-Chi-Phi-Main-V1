@@ -541,6 +541,10 @@ function saveCCWeek() {
         nd,
         role,
         tru,
+        // [SYNC-SAFE] Đóng băng NỢ CŨ (nợ lũy kế trước tuần này) để đồng bộ lên cloud,
+        // tránh lệch số giữa các thiết bị khi thiết bị chưa tải đủ lịch sử năm cũ.
+        // forceLive=true: tính lại từ dữ liệu local, KHÔNG đọc snapshot cũ của chính tuần này.
+        debtBefore: _calcDebtBefore(name, fromDate, true),
       });
   });
   if (!workers.length) {
