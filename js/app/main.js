@@ -28,6 +28,17 @@ function init() {
   document.getElementById('entry-date').value = today();
   document.getElementById('ung-date').value = today();
 
+  // ── [FIX Lỗi 2] Sau khi nhập file JSON xong, app tự reload lại ──────────
+  // File JSON có thể chứa dữ liệu của NHIỀU năm. importJSONFull() đã đặt cờ
+  // '_showAllYearsAfterReload' trước khi reload. Ở đây ta đọc cờ đó và set bộ
+  // lọc năm = "Tất cả" (Set rỗng) → mọi năm vừa nhập đều hiển thị, không bị
+  // giấu mất các năm khác ngoài năm hiện tại.
+  if (localStorage.getItem('_showAllYearsAfterReload') === '1') {
+    localStorage.removeItem('_showAllYearsAfterReload');
+    activeYears = new Set();      // rỗng = "Tất cả"
+    _syncActiveYearCompat();
+  }
+
   // Hiển thị dữ liệu local ngay lập tức
   initTable(5);
   initUngTable(4);
@@ -68,11 +79,15 @@ function init() {
 
   // Tải dữ liệu mới nhất từ cloud (nếu đã có Bin ID)
   gsLoadAll(function(data) {
-    if (!data) return;
+    // [FIX Lỗi 1] Reload dữ liệu từ local (IDB) — LUÔN chạy, kể cả khi cloud
+    // pull trả về null (vd: bị chặn 2h sau khi nhập JSON, hoặc đang có pull khác
+    // chạy song song). Trước đây dòng `if(!data) return` khiến app bỏ qua luôn
+    // bước render khi pull null → màn hình trắng / chỉ thấy năm hiện tại.
     invoices    = load('inv_v3', []);
     ungRecords  = load('ung_v1', []);
     ccData      = load('cc_v2', []);
     tbData      = load('tb_v1', []);
+    thuRecords  = load('thu_v1', []);
     projects    = load('projects_v1', []);
     cats.congTrinh      = load('cat_ct',       DEFAULTS.congTrinh);
     cats.congTrinhYears = load('cat_ct_years', {});
@@ -80,6 +95,12 @@ function init() {
     cats.nhaCungCap     = load('cat_ncc',      DEFAULTS.nhaCungCap);
     cats.nguoiTH        = load('cat_nguoi',    DEFAULTS.nguoiTH);
     cats.tbTen          = load('cat_tbteb',    DEFAULTS.tbTen);
+
+    // [FIX Lỗi 1] Nếu năm đang chọn (mặc định = năm hiện tại) KHÔNG có dữ liệu
+    // nào, nhưng các năm khác lại có → tự chuyển bộ lọc sang "Tất cả" để app
+    // luôn hiển thị được dữ liệu, tránh màn hình trắng khi mở lên.
+    _autoSelectYearsWithData();
+
     buildYearSelect(); updateTop();
     rebuildEntrySelects(); rebuildCCNameList(); populateCCCtSel();
     initTable(5); initUngTable(4); initCC();
@@ -88,11 +109,44 @@ function init() {
     // → đảm bảo projects là single source of truth, loại bỏ garbage
     rebuildCatCTFromProjects();
     updateTop();
-    toast(`✅ Đồng bộ xong! ${built2.cts} CT mới`, 'success');
+    // Render lại tab đang mở theo activeYears (có thể vừa được đổi sang "Tất cả")
+    if (typeof renderActiveTab === 'function') renderActiveTab();
+    // Chỉ báo "Đồng bộ xong" khi thực sự kéo được dữ liệu mới từ cloud
+    if (data) toast(`✅ Đồng bộ xong! ${built2.cts} CT mới`, 'success');
   });
 }
 
 function today() { return new Date().toISOString().split('T')[0]; }
+
+// ── [FIX Lỗi 1] Tự chọn năm có dữ liệu khi năm hiện tại trống ────────────
+// Giải quyết tình huống: mở app lên, bộ lọc mặc định là năm hiện tại nhưng
+// năm đó chưa có dữ liệu (dữ liệu nằm ở các năm khác) → màn hình trắng.
+// Cách xử lý: nếu năm đang chọn trống mà năm khác có dữ liệu → chuyển sang
+// "Tất cả" để hiển thị mọi thứ. Tôn trọng lựa chọn của user nếu họ đã chủ
+// động chọn "Tất cả" hoặc nhiều năm (chỉ can thiệp khi đang chọn đúng 1 năm).
+function _autoSelectYearsWithData() {
+  if (activeYears.size !== 1) return;          // user đã chọn "Tất cả"/nhiều năm → giữ nguyên
+  const cur = [...activeYears][0];
+
+  // Gom tất cả các năm đang có dữ liệu trong local (đọc trực tiếp từ store)
+  const yrs = new Set();
+  const addYrs = (arr, field) => (arr || []).forEach(r => {
+    const d = r[field];
+    if (d && d.length >= 4) yrs.add(parseInt(d.slice(0, 4)));
+  });
+  addYrs(load('inv_v3', []), 'ngay');
+  addYrs(load('ung_v1', []), 'ngay');
+  addYrs(load('cc_v2',  []), 'fromDate');
+  addYrs(load('tb_v1',  []), 'ngay');
+  addYrs(load('thu_v1', []), 'ngay');
+
+  if (yrs.has(cur)) return;     // năm hiện tại đã có dữ liệu → giữ nguyên
+  if (yrs.size === 0) return;   // chưa có dữ liệu năm nào (sẽ chờ cloud pull) → giữ nguyên
+
+  // Năm hiện tại trống nhưng năm khác có dữ liệu → hiển thị "Tất cả"
+  activeYears = new Set();      // rỗng = "Tất cả"
+  _syncActiveYearCompat();
+}
 
 
 // ══════════════════════════════

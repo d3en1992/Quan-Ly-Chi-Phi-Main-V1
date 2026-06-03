@@ -620,6 +620,10 @@ async function importJSONFull(data) {
     }
 
     // Step 6: Reload — dbInit reads fresh IDB, _reloadGlobals rebuilds everything
+    // [FIX Lỗi 2] File JSON có thể chứa NHIỀU năm. Đặt cờ để sau khi reload,
+    // init() set bộ lọc năm = "Tất cả" → mọi năm vừa nhập đều hiển thị, không
+    // bị giấu mất các năm khác ngoài năm hiện tại.
+    localStorage.setItem('_showAllYearsAfterReload', '1');
     location.reload();
 
   } catch(e) {

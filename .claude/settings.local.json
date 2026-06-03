@@ -62,7 +62,9 @@
       "Bash(node --check js/modules/chamcong/chamcong.week-form.js)",
       "Bash(node --check js/modules/nhapxuat/nhapxuat.export.js)",
       "Bash(node --check js/modules/nhapxuat/nhapxuat.parsers.js)",
-      "Bash(node --check js/modules/nhapxuat/nhapxuat.import.js)"
+      "Bash(node --check js/modules/nhapxuat/nhapxuat.import.js)",
+      "Bash(node --check \"js/app/main.js\")",
+      "Bash(node --check \"js/core/core.state-backup.js\")"
     ]
   }
 }
