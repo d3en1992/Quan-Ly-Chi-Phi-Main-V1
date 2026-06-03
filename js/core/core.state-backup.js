@@ -454,14 +454,23 @@ async function renderBackupList() {
   wrap.innerHTML = rows;
 }
 
+// Các key liên quan đến xác thực — TUYỆT ĐỐI không xuất và không nhập
+// để tránh ghi đè tài khoản / mật khẩu trên các thiết bị khác
+const IMPORT_PROTECTED_KEYS = new Set(['users_v1']);
+
 // ── Export toàn bộ data ra file JSON (snapshot từ _mem) ──────
 function exportJSON() {
   // Chuẩn hóa dữ liệu trước khi xuất: đảm bảo mọi record giao dịch đủ 6 field
   // chuẩn (id, createdAt, updatedAt, deletedAt, deviceId, projectId), bất kể
   // trạng thái store hiện tại. Dùng chung logic với import (core.normalize.js).
+
+  // Loại bỏ các key nhạy cảm (tài khoản/mật khẩu) trước khi xuất
+  const rawData = { ..._mem };
+  IMPORT_PROTECTED_KEYS.forEach(k => delete rawData[k]); // Không xuất users_v1
+
   const exportData = (typeof normalizeImportStore === 'function')
-    ? normalizeImportStore({ ..._mem })
-    : { ..._mem };
+    ? normalizeImportStore(rawData)
+    : rawData;
   const snap = {
     meta: { version: DATA_VERSION, exportedAt: Date.now() },
     data: exportData,
@@ -567,14 +576,26 @@ async function importJSONFull(data) {
   try {
     if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang khôi phục snapshot...');
 
+    // [BẢO VỆ AUTH] Lưu lại tài khoản/mật khẩu TRƯỚC khi xóa DB
+    // Bước này đảm bảo dữ liệu đăng nhập của thiết bị này không bị mất
+    // dù file JSON có chứa users_v1 hay không
+    const savedUsers = load('users_v1', []);
+
     // Step 1: Clear ALL local data (IDB + _mem)
     await Promise.all(db.tables.map(t => t.clear()));
     Object.keys(_mem).forEach(k => delete _mem[k]);
 
     // Step 2: Sanitize — ensure every record has id + updatedAt, then dedup
+    // Đồng thời lọc bỏ các key nhạy cảm (tài khoản/mật khẩu) từ file import
     const now = Date.now();
     const clean = {};
     for (const key of Object.keys(data)) {
+      // [BẢO VỆ AUTH] Bỏ qua hoàn toàn users_v1 và mọi key liên quan đến auth
+      // để tránh ghi đè tài khoản/mật khẩu đang dùng trên thiết bị này
+      if (IMPORT_PROTECTED_KEYS.has(key)) {
+        console.log('[Import] Bỏ qua key nhạy cảm:', key);
+        continue;
+      }
       let val = data[key];
       if (Array.isArray(val)) {
         // Fill missing id / updatedAt — preserve original values
@@ -601,6 +622,15 @@ async function importJSONFull(data) {
       _mem[key] = val;
       writes.push(_dbSave(key, val));
     }
+
+    // [BẢO VỆ AUTH] Phục hồi tài khoản/mật khẩu đã lưu ở bước đầu
+    // Đảm bảo thiết bị này giữ nguyên thông tin đăng nhập sau import
+    if (Array.isArray(savedUsers) && savedUsers.length > 0) {
+      _mem['users_v1'] = savedUsers;
+      writes.push(_dbSave('users_v1', savedUsers));
+      console.log('[Import] ✓ Đã phục hồi users_v1 (', savedUsers.length, 'tài khoản) — không bị ghi đè từ file JSON');
+    }
+
     await Promise.all(writes);
 
     // Step 4: Block pull for 2 h after reload — prevent cloud from overwriting fresh import
