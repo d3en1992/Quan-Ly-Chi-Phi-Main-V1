@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": 4,
-    "exportedAt": 1780053925672
+    "exportedAt": 1780503810966
   },
   "data": {
     "inv_v3": [
@@ -716,13 +716,13 @@
         "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
         "loai": "Sắt Thép",
         "nguoi": "TÌNH",
-        "ncc": "HIỆP ĐỔ BÊ TÔNG TAY",
+        "ncc": "CTY SẮT THÉP HỮU SANG",
         "nd": "Sắt rìa mái 2",
         "tien": 7651000,
         "thanhtien": 7651000,
         "source": "quick",
-        "updatedAt": 1778211056833,
-        "_ts": 1778211056833,
+        "updatedAt": 1780459951623,
+        "_ts": 1780459951623,
         "createdAt": 1778211056833,
         "deletedAt": null,
         "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
@@ -1107,7 +1107,7 @@
       },
       {
         "id": "10f4be4e-3fef-407b-8d3a-b5fda97bc1ad",
-        "ngay": "2026-02-18",
+        "ngay": "2026-04-12",
         "congtrinh": "CT TT Hưng Long (Bình Chánh)",
         "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
         "loai": "Bê Tông Tay",
@@ -1117,8 +1117,8 @@
         "tien": 5610000,
         "thanhtien": 5610000,
         "source": "quick",
-        "updatedAt": 1778207089486,
-        "_ts": 1778207089486,
+        "updatedAt": 1780460265947,
+        "_ts": 1780460265947,
         "createdAt": 1778207089486,
         "deletedAt": null,
         "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
@@ -6713,18 +6713,18 @@
       },
       {
         "id": "5d1f9e8f-df04-4cc3-ab94-d3981c48899e",
-        "ngay": "2026-02-23",
+        "ngay": "2026-04-23",
         "congtrinh": "CT TT Hưng Long (Bình Chánh)",
         "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
         "loai": "Bê Tông Tay",
         "nguoi": "TÌNH",
         "ncc": "HIỆP ĐỔ BÊ TÔNG TAY",
-        "nd": "Bê tông rìa mái",
+        "nd": "Bê tông rìa mái l1",
         "tien": 3800000,
         "thanhtien": 3800000,
         "source": "quick",
-        "updatedAt": 1778207122265,
-        "_ts": 1778207122265,
+        "updatedAt": 1780460345577,
+        "_ts": 1780460345577,
         "createdAt": 1778207051112,
         "deletedAt": null,
         "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
@@ -12243,20 +12243,21 @@
       },
       {
         "id": "a5b496c1-6cbc-47b8-a4e6-dd5db146f580",
-        "createdAt": 1778934111982,
-        "updatedAt": 1778934111982,
-        "deletedAt": null,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "ngay": "2026-05-16",
         "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
         "loai": "Vật Liệu Xây Dựng",
         "nguoi": "TÌNH",
         "ncc": "VLXD DUY THỊNH PHÁT",
         "nd": "VLXD Móng",
         "tien": 19745000,
         "thanhtien": 19745000,
-        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
-        "source": "quick"
+        "source": "quick",
+        "updatedAt": 1780458804585,
+        "_ts": 1780458804585,
+        "createdAt": 1778934111982,
+        "deletedAt": 1780458804585,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
       },
       {
         "id": "a62379eb-c152-4258-8d7a-879613fc531a",
@@ -19582,6 +19583,642 @@
         "createdAt": 1774079902697,
         "deletedAt": 1774081674376,
         "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded"
+      },
+      {
+        "id": "025e1931-2902-4c5d-9a5e-5df55b05da2a",
+        "ngay": "2026-04-17",
+        "congtrinh": "CT Nhà Tình (925 Âu Cơ, TP)",
+        "projectId": "8b4470e1-900a-4d06-8041-b67a1ed4b095",
+        "loai": "Copha Thuê",
+        "nguoi": "TÌNH",
+        "ncc": "SẮT THÉP KIM PHÁT",
+        "nd": "Thuê chống tăng nhà Tình",
+        "tien": 3590000,
+        "thanhtien": 3590000,
+        "source": "quick",
+        "updatedAt": 1780461262266,
+        "_ts": 1780461262266,
+        "createdAt": 1780461262266,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "5e47fcab-4a34-4de2-adbb-1ffc2ef85485",
+        "ngay": "2026-05-26",
+        "congtrinh": "CT Nhà Tình (925 Âu Cơ, TP)",
+        "projectId": "8b4470e1-900a-4d06-8041-b67a1ed4b095",
+        "loai": "Hóa Đơn Lẻ",
+        "nguoi": "TÌNH",
+        "ncc": "HÓA ĐƠN MUA LẺ",
+        "nd": "Mua tôn lớp mái nhà bên cạnh",
+        "tien": 1200000,
+        "thanhtien": 1200000,
+        "source": "quick",
+        "updatedAt": 1780461140265,
+        "_ts": 1780461140265,
+        "createdAt": 1780461140265,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "04046aa2-32ac-4f9a-95f0-12b33ad31193",
+        "ngay": "2026-06-02",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Bê Tông Tay",
+        "nguoi": "TÌNH",
+        "ncc": "HIỆP ĐỔ BÊ TÔNG TAY",
+        "nd": "Đổ bt tay rìa mái Mái - khoảng 10 khối",
+        "tien": 3800000,
+        "thanhtien": 3800000,
+        "source": "quick",
+        "updatedAt": 1780460648394,
+        "_ts": 1780460648394,
+        "createdAt": 1780460648394,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "b5f7def3-c738-48df-a3f4-9ae818ef054b",
+        "ngay": "2026-05-17",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Bê Tông Tay",
+        "nguoi": "TÌNH",
+        "ncc": "HIỆP ĐỔ BÊ TÔNG TAY",
+        "nd": "Đổ bt tay rìa mái L3",
+        "tien": 3800000,
+        "thanhtien": 3800000,
+        "source": "quick",
+        "updatedAt": 1780460584718,
+        "_ts": 1780460584718,
+        "createdAt": 1780460584718,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "db2b0a0b-e28d-4a75-9c0b-6e6f7e19b1a9",
+        "ngay": "2026-05-09",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Bê Tông Tay",
+        "nguoi": "TÌNH",
+        "ncc": "HIỆP ĐỔ BÊ TÔNG TAY",
+        "nd": "Đổ bt tay rìa mái L2",
+        "tien": 3800000,
+        "thanhtien": 3800000,
+        "source": "quick",
+        "updatedAt": 1780460530666,
+        "_ts": 1780460530666,
+        "createdAt": 1780460530666,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "21645fc8-480d-4cc7-9a78-403b4430fee5",
+        "ngay": "2026-06-03",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Sửa Máy",
+        "nguoi": "TÌNH",
+        "ncc": "THẮNG SỬA MÁY TRỘN",
+        "nd": "Sửa máy trộn",
+        "tien": 800000,
+        "thanhtien": 800000,
+        "source": "quick",
+        "updatedAt": 1780459840956,
+        "_ts": 1780459840956,
+        "createdAt": 1780459840956,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "6548e160-ba3b-4f35-a159-ae41081f2e6e",
+        "ngay": "2026-05-30",
+        "congtrinh": "CÔNG TY",
+        "projectId": "COMPANY",
+        "loai": "Lương Khối Văn Phòng",
+        "nguoi": "TÌNH",
+        "ncc": "CÔNG TY NGUYỄN HỮU",
+        "nd": "Lương KS Tình",
+        "tien": 15000000,
+        "thanhtien": 15000000,
+        "source": "quick",
+        "updatedAt": 1780459761577,
+        "_ts": 1780459761577,
+        "createdAt": 1780459761577,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "0c61f709-0406-47de-ade9-47db3d7709b3",
+        "ngay": "2026-05-30",
+        "congtrinh": "CÔNG TY",
+        "projectId": "COMPANY",
+        "loai": "Lương Khối Văn Phòng",
+        "nguoi": "TÌNH",
+        "ncc": "CÔNG TY NGUYỄN HỮU",
+        "nd": "Lương QLKS Lam",
+        "tien": 18000000,
+        "thanhtien": 18000000,
+        "source": "quick",
+        "updatedAt": 1780459761577,
+        "_ts": 1780459761577,
+        "createdAt": 1780459761577,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "6b2c0a9a-21eb-4180-8847-c43d99dfc229",
+        "ngay": "2026-05-31",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Sắt Thép",
+        "nguoi": "TÌNH",
+        "ncc": "SẮT THÉP VLXD ĐỨC ANH",
+        "nd": "Sắt đà kiềng + cột trệt",
+        "tien": 18505000,
+        "thanhtien": 18505000,
+        "source": "quick",
+        "updatedAt": 1780458674464,
+        "_ts": 1780458674464,
+        "createdAt": 1780458674464,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "df3f111f-0d89-4caa-8d16-baf63d934383",
+        "ngay": "2026-05-30",
+        "congtrinh": "CT Nhà Tình (925 Âu Cơ, TP)",
+        "projectId": "8b4470e1-900a-4d06-8041-b67a1ed4b095",
+        "loai": "Hóa Đơn Lẻ",
+        "nguoi": "TÌNH",
+        "ncc": "HÓA ĐƠN MUA LẺ",
+        "nd": "Mua van nước nóng",
+        "tien": 325000,
+        "thanhtien": 325000,
+        "source": "quick",
+        "updatedAt": 1780458544221,
+        "_ts": 1780458544221,
+        "createdAt": 1780458544221,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "13e6bd2b-8303-4d62-aa2b-3c93be316688",
+        "ngay": "2026-05-30",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Hóa Đơn Lẻ",
+        "nguoi": "TÌNH",
+        "ncc": "HÓA ĐƠN MUA LẺ",
+        "nd": "Mua 1 cây ông 114",
+        "tien": 500000,
+        "thanhtien": 500000,
+        "source": "quick",
+        "updatedAt": 1780459365438,
+        "_ts": 1780459365438,
+        "createdAt": 1780458544221,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "bc62c955-bddc-445f-b7ed-1cefb3f1ed8b",
+        "ngay": "2026-05-30",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Hóa Đơn Lẻ",
+        "nguoi": "TÌNH",
+        "ncc": "HÓA ĐƠN MUA LẺ",
+        "nd": "Mua ống + Lơi làm phần móng",
+        "tien": 600000,
+        "thanhtien": 600000,
+        "source": "quick",
+        "updatedAt": 1780459433142,
+        "_ts": 1780459433142,
+        "createdAt": 1780458544221,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "68a96db8-73c7-4bb8-9045-ad807d175605",
+        "ngay": "2026-06-02",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Hóa Đơn Lẻ",
+        "nguoi": "TÌNH",
+        "ncc": "HÓA ĐƠN MUA LẺ",
+        "nd": "Mua lưới công trình",
+        "tien": 400000,
+        "thanhtien": 400000,
+        "source": "quick",
+        "updatedAt": 1780457968770,
+        "_ts": 1780457968770,
+        "createdAt": 1780457968770,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "2acee1a4-1456-4427-b92c-2d72fedb9e3f",
+        "ngay": "2026-05-30",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD HOÀNG TUẤN BC",
+        "nd": "Vật liệu ngày 8/5 và 16/5",
+        "tien": 14300000,
+        "thanhtien": 14300000,
+        "source": "quick",
+        "updatedAt": 1780457819298,
+        "_ts": 1780457819298,
+        "createdAt": 1780457819298,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "3aa6f194-c7b0-4a65-a980-3edf47ccbafd",
+        "ngay": "2026-05-28",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Sắt Thép",
+        "nguoi": "TÌNH",
+        "ncc": "CTY SẮT THÉP HỮU SANG",
+        "nd": "Sắt rìa mái Mái chính + tiền xe",
+        "tien": 12668000,
+        "thanhtien": 12668000,
+        "source": "quick",
+        "updatedAt": 1780457748650,
+        "_ts": 1780457748650,
+        "createdAt": 1780457748650,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "2839681a-35a6-43da-8a58-c71285bf3c86",
+        "ngay": "2026-05-26",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "loai": "Sắt Thép",
+        "nguoi": "TÌNH",
+        "ncc": "HÓA ĐƠN MUA LẺ",
+        "nd": "Mua sắt đai + bút xóa",
+        "tien": 2284000,
+        "thanhtien": 2284000,
+        "source": "quick",
+        "updatedAt": 1780457539735,
+        "_ts": 1780457539735,
+        "createdAt": 1780457539735,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "5b100243-1b3e-42ae-850a-c909bcebdaac",
+        "ngay": "2026-05-12",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "cát bt, đá 4x6, đá 1x2, xi ht pow",
+        "tien": 2560000,
+        "thanhtien": 2560000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "cát bt",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 400000,
+            "thanhtien": 400000
+          },
+          {
+            "ten": "đá 4x6",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 600000,
+            "thanhtien": 600000
+          },
+          {
+            "ten": "đá 1x2",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 670000,
+            "thanhtien": 670000
+          },
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 10,
+            "dongia": 89000,
+            "thanhtien": 890000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "a9e666a6-6862-4771-829f-8f803ec79239",
+        "ngay": "2026-05-13",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "cát bt, đá 1x2, đá 4x6, xi ht pow",
+        "tien": 10830000,
+        "thanhtien": 10830000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "cát bt",
+            "dv": "m3",
+            "sl": 5,
+            "dongia": 430000,
+            "thanhtien": 2150000
+          },
+          {
+            "ten": "đá 1x2",
+            "dv": "m3",
+            "sl": 5,
+            "dongia": 730000,
+            "thanhtien": 3650000
+          },
+          {
+            "ten": "đá 4x6",
+            "dv": "m3",
+            "sl": 5,
+            "dongia": 650000,
+            "thanhtien": 3250000
+          },
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 20,
+            "dongia": 89000,
+            "thanhtien": 1780000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "e93be098-b93a-41fb-bda9-9c81b74c4bfe",
+        "ngay": "2026-05-15",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "xi ht pow, săt 12",
+        "tien": 2705000,
+        "thanhtien": 2705000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 20,
+            "dongia": 89000,
+            "thanhtien": 1780000
+          },
+          {
+            "ten": "săt 12",
+            "dv": "cây",
+            "sl": 5,
+            "dongia": 185000,
+            "thanhtien": 925000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "7efa816f-19e6-4845-8ece-a1e72a83bd1f",
+        "ngay": "2026-05-16",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "đá 1x2",
+        "tien": 3650000,
+        "thanhtien": 3650000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "đá 1x2",
+            "dv": "m3",
+            "sl": 5,
+            "dongia": 730000,
+            "thanhtien": 3650000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "9a84a870-dad1-4fe0-aacb-617c4c0318dd",
+        "ngay": "2026-05-18",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "cát bt, xi ht pow",
+        "tien": 1690000,
+        "thanhtien": 1690000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "cát bt",
+            "dv": "xe",
+            "sl": 2,
+            "dongia": 400000,
+            "thanhtien": 800000
+          },
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 10,
+            "dongia": 89000,
+            "thanhtien": 890000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "129e379d-acaf-45a2-8bcd-b51156818628",
+        "ngay": "2026-05-19",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "cát bt, đá 1x2, xi ht pow",
+        "tien": 1515000,
+        "thanhtien": 1515000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "cát bt",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 400000,
+            "thanhtien": 400000
+          },
+          {
+            "ten": "đá 1x2",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 670000,
+            "thanhtien": 670000
+          },
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 5,
+            "dongia": 89000,
+            "thanhtien": 445000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "d83a6809-3dff-406d-b6f6-b5e35c22f21a",
+        "ngay": "2026-05-20",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "gạch đinh, xi ht pow, cát bt",
+        "tien": 4093200,
+        "thanhtien": 4093200,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "gạch đinh",
+            "dv": "v",
+            "sl": 2000,
+            "dongia": 1600,
+            "thanhtien": 3200000
+          },
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 10,
+            "dongia": 89000,
+            "thanhtien": 890000
+          },
+          {
+            "ten": "cát bt",
+            "dv": "xe",
+            "sl": 2,
+            "dongia": 1600,
+            "thanhtien": 3200
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "ccb2962c-7c54-464c-a46d-e4aeebf4f5d1",
+        "ngay": "2026-05-22",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "cát bt, gạch ống",
+        "tien": 2000000,
+        "thanhtien": 2000000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "cát bt",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 400000,
+            "thanhtien": 400000
+          },
+          {
+            "ten": "gạch ống",
+            "dv": "viên",
+            "sl": 1000,
+            "dongia": 1600,
+            "thanhtien": 1600000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "24f40b4d-0e74-42d9-9372-857ff2aba1f0",
+        "ngay": "2026-05-23",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "loai": "Vật Liệu Xây Dựng",
+        "nguoi": "TÌNH",
+        "ncc": "VLXD DUY THỊNH PHÁT",
+        "nd": "gạch ống, cát bt, xi ht pow",
+        "tien": 2445000,
+        "thanhtien": 2445000,
+        "source": "detail",
+        "items": [
+          {
+            "ten": "gạch ống",
+            "dv": "viên",
+            "sl": 1000,
+            "dongia": 1600,
+            "thanhtien": 1600000
+          },
+          {
+            "ten": "cát bt",
+            "dv": "xe",
+            "sl": 1,
+            "dongia": 400000,
+            "thanhtien": 400000
+          },
+          {
+            "ten": "xi ht pow",
+            "dv": "bao",
+            "sl": 5,
+            "dongia": 89000,
+            "thanhtien": 445000
+          }
+        ],
+        "updatedAt": 1780459177209,
+        "_ts": 1780459177209,
+        "createdAt": 1780459174246,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
       }
     ],
     "cc_v2": [
@@ -23155,6 +23792,90 @@
         "ctPid": "8b4470e1-900a-4d06-8041-b67a1ed4b095"
       },
       {
+        "id": "123667bb-2d42-413a-a6a9-cd002650edb5",
+        "fromDate": "2026-05-24",
+        "toDate": "2026-05-30",
+        "ct": "SC Chú Thỉ (24 MGX, BT)",
+        "projectId": "b763226e-9b7f-4851-a55e-6e937f6d37b6",
+        "updatedAt": 1780113800117,
+        "deletedAt": null,
+        "workers": [
+          {
+            "name": "THANH L",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              1,
+              1
+            ],
+            "luong": 560000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "NHƯ",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              1,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "THIỆN",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              0,
+              0
+            ],
+            "luong": 560000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "LIỄU",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              0,
+              0
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          }
+        ],
+        "ctPid": "b763226e-9b7f-4851-a55e-6e937f6d37b6"
+      },
+      {
         "id": "1269e4c2-ea6c-4d76-94ea-0f3ac71a2ca8",
         "fromDate": "2025-03-02",
         "toDate": "2025-03-08",
@@ -25543,6 +26264,107 @@
         "updatedAt": 1774773187241,
         "deletedAt": null,
         "deviceId": "c5c95381-c839-48de-be6f-412723dff06b"
+      },
+      {
+        "id": "1f6d798d-8255-44ff-80a1-bf98e53b4b77",
+        "fromDate": "2026-05-24",
+        "toDate": "2026-05-30",
+        "ct": "CT Nhà Tình (925 Âu Cơ, TP)",
+        "projectId": "8b4470e1-900a-4d06-8041-b67a1ed4b095",
+        "updatedAt": 1780460972560,
+        "deletedAt": null,
+        "workers": [
+          {
+            "name": "LONG",
+            "d": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "luong": 680000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "HIỀN",
+            "d": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "luong": 560000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 1000000,
+            "loanAmount": 0
+          },
+          {
+            "name": "DƯƠNG",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "luong": 560000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "KHOA",
+            "d": [
+              0,
+              1,
+              1,
+              0,
+              0,
+              0,
+              0
+            ],
+            "luong": 540000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "XUÂN",
+            "d": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          }
+        ]
       },
       {
         "id": "21257146-5b70-4f46-8493-343d782253eb",
@@ -31539,11 +32361,11 @@
         "fromDate": "2026-01-18",
         "toDate": "2026-01-24",
         "ct": "NHÀ TÌNH",
-        "projectId": "UNASSIGNED",
-        "updatedAt": 1777340729725,
+        "projectId": null,
+        "updatedAt": 1773670657476,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
+        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
         "workers": [
           {
             "name": "LONG",
@@ -32942,11 +33764,11 @@
         "fromDate": "2026-02-08",
         "toDate": "2026-02-14",
         "ct": "C THÁI LA",
-        "projectId": "UNASSIGNED",
-        "updatedAt": 1777291097310,
+        "projectId": null,
+        "updatedAt": 1773675465233,
         "createdAt": 1773674994821,
         "deletedAt": 1773675465233,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
+        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
         "workers": [
           {
             "name": "THANH L",
@@ -38437,6 +39259,161 @@
         "ctPid": "8b4470e1-900a-4d06-8041-b67a1ed4b095"
       },
       {
+        "id": "793387df-ed48-45eb-90e6-eadabcc50cf3",
+        "fromDate": "2026-05-24",
+        "toDate": "2026-05-30",
+        "ct": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "updatedAt": 1780460889775,
+        "deletedAt": null,
+        "workers": [
+          {
+            "name": "SƠN",
+            "d": [
+              0,
+              1,
+              0,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 680000,
+            "phucap": 0,
+            "hdmuale": 325000,
+            "nd": "Mua đồ",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "SƠN MT",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 540000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "LOAN",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 200000,
+            "nd": "Tiền nước 2 tuần",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "LÁNH",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "ĐỨC M",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 520000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "THANH L",
+            "d": [
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
+            "luong": 560000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "NHƯ",
+            "d": [
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "KHOA",
+            "d": [
+              0,
+              0,
+              0,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 540000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          }
+        ]
+      },
+      {
         "id": "7a32859b-547d-4951-aa43-68125c89719f",
         "fromDate": "2025-04-06",
         "toDate": "2025-04-12",
@@ -41119,11 +42096,11 @@
         "fromDate": "2026-01-25",
         "toDate": "2026-01-31",
         "ct": "NHÀ TÌNH",
-        "projectId": "UNASSIGNED",
-        "updatedAt": 1777340729725,
+        "projectId": null,
+        "updatedAt": 1773670657476,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
+        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
         "workers": [
           {
             "name": "LONG",
@@ -46161,11 +47138,11 @@
         "fromDate": "2026-01-04",
         "toDate": "2026-01-10",
         "ct": "CT HƯNG LONG",
-        "projectId": "UNASSIGNED",
-        "updatedAt": 1777340729725,
+        "projectId": null,
+        "updatedAt": 1773670657476,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
+        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
         "workers": [
           {
             "name": "TOÁN",
@@ -46276,7 +47253,7 @@
             "loanAmount": 0
           },
           {
-            "name": "SÁU BC",
+            "name": "SÁU",
             "d": [
               0,
               1,
@@ -46294,7 +47271,7 @@
             "loanAmount": 0
           },
           {
-            "name": "ÚT BC",
+            "name": "ÚT",
             "d": [
               1,
               1,
@@ -46791,6 +47768,54 @@
         "updatedAt": 1774773187241,
         "deletedAt": null,
         "deviceId": "c5c95381-c839-48de-be6f-412723dff06b"
+      },
+      {
+        "id": "b11e30dc-d955-46f8-9def-d1181f038b9f",
+        "fromDate": "2026-05-24",
+        "toDate": "2026-05-30",
+        "ct": "SC CH Quân Tuyền (CC Harmona, TB)",
+        "projectId": "4b02fc79-f866-4a58-b872-d5c3bd2197cc",
+        "updatedAt": 1780113936096,
+        "deletedAt": null,
+        "workers": [
+          {
+            "name": "THIỆN",
+            "d": [
+              0,
+              0,
+              0,
+              0,
+              1,
+              1,
+              1
+            ],
+            "luong": 560000,
+            "phucap": 60000,
+            "hdmuale": 0,
+            "nd": "Phụ cấp gửi xe",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "LIỄU",
+            "d": [
+              0,
+              0,
+              0,
+              0,
+              1,
+              1,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 60000,
+            "hdmuale": 0,
+            "nd": "Phụ cấp gửi xe",
+            "tru": 0,
+            "loanAmount": 0
+          }
+        ],
+        "ctPid": "4b02fc79-f866-4a58-b872-d5c3bd2197cc"
       },
       {
         "id": "b1e8e4e9-c4e9-4a23-be18-3d86001c9ba9",
@@ -53307,11 +54332,11 @@
         "fromDate": "2026-01-11",
         "toDate": "2026-01-17",
         "ct": "Bảo Lộc",
-        "projectId": "UNASSIGNED",
-        "updatedAt": 1777291097310,
+        "projectId": null,
+        "updatedAt": 1773670657476,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
+        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
         "workers": [
           {
             "name": "THANH (L)",
@@ -55462,11 +56487,11 @@
         "fromDate": "2026-02-01",
         "toDate": "2026-02-07",
         "ct": "NHÀ TÌNH",
-        "projectId": "UNASSIGNED",
-        "updatedAt": 1777291097310,
+        "projectId": null,
+        "updatedAt": 1773670657476,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
+        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
         "workers": [
           {
             "name": "LONG",
@@ -56814,6 +57839,144 @@
         "updatedAt": 1774773187241,
         "deletedAt": null,
         "deviceId": "c5c95381-c839-48de-be6f-412723dff06b"
+      },
+      {
+        "id": "f717c282-aef6-48b3-967b-c21313d75178",
+        "fromDate": "2026-05-24",
+        "toDate": "2026-05-30",
+        "ct": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "updatedAt": 1780121054934,
+        "deletedAt": null,
+        "workers": [
+          {
+            "name": "TOÁN",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 680000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "C TÂM",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "THỌ",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 660000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "SÁU BC",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 550000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "THIỆN BC",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "ÚT BC",
+            "d": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              0.5,
+              1
+            ],
+            "luong": 450000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          },
+          {
+            "name": "BÍNH",
+            "d": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1
+            ],
+            "luong": 550000,
+            "phucap": 0,
+            "hdmuale": 0,
+            "nd": "",
+            "tru": 0,
+            "loanAmount": 0
+          }
+        ],
+        "ctPid": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0"
       },
       {
         "id": "f7762acf-e7dc-49b2-b897-8726176de373",
@@ -60099,11 +61262,11 @@
         "fromDate": "2026-01-18",
         "toDate": "2026-01-24",
         "ct": "NHÀ TÌNH",
-        "projectId": null,
-        "updatedAt": 1773670657476,
+        "projectId": "UNASSIGNED",
+        "updatedAt": 1777340729725,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
+        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "workers": [
           {
             "name": "LONG",
@@ -60238,11 +61401,11 @@
         "fromDate": "2026-02-08",
         "toDate": "2026-02-14",
         "ct": "C THÁI LA",
-        "projectId": null,
-        "updatedAt": 1773675465233,
+        "projectId": "UNASSIGNED",
+        "updatedAt": 1777291097310,
         "createdAt": 1773674994821,
         "deletedAt": 1773675465233,
-        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
+        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "workers": [
           {
             "name": "THANH L",
@@ -60305,11 +61468,11 @@
         "fromDate": "2026-01-25",
         "toDate": "2026-01-31",
         "ct": "NHÀ TÌNH",
-        "projectId": null,
-        "updatedAt": 1773670657476,
+        "projectId": "UNASSIGNED",
+        "updatedAt": 1777340729725,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
+        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "workers": [
           {
             "name": "LONG",
@@ -60516,11 +61679,11 @@
         "fromDate": "2026-01-04",
         "toDate": "2026-01-10",
         "ct": "CT HƯNG LONG",
-        "projectId": null,
-        "updatedAt": 1773670657476,
+        "projectId": "UNASSIGNED",
+        "updatedAt": 1777340729725,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
+        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "workers": [
           {
             "name": "TOÁN",
@@ -60631,7 +61794,7 @@
             "loanAmount": 0
           },
           {
-            "name": "SÁU",
+            "name": "SÁU BC",
             "d": [
               0,
               1,
@@ -60649,7 +61812,7 @@
             "loanAmount": 0
           },
           {
-            "name": "ÚT",
+            "name": "ÚT BC",
             "d": [
               1,
               1,
@@ -60727,11 +61890,11 @@
         "fromDate": "2026-01-11",
         "toDate": "2026-01-17",
         "ct": "Bảo Lộc",
-        "projectId": null,
-        "updatedAt": 1773670657476,
+        "projectId": "UNASSIGNED",
+        "updatedAt": 1777291097310,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
+        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "workers": [
           {
             "name": "THANH (L)",
@@ -60776,11 +61939,11 @@
         "fromDate": "2026-02-01",
         "toDate": "2026-02-07",
         "ct": "NHÀ TÌNH",
-        "projectId": null,
-        "updatedAt": 1773670657476,
+        "projectId": "UNASSIGNED",
+        "updatedAt": 1777291097310,
         "createdAt": 1773393217412,
         "deletedAt": 1773670657476,
-        "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded",
+        "deviceId": "c5c95381-c839-48de-be6f-412723dff06b",
         "workers": [
           {
             "name": "LONG",
@@ -69932,6 +71095,90 @@
         "createdAt": 1774079902705,
         "deletedAt": 1774081674376,
         "deviceId": "b286ca37-9a77-4422-8f66-40f4ab61fded"
+      },
+      {
+        "id": "98e2df34-f929-42a7-bb4c-0d331afd6206",
+        "updatedAt": 1780459586092,
+        "ngay": "2026-06-02",
+        "tp": "TP NỘI THẤT A NHẬT",
+        "loai": "thauphu",
+        "congtrinh": "SC CH Quân Tuyền (CC Harmona, TB)",
+        "projectId": "4b02fc79-f866-4a58-b872-d5c3bd2197cc",
+        "tien": 75000000,
+        "nd": "Ứng nội thất - L2",
+        "createdAt": 1780459586092,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "4a148d92-c131-46fe-8587-4664b3e9043a",
+        "updatedAt": 1780459314592,
+        "ngay": "2026-05-29",
+        "tp": "VLXD DUY THỊNH PHÁT",
+        "loai": "nhacungcap",
+        "congtrinh": "CT A Hoàng (Hóc Môn)",
+        "projectId": "d6517b9d-3b56-4486-a394-e8d3521f2e7b",
+        "tien": 20000000,
+        "nd": "Ứng D2 - Tiền mặt",
+        "createdAt": 1780459314592,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "503ad5ba-ebfa-41f3-84fb-d1ba0d7fb822",
+        "updatedAt": 1780458359862,
+        "ngay": "2026-05-30",
+        "tp": "VLXD HOÀNG TUẤN BC",
+        "loai": "nhacungcap",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "tien": 14300000,
+        "nd": "Ứng tiền L10 - CK",
+        "createdAt": 1780458359862,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "f1836bc5-d35c-4f2b-85e4-8d3774553132",
+        "updatedAt": 1780458258063,
+        "ngay": "2026-05-31",
+        "tp": "TPSN ĐỎ",
+        "loai": "thauphu",
+        "congtrinh": "SC Chú Thỉ (24 MGX, BT)",
+        "projectId": "b763226e-9b7f-4851-a55e-6e937f6d37b6",
+        "tien": 5000000,
+        "nd": "Ứng đợt 7 - CK",
+        "createdAt": 1780458258063,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "6c0f3c0a-81e7-41a3-ba2b-c480c7db5a25",
+        "updatedAt": 1780458258063,
+        "ngay": "2026-05-31",
+        "tp": "TPDN HÀ",
+        "loai": "thauphu",
+        "congtrinh": "CT Nhà Tình (925 Âu Cơ, TP)",
+        "projectId": "8b4470e1-900a-4d06-8041-b67a1ed4b095",
+        "tien": 10000000,
+        "nd": "Ứng đợt 9 mua ống đồng Nhà Tình - CK",
+        "createdAt": 1780458258063,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
+      },
+      {
+        "id": "bf6607a9-348a-422f-9c1f-a92d768b3ec5",
+        "updatedAt": 1780458258063,
+        "ngay": "2026-05-31",
+        "tp": "TPDN BÉ",
+        "loai": "thauphu",
+        "congtrinh": "SC Chú Thỉ (24 MGX, BT)",
+        "projectId": "b763226e-9b7f-4851-a55e-6e937f6d37b6",
+        "tien": 5000000,
+        "nd": "Ứng đợt 5 - Tiền mặt",
+        "createdAt": 1780458258063,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb"
       }
     ],
     "thu_v1": [
@@ -70541,6 +71788,19 @@
         "nd": "chuyển một lần"
       },
       {
+        "id": "e29e1a77-b211-45b4-8e7d-13e31b22f54d",
+        "createdAt": 1780282514024,
+        "updatedAt": 1780282514024,
+        "deletedAt": null,
+        "deviceId": "59d67d4f-bb18-49aa-b7b5-77eed9d57b46",
+        "ngay": "2026-05-26",
+        "congtrinh": "CT TT Hưng Long (Bình Chánh)",
+        "projectId": "61fdf5ec-b7e1-4aaa-8a2d-2c7e8b0c6ac0",
+        "tien": 200000000,
+        "nguoi": "GIÁM ĐỐC",
+        "nd": "đợt 9"
+      },
+      {
         "id": "e2f67e1e-08e5-4f67-a620-4b662beecebe",
         "createdAt": 1776322445636,
         "updatedAt": 1776322445636,
@@ -70628,6 +71888,19 @@
         "nguoi": "",
         "nd": "A Lam Trả tiền nợ T2 - 2026",
         "projectId": "COMPANY"
+      },
+      {
+        "id": "edbbc7ea-bdc4-4ea2-8037-4a46e01fb9fb",
+        "createdAt": 1780459525706,
+        "updatedAt": 1780459525706,
+        "deletedAt": null,
+        "deviceId": "867e8f90-a95a-4aa8-896a-56d1e8d46beb",
+        "ngay": "2026-06-01",
+        "congtrinh": "SC CH Quân Tuyền (CC Harmona, TB)",
+        "projectId": "4b02fc79-f866-4a58-b872-d5c3bd2197cc",
+        "tien": 94000000,
+        "nguoi": "TÌNH",
+        "nd": "Ứng Đợt 2 - HD Nội Thất"
       }
     ],
     "cat_ct": [
@@ -70658,21 +71931,21 @@
       "SC Cafe Ugo Vinh - Q2"
     ],
     "cat_loai": [
-      "THIẾT KẾ - XIN PHÉP",
+      "NHÂN CÔNG",
+      "HÓA ĐƠN LẺ",
+      "VẬN CHUYỂN",
+      "XÀ BẦN - ĐỔ RÁC",
+      "ĐIỆN NƯỚC",
+      "SỬA MÁY",
+      "COPHA",
+      "GIẢI KHÁT",
       "Đào Đất",
       "Ép Cọc",
+      "Sắt Thép",
       "Bê Tông Tươi",
       "Vật Liệu Xây Dựng",
-      "Hóa Đơn Lẻ",
-      "Vận Chuyển",
-      "Xà Bần - Đổ Rác",
-      "Điện Nước",
-      "Sửa Máy",
-      "Copha",
-      "Giải Khát",
-      "Nhân Công",
+      "thiết kế - xin phép",
       "Copha Thuê",
-      "Sắt Thép",
       "Vật Tư Điện Nước",
       "Đổ Bê Tông",
       "Văn Phòng",
@@ -70722,7 +71995,8 @@
       "CH MÁY HẢI DƯƠNG",
       "CH THÁI SƠN II",
       "VLXD DUY THỊNH PHÁT",
-      "SẮT THÉP VLXD ĐỨC ANH"
+      "SẮT THÉP VLXD ĐỨC ANH",
+      "THẮNG SỬA MÁY TRỘN"
     ],
     "cat_nguoi": [
       "TÌNH",
@@ -70789,8 +72063,9 @@
       "ĐỨC M"
     ],
     "cat_tbteb": [
-      "Máy cắt bàn",
-      "Máy Cắt Thủy Lực Cầm Tay",
+      "Máy cắt thủy lực cầm tay",
+      "Máy Cắt Cầm Tay",
+      "Máy Cắt Bàn",
       "Chống Tăng",
       "Máy Cắt Gỗ Cầm Tay",
       "Máy Đụt Nhỏ",
@@ -70807,10 +72082,9 @@
       "Máy Đánh Bột",
       "Máy Trộn",
       "Xe Rùa",
-      "Máy Uốn Sắt Lớn",
       "Bàn Cắt Gạch Đẩy Tay 1.4m",
       "Bàn Cắt Gạch Đẩy Tay 1m",
-      "Máy cắt cầm tay",
+      "Máy uốn sắt lớn",
       "Chân Dàn 1.7m",
       "Chân Dàn 1.5m",
       "Xẻng",
@@ -71799,18 +73073,18 @@
         "username": "Tinh",
         "password": "12345",
         "role": "admin",
-        "updatedAt": 1780048315574,
+        "updatedAt": 1780462981771,
         "sessionVersion": 2,
         "sessions": [
           {
             "deviceId": "3a4611bc-5e3e-488c-8c86-fdee8d14a56a",
             "loginAt": 1776300477111,
-            "lastActive": 1780034759022
+            "lastActive": 1780401593468
           },
           {
             "deviceId": "e273a89f-26c1-4a3a-9432-c502b373516d",
             "loginAt": 1776261443583,
-            "lastActive": 1779676245181
+            "lastActive": 1780462981771
           },
           {
             "deviceId": "5615f237-5b22-484b-84a2-eefb8e443b0a",
@@ -71820,7 +73094,7 @@
           {
             "deviceId": "aecd947b-5120-4d9d-8f56-ff695536625d",
             "loginAt": 1777474450794,
-            "lastActive": 1780048315574
+            "lastActive": 1780336421736
           }
         ]
       },
@@ -71829,13 +73103,13 @@
         "username": "giamdoc",
         "password": "123",
         "role": "giamdoc",
-        "updatedAt": 1780047541122,
+        "updatedAt": 1780282695004,
         "sessionVersion": 1,
         "sessions": [
           {
             "deviceId": "743e9e7e-1203-492f-94e0-61f2f4f0e3c6",
             "loginAt": 1776397540457,
-            "lastActive": 1780047541122
+            "lastActive": 1780282695004
           },
           {
             "deviceId": "aecd947b-5120-4d9d-8f56-ff695536625d",
@@ -71849,13 +73123,13 @@
         "username": "ketoan",
         "password": "123",
         "role": "ketoan",
-        "updatedAt": 1780031831353,
+        "updatedAt": 1780474706992,
         "sessionVersion": 1,
         "sessions": [
           {
             "deviceId": "49414170-23c6-4722-8034-a24136331e19",
             "loginAt": 1776304685314,
-            "lastActive": 1780031831353
+            "lastActive": 1780474706992
           },
           {
             "deviceId": "aecd947b-5120-4d9d-8f56-ff695536625d",
@@ -71987,14 +73261,14 @@
         {
           "id": "9f1c68c8-2d77-4dc5-8c49-205276d7d4da",
           "name": "NHÂN CÔNG",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "6a559682-0fb1-409e-a44e-1a905938e900",
           "name": "HÓA ĐƠN LẺ",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "3fe8bc85-0320-470b-acff-ea20235d1ad6",
@@ -72005,44 +73279,44 @@
         {
           "id": "b13e9be9-1006-4cb2-a026-d7e2be3e8176",
           "name": "VẬN CHUYỂN",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "0cbef881-9b5b-41f4-9f67-93a6b5feae4b",
           "name": "XÀ BẦN - ĐỔ RÁC",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "63b95b91-59c4-4218-93a3-9e4b6a475b56",
           "name": "THIẾT KẾ - XIN PHÉP",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "d2fbb448-2fda-40a9-8abd-dfaab553f3d1",
           "name": "ĐIỆN NƯỚC",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "817287df-b329-482c-bde1-4c390982a628",
           "name": "SỬA MÁY",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "d5e08556-87d4-4ed8-aa9e-9c8b7af6824c",
           "name": "COPHA",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "3f6f085c-c42e-4c13-bb32-76ea05cba7f7",
           "name": "GIẢI KHÁT",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "50eebbba-04d4-4462-8b61-b94673558745",
@@ -72059,8 +73333,8 @@
         {
           "id": "4a17e50f-b1c5-4c09-be89-d9080df7a38d",
           "name": "Sắt Thép",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "5ff9a055-e213-42e9-9bc3-d53ebb45a442",
@@ -72077,8 +73351,8 @@
         {
           "id": "78f2cdff-c815-440a-b49e-dc6f9736f09e",
           "name": "Hóa Đơn Lẻ",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "fc4c9af8-2257-423c-b504-ce24725c8ea9",
@@ -72089,56 +73363,56 @@
         {
           "id": "81c4fa77-bf88-4f2f-9c51-977c43dbaed4",
           "name": "Vận Chuyển",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "dcd435d9-8e89-4f9a-a1aa-4558419021de",
           "name": "Xà Bần - Đổ Rác",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "84d4f5ff-f8a9-48c2-8ec1-3e1d7f21481e",
           "name": "Điện Nước",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "26c37b0a-4d04-4c1a-80e6-7eac1bfecc14",
           "name": "Sửa Máy",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "66b31d07-2aa9-440f-a163-3d3e1319cf38",
           "name": "Copha",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "e72c5fd6-4599-4e16-bc81-b90bd498adfa",
           "name": "Giải Khát",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "73c47506-09a4-479c-9f31-60f1bbc66dd3",
           "name": "thiết kế - xin phép",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777471
         },
         {
           "id": "6e897a30-afd9-479f-88a7-ca29c33a1034",
           "name": "Nhân Công",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "9616f9e8-ae2b-4364-927c-2484945ac59c",
           "name": "Thiết Kế - Xin Phép",
           "isDeleted": true,
-          "updatedAt": 1780053920703
+          "updatedAt": 1780503799784
         },
         {
           "id": "8ce69709-57aa-46ed-b962-7aae62777a41",
@@ -72150,7 +73424,7 @@
           "id": "9b3cdf47-8378-4cf4-beb7-ab376ed9c8b8",
           "name": "Nhân Công",
           "isDeleted": true,
-          "updatedAt": 1780053920703
+          "updatedAt": 1780503799784
         },
         {
           "id": "e2699462-78ca-4e8a-83ae-7c6de58b1aae",
@@ -72167,8 +73441,8 @@
         {
           "id": "44817a96-271d-4dd2-911d-f0097b7ee0ce",
           "name": "Sắt Thép",
-          "isDeleted": false,
-          "updatedAt": 1780053920507
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "b4b0ddc2-9078-4408-8f26-a3610b62d7ce",
@@ -72192,7 +73466,7 @@
           "id": "2da44322-fc9b-489b-ac61-873d0117dbd9",
           "name": "Hóa Đơn Lẻ",
           "isDeleted": true,
-          "updatedAt": 1780053920703
+          "updatedAt": 1780503799784
         },
         {
           "id": "d6bdd988-c1c1-4a9c-ba6e-4794137012d5",
@@ -72338,7 +73612,7 @@
           "id": "a08d0d3d-09d0-44ae-8755-177124867aa6",
           "name": "VLXD HÙNG HUỆ",
           "isDeleted": false,
-          "updatedAt": 1778933774846
+          "updatedAt": 1780503777506
         },
         {
           "id": "b90e7354-9dfa-4b7a-9245-dc56f50c781f",
@@ -72362,7 +73636,7 @@
           "id": "c70a0756-92c0-4d1e-b127-405cccba59a3",
           "name": "VLXD HÙNG huệ",
           "isDeleted": true,
-          "updatedAt": 1778933783783
+          "updatedAt": 1780503799784
         },
         {
           "id": "660b17cd-56a7-4a35-b0d4-913cbbde7416",
@@ -72555,6 +73829,12 @@
           "name": "SẮT THÉP VLXD ĐỨC ANH",
           "isDeleted": false,
           "updatedAt": 1778933774846
+        },
+        {
+          "id": "5cec1690-e798-44c2-bfb5-e2fe019fbc57",
+          "name": "THẮNG SỬA MÁY TRỘN",
+          "isDeleted": false,
+          "updatedAt": 1780459827225
         }
       ],
       "nguoi": [
@@ -73041,14 +74321,14 @@
         {
           "id": "15692f3d-fdd2-404d-877f-852dd11bd133",
           "name": "Máy cắt bàn",
-          "isDeleted": false,
-          "updatedAt": 1780053920516
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "59c10bc6-5211-4da7-b6f2-3393dca88e6c",
           "name": "Máy cắt thủy lực cầm tay",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777490
         },
         {
           "id": "161a62ca-c86e-438f-a961-804ed3aa8bea",
@@ -73065,8 +74345,8 @@
         {
           "id": "616395f2-f055-4543-887a-9932910d03d8",
           "name": "Máy Cắt Cầm Tay",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777490
         },
         {
           "id": "fe555f50-b78b-45b7-ac23-a2cb19b4a50c",
@@ -73083,14 +74363,14 @@
         {
           "id": "99d13474-a7b6-4ade-a706-269a2f317bd9",
           "name": "Máy Cắt Thủy Lực Cầm Tay",
-          "isDeleted": false,
-          "updatedAt": 1780053920516
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "b1638c58-7c22-4e38-8f56-9c500b7b68f0",
           "name": "Máy Cắt Bàn",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777490
         },
         {
           "id": "ba657d65-1d20-42c6-bbbc-4d62b9d7c190",
@@ -73251,8 +74531,8 @@
         {
           "id": "748a22e0-27c9-4a82-80a2-43f167217ed1",
           "name": "Máy Uốn Sắt Lớn",
-          "isDeleted": false,
-          "updatedAt": 1780053920516
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "e8ec6618-7a40-41fd-a5c7-bae9234c1808",
@@ -73275,20 +74555,20 @@
         {
           "id": "10ea95d9-f8db-4d32-b858-d5d11d9068a4",
           "name": "Máy cắt cầm tay",
-          "isDeleted": false,
-          "updatedAt": 1780053920516
+          "isDeleted": true,
+          "updatedAt": 1780503799784
         },
         {
           "id": "c7a9b32e-73c5-470f-97cc-69625d3a2261",
           "name": "Máy cắt bàn",
           "isDeleted": true,
-          "updatedAt": 1780053920703
+          "updatedAt": 1780503799784
         },
         {
           "id": "968466e1-c7c8-4558-9bd7-e6fdfb812adc",
           "name": "Máy uốn sắt lớn",
-          "isDeleted": true,
-          "updatedAt": 1780053920703
+          "isDeleted": false,
+          "updatedAt": 1780503777490
         },
         {
           "id": "98d18ee4-c642-4ec6-8401-921736a6b6d5",

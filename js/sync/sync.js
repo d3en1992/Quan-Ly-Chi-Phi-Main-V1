@@ -285,14 +285,19 @@ async function pushChanges(opts = {}) {
   if (!silent) showSyncBanner('⏳ Đang đẩy (push)...');
 
   // Push ngầm: chỉ năm hiện tại (nhẹ). Push thủ công: tất cả năm.
+  // [FIX đồng bộ] opts.allYears = true → ép đẩy TẤT CẢ các năm dù đang silent.
+  // Bắt buộc dùng khi import file (JSON/Excel) chứa nhiều năm: nếu không, chỉ
+  // năm hiện tại được đẩy lên cloud → thiết bị khác không thấy các năm còn lại.
+  const _allYears = opts?.allYears ?? false;
   const _curYr = String(activeYear || new Date().getFullYear());
-  const years  = silent ? [_curYr] : _getAllLocalYears();
+  const years  = (silent && !_allYears) ? [_curYr] : _getAllLocalYears();
 
   // ── Lọc theo key đã đổi (chỉ áp dụng cho push ngầm) ──
   // Push thủ công (silent=false) luôn đẩy đủ. Push ngầm: nếu biết key nào đổi
   // thì chỉ đẩy đúng hạng mục + meta liên quan để tiết kiệm read/write.
   const _hasDirty   = (typeof _dirtyKeys !== 'undefined' && _dirtyKeys.size > 0);
-  const _scoped     = silent && _hasDirty;            // có đủ thông tin để thu hẹp phạm vi
+  // allYears (import) → KHÔNG thu hẹp: đẩy đủ mọi hạng mục để khôi phục trọn vẹn
+  const _scoped     = silent && _hasDirty && !_allYears;
   const _catsToPush = _scoped
     ? _YEAR_CATS.filter(c => _dirtyKeys.has(c.key))
     : _YEAR_CATS;

@@ -638,7 +638,10 @@ function _applyImport() {
   if (typeof _clearQueue       === 'function') _clearQueue();
   if (fbReady() && typeof pushChanges === 'function') {
     console.log('[Import] ✔ stamped updatedAt=' + _applyNow + ' · force push skipPull');
-    pushChanges({ silent: true, skipPull: true });
+    // [FIX đồng bộ] allYears:true → đẩy TẤT CẢ các năm vừa import lên cloud
+    // (file Excel có thể chứa nhiều năm). Thiếu cờ này → thiết bị khác chỉ thấy
+    // năm hiện tại, mất dữ liệu các năm còn lại.
+    pushChanges({ silent: true, skipPull: true, allYears: true });
   }
 
   // ── 6. Toast + Log ─────────────────────────────────────────

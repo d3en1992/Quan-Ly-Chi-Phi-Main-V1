@@ -612,8 +612,11 @@ async function importJSONFull(data) {
       try {
         _syncPulling = false;
         _syncPushing = false;
-        await pushChanges({ silent: true, skipPull: true });
-        console.log('[Import] ✓ Push cloud hoàn tất sau import');
+        // [FIX đồng bộ] allYears:true → đẩy TẤT CẢ các năm trong file JSON lên
+        // cloud (không chỉ năm hiện tại). Nếu thiếu cờ này, thiết bị khác chỉ
+        // thấy năm hiện tại, mất hết dữ liệu các năm còn lại.
+        await pushChanges({ silent: true, skipPull: true, allYears: true });
+        console.log('[Import] ✓ Push cloud hoàn tất sau import (tất cả năm)');
       } catch(e) {
         console.warn('[Import] Push cloud lỗi (sẽ sync lại sau reload):', e);
       }
