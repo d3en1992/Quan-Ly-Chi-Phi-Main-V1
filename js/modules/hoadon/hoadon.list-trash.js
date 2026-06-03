@@ -74,9 +74,14 @@ function filterAndRender() {
     if(q) { const t=[inv.ngay,resolveProjectName(inv),recCatName(inv,'inv','loai'),recCatName(inv,'inv','nguoi'),recCatName(inv,'inv','ncc'),inv.nd,String(inv.thanhtien||inv.tien||0)].join(' ').toLowerCase(); if(!t.includes(q)) return false; }
     return true;
   });
-  // Sort: Newest → Oldest based on ngay
+  // Sắp xếp giảm dần theo ngày: ngày mới nhất lên đầu, cũ nhất xuống cuối
+  // Dùng so sánh chuỗi ISO (YYYY-MM-DD) — chính xác hơn localeCompare vì không phụ thuộc locale
   filteredInvs.sort((a, b) => {
-    return (b.ngay || '').localeCompare(a.ngay || '');
+    const da = a.ngay || '';
+    const db = b.ngay || '';
+    if (db > da) return 1;
+    if (db < da) return -1;
+    return 0;
   });
   renderTable();
 }

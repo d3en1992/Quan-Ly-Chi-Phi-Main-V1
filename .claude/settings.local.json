@@ -67,7 +67,9 @@
       "Bash(node --check \"js/core/core.state-backup.js\")",
       "Bash(node --check \"js/sync/sync.js\")",
       "Bash(node --check \"js/modules/nhapxuat/nhapxuat.import.js\")",
-      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\core\\\\core.state-backup.js\")"
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\core\\\\core.state-backup.js\")",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\app\\\\main.js\")",
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\modules\\\\hoadon\\\\hoadon.list-trash.js\")"
     ]
   }
 }

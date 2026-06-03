@@ -375,6 +375,10 @@ function renderActiveTab() {
     case 'congtrinh':
       renderProjectsPage();
       break;
+    case 'thongkecphd':
+      // Rebuild filter dropdowns + render lại bảng ngay khi đổi năm
+      buildFilters(); filterAndRender();
+      break;
     case 'doanhthu':
       // dtPopulateSels() gọi renderHdcTable + renderHdtpTable + renderCongNoThauPhu bên trong
       dtPopulateSels(); renderThuTable();
