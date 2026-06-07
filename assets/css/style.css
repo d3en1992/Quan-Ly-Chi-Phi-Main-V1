@@ -7,17 +7,97 @@
   --ink3: #9a9590;
   --line: #e2e0db;
   --line2: #cccac4;
-  --gold: #c8870a;
-  --gold-bg: #fef3dc;
-  --blue: #1e5cb3;
-  --blue-bg: #e8f0fb;
-  --green: #1a7a45;
-  --green-bg: #e6f4ec;
-  --red: #c0392b;
-  --red-bg: #fdecea;
+  /* Bảng màu nhấn — đã hạ tông (desaturate) sang tông đất/trầm cho dịu mắt */
+  --gold: #9a7424;   /* vàng đất (cũ #c8870a) */
+  --gold-bg: #f6efe0;
+  --blue: #345f95;   /* xanh dương trầm (cũ #1e5cb3) */
+  --blue-bg: #eaf0f7;
+  --green: #2f7350;  /* xanh lá trầm (cũ #1a7a45) */
+  --green-bg: #e9f2ec;
+  --red: #a94b3f;    /* đỏ gạch dịu (cũ #c0392b) */
+  --red-bg: #f8ebe8;
   --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
   --shadow-lg: 0 4px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
 }
+/* ══════════════════════════════════════════════════════════════
+   SOFT UI — Hạ tông màu toàn cục cho dịu mắt, dễ đọc (ưu tiên người
+   lớn tuổi dùng máy bàn). Ghi đè biến màu semantic của Bootstrap về
+   tông trầm/đất thay cho các màu neon (vàng/xanh/đỏ) quá tươi.
+   Vì các class text-*, bg-*, badge... đều tham chiếu các biến này nên
+   chỉ cần ghi đè ở một nơi là toàn app dịu lại.
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --bs-warning: #9a7424;  --bs-warning-rgb: 154, 116, 36;   /* vàng đất (was #ffc107) */
+  --bs-success: #2f7350;  --bs-success-rgb: 47, 115, 80;    /* xanh lá trầm */
+  --bs-primary: #345f95;  --bs-primary-rgb: 52, 95, 149;    /* xanh dương trầm */
+  --bs-danger:  #a94b3f;  --bs-danger-rgb: 169, 75, 63;     /* đỏ gạch dịu */
+  --bs-info:    #47788c;  --bs-info-rgb: 71, 120, 140;      /* xanh ngọc trầm */
+}
+/* Nút đặc (solid): Bootstrap biên dịch màu cứng trong từng class .btn-*,
+   nên phải hạ tông qua biến --bs-btn-* cho đồng bộ bảng màu phía trên.
+   Áp dụng cho các nút thao tác như Sửa, Xóa, [CC], + Thêm... */
+.btn-warning {
+  --bs-btn-bg: #c8a14a; --bs-btn-border-color: #c8a14a;
+  --bs-btn-hover-bg: #b58e38; --bs-btn-hover-border-color: #b58e38;
+  --bs-btn-active-bg: #a8842c; --bs-btn-active-border-color: #a8842c;
+  --bs-btn-color: #3a2e0a; --bs-btn-hover-color: #3a2e0a; --bs-btn-active-color: #3a2e0a;
+}
+.btn-success {
+  --bs-btn-bg: #3f8060; --bs-btn-border-color: #3f8060;
+  --bs-btn-hover-bg: #357052; --bs-btn-hover-border-color: #357052;
+  --bs-btn-active-bg: #2f6349; --bs-btn-active-border-color: #2f6349;
+}
+.btn-primary {
+  --bs-btn-bg: #3f6699; --bs-btn-border-color: #3f6699;
+  --bs-btn-hover-bg: #365984; --bs-btn-hover-border-color: #365984;
+  --bs-btn-active-bg: #2f4d72; --bs-btn-active-border-color: #2f4d72;
+}
+.btn-danger {
+  --bs-btn-bg: #b0584c; --bs-btn-border-color: #b0584c;
+  --bs-btn-hover-bg: #9c4a3f; --bs-btn-hover-border-color: #9c4a3f;
+  --bs-btn-active-bg: #8a4136; --bs-btn-active-border-color: #8a4136;
+}
+.btn-info {
+  --bs-btn-bg: #5a8a9c; --bs-btn-border-color: #5a8a9c;
+  --bs-btn-hover-bg: #4d7888; --bs-btn-hover-border-color: #4d7888;
+  --bs-btn-color: #fff; --bs-btn-hover-color: #fff; --bs-btn-active-color: #fff;
+}
+/* Nút viền (outline) — đồng bộ tông trầm cho các màu hay dùng */
+.btn-outline-primary {
+  --bs-btn-color: #3f6699; --bs-btn-border-color: #9db4d0;
+  --bs-btn-hover-bg: #3f6699; --bs-btn-hover-border-color: #3f6699;
+  --bs-btn-active-bg: #2f4d72; --bs-btn-active-border-color: #2f4d72;
+}
+.btn-outline-info {
+  --bs-btn-color: #4d7888; --bs-btn-border-color: #a9c4ce;
+  --bs-btn-hover-bg: #5a8a9c; --bs-btn-hover-border-color: #5a8a9c; --bs-btn-hover-color: #fff;
+}
+.btn-outline-danger {
+  --bs-btn-color: #a94b3f; --bs-btn-border-color: #d6a89f;
+  --bs-btn-hover-bg: #b0584c; --bs-btn-hover-border-color: #b0584c;
+}
+
+/* ── Nút chức năng quan trọng: "⚡ Nhập nhanh" & "📋 Hóa đơn chi tiết" ──
+   Thêm viền nổi bật + glow nhẹ để người dùng chú ý ngay 2 nút này,
+   phân biệt rõ với các phần tử khác. Áp dụng cho nav-pill nhập liệu. */
+.key-action-btn {
+  border: 1.5px solid var(--bs-primary);
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb), 0.10);
+  transition: box-shadow .18s ease, transform .12s ease, background .18s ease;
+}
+.key-action-btn:hover {
+  box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), 0.18);
+  transform: translateY(-1px);
+}
+/* Khi đang chọn (active): tô nền primary trầm + glow rõ hơn để nhấn mạnh */
+.key-action-btn.active {
+  background: var(--bs-primary);
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), 0.22);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'IBM Plex Sans', sans-serif !important; background: var(--bs-tertiary-bg); color: var(--bs-body-color); font-size: 13px; line-height: 1.5; }
 
@@ -893,7 +973,7 @@ body.auth-guest #jb-btn {
 .db-kpi-card.accent-gold  { border-left:3px solid var(--bs-warning); }
 .db-kpi-card.accent-green { border-left:3px solid var(--bs-success); }
 .db-kpi-card.accent-red   { border-left:3px solid var(--bs-danger); }
-.db-kpi-card.accent-blue  { border-left:3px solid #4a90d9; }
+.db-kpi-card.accent-blue  { border-left:3px solid var(--bs-primary); }
 .db-bar-wrap  { display:flex; align-items:flex-end; gap:5px; height:160px; padding-bottom:22px; position:relative; }
 .db-bar-col   { display:flex; flex-direction:column; align-items:center; flex:1; min-width:28px; }
 .db-bar       { width:100%; background:var(--bs-warning); border-radius:4px 4px 0 0;

@@ -28,7 +28,12 @@ function _initQuickSheetGrid() {
         source: () => {
           // Nhập Nhanh là tab nhập liệu → ẩn CT đã quyết toán khỏi gợi ý
           const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects||[]);
-          return projs.filter(p => !p.deletedAt && p.id && p.status !== 'closed').map(p => ({ name: p.name, id: p.id }));
+          const list = projs.filter(p => !p.deletedAt && p.id && p.status !== 'closed').map(p => ({ name: p.name, id: p.id }));
+          // Bổ sung mục "CÔNG TY" (chi phí chung) vào đầu danh sách gợi ý
+          const company = (typeof PROJECT_COMPANY !== 'undefined' && PROJECT_COMPANY)
+            ? { name: PROJECT_COMPANY.name, id: PROJECT_COMPANY.id }
+            : { name: 'CÔNG TY', id: 'COMPANY' };
+          return [company, ...list];
         },
         required: true, copyFromAbove: true },
       { field: 'tien',  type: 'money' },
@@ -68,7 +73,12 @@ function validateQuickEntryCategories() {
   const nccOpts   = dedupArr(cats.nhaCungCap  || []);
   const projOpts  = (() => {
     const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects || []);
-    return projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+    const list = projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+    // "CÔNG TY" là lựa chọn hợp lệ → thêm vào để không bị báo sai khi validate
+    const company = (typeof PROJECT_COMPANY !== 'undefined' && PROJECT_COMPANY)
+      ? { name: PROJECT_COMPANY.name, id: PROJECT_COMPANY.id }
+      : { name: 'CÔNG TY', id: 'COMPANY' };
+    return [company, ...list];
   })();
 
   let invalidCount = 0;

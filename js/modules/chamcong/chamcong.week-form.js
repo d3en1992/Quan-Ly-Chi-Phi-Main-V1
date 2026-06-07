@@ -120,7 +120,7 @@ function buildCCTable(workers) {
     <th class="cc-debt-col col-debtbefore" style="text-align:right;${BG_DEBT}" title="Nợ tồn đọng trước tuần này">Nợ Cũ</th>
     <th class="cc-debt-col col-loan" style="text-align:right;${BG_DEBT}">Vay Mới (+)</th>
     <th class="cc-debt-col col-tru" style="text-align:right;${BG_DEBT};color:var(--red)">Trừ Nợ (-)</th>
-    <th class="col-total" style="text-align:right;background:#c8870a;color:#fff;font-weight:700">Thực Lãnh</th>
+    <th class="col-total" style="text-align:right;background:var(--gold);color:#fff;font-weight:700">Thực Lãnh</th>
     <th class="col-del" style="${BG}"></th>
   `;
   const tbody = document.getElementById("cc-tbody");

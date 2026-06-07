@@ -503,7 +503,8 @@ function _dbBarChart(data) {
 
 // ── Pie Chart tỷ trọng (SVG) ─────────────────────────────────
 function _dbPieChart(data) {
-  const COLORS = ['#f0b429','#1db954','#4a90d9','#e74c3c','#9b59b6','#e67e22','#aaa'];
+  // Bảng màu biểu đồ tròn — đã hạ tông sang tông trầm/đất, dịu mắt & chuyên nghiệp hơn
+  const COLORS = ['#c8a14a','#5a9e78','#5b86b3','#c46a5e','#8a6fa8','#c2895a','#9aa0a6'];
   const KEY_TYPES = ['Nhân Công','Vật Liệu XD','Thầu Phụ','Sắt Thép','Đổ Bê Tông'];
 
   const byType = {};
@@ -673,7 +674,7 @@ function _dbKPIWeekly(yr, invoiceData, ungData, thauPhuTotal) {
 // Tooltip: hiện top-3 CT chi nhiều nhất tuần đó
 // Section tóm tắt 4 tuần gần nhất (card lớn, chữ 24px)
 function _dbBarChartWeekly(yr, invoiceData, ungData) {
-  const C_INV = '#f0a500'; // amber — Hóa đơn / CP-HĐ
+  const C_INV = '#c2913a'; // amber — Hóa đơn / CP-HĐ
   const C_TP  = '#8B4513'; // nâu   — Ứng thầu phụ
   const C_NCC = '#8e9ca6'; // xám   — Ứng nhà cung cấp
 
@@ -718,7 +719,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
     const cx     = i * (colW + gap);
     const isSel  = w.key === selectedDashboardWeekKey;
     const lbl    = (i % lblStep === 0) ? `T${wkNum}` : '';
-    const lblColor   = isSel ? '#e67e22' : '#333';
+    const lblColor   = isSel ? '#c2895a' : '#333';
     const lblWeight  = isSel ? '700' : '600';
 
     // Top-3 CT cho footer tooltip
@@ -760,8 +761,8 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
 
     // Bỏ hậu tố "tr" — chỉ hiển thị số; giảm font 20%: 13→10px
     const amt       = v.total>=1e9?(v.total/1e9).toFixed(1)+'tỷ':v.total>=1e6?String(Math.round(v.total/1e6)):'';
-    const selStroke = isSel ? `stroke="#e67e22" stroke-width="2"` : 'stroke="none"';
-    const selBg     = isSel ? `<rect x="${cx-1}" y="0" width="${colW+2}" height="${H}" fill="#e67e2215" rx="2"/>` : '';
+    const selStroke = isSel ? `stroke="#c2895a" stroke-width="2"` : 'stroke="none"';
+    const selBg     = isSel ? `<rect x="${cx-1}" y="0" width="${colW+2}" height="${H}" fill="#c2895a15" rx="2"/>` : '';
 
     return `<g onclick="_dbSelectWeek('${w.key}')" style="cursor:pointer">
       ${selBg}
@@ -904,7 +905,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
   }).join('');
 
   const selNote = selectedDashboardWeekKey
-    ? `<span style="color:#e67e22;font-weight:700;font-size:10px;margin-left:auto">
+    ? `<span style="color:#c2895a;font-weight:700;font-size:10px;margin-left:auto">
          📌 T${allWeeks.findIndex(w=>w.key===selectedDashboardWeekKey)+1}
          (${weekLabel(selectedDashboardWeekKey)}) — click lại để bỏ
        </span>`
@@ -944,7 +945,7 @@ function _dbSetWeekFilter(f) {
 // Hiển thị tỷ trọng 3 nguồn: Hóa đơn, Ứng TP, Ứng NCC
 // Nếu selectedDashboardWeekKey → lọc theo tuần đó; không thì tổng năm
 function _dbPieChartWeekly(invoiceData, ungData) {
-  const C_INV = '#f0a500';
+  const C_INV = '#c2913a';
   const C_TP  = '#8B4513';
   const C_NCC = '#8e9ca6';
 
@@ -1126,7 +1127,7 @@ function _dbUngByCT() {
           <div style="font-weight:600;color:var(--bs-body-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
                title="${x(ct)}">${x(ct)}</div>
           <div class="db-rank-bar-bg" style="margin-top:4px">
-            <div class="db-rank-bar-fill" style="width:${pct}%;background:#4a90d9"></div>
+            <div class="db-rank-bar-fill" style="width:${pct}%;background:var(--bs-primary)"></div>
           </div>
         </div>
         <div class="db-rank-amt">${fmtM(amt)}</div>
@@ -1139,7 +1140,7 @@ function _dbUngByCT() {
         <td style="padding:7px 8px;white-space:nowrap;color:var(--bs-secondary-color);font-size:12px">${r.ngay}</td>
         <td style="padding:7px 8px;font-weight:600">${x(r.tp)||'—'}</td>
         <td style="padding:7px 8px;color:var(--bs-secondary-color);font-size:12px">${x(r.nd)||'—'}</td>
-        <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;color:#4a90d9;white-space:nowrap">${fmtM(r.tien||0)}</td>
+        <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--bs-primary);white-space:nowrap">${fmtM(r.tien||0)}</td>
       </tr>`).join('');
     const total = sumBy(filtered, 'tien');
     wrap.innerHTML = `<div style="overflow-x:auto">
@@ -1156,7 +1157,7 @@ function _dbUngByCT() {
         <tfoot>
           <tr style="font-weight:700;border-top:2px solid var(--bs-border-color)">
             <td colspan="3" style="padding:7px 8px;color:var(--bs-secondary-color)">Tổng cộng (${filtered.length} lần)</td>
-            <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:#4a90d9">${fmtM(total)}</td>
+            <td style="padding:7px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--bs-primary)">${fmtM(total)}</td>
           </tr>
         </tfoot>
       </table>
