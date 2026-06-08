@@ -71,7 +71,13 @@
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\app\\\\main.js\")",
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\modules\\\\hoadon\\\\hoadon.list-trash.js\")",
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\migrate-2026-firebase.js\")",
-      "Bash(node --check \"D:/NGUYEN HUU/APP QUAN LY CONG TRINH/Claude \\(Old ver\\)/js/sync/sync.js\")"
+      "Bash(node --check \"D:/NGUYEN HUU/APP QUAN LY CONG TRINH/Claude \\(Old ver\\)/js/sync/sync.js\")",
+      "Bash(ls -la *.jpg *.png)",
+      "Bash(ls assets/)",
+      "Bash(find assets *)",
+      "Bash(mkdir -p assets/img)",
+      "Bash(git mv *)",
+      "Bash(mv \"logo cty_LE_upscale.jpg\" \"assets/img/logo-cty.jpg\")"
     ]
   }
 }

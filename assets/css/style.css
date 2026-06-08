@@ -139,6 +139,14 @@ body { font-family: 'IBM Plex Sans', sans-serif !important; background: var(--bs
   flex-shrink: 0;
 }
 .app-name span { color: #f0b429; }
+/* Logo công ty trên navbar & sidebar — cao cố định để không phá vỡ layout, bo góc nhẹ */
+.app-logo {
+  height: 28px; width: auto;
+  border-radius: 4px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
 /* ── Sidebar Navigation buttons (Bootstrap Offcanvas) ─────── */
 /* Kiểu dọc thay cho thanh ngang cũ — thân thiện với mobile   */
 .nav-btn {
