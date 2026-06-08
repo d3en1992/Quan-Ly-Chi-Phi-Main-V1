@@ -247,7 +247,7 @@ function _showImportPreviewNew(session) {
     ov = document.createElement('div');
     ov.id = 'import-modal-overlay';
     ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center';
-    ov.onclick = function(e) { if (e.target === this) ov.style.display = 'none'; };
+    // [CHẶN ĐÓNG NHẦM] Đã bỏ đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập
     document.body.appendChild(ov);
   }
 

@@ -66,7 +66,7 @@ function showCtModal(ctName) {
   document.getElementById('ct-modal').classList.add('open');
 }
 function closeModal(){ document.getElementById('ct-modal').classList.remove('open'); }
-document.getElementById('ct-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget)closeModal(); });
+// [CHẶN ĐÓNG NHẦM] Đã bỏ đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập
 
 // ══════════════════════════════
 //  DANH MỤC — NORMALIZE + DEDUP

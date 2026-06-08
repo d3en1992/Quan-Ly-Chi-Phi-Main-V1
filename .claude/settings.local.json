@@ -70,7 +70,8 @@
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\core\\\\core.state-backup.js\")",
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\app\\\\main.js\")",
       "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\js\\\\modules\\\\hoadon\\\\hoadon.list-trash.js\")",
-      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\migrate-2026-firebase.js\")"
+      "Bash(node --check \"D:\\\\NGUYEN HUU\\\\APP QUAN LY CONG TRINH\\\\Claude \\(Old ver\\)\\\\migrate-2026-firebase.js\")",
+      "Bash(node --check \"D:/NGUYEN HUU/APP QUAN LY CONG TRINH/Claude \\(Old ver\\)/js/sync/sync.js\")"
     ]
   }
 }

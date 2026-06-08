@@ -356,7 +356,9 @@ async function pushChanges(opts = {}) {
     // ── 4 doc danh mục dùng chung: đọc-gộp-ghi (bỏ qua nếu meta không đổi) ──
     if (_pushMeta) {
       try {
-        if (!skipPull) await _pullMeta();   // gộp cloud → local trước
+        // GỘP (không thay thế) cloud vào local trước khi ghi, để KHÔNG làm mất
+        // record vừa thêm ở local (lỗi cũ: _pullMeta() thay thế → mất HĐ thầu phụ).
+        if (!skipPull) await _mergeMetaForPush();
         const metas = [
           [fbDocMetaCT(), fbMetaCTPayload()],
           [fbDocMetaDM(), fbMetaDMPayload()],
@@ -474,6 +476,90 @@ async function _pullMeta() {
 
   if (changed) console.log('[Sync] ▼ danh mục đã thay thế theo cloud');
   return changed;
+}
+
+// ══════════════════════════════════════════════════════════════
+// [10b] MERGE META TRƯỚC KHI PUSH — GỘP cloud vào local (KHÔNG thay thế)
+// ──────────────────────────────────────────────────────────────
+// ⚠️ KHÁC BIỆT QUAN TRỌNG so với _pullMeta():
+//   • _pullMeta()        = THAY THẾ local bằng cloud (dùng cho PULL thật — cloud là chuẩn).
+//   • _mergeMetaForPush()= GỘP cloud + local, GIỮ cả 2 (dùng cho bước trước PUSH).
+//
+// LÝ DO RA ĐỜI (sửa lỗi mất dữ liệu): Trước đây bước "gộp cloud trước khi ghi"
+// trong pushChanges() lại gọi _pullMeta() — tức là THAY THẾ local bằng cloud cũ.
+// Khi user vừa thêm 1 HĐ thầu phụ / HĐ chính / công trình..., record mới chỉ có ở
+// local, CHƯA có trên cloud. _pullMeta() đọc cloud (chưa có record) rồi GHI ĐÈ local
+// → record mới bị xóa khỏi _mem ngay trước khi build payload → payload đẩy lại data
+// cũ lên cloud → record mới MẤT TRẮNG (F5 lại càng mất vì pull cloud không có nó).
+//
+// Hàm này gộp theo đúng kiểu dữ liệu của từng doc meta để KHÔNG bao giờ làm mất
+// thay đổi local (record vừa thêm) lẫn thay đổi từ máy khác (record chỉ có ở cloud):
+//   - projects, thauPhu : mảng có id+updatedAt+deletedAt → mergeDatasets() (LWW + tombstone)
+//   - hopDong           : object map theo key CT          → _mergeHopDong() (LWW)
+//   - catItems          : per-item theo updatedAt          → _mergeCatItems() + dựng lại mảng tên
+//   - cnRoles, ctYears  : object map không có timestamp     → gộp nông, local đè cloud (local mới nhất)
+//   - users             : giữ mật khẩu local                → _mergeUsersSafe()
+// ══════════════════════════════════════════════════════════════
+async function _mergeMetaForPush() {
+  // ── meta_cong_trinh: projects (mảng) ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaCT()));
+    if (d && Array.isArray(d.projects)) {
+      const merged = mergeDatasets(load('projects_v1', []), d.projects);
+      _memSet('projects_v1', merged);
+      if (typeof projects !== 'undefined') projects = merged;
+    }
+  } catch (e) { console.warn('[Sync] merge-push meta_cong_trinh lỗi:', e.message || e); }
+
+  // ── meta_danh_muc: catItems (per-item), cnRoles + ctYears (object map) ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaDM()));
+    if (d) {
+      if (d.catItems && typeof d.catItems === 'object') {
+        const merged = _mergeCatItems(load('cat_items_v1', {}), d.catItems);
+        _memSet('cat_items_v1', merged);
+        _applyCatItemArrays(merged); // dựng lại cat_loai, cat_ncc... từ bản đã gộp
+      }
+      // cnRoles/ctYears không có timestamp từng key → gộp nông: cloud làm nền,
+      // local ghi đè (local là thay đổi user vừa thực hiện, ưu tiên giữ).
+      if (d.cnRoles && typeof d.cnRoles === 'object') {
+        const merged = { ...d.cnRoles, ...load('cat_cn_roles', {}) };
+        _memSet('cat_cn_roles', merged);
+        if (typeof cnRoles !== 'undefined') cnRoles = merged;
+      }
+      if (d.ctYears && typeof d.ctYears === 'object') {
+        const merged = { ...d.ctYears, ...load('cat_ct_years', {}) };
+        _memSet('cat_ct_years', merged);
+        if (typeof cats !== 'undefined') cats.congTrinhYears = merged;
+      }
+    }
+  } catch (e) { console.warn('[Sync] merge-push meta_danh_muc lỗi:', e.message || e); }
+
+  // ── meta_tai_khoan: users (gộp an toàn, giữ mật khẩu local) ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaTK()));
+    if (d && Array.isArray(d.users)) {
+      const merged = _mergeUsersSafe(load('users_v1', []), d.users);
+      _memSet('users_v1', merged);
+    }
+  } catch (e) { console.warn('[Sync] merge-push meta_tai_khoan lỗi:', e.message || e); }
+
+  // ── meta_hop_dong: hopDong (object map) + thauPhu (mảng) ──
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaHD()));
+    if (d) {
+      if (d.hopDong && typeof d.hopDong === 'object') {
+        const merged = _mergeHopDong(load('hopdong_v1', {}), d.hopDong);
+        _memSet('hopdong_v1', merged);
+        if (typeof hopDongData !== 'undefined') hopDongData = merged;
+      }
+      if (Array.isArray(d.thauPhu)) {
+        const merged = mergeDatasets(load('thauphu_v1', []), d.thauPhu);
+        _memSet('thauphu_v1', merged);
+        if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = merged;
+      }
+    }
+  } catch (e) { console.warn('[Sync] merge-push meta_hop_dong lỗi:', e.message || e); }
 }
 
 // ══════════════════════════════════════════════════════════════

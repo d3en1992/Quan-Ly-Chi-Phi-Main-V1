@@ -2764,7 +2764,8 @@
         <!-- MODALS: DOANH THU ============================================ -->
 
         <!-- Modal: Khai Bao HD Chinh -->
-        <div id="dt-modal-hdc-ov" class="overlay" onclick="if(event.target===this)closeDtModal('hdc')">
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-hdc-ov" class="overlay">
           <div class="app-modal" style="max-width:660px">
             <div class="app-modal-head">
               <h3>&#x1F4CB; Khai B&#225;o H&#7907;p &#272;&#7891;ng Ch&#237;nh</h3>
@@ -2809,7 +2810,8 @@
         </div>
 
         <!-- Modal: Ghi Nhan Thu Tien -->
-        <div id="dt-modal-thu-ov" class="overlay" onclick="if(event.target===this)closeDtModal('thu')">
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-thu-ov" class="overlay">
           <div class="app-modal" style="max-width:580px">
             <div class="app-modal-head">
               <h3>&#x1F4B0; Ghi Nh&#7853;n Thu Ti&#7873;n</h3>
@@ -2860,7 +2862,8 @@
         </div>
 
         <!-- Modal: Khai Bao HD Thau Phu -->
-        <div id="dt-modal-hdtp-ov" class="overlay" onclick="if(event.target===this)closeDtModal('hdtp')">
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-hdtp-ov" class="overlay">
           <div class="app-modal" style="max-width:660px">
             <div class="app-modal-head">
               <h3>&#x1F91D; Khai B&#225;o H&#7907;p &#272;&#7891;ng Th&#7847;u Ph&#7909;</h3>

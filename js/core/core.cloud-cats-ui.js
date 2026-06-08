@@ -268,7 +268,7 @@ function _createModalOverlay() {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'bin-modal-overlay';
-    ov.onclick = function(e) { if(e.target===this) closeBinModal(); };
+    // [CHẶN ĐÓNG NHẦM] Đã bỏ đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập
     ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center';
     document.body.appendChild(ov);
   }

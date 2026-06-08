@@ -58,7 +58,7 @@ function _showDeleteConfirm(title, bodyHtml, onConfirm) {
     okBtn.style.opacity = ok ? '1' : '.45';
   });
   canBtn.addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  // [CHẶN ĐÓNG NHẦM] Đã bỏ đóng khi click nền — popup xác nhận chỉ đóng bằng nút Hủy để tránh thao tác nhầm
   okBtn.addEventListener('click', () => {
     if (inp.value.trim() !== 'DELETE') return;
     overlay.remove();
