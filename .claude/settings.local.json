@@ -77,7 +77,9 @@
       "Bash(find assets *)",
       "Bash(mkdir -p assets/img)",
       "Bash(git mv *)",
-      "Bash(mv \"logo cty_LE_upscale.jpg\" \"assets/img/logo-cty.jpg\")"
+      "Bash(mv \"logo cty_LE_upscale.jpg\" \"assets/img/logo-cty.jpg\")",
+      "Bash(ls -la *.png *.jpg *.ico *.svg)",
+      "Bash(ls -la assets/img/)"
     ]
   }
 }
