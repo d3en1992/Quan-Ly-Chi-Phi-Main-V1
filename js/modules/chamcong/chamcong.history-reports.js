@@ -614,16 +614,20 @@ function xuatPhieuLuong() {
 }
 
 // Helper: format ngày YYYY-MM-DD → DD/MM/YYYY
-function exportUngToImage() {
-  // 1. Lấy các dòng được tick (dựa vào data-id khớp filteredUng)
+// Lõi xuất phiếu ứng PNG — tách riêng theo từng bảng (TP / NCC) để không xuất lẫn lộn.
+//  scopeId     : id container của bảng cần lấy checkbox ('ung-tp-section' | 'ung-ncc-section')
+//  sourceRecs  : danh sách bản ghi tương ứng để lấy dữ liệu (filteredUngTp | filteredUngNcc)
+function _exportUngImageFrom(scopeId, sourceRecs) {
+  // 1. Chỉ lấy các dòng được tick TRONG đúng bảng đang xuất (không lấy nhầm bảng kia)
+  const scope = document.getElementById(scopeId);
   const checkedIds = new Set(
-    [...document.querySelectorAll('.ung-row-chk:checked')].map(el => el.dataset.id)
+    [...(scope ? scope.querySelectorAll('.ung-row-chk:checked') : [])].map(el => el.dataset.id)
   );
   if (!checkedIds.size) {
     toast('⚠️ Vui lòng tick chọn ít nhất 1 khoản ứng!', 'error');
     return;
   }
-  const rows = filteredUng.filter(r => checkedIds.has(String(r.id)));
+  const rows = (sourceRecs || []).filter(r => checkedIds.has(String(r.id)));
   if (!rows.length) {
     toast('⚠️ Không tìm thấy dữ liệu — thử lọc lại rồi tick chọn!', 'error');
     return;
@@ -685,4 +689,14 @@ function exportUngToImage() {
       toast('❌ Lỗi khi tạo ảnh: ' + err.message, 'error');
     });
   });
+}
+
+// Xuất phiếu ứng riêng cho bảng THẦU PHỤ (chỉ lấy dòng tick trong bảng Thầu Phụ)
+function exportUngTpToImage() {
+  _exportUngImageFrom('ung-tp-section', filteredUngTp);
+}
+
+// Xuất phiếu ứng riêng cho bảng NHÀ CUNG CẤP (chỉ lấy dòng tick trong bảng NCC)
+function exportUngNccToImage() {
+  _exportUngImageFrom('ung-ncc-section', filteredUngNcc);
 }

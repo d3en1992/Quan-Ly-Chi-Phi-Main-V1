@@ -1369,6 +1369,7 @@
                       <th>Người TH</th>
                       <th>Nội Dung</th>
                       <th>NCC</th>
+                      <th class="text-center">Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody id="today-inv-tbody"></tbody>
@@ -1967,7 +1968,7 @@
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-outline-secondary btn-sm" onclick="exportUngTpCSV()">⬇ CSV</button>
-              <button class="btn btn-sm" onclick="exportUngToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng</button>
+              <button class="btn btn-sm" onclick="exportUngTpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Thầu Phụ rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng TP</button>
             </div>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
@@ -1997,6 +1998,7 @@
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-outline-secondary btn-sm" onclick="exportUngNccCSV()">⬇ CSV</button>
+              <button class="btn btn-sm" onclick="exportUngNccToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Nhà Cung Cấp rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng NCC</button>
             </div>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden">

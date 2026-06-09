@@ -122,17 +122,24 @@ function filterAndRenderUng() {
 function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) {
   const mono = "font-family:'IBM Plex Mono',monospace";
   const tp = Math.ceil(allRecs.length / UNG_TP_PG);
-  let pagHtml = '';
+  // Dòng thống kê (summary row) — LUÔN hiển thị ở cuối bảng, thống kê theo kết quả ĐANG LỌC
+  // (dùng allRecs = toàn bộ bản ghi sau khi lọc, không phải chỉ dòng của trang hiện tại).
+  // Định dạng đầy đủ "X bản ghi · Tổng: 260.000.000 đ".
+  const summaryHtml = `<span>${allRecs.length} bản ghi · Tổng: <strong class="text-primary" style="${mono}">${numFmt(sumBy(allRecs,'tien'))} đ</strong></span>`;
+  // Nút phân trang chỉ hiện khi có nhiều hơn 1 trang
+  let pagBtns = '';
   if (tp > 1) {
     const btns = [];
     for (let p = 1; p <= Math.min(tp, 10); p++) {
       btns.push(`<li class="page-item ${p===curPage?'active':''}"><button class="page-link" onclick="${paginationFn}(${p})">${p}</button></li>`);
     }
-    pagHtml = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);font-size:12px" class="text-secondary">
-      <span>${allRecs.length} dòng · <span style="${mono};font-weight:700">${fmtS(sumBy(allRecs,'tien'))}</span></span>
-      <ul class="pagination pagination-sm mb-0">${btns.join('')}</ul>
-    </div>`;
+    pagBtns = `<ul class="pagination pagination-sm mb-0">${btns.join('')}</ul>`;
   }
+  // Footer gộp: bên trái là summary, bên phải là phân trang (nếu có)
+  const pagHtml = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);font-size:12px" class="text-secondary">
+      ${summaryHtml}
+      ${pagBtns}
+    </div>`;
   // Sticky columns: dùng class chuyên để background bám theo hover state
   // (tránh bị transparent khi Bootstrap .table-hover áp dụng background lên row)
   return `<div class="ung-table-wrap" style="overflow-x:auto">
@@ -179,8 +186,8 @@ function renderUngTpSection() {
   }
   const paged = filteredUngTp.slice((ungTpPage-1)*UNG_TP_PG, ungTpPage*UNG_TP_PG);
   container.innerHTML = _ungTableHTML(paged, filteredUngTp, 'Thầu Phụ', 'goUngTpTo', ungTpPage);
-  if (pagEl) pagEl.innerHTML =
-    `<span>${filteredUngTp.length} bản ghi · Tổng: <strong class="text-primary font-monospace">${fmtS(sumBy(filteredUngTp,'tien'))}</strong></span>`;
+  // Đã bỏ dòng text thống kê "X bản ghi · Tổng" dư thừa cho gọn giao diện
+  if (pagEl) pagEl.innerHTML = '';
 }
 
 function renderUngNccSection() {
@@ -193,8 +200,8 @@ function renderUngNccSection() {
   }
   const paged = filteredUngNcc.slice((ungNccPage-1)*UNG_TP_PG, ungNccPage*UNG_TP_PG);
   container.innerHTML = _ungTableHTML(paged, filteredUngNcc, 'Nhà Cung Cấp', 'goUngNccTo', ungNccPage);
-  if (pagEl) pagEl.innerHTML =
-    `<span>${filteredUngNcc.length} bản ghi · Tổng: <strong class="text-primary font-monospace">${fmtS(sumBy(filteredUngNcc,'tien'))}</strong></span>`;
+  // Đã bỏ dòng text thống kê "X bản ghi · Tổng" dư thừa cho gọn giao diện
+  if (pagEl) pagEl.innerHTML = '';
 }
 
 // Backward-compat wrapper — gọi cả 2 section

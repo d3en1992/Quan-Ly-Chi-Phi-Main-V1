@@ -151,6 +151,7 @@ function delInvoice(id) {
   clearInvoiceCache(); save('inv_v3', invoices);
   trashAdd({...inv}); // giữ trong trash để UI "Thùng Rác" vẫn hoạt động
   updateTop(); buildFilters(); filterAndRender(); renderTrash();
+  renderTodayInvoices(); // cập nhật lại bảng "Hóa đơn đã nhập trong ngày" để dòng vừa xóa biến mất
   toast('Đã xóa (có thể khôi phục trong Thùng Rác)');
 }
 
@@ -346,7 +347,7 @@ function renderTodayInvoices() {
   const todayInvs = invoices.filter(i => i.ngay === date && !i.ccKey && !i.deletedAt);
   if(!todayInvs.length) {
     const displayDate = fmtISODate(date, date);
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Chưa có hóa đơn nào vào ngày ${displayDate}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Chưa có hóa đơn nào vào ngày ${displayDate}</td></tr>`;
     if(footer) footer.innerHTML = '';
     return;
   }
@@ -360,6 +361,12 @@ function renderTodayInvoices() {
       <td class="text-secondary" style="font-size:11px">${x(recCatName(inv,'inv','nguoi')||'—')}</td>
       <td class="text-secondary" style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(recCatName(inv,'inv','ncc')||'—')}</td>
+      <td style="white-space:nowrap" class="text-center">
+        <span class="d-inline-flex gap-1">
+          <button class="btn btn-outline-primary btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn"><i class="bi bi-trash-fill"></i></button>
+        </span>
+      </td>
     </tr>`;
   }).join('');
 

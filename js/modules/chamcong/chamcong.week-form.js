@@ -63,11 +63,37 @@ function loadCCWeekForm() {
   if (rec) {
     buildCCTable(rec.workers);
   } else if (ct) {
-    // Auto-copy workers from most recent week of same CT (names+luong only, clear days/extra)
-    const prev = ccData
-      .filter((w) => !w.deletedAt && _matchCT(w) && w.fromDate < f)
-      .sort((a, b) => b.fromDate.localeCompare(a.fromDate))[0];
-    if (prev) {
+    // Tự động copy DANH SÁCH công nhân + Lương/ngày sang tuần mới — nhưng có ĐIỀU KIỆN:
+    // CHỈ copy từ ĐÚNG tuần liền trước đó (lùi 7 ngày), và CHỈ KHI tuần liền trước
+    // thực sự có phát sinh ngày công. Mục đích: tránh việc bấm "Tuần sau" liên tục
+    // qua các tuần trống làm rác dữ liệu (tên + lương) bị kéo dài mãi mãi.
+
+    // Tính ngày Chủ Nhật của tuần liền trước (lùi đúng 7 ngày so với tuần đang mở)
+    const prevDate = new Date(f + "T00:00:00");
+    prevDate.setDate(prevDate.getDate() - 7);
+    const prevWeekISO =
+      prevDate.getFullYear() +
+      "-" +
+      String(prevDate.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(prevDate.getDate()).padStart(2, "0");
+
+    // Tìm bản ghi của ĐÚNG tuần liền trước + cùng công trình (không lấy tuần xa hơn)
+    const prev = ccData.find(
+      (w) => !w.deletedAt && w.fromDate === prevWeekISO && _matchCT(w),
+    );
+
+    // Kiểm tra tuần liền trước có ngày công thực tế hay không
+    // (ít nhất 1 công nhân có chấm công > 0 trong 7 ngày của tuần)
+    const _hasActualWork =
+      prev &&
+      Array.isArray(prev.workers) &&
+      prev.workers.some(
+        (wk) => Array.isArray(wk.d) && wk.d.some((v) => Number(v) > 0),
+      );
+
+    if (_hasActualWork) {
+      // Tuần liền trước CÓ dữ liệu → copy tên + lương, xóa sạch ngày công/phụ cấp/nợ
       const stub = prev.workers.map((wk) => ({
         name: wk.name,
         luong: wk.luong,
@@ -81,6 +107,7 @@ function loadCCWeekForm() {
       }));
       buildCCTable(stub);
     } else {
+      // Tuần liền trước KHÔNG có dữ liệu chấm công → để trống danh sách
       buildCCTable([]);
     }
   } else {
