@@ -222,7 +222,7 @@ function delUngRecord(id) {
   if (idx < 0) return;
   if (!confirm('Xóa bản ghi tiền ứng này?')) return;
   const now = Date.now();
-  ungRecords[idx] = { ...ungRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID };
+  ungRecords[idx] = { ...ungRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('ung_v1', ungRecords);
   buildUngFilters(); filterAndRenderUng(); _refreshAllTabs();
   toast('Đã xóa bản ghi tiền ứng');

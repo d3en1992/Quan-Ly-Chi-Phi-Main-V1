@@ -80,7 +80,9 @@
       "Bash(mv \"logo cty_LE_upscale.jpg\" \"assets/img/logo-cty.jpg\")",
       "Bash(ls -la *.png *.jpg *.ico *.svg)",
       "Bash(ls -la assets/img/)",
-      "Bash(node --check js/modules/tienung/tienung.history.js)"
+      "Bash(node --check js/modules/tienung/tienung.history.js)",
+      "Read(//c/Users/tinhn/.claude/**)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

@@ -146,7 +146,7 @@ function delInvoice(id) {
   const now = Date.now();
   const idx = invoices.findIndex(i => String(i.id) === String(id));
   if (idx >= 0) {
-    invoices[idx] = { ...invoices[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID };
+    invoices[idx] = { ...invoices[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   }
   clearInvoiceCache(); save('inv_v3', invoices);
   trashAdd({...inv}); // giữ trong trash để UI "Thùng Rác" vẫn hoạt động

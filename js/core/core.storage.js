@@ -90,6 +90,7 @@ const DB_KEY_MAP = {
   'cat_tbteb':    { table: 'categories', isArr: false, rowId: 'tbTen'      },
   // ── Settings objects (settings table) ────────────────────────
   'projects_v1':  { table: 'settings',   isArr: false, rowId: 'projects'    },
+  'customers_v1': { table: 'settings',   isArr: false, rowId: 'customers'   }, // Chủ đầu tư (CRM) — mảng khách hàng lưu blob trong settings
   'hopdong_v1':   { table: 'settings',   isArr: false, rowId: 'hopdong'     },
   'thauphu_v1':   { table: 'settings',   isArr: false, rowId: 'thauphu'     },
   'trash_v1':     { table: 'settings',   isArr: false, rowId: 'trash'       },
@@ -198,7 +199,7 @@ const LAST_SYNC_KEY = 'lastSyncAt';
 // Keys kích hoạt pending counter — gồm cả cat để xóa danh mục không bị sống lại sau pull
 const _SYNC_DATA_KEYS = new Set([
   'inv_v3','cc_v2','ung_v1','tb_v1','thu_v1',
-  'thauphu_v1','hopdong_v1','projects_v1','trash_v1','users_v1',
+  'thauphu_v1','hopdong_v1','projects_v1','customers_v1','trash_v1','users_v1',
   // Cat string-array keys: pending guard tránh pull ghi đè danh mục đã xóa local
   'cat_ct','cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb',
   // Roles & years: cần pending guard giống cat arrays

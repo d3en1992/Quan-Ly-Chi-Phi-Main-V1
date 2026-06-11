@@ -52,7 +52,8 @@ function fbYearCatPayload(yr, key, dateField) {
 
 // Payload 4 doc danh mục dùng chung
 function fbMetaCTPayload() {
-  return { v: 4, projects: load('projects_v1', []) };
+  // Đẩy kèm customers (Chủ đầu tư/CRM) trong cùng doc meta_cong_trinh
+  return { v: 4, projects: load('projects_v1', []), customers: load('customers_v1', []) };
 }
 function fbMetaDMPayload() {
   return { v: 4,

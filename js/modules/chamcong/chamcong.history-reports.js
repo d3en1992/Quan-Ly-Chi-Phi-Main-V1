@@ -385,7 +385,7 @@ function delCCWeekById(id, fromDate, ct) {
     const matchKey = r.fromDate === fromDate && (r.projectId === ct || r.ct === ct);
     if ((matchId || matchKey) && !r.deletedAt) {
       found = true;
-      return { ...r, deletedAt: now, updatedAt: now, deviceId: DEVICE_ID };
+      return { ...r, deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
     }
     return r;
   });

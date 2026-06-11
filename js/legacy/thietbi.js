@@ -426,7 +426,7 @@ function tbDeleteRow(id) {
   if (!r) return;
   if (!isKhoTong(r)) { toast('Không thể xóa thiết bị ở công trình!', 'error'); return; }
   if (!confirm('Xóa thiết bị này khỏi Kho Tổng?')) return;
-  tbData = softDeleteRecord(tbData, id);
+  tbData = softDeleteRecord(tbData, id, { deletedBy: getCurrentUser()?.username || 'Không rõ' });
   save('tb_v1', tbData);
   tbRenderList();
   tbRenderThongKeVon();

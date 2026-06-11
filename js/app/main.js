@@ -89,6 +89,7 @@ function init() {
     tbData      = load('tb_v1', []);
     thuRecords  = load('thu_v1', []);
     projects    = load('projects_v1', []);
+    customers   = load('customers_v1', []); // Chủ đầu tư (CRM) — nạp sau pull cloud
     cats.congTrinh      = load('cat_ct',       DEFAULTS.congTrinh);
     cats.congTrinhYears = load('cat_ct_years', {});
     cats.loaiChiPhi     = load('cat_loai',     DEFAULTS.loaiChiPhi);
@@ -166,7 +167,8 @@ function goPage(btn, id) {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
     thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
     nhapung: '💰 Tiền Ứng', thietbi: '🔧 Theo Dõi TB',
-    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', dashboard: '📊 Dashboard'
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', dashboard: '📊 Dashboard',
+    thungrac: '🗑️ Thùng Rác'
   };
   _setTopbarTabTitle(_PAGE_LABELS[id] || '');
   // Reload globals từ _mem → đảm bảo tab switch luôn thấy data mới nhất (kể cả khi auto-sync chạy ngầm)
@@ -180,6 +182,7 @@ function goPage(btn, id) {
   if (id==='chamcong') { populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); }
   if (id==='thietbi') { tbPopulateSels(); tbBuildRows(5); tbRenderList(); renderKhoTong(); }
   if (id==='congtrinh') renderProjectsPage();
+  if (id==='thungrac') renderThungRac();
   queueApplyRoleUI();
 }
 
@@ -435,8 +438,10 @@ window._dataReady = false;
   thuRecords       = load('thu_v1',      []);
   thauPhuContracts = load('thauphu_v1',  []);
   projects         = load('projects_v1', []);
+  customers        = load('customers_v1', []); // Chủ đầu tư (CRM)
   _migrateProjectDates(); // year → startDate/endDate migration (idempotent)
   if (typeof _migrateChuDauTuFromHopDong === 'function') _migrateChuDauTuFromHopDong(); // backfill chuDauTu từ hopdong_v1.khachHang
+  if (typeof _migrateCustomersFromProjects === 'function') _migrateCustomersFromProjects(); // backfill customerId từ chuDauTu
   cats.congTrinh      = load('cat_ct',       DEFAULTS.congTrinh);
   cats.congTrinhYears = load('cat_ct_years', {});
   cats.loaiChiPhi     = load('cat_loai',     DEFAULTS.loaiChiPhi);

@@ -167,7 +167,7 @@ function delHopDongChinh(keyId) {
   const ctName = p ? p.name : keyId;
   if (!confirm('Xóa hợp đồng của ' + ctName + '?')) return;
   const now = Date.now();
-  hopDongData[keyId] = { ...(hopDongData[keyId] || {}), deletedAt: now, updatedAt: now };
+  hopDongData[keyId] = { ...(hopDongData[keyId] || {}), deletedAt: now, updatedAt: now, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('hopdong_v1', hopDongData);
   renderHdcTable(_hdcPage);
   renderDashboard();
@@ -380,7 +380,7 @@ function delThuRecord(id) {
   const idx = thuRecords.findIndex(r => String(r.id) === String(id));
   if (idx < 0) return;
   const now = Date.now();
-  thuRecords[idx] = { ...thuRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID };
+  thuRecords[idx] = { ...thuRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('thu_v1', thuRecords);
   renderThuTable(_thuPage);
   renderDashboard();
@@ -574,7 +574,7 @@ function delHopDongThauPhu(id) {
   const idx = thauPhuContracts.findIndex(r => r.id === id);
   if (idx < 0) return;
   const now = Date.now();
-  thauPhuContracts[idx] = { ...thauPhuContracts[idx], deletedAt: now, updatedAt: now };
+  thauPhuContracts[idx] = { ...thauPhuContracts[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('thauphu_v1', thauPhuContracts);
   renderHdtpTable(_hdtpPage);
   toast('Đã xóa hợp đồng thầu phụ', 'success');

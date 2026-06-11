@@ -31,8 +31,6 @@ const PROJECT_STATUS = {
 const _PROJ_DATE_RE    = /^\d{4}-\d{2}-\d{2}$|^\d{2}\/\d{2}\/\d{4}$|^\d{2}-\d{2}-\d{4}$/;
 const _VALID_STATUSES  = new Set(['planning', 'active', 'completed', 'closed']);
 const _PROJ_VALID_TYPES = new Set(['CT', 'SC', 'OTHER']);
-// Hệ số trọng số phân bổ chi phí chung: CT=1.6, SC=1.0, OTHER=1.2
-const _PROJ_FACTORS    = { CT: 1.6, SC: 1.0, OTHER: 1.2 };
 
 // Xác định loại công trình theo tên (không dùng field type)
 // CT: tên bắt đầu bằng "CT", SC: bắt đầu bằng "SC", còn lại: OTHER
@@ -217,7 +215,7 @@ function getProjectAutoStartDate(projectId) {
  * @param {string} [opts.note]      Ghi chú
  * @returns {Object} Công trình vừa tạo
  */
-function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '', chuDauTu = '' } = {}) {
+function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '', chuDauTu = '', customerId = null, heSoTiTrong = 1 } = {}) {
   if (!name || !name.trim()) throw new Error('Tên công trình không được để trống');
   if (!PROJECT_STATUS[status]) throw new Error('Trạng thái không hợp lệ: ' + status);
   const nowMs  = Date.now();
@@ -242,6 +240,10 @@ function createProject({ name, type = 'OTHER', status = 'active', startDate, end
     closedDate:  closedDate || null,
     note:        note || '',
     chuDauTu:    (chuDauTu || '').trim(),
+    // FK liên kết tới bản ghi khách hàng (CRM). Vẫn giữ chuDauTu = tên để tương thích ngược.
+    customerId:  customerId || null,
+    // Hệ số tỉ trọng phân bổ chi phí chung (mặc định 1, k=0 → không gánh)
+    heSoTiTrong: (typeof heSoTiTrong === 'number' && isFinite(heSoTiTrong) && heSoTiTrong >= 0) ? heSoTiTrong : 1,
     createdYear: _year,
     createdAt:   nowMs,
     updatedAt:   nowMs
@@ -267,6 +269,11 @@ function updateProject(id, changes = {}) {
   // Loại bỏ các trường không được phép ghi đè qua changes
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...safeChanges } = changes;
   if (typeof safeChanges.chuDauTu === 'string') safeChanges.chuDauTu = safeChanges.chuDauTu.trim();
+  // Ép kiểu hệ số tỉ trọng về số hợp lệ (>= 0); không hợp lệ → 1
+  if ('heSoTiTrong' in safeChanges) {
+    const _k = Number(safeChanges.heSoTiTrong);
+    safeChanges.heSoTiTrong = (isFinite(_k) && _k >= 0) ? _k : 1;
+  }
   projects[idx] = {
     ...projects[idx],
     ...safeChanges,
@@ -425,14 +432,21 @@ function getProjectDays(p) {
   return days <= 0 ? 1 : days;
 }
 
-/** Hệ số phân bổ theo loại công trình (dựa vào tên): CT=1.6, SC=1.0, OTHER=1.2. */
-function getProjectFactor(p) {
-  return _PROJ_FACTORS[_projTypeByName(p && p.name)] || 1.2;
+/**
+ * Hệ số tỉ trọng (k) do người dùng nhập — dùng để phân bổ chi phí chung CÔNG TY.
+ * Mặc định = 1 (nếu chưa nhập hoặc giá trị không hợp lệ).
+ * k = 0 → công trình KHÔNG gánh chi phí chung (trọng số = 0).
+ */
+function getProjectK(p) {
+  const k = p && p.heSoTiTrong;
+  return (typeof k === 'number' && isFinite(k) && k >= 0) ? k : 1;
 }
+// Alias giữ tương thích tên cũ — "factor" giờ chính là hệ số k người dùng nhập.
+function getProjectFactor(p) { return getProjectK(p); }
 
-/** Trọng số = days × factor. */
+/** Trọng số phân bổ = số ngày thi công (trong năm) × hệ số tỉ trọng k. */
 function getProjectWeight(p) {
-  return getProjectDays(p) * getProjectFactor(p);
+  return getProjectDays(p) * getProjectK(p);
 }
 
 /** Tổng chi phí chung CÔNG TY trong năm đang chọn. */

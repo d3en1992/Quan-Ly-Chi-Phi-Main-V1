@@ -986,6 +986,12 @@
                     data-bs-dismiss="offcanvas">
               📊 DASHBOARD
             </button>
+            <button class="nav-btn"
+                    data-page="thungrac"
+                    onclick="goPage(this,'thungrac')"
+                    data-bs-dismiss="offcanvas">
+              🗑️ THÙNG RÁC
+            </button>
           </nav>
         </div>
       </div>
@@ -1408,14 +1414,6 @@
         </div>
         <div class="records-wrap card shadow-sm overflow-hidden">
           <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
-            <select
-              class="form-select form-select-sm w-auto"
-              id="f-view"
-              onchange="switchTatCaView(this.value)"
-            >
-              <option value="active">Tất cả HĐ</option>
-              <option value="trash">🗑 Đã xóa</option>
-            </select>
             <div class="search-box" id="tc-search-box">
               <span class="ico">🔍</span>
               <input
@@ -2934,6 +2932,9 @@
       <div class="page active" id="page-congtrinh">
         <div id="ct-overview-wrap"></div>
       </div>
+
+      <!-- ── PAGE: THÙNG RÁC ──────────────────────────────────────── -->
+      <div class="page" id="page-thungrac"></div>
     </div>
     <!-- /content -->
 
@@ -2947,6 +2948,21 @@
       </div>
     </div>
 
+    <!-- Modal: Quản Lý Khách Hàng (custom overlay — cùng pattern ct-modal) -->
+    <div class="overlay" id="kh-modal">
+      <div class="app-modal" style="max-width:720px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+        <div class="app-modal-head">
+          <h3>👥 Quản Lý Khách Hàng</h3>
+          <button class="close-btn" onclick="closeKhachHangModal()">✕</button>
+        </div>
+        <div class="app-modal-body" id="kh-modal-body" style="flex:1;overflow-y:auto;padding:0"></div>
+        <div style="padding:10px 16px;border-top:1px solid var(--bs-border-color);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+          <button class="btn btn-success btn-sm" onclick="_khShowAddForm()">➕ Thêm Khách Hàng</button>
+          <button class="btn btn-secondary btn-sm" onclick="closeKhachHangModal()">Đóng</button>
+        </div>
+      </div>
+    </div>
+
     <div class="app-toast" id="toast"></div>
 
     <script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
@@ -2955,6 +2971,8 @@
     <script src="js/core/core.state-backup.js"></script>
     <script src="js/core/core.cloud-cats-ui.js"></script>
     <script src="js/modules/projects/projects.model.js"></script>
+    <script src="js/modules/khachhang/khachhang.model.js"></script>
+    <script src="js/modules/khachhang/khachhang.ui.js"></script>
     <script src="js/modules/projects/projects.migration-selects.js"></script>
     <script src="js/modules/projects/projects.ui.js"></script>
     <script src="js/legacy/tienich.js"></script>
@@ -2979,6 +2997,7 @@
     <script src="js/modules/doanhthu/doanhthu.core.js"></script>
     <script src="js/modules/doanhthu/doanhthu.forms.js"></script>
     <script src="js/modules/doanhthu/doanhthu.reports-export.js"></script>
+    <script src="js/modules/thungrac/thungrac.js"></script>
     <script src="js/sync/sync.js"></script>
     <script src="js/app/auth.js"></script>
     <script src="js/app/main.js"></script>

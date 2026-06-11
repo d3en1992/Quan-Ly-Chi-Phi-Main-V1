@@ -39,11 +39,11 @@ const DEVICE_ID = (() => {
 // [2] SOFT DELETE — không xóa khỏi mảng, chỉ đánh dấu deletedAt
 // (nhiều module gọi: thietbi.js, projects, chấm công...)
 // ══════════════════════════════════════════════════════════════
-function softDeleteRecord(arr, id) {
+function softDeleteRecord(arr, id, extra = {}) {
   const now = Date.now();
   return arr.map(r =>
     String(r.id) === String(id)
-      ? { ...r, deletedAt: now, updatedAt: now, deviceId: DEVICE_ID }
+      ? { ...r, deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, ...extra }
       : r
   );
 }
@@ -303,7 +303,7 @@ async function pushChanges(opts = {}) {
     : _YEAR_CATS;
   // Các key kích hoạt từng doc meta (gộp theo payload tương ứng)
   const _META_TRIGGER_KEYS = new Set([
-    'projects_v1','cat_ct',                                   // → meta_cong_trinh
+    'projects_v1','customers_v1','cat_ct',                    // → meta_cong_trinh
     'cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb',
     'cat_items_v1','cat_cn_roles','cat_ct_years',             // → meta_danh_muc
     'users_v1',                                               // → meta_tai_khoan
@@ -416,6 +416,12 @@ async function _pullMeta() {
       if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
       changed = true;
     }
+    // customers (Chủ đầu tư/CRM) đi kèm trong cùng doc — thay thế local bằng cloud
+    if (d && Array.isArray(d.customers)) {
+      _memSet('customers_v1', d.customers);
+      if (typeof customers !== 'undefined') customers = d.customers;
+      changed = true;
+    }
   } catch (e) { console.warn('[Sync] meta_cong_trinh pull lỗi:', e.message || e); }
 
   // ── meta_danh_muc: catItems (source of truth), vai trò CN, năm theo CT ──
@@ -508,6 +514,12 @@ async function _mergeMetaForPush() {
       const merged = mergeDatasets(load('projects_v1', []), d.projects);
       _memSet('projects_v1', merged);
       if (typeof projects !== 'undefined') projects = merged;
+    }
+    // customers (Chủ đầu tư/CRM): LWW + tombstone merge giống projects
+    if (d && Array.isArray(d.customers)) {
+      const mergedC = mergeDatasets(load('customers_v1', []), d.customers);
+      _memSet('customers_v1', mergedC);
+      if (typeof customers !== 'undefined') customers = mergedC;
     }
   } catch (e) { console.warn('[Sync] merge-push meta_cong_trinh lỗi:', e.message || e); }
 

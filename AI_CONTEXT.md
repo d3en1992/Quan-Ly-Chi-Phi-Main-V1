@@ -33,6 +33,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.7 UI/UX Phase 3 — Sticky + dropdown + dashboard fixes (24/05/2026)](#97-uiux-phase-3--sticky--dropdown--dashboard-fixes-24052026)
    - [9.8 Chủ Đầu Tư + Hide Closed Projects (24/05/2026)](#98-chủ-đầu-tư--hide-closed-projects-24052026)
    - [9.9 Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026)](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)
+   - [9.10 Hóa đơn trong ngày + Chấm công copy + Tiền Ứng (11/06/2026)](#910-hóa-đơn-trong-ngày--chấm-công-copy--tiền-ứng-11062026)
 
 **Phụ lục**
 
@@ -83,7 +84,8 @@ Thứ tự chính xác trong `index.html`:
 | 5 | `js/core/core.normalize.js` | Module chuẩn hóa record về 6 field tiêu chuẩn (`id`, `createdAt`, `updatedAt`, `deletedAt`, `deviceId`, `projectId`) dùng cho import/restore: `normalizeRecord`, `normalizeDataset`, `normalizeImportStore`, `_NORM_CT_FIELD`. Nạp sau `core.storage.js`, trước `core.state-backup.js`. |
 | 6 | `js/core/core.state-backup.js` | State orchestration: `DATA_VERSION`, `migrateData`, `_migrateHopDongKeys`, project lookup helpers, `BACKUP_KEYS`, backup/restore (`_snapshotNow`, `restoreFromBackup`, `renderBackupList`), `exportJSON`, `importJSON`, `importJSONFull` (push cloud cấu trúc B), `_normalizeImportData` (wrapper gọi `normalizeImportStore`), `clearAllCache`, `afterDataChange`, `_reloadGlobals`, khởi tạo global `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` |
 | 7 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, `fsWrap/fsUnwrap`, Firebase REST (`fsGet/fsSet/fsDelete`), cấu trúc B (`fbDocYearCat`, `fbDocMetaCT/DM/TK/HD`, `_YEAR_CATS`, `fbYearCatPayload`, `fbMetaCT/DM/TK/HDPayload`), `_wipeOrphanCloudDocs` (dọn doc rác cấu trúc cũ), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `normalizeCatDisplayName`, `showSyncBanner`, `_setSyncState` |
-| 8 | `js/modules/projects/projects.model.js` | Domain model công trình: `PROJECT_STATUS`, `PROJECT_COMPANY`, `let projects = []`, `_saveProjects`, `rebuildCatCTFromProjects`, `createProject`, `updateProject`, `getProjectById`, `findProjectIdByName`, `getSortedProjects`, `getAllProjects`, `getProjectOptions`, `getProjectDays/Factor/Weight`, `getCompanyCost`, `allocateCompanyCost`, `canDeleteProject`, `resolveProjectName` |
+| 8 | `js/modules/projects/projects.model.js` | Domain model công trình: `PROJECT_STATUS`, `PROJECT_COMPANY`, `let projects = []`, `_saveProjects`, `rebuildCatCTFromProjects`, `createProject` (có param `customerId`), `updateProject`, `getProjectById`, `findProjectIdByName`, `getSortedProjects`, `getAllProjects`, `getProjectOptions`, `getProjectDays`, `getProjectK`, `getProjectFactor` (=k, tương thích cũ), `getProjectWeight` (=ngày×k), `getCompanyCost`, `allocateCompanyCost`, `canDeleteProject`, `resolveProjectName`. Project có thêm field `customerId` (FK → khách hàng) và `heSoTiTrong` (k). |
+| 8b | `js/modules/khachhang/khachhang.model.js` | Model Khách Hàng (Chủ đầu tư/CRM): `let customers = []`, `_saveCustomers`, `_normCustomerName`, `getCustomerById`, `findCustomerByName`, `getAllCustomers`, `createCustomer`, `updateCustomer`, `deleteCustomer` (xóa mềm), `getOrCreateCustomerByName`, `getCustomerOptions`, `_migrateCustomersFromProjects`. Nạp sau `projects.model.js`, trước `projects.migration-selects.js`. |
 | 9 | `js/modules/projects/projects.migration-selects.js` | Migration linking + shared select helpers: `migrateProjectLinks`, `deduplicateProjects`, `_buildProjOpts`, `_buildProjFilterOpts`, `_readPidFromSel`, `_checkProjectClosed` |
 | 10 | `js/modules/projects/projects.ui.js` | Full UI tab Công Trình: `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_goTabWithCT`, `renderProjectsPage`, `renderCTOverview`, `_ctApply`, `_ctRenderGrid`, `openCTDetail`, `openCTCreateModal`, `saveCTCreate`, `openCTEditModal`, `saveCTEdit`, `quickCloseCT`, `confirmQuickClose`, `quickCompleteCT`, `confirmQuickComplete`, `confirmDeleteCT` |
 | 11 | `js/legacy/tienich.js` | Utility, formatter, `buildInvoices()`, invoice cache |
@@ -206,7 +208,7 @@ Dexie physical schema:
 | `equipment` | `id, updatedAt` | `tb_v1` |
 | `ung` | `id, updatedAt` | `ung_v1` |
 | `revenue` | `id, updatedAt` | `thu_v1` |
-| `settings` | `id` | `projects_v1`, `hopdong_v1`, `thauphu_v1`, `trash_v1`, `users_v1`, `cat_ct_years`, `cat_cn_roles`, `cat_items_v1` |
+| `settings` | `id` | `projects_v1`, `customers_v1`, `hopdong_v1`, `thauphu_v1`, `trash_v1`, `users_v1`, `cat_ct_years`, `cat_cn_roles`, `cat_items_v1` |
 
 Online-only data flow (cloud-authoritative):
 
@@ -236,7 +238,7 @@ sequenceDiagram
 
 Mỗi **năm × hạng mục = 1 doc** + **4 doc meta dùng chung**, tên field **đầy đủ (không nén)**:
 
-- `meta_cong_trinh` → `{ projects }`
+- `meta_cong_trinh` → `{ projects, customers }`
 - `meta_danh_muc` → `{ cats, catItems, cnRoles, ctYears }`
 - `meta_tai_khoan` → `{ users }`
 - `meta_hop_dong` → `{ hopDong, thauPhu }`
@@ -272,7 +274,8 @@ Mỗi **năm × hạng mục = 1 doc** + **4 doc meta dùng chung**, tên field 
 | `tb_v1` | `Array<Object>` | Thiết bị | `id:string`, `ct:string`, `projectId:string\|null`, `ten:string`, `soluong:number`, `tinhtrang:string`, `nguoi:string`, `ghichu:string`, `ngay:string`, metadata |
 | `ung_v1` | `Array<Object>` | Tiền ứng | `id:string`, `ngay:string`, `loai:'thauphu'\|'nhacungcap'\|'congnhan'`, `tp:string`, `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nd:string`, metadata |
 | `thu_v1` | `Array<Object>` | Thu tiền | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nguoi:string`, `nd:string`, metadata |
-| `projects_v1` | `Array<Object>` | Master công trình | `{ id, name, type, status, startDate, endDate, closedDate, note, chuDauTu, createdYear, createdAt, updatedAt, deletedAt }` <br> - Special ID: `COMPANY` (CÔNG TY) for overhead costs. <br> - Statuses: `planning`, `active`, `completed`, `closed`. <br> - Types: `CT` (Công trình), `SC` (Sửa chữa), `OTHER`. |
+| `projects_v1` | `Array<Object>` | Master công trình | `{ id, name, type, status, startDate, endDate, closedDate, note, chuDauTu, customerId, heSoTiTrong, createdYear, createdAt, updatedAt, deletedAt }` <br> - `customerId`: FK → `customers_v1[].id` (dual-write cùng `chuDauTu` = tên KH). <br> - `heSoTiTrong` (k): hệ số phân bổ chi phí chung, mặc định 1, `k=0` → không gánh. <br> - Special ID: `COMPANY` (CÔNG TY) for overhead costs. <br> - Statuses: `planning`, `active`, `completed`, `closed`. <br> - Types: `CT` (Công trình), `SC` (Sửa chữa), `OTHER`. |
+| `customers_v1` | `Array<Object>` | Master khách hàng (Chủ đầu tư / CRM) | `{ id, name, phone, email, address, taxCode, note, createdAt, updatedAt, deletedAt }` <br> - 1 khách hàng → nhiều công trình (qua `projects_v1[].customerId`). <br> - Sync piggyback trong doc `meta_cong_trinh`. |
 | `hopdong_v1` | `Object map` | Hợp đồng chính | Key ưu tiên là `projectId`, legacy fallback là tên CT. Value: `giaTri:number`, `giaTriphu:number`, `phatSinh:number`, `nguoi:string`, `ngay:string`, `projectId:string`, `khachHang:string` (legacy fallback cho Chủ Đầu Tư), `items:array?`, `updatedAt:number`, `deletedAt:number\|null` |
 | `thauphu_v1` | `Array<Object>` | Hợp đồng thầu phụ | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string\|null`, `thauphu:string`, `giaTri:number`, `phatSinh:number`, `nd:string`, `items:array?`, metadata |
 | `trash_v1` | `Array/Object` | Thùng rác hóa đơn | Lưu record bị đưa vào trash; vẫn cần giữ metadata để phục hồi/đối chiếu |
@@ -301,10 +304,11 @@ Metadata chuẩn cho record nghiệp vụ:
 | `js/core/core.normalize.js` | `_NORM_CT_FIELD`, `_NORM_UUID_RE` | `_normIsUUID()`, `_normDeviceId()`, `normalizeRecord(rec, key, ctByName)`, `normalizeDataset(key, arr, ctByName)`, `normalizeImportStore(data)` |
 | `js/core/core.state-backup.js` | `DATA_VERSION`, `DATA_VERSION_KEY`, `BACKUP_KEYS`, `BACKUP_KEY`, `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` | `migrateData()`, `_migrateHopDongKeys()`, `_hdLookup()`, `_hdKeyOf()`, `_getProjectById()`, `_getProjectNameById()`, `_resolveCtName()`, `_restoreStore()`, `clearAllCache()`, `getState()`, `afterDataChange()`, `_reloadGlobals()`, `_snapshotNow()`, `getBackupList()`, `restoreFromBackup()`, `renderBackupList()`, `exportJSON()`, `importJSON()`, `importJSONFull()`, `_normalizeImportData()` (wrapper gọi `normalizeImportStore`) |
 | `js/core/core.cloud-cats-ui.js` | `lastSyncUI`, `_CATITEM_TYPE_MAP`, `_YEAR_CATS`, `_fsReads`, `_fsWrites` | `fbReady()`, `fsWrap()`, `fsUnwrap()`, `fbDocYearCat(yr,cat)`, `fbDocMetaCT()`, `fbDocMetaDM()`, `fbDocMetaTK()`, `fbDocMetaHD()`, `fbYearCatPayload(yr,key,dateField)`, `fbMetaCTPayload()`, `fbMetaDMPayload()`, `fbMetaTKPayload()`, `fbMetaHDPayload()`, `_fsCountRead()`, `_fsCountWrite()`, `getFsCounter()`, `fsUrl()`, `fsGet()`, `fsSet()`, `fsDelete()`, `_wipeOrphanCloudDocs()`, `estimateYearKb()`, `gsLoadAll()`, `updateJbBtn()`, `_ensureSyncDot()`, `_setSyncDot()`, `openBinModal()`, `closeBinModal()`, `renderBinModal()`, `_createModalOverlay()`, `fbSaveConfig()`, `fbDisconnect()`, `reloadFromCloud()`, `syncNow()`, `buildYearSelect()`, `_renderYearSelect()`, `_updateYearBtn()`, `saveCats()`, `_catNormKey()`, `_dedupCatItemsNow()`, `normalizeCatDisplayName(catIdOrType,name)`, `_syncCatItems()`, `_rebuildCatArrsFromItems()`, `_migrateCatItemsIfNeeded()`, `showSyncBanner()`, `hideSyncBanner()`, `_setSyncState()` |
-| `js/app/main.js` | `activeYears`, `activeYear`, `currentUser`, `_roleObserver`, `_userHeartbeatTimer`, `window._dataReady` | `init()`, `initAuth()`, `goPage()`, `renderActiveTab()`, `buildYearSelect()`, `onYearChange()`, `applyRoleUI()`, `loadUsers()`, `saveUsers()`, `_showOfflineBlock()`, `_migrateProjectDates()`, `_migrateChuDauTuFromHopDong()` |
-| `js/modules/projects/projects.model.js` | `PROJECT_STATUS`, `PROJECT_COMPANY`, `projects`, `_PROJ_DATE_RE`, `_VALID_STATUSES`, `_PROJ_VALID_TYPES`, `_PROJ_FACTORS` | `_projTypeByName()`, `_isValidProject()`, `cleanupInvalidProjects()`, `_saveProjects()`, `rebuildCatCTFromProjects()`, `_migrateProjectDates()`, `getProjectAutoStartDate()`, `createProject()`, `updateProject()`, `_syncChuDauTuToHopDong()`, `getProjectById()`, `findProjectIdByName()`, `getSortedProjects()`, `getAllProjects()`, `getProjectOptions()`, `getProjectDays()`, `getProjectFactor()`, `getProjectWeight()`, `getCompanyCost()`, `allocateCompanyCost()`, `canDeleteProject()`, `resolveProjectName()` |
+| `js/app/main.js` | `activeYears`, `activeYear`, `currentUser`, `_roleObserver`, `_userHeartbeatTimer`, `window._dataReady` | `init()`, `initAuth()`, `goPage()`, `renderActiveTab()`, `buildYearSelect()`, `onYearChange()`, `applyRoleUI()`, `loadUsers()`, `saveUsers()`, `_showOfflineBlock()`, `_migrateProjectDates()`, `_migrateChuDauTuFromHopDong()`, `_migrateCustomersFromProjects()` (nạp `customers` global ở cả 2 block load) |
+| `js/modules/projects/projects.model.js` | `PROJECT_STATUS`, `PROJECT_COMPANY`, `projects`, `_PROJ_DATE_RE`, `_VALID_STATUSES`, `_PROJ_VALID_TYPES` | `_projTypeByName()`, `_isValidProject()`, `cleanupInvalidProjects()`, `_saveProjects()`, `rebuildCatCTFromProjects()`, `_migrateProjectDates()`, `getProjectAutoStartDate()`, `createProject(...customerId, heSoTiTrong)`, `updateProject()`, `_syncChuDauTuToHopDong()`, `getProjectById()`, `findProjectIdByName()`, `getSortedProjects()`, `getAllProjects()`, `getProjectOptions()`, `getProjectDays()`, `getProjectK()` (k phân bổ, mặc định 1), `getProjectFactor()` (=k, tương thích cũ), `getProjectWeight()` (=ngày×k), `getCompanyCost()`, `allocateCompanyCost()`, `canDeleteProject()`, `resolveProjectName()`. _(Đã bỏ `_PROJ_FACTORS` cứng CT/SC/OTHER.)_ |
+| `js/modules/khachhang/khachhang.model.js` | `customers` | `_saveCustomers()`, `_normCustomerName()` (bỏ dấu, không phân biệt hoa/thường), `getCustomerById()`, `findCustomerByName()`, `getAllCustomers()`, `createCustomer()`, `updateCustomer()`, `deleteCustomer()` (xóa mềm), `getOrCreateCustomerByName()`, `getCustomerOptions(selectedId)`, `_migrateCustomersFromProjects()` |
 | `js/modules/projects/projects.migration-selects.js` | _(không có global riêng)_ | `migrateProjectLinks()`, `deduplicateProjects()`, `_buildProjOpts(selected, placeholder, { includeCompany, excludeClosed })`, `_buildProjFilterOpts()`, `_readPidFromSel()`, `_checkProjectClosed()` |
-| `js/modules/projects/projects.ui.js` | `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_ctSearch`, `_ctFStatus`, `_ctFType`, `_ctFLaiLo` | `_goTabWithCT()`, `renderProjectsPage()`, `_ctGetCosts()`, `_buildInvoiceMap()`, `_ctGetCostsFromMap()`, `_ptDuration()`, `_ptStatusBadge()`, `_ptStatBox()`, `_ptDurationDays()`, `renderCTOverview()`, `_ctApply()`, `_ctRenderGrid()`, `openCTDetail()`, `openCTCreateModal()`, `saveCTCreate()`, `openCTEditModal()`, `saveCTEdit()`, `quickCloseCT()`, `confirmQuickClose()`, `quickCompleteCT()`, `confirmQuickComplete()`, `confirmDeleteCT()` |
+| `js/modules/projects/projects.ui.js` | `_fmtProjDate`, `_PT_STATUS_META`, `_PT_GROUP_LABELS`, `_PT_ORDER`, `_ctSearch`, `_ctFStatus`, `_ctFType`, `_ctFLaiLo` | `_goTabWithCT()`, `renderProjectsPage()`, `_ctGetCosts()`, `_buildInvoiceMap()`, `_ctGetCostsFromMap()`, `_ptDuration()`, `_ptStatusBadge()`, `_ptStatBox()`, `_ptDurationDays()`, `renderCTOverview()`, `_ctApply()`, `_ctRenderGrid()`, `_ctTongChi(p,c)` (nguồn duy nhất tính tổng chi — dùng cho thẻ + chi tiết), `openCTDetail()`, `_renderCustomerSelect()`, `_renderNewCustPane()`, `_onCustPickerChange()`, `_resolveCustomerFromPicker()` (picker chọn/thêm KH), `openCTCreateModal()`, `saveCTCreate()`, `openCTEditModal()`, `saveCTEdit()`, `quickCloseCT()`, `confirmQuickClose()`, `quickCompleteCT()`, `confirmQuickComplete()`, `confirmDeleteCT()` |
 | `js/legacy/tienich.js` | `invoiceCache`, numeric keypad state | `buildInvoices()`, `getInvoicesCached()`, `clearInvoiceCache()`, `updateTop()`, format/date utilities |
 | `js/modules/hoadon/hoadon.quick-entry.js` | _(không có global riêng ngoài scope của module)_ | `initTable()`, `addRows()`, `refreshEntryDropdowns()`, `addRow()`, `delRow()`, `renumber()`, `calcSummary()`, `clearTable()`, `saveAllRows()`, `_showDupModal()`, `closeDupModal()`, `forceSaveAll()`, `_ensureInvRef()`, `_doSaveRows()`, `calcRowMoney()`, `getRowData()` |
 | `js/modules/hoadon/hoadon.sheet-grid.js` | Sheet/grid interaction state | Excel-like selection, copy/paste vùng, keyboard navigation, autocomplete trong bảng nhập nhanh |
@@ -803,6 +807,92 @@ Tên công trình đã có ở `modal-title` header. Row 0 trong `openCTDetail` 
 - `_wipeOrphanCloudDocs()`: liệt kê collection, **xóa hẳn** mọi doc không thuộc B (doc gộp `y2025`/`y2026` đời cũ, `danh_muc`, rác V2...). Dùng `fsDelete` (REST DELETE).
 
 **Dọn code chết:** đã xóa `compressInv/CC/Ung/Tb` + `expandInv/CC/Ung/Tb`, `fbDocYear`, `fbDocCats`, `fbYearPayload`, `fbCatsPayload` (không còn caller). Block push V2 trong `importJSONFull` đã xóa.
+
+### 9.10. Hóa đơn trong ngày + Chấm công copy + Tiền Ứng (11/06/2026)
+
+Bốn yêu cầu tính năng/sửa lỗi cộng một tinh chỉnh summary row.
+
+#### Task 1 — Tab Nhập Hóa Đơn: nút Sửa/Xóa cho bảng "Hóa Đơn Đã Nhập Trong Ngày"
+
+**Vấn đề:** Bảng `#today-inv-tbody` chỉ hiển thị, chưa cho sửa/xóa nhanh từng dòng.
+
+**Giải pháp:**
+- `index.html`: thêm cột header `<th class="text-center">Thao Tác</th>` vào bảng "Hóa Đơn Đã Nhập Trong Ngày" (table có `#today-inv-tbody`).
+- `hoadon.list-trash.js` → `renderTodayInvoices()`: mỗi dòng thêm 1 ô thao tác với 2 nút tái dùng đúng handler của bảng "Tất cả": `editManualInvoice(id)` (✏️) và `delInvoice(id)` (🗑️). Đổi colspan của empty-row 6 → 7.
+- `hoadon.list-trash.js` → `delInvoice()`: thêm `renderTodayInvoices()` vào cuối để bảng trong ngày tự cập nhật sau khi xóa (bảng này filter `!i.ccKey` nên toàn hóa đơn manual → an toàn cho cả 2 hàm sửa/xóa).
+
+#### Task 2 — Tab Sổ Chấm Công: chỉ copy tuần khi tuần liền trước có ngày công
+
+**Vấn đề (logic bug):** `loadCCWeekForm()` auto-copy tên + lương từ **tuần gần nhất bất kỳ** có `fromDate < f`, bất kể tuần liền trước có dữ liệu hay không. Bấm "Tuần sau" liên tục qua các tuần trống → rác (tên + lương) bị kéo dài mãi.
+
+**Giải pháp:** `chamcong.week-form.js` → `loadCCWeekForm()` nhánh `else if (ct)`:
+- Tính `prevWeekISO` = ngày CN của **đúng tuần liền trước** (lùi 7 ngày từ `f`), tìm record `fromDate === prevWeekISO && _matchCT(w)` (không lấy tuần xa hơn).
+- Chỉ copy stub (tên + lương, xóa ngày công/phụ cấp/nợ) **NẾU** tuần liền trước có ngày công thực tế: `prev.workers.some(wk => Array.isArray(wk.d) && wk.d.some(v => Number(v) > 0))`.
+- Ngược lại → `buildCCTable([])` (để trống danh sách).
+
+#### Task 3 — Tab Tiền Ứng: summary row ở cuối bảng Thầu Phụ & NCC
+
+**Diễn biến:** đầu tiên gỡ dòng text "X bản ghi · Tổng" dư thừa ở `pagEl` (`#ung-tp-pagination` / `#ung-ncc-pagination`) trong `renderUngTpSection()` / `renderUngNccSection()` (set `pagEl.innerHTML = ''`). Sau đó bổ sung lại **summary row chuẩn** trong footer của bảng.
+
+**Giải pháp:** `tienung.history.js` → `_ungTableHTML()`:
+- Dòng summary **luôn hiển thị** ở cuối bảng (kể cả khi chỉ 1 trang), thống kê theo `allRecs` (toàn bộ bản ghi **đang lọc**, không phải chỉ dòng của trang hiện tại).
+- Định dạng đầy đủ: `X bản ghi · Tổng: <numFmt> đ` (dùng `numFmt` thay vì `fmtS` rút gọn "tr").
+- Nút phân trang chỉ render khi `tp > 1`, nằm cùng hàng bên phải summary.
+
+#### Task 4 — Tab Tiền Ứng: tách nút Xuất Phiếu Ứng theo loại
+
+**Vấn đề:** 1 nút `exportUngToImage()` chung (chỉ đặt ở section Thầu Phụ) gom checkbox của cả 2 bảng (chung class `.ung-row-chk`) → chứng từ lẫn lộn.
+
+**Giải pháp:**
+- `chamcong.history-reports.js`: refactor `exportUngToImage()` thành lõi `_exportUngImageFrom(scopeId, sourceRecs)` — chỉ lấy `.ung-row-chk:checked` **trong đúng container** (`scope.querySelectorAll`) và lọc theo `sourceRecs`. Thêm 2 wrapper: `exportUngTpToImage()` (`'ung-tp-section'`, `filteredUngTp`) và `exportUngNccToImage()` (`'ung-ncc-section'`, `filteredUngNcc`).
+- `index.html`: nút section Thầu Phụ đổi thành "📸 Xuất Phiếu Ứng TP" gọi `exportUngTpToImage()`; thêm nút "📸 Xuất Phiếu Ứng NCC" gọi `exportUngNccToImage()` vào section Nhà Cung Cấp.
+
+---
+
+### 9.11. Model Khách Hàng (CRM) + Tổng chi trên thẻ + Hệ số tỉ trọng (11/06/2026)
+
+Ba việc: tách Chủ Đầu Tư thành model dữ liệu độc lập (hướng CRM), sửa số tiền hiển thị trên thẻ công trình, và thay "factor theo tên loại" bằng "hệ số tỉ trọng k" do người dùng nhập.
+
+#### Việc 1 — Tách "Chủ Đầu Tư" thành Model Khách Hàng (phạm vi: Model + dropdown, **chưa có tab quản lý**)
+
+**Bối cảnh:** trước đây `chuDauTu` chỉ là 1 ô text trên công trình. Mục tiêu CRM: 1 khách hàng → nhiều công trình (quan hệ 1-N), lưu SĐT/email/địa chỉ/MST để chăm sóc.
+
+**Giải pháp — file mới `js/modules/khachhang/khachhang.model.js`:**
+- Global `let customers = []`. Shape KH: `{ id, name, phone, email, address, taxCode, note, createdAt, updatedAt, deletedAt }`.
+- CRUD: `getCustomerById`, `findCustomerByName` (so khớp không phân biệt hoa/thường & dấu qua `_normCustomerName` dùng `normalize('NFD')`), `getAllCustomers` (sort theo tên locale vi), `createCustomer`, `updateCustomer`, `deleteCustomer` (xóa mềm `deletedAt`), `getOrCreateCustomerByName`, `getCustomerOptions(selectedId)` (render `<option>`), `_saveCustomers()` → `save('customers_v1', customers)`.
+- Migration `_migrateCustomersFromProjects()`: mỗi project có `chuDauTu` nhưng chưa có `customerId` → tìm/tạo KH rồi gán `project.customerId` (idempotent, chạy 1 lần lúc khởi động).
+- **Chiến lược dual-write:** project lưu cả `customerId` (FK) **và** `chuDauTu` = tên KH (giữ tương thích ngược cho search/sort/đồng bộ HĐ).
+
+**Đăng ký store (`js/core/core.storage.js`):**
+- `DB_KEY_MAP['customers_v1'] = { table:'settings', isArr:false, rowId:'customers' }`.
+- Thêm `'customers_v1'` vào `_SYNC_DATA_KEYS`.
+
+**Nạp dữ liệu (`js/app/main.js`):** thêm `customers = load('customers_v1', [])` ở **cả 2 block** (callback `gsLoadAll` sau pull cloud + block init chính); gọi `_migrateCustomersFromProjects()` sau `_migrateChuDauTuFromHopDong()`.
+
+**Đồng bộ cloud (piggyback trong doc `meta_cong_trinh`, KHÔNG tạo doc mới):**
+- `js/core/core.cloud-cats-ui.js` → `fbMetaCTPayload()`: thêm `customers: load('customers_v1', [])`.
+- `js/sync/sync.js`: thêm `'customers_v1'` vào `_META_TRIGGER_KEYS`; trong `_pullMeta()` (block `meta_cong_trinh`) đọc `d.customers` → `_memSet('customers_v1', ...)` + gán `customers`; trong `_mergeMetaForPush()` merge `customers` qua `mergeDatasets()` (LWW + tombstone, KH có đủ id/updatedAt/deletedAt).
+
+**Dropdown UI (`js/modules/projects/projects.ui.js`):**
+- Helper dùng chung: `_renderCustomerSelect(prefix, selectedId, ...)` (dropdown KH + option `__new__` "➕ Thêm mới"), `_renderNewCustPane(prefix, ...)` (panel nhập KH mới full-width, ẩn mặc định), `_onCustPickerChange(prefix)` (toggle panel), `_resolveCustomerFromPicker(prefix)` → `{ customerId, chuDauTu }` (chọn có sẵn / tạo KH mới / để trống).
+- Modal Tạo (`openCTCreateModal`/`saveCTCreate`) và Sửa (`openCTEditModal`/`saveCTEdit`): thay ô text `ct-*-chudautu` bằng dropdown `ct-*-customer` + panel `ct-*-newcust`; khi lưu gọi `_resolveCustomerFromPicker()` → truyền `customerId` + `chuDauTu` vào `createProject`/`updateProject`.
+- Ô "Chủ Đầu Tư" trong chi tiết: nếu có `customerId` → hiện tên KH + dòng phụ SĐT · email; fallback `p.chuDauTu`.
+- `createProject` nhận thêm param `customerId` (lưu `customerId: customerId || null`). `updateProject` đã pass `safeChanges` nên `customerId` tự chảy.
+- HTML IDs mới: `ct-new-customer`, `ct-new-newcust`, `ct-new-cust-name/-phone/-email/-address/-taxcode` (và bộ `ct-edit-*` tương ứng).
+
+**Nạp script:** `index.html` thêm `<script src="js/modules/khachhang/khachhang.model.js">` (giữa `projects.model.js` và `projects.migration-selects.js`).
+
+#### Việc 2 — Sửa số tiền hiển thị trên thẻ công trình
+
+**Vấn đề:** thẻ ở Dashboard chỉ hiện tổng hóa đơn (`c.total`), không khớp "tổng chi" ở modal chi tiết (gồm cả tiền ứng thầu phụ/NCC trừ HĐ NCC trùng).
+
+**Giải pháp (`js/modules/projects/projects.ui.js`):** thêm helper `_ctTongChi(p, c)` là **nguồn duy nhất** tính `{ tongChi, ungTp, ungNcc, tongHopDongNcc }`; dùng chung cho cả `_ctRenderGrid` (thẻ) và `openCTDetail` (chi tiết) → thẻ và chi tiết luôn cùng số.
+
+#### Việc 3 — Hệ số tỉ trọng k (thay factor theo tên loại, giữ số ngày)
+
+**Vấn đề:** trọng số phân bổ chi phí chung cũ = `_PROJ_FACTORS` cứng theo tên loại (CT=1.6/SC=1.0/OTHER=1.2) — không chỉnh được.
+
+**Giải pháp (`js/modules/projects/projects.model.js`):** bỏ `_PROJ_FACTORS`; thêm `getProjectK(p)` (đọc `p.heSoTiTrong`, mặc định 1, `k=0` → không gánh chi phí chung); `getProjectWeight(p) = getProjectDays(p) × getProjectK(p)`. `createProject`/`updateProject` nhận & validate `heSoTiTrong` (số ≥ 0, không hợp lệ → 1). UI: modal Sửa thêm ô `ct-edit-hesotitrong`; nhãn box phân bổ trong chi tiết hiện `(k=...)`.
 
 ---
 

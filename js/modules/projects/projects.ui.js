@@ -112,6 +112,52 @@ function _ctGetCostsFromMap(project, invMap) {
   };
 }
 
+// ── Tính TỔNG CHI thực tế của một công trình (single source of truth) ──
+// Trả về cùng giá trị "Tổng Chi Công Trình" như trong modal chi tiết, để
+// thẻ ngoài Dashboard và modal luôn khớp nhau. KHÔNG bao gồm chi phí chung
+// CÔNG TY phân bổ (đó là số phụ hiển thị riêng "/X").
+//
+// Công thức: tổng HĐ + ứng thầu phụ + ứng NCC − công nợ NCC (đã nằm trong HĐ)
+//   - ungTp  : ứng thầu phụ (loai='thauphu') của CT, theo năm đang chọn
+//   - ungNcc : ứng nhà cung cấp (loai='nhacungcap') của CT, theo năm đang chọn
+//   - tongHopDongNcc: phần HĐ thuộc các NCC mà CT này đã ứng → trừ ra để tránh
+//     double-count (vì các HĐ đó đã được cộng trong c.total)
+//
+// @param {Object} p  Project (cần p.id, p.name)
+// @param {Object} c  Cost object từ _ctGetCosts / _ctGetCostsFromMap ({ total, invs })
+// @returns {{ tongChi, ungTp, ungNcc, tongHopDongNcc }}
+function _ctTongChi(p, c) {
+  const _hasUng = typeof ungRecords !== 'undefined';
+
+  // Ứng thầu phụ của CT theo năm
+  const ungTp = _hasUng ? ungRecords.filter(r => {
+    if (r.deletedAt || r.loai !== 'thauphu' || !inActiveYear(r.ngay)) return false;
+    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
+  }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
+
+  // Ứng nhà cung cấp của CT theo năm
+  const ungNcc = _hasUng ? ungRecords.filter(r => {
+    if (r.deletedAt || r.loai !== 'nhacungcap' || !inActiveYear(r.ngay)) return false;
+    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
+  }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
+
+  // Tên các NCC mà CT này đã ứng (toàn bộ lịch sử, không lọc năm)
+  const nccNamesInUng = new Set(
+    _hasUng ? ungRecords.filter(r => {
+      if (r.deletedAt || r.loai !== 'nhacungcap') return false;
+      return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
+    }).map(r => (r.tp || '').trim()).filter(Boolean) : []
+  );
+
+  // Công nợ NCC: tổng HĐ thuộc NCC đã ứng (đã có trong c.total → trừ để khỏi đếm 2 lần)
+  const tongHopDongNcc = (c.invs || [])
+    .filter(i => i.ncc && nccNamesInUng.has(i.ncc.trim()))
+    .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+
+  const tongChi = (c.total || 0) + ungTp + ungNcc - tongHopDongNcc;
+  return { tongChi, ungTp, ungNcc, tongHopDongNcc };
+}
+
 // ── Tính thời gian thi công ─────────────────────────────────────────
 function _ptDuration(p) {
   if (!p.startDate) return '';
@@ -369,13 +415,11 @@ function _ctRenderGrid() {
       if (r.deletedAt || !inActiveYear(r.ngay)) return false;
       return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
     }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
-    const ungTp = (typeof ungRecords !== 'undefined') ? ungRecords.filter(r => {
-      if (r.deletedAt || r.loai !== 'thauphu' || !inActiveYear(r.ngay)) return false;
-      return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-    }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
-    const laiLo = thu - (c.total + ungTp);
+    // Tổng chi thực tế (HĐ + ứng thầu phụ + ứng NCC − công nợ NCC) — dùng chung với modal
+    const { tongChi, ungTp } = _ctTongChi(p, c);
+    const laiLo = thu - tongChi;
     const days  = _ptDurationDays(p, c.invs);
-    return { p, c, laiLo, days, thu, ungTp };
+    return { p, c, tongChi, laiLo, days, thu, ungTp };
   });
 
   // Chỉ giữ CT có hóa đơn hợp lệ theo năm đang chọn:
@@ -445,7 +489,7 @@ function _ctRenderGrid() {
 
   gridWrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
     ${companyCard}
-    ${withData.map(({ p, c, days }) => {
+    ${withData.map(({ p, c, tongChi, days }) => {
       const dim      = p.status === 'closed' ? 'opacity:.72;' : '';
       const durLabel = days > 0 ? `${days} ngày` : '';
       const _pt = _projTypeByName(p.name);
@@ -454,6 +498,7 @@ function _ctRenderGrid() {
       const countLine = c.count > 0
         ? `<span>${c.count} hóa đơn</span>${durLabel ? `<span class="text-secondary">·</span><span>${durLabel}</span>` : ''}`
         : `<span class="ghost">Chưa phát sinh</span>`;
+      // [FIX] Hiển thị TỔNG CHI thực tế (gồm ứng thầu phụ / NCC) thay vì chỉ tổng hóa đơn
       return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
         <div class="ct-card-head" style="align-items:flex-start">
           <div style="flex:1;min-width:0">
@@ -463,7 +508,7 @@ function _ctRenderGrid() {
               ${countLine}
             </div>
           </div>
-          <div class="ct-card-total" style="margin-left:8px">${fmtS(c.total)}</div>
+          <div class="ct-card-total" style="margin-left:8px">${fmtS(tongChi)}</div>
         </div>
       </div>`;
     }).join('')}
@@ -522,37 +567,13 @@ function openCTDetail(id) {
   const matCost  = c.invs.filter(i => i.source !== 'cc').reduce((s,i) => s+(i.thanhtien||i.tien||0), 0);
   const labCost  = c.invs.filter(i => i.source === 'cc').reduce((s,i) => s+(i.thanhtien||i.tien||0), 0);
 
-  // Ứng thầu phụ (loai='thauphu') — KHÔNG tính ứng công nhân
-  const ungTpCost = (typeof ungRecords !== 'undefined') ? ungRecords.filter(r => {
-    if (r.deletedAt || r.loai !== 'thauphu') return false;
-    if (!inActiveYear(r.ngay)) return false;
-    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-  }).reduce((s,r) => s+(r.tien||0), 0) : 0;
-
-  // Ứng nhà cung cấp (loai='nhacungcap')
-  const ungNccCost = (typeof ungRecords !== 'undefined') ? ungRecords.filter(r => {
-    if (r.deletedAt || r.loai !== 'nhacungcap') return false;
-    if (!inActiveYear(r.ngay)) return false;
-    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-  }).reduce((s,r) => s+(r.tien||0), 0) : 0;
-
-  // Danh sách tên NCC đã ứng cho công trình này (toàn bộ lịch sử, không lọc năm)
-  // → dùng để xác định đúng NCC nào thuộc công trình, tránh trừ nhầm NCC không liên quan
-  const nccNamesInUng = new Set(
-    (typeof ungRecords !== 'undefined') ? ungRecords.filter(r => {
-      if (r.deletedAt || r.loai !== 'nhacungcap') return false;
-      return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-    }).map(r => (r.tp || '').trim()).filter(Boolean) : []
-  );
-
-  // Công nợ NCC: tổng HĐ của NCC có trong danh sách ứng NCC của công trình
-  // (đã nằm trong c.total → cần trừ để tránh double-count với ungNccCost)
-  const tongHopDongNhaCungCap = c.invs
-    .filter(i => i.ncc && nccNamesInUng.has(i.ncc.trim()))
-    .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
-
-  // Tổng chi = chi phí HĐ + ứng thầu phụ + ứng NCC - công nợ NCC
-  const tongChiCongTrinh = c.total + ungTpCost + ungNccCost - tongHopDongNhaCungCap;
+  // Tổng chi thực tế — dùng chung helper _ctTongChi (single source of truth với thẻ Dashboard)
+  // Trả về: tongChi, ungTp (ứng thầu phụ), ungNcc (ứng NCC), tongHopDongNcc (công nợ NCC)
+  const _tc = _ctTongChi(p, c);
+  const ungTpCost            = _tc.ungTp;
+  const ungNccCost           = _tc.ungNcc;
+  const tongHopDongNhaCungCap = _tc.tongHopDongNcc;
+  const tongChiCongTrinh      = _tc.tongChi;
 
   // Doanh thu / hợp đồng
   const hdct         = (typeof _hdLookup === 'function')
@@ -658,11 +679,20 @@ function openCTDetail(id) {
   html += `
   <div class="ctd-hdr" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div style="${_bx};padding:10px 14px">
-      ${_lb('Chủ Đầu Tư')}
-      <div style="font-size:14px;font-weight:700;color:var(--bs-body-color);line-height:1.4">${p.chuDauTu ? x(p.chuDauTu) : '<span class="text-secondary" style="font-weight:400;font-size:12px">— Chưa nhập —</span>'}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.6px">Chủ Đầu Tư</div>
+        <button class="btn btn-outline-secondary btn-sm" style="font-size:10px;padding:1px 7px;line-height:1.5" onclick="openKhachHangModal()">👥 +KH</button>
+      </div>
+      ${(() => {
+        // Ưu tiên bản ghi khách hàng (CRM) nếu công trình đã liên kết customerId
+        const _cust = (p.customerId && typeof getCustomerById === 'function') ? getCustomerById(p.customerId) : null;
+        const _ten  = _cust ? _cust.name : (p.chuDauTu || '');
+        if (!_ten) return '<div style="font-size:14px;font-weight:700;line-height:1.4"><span class="text-secondary" style="font-weight:400;font-size:12px">— Chưa nhập —</span></div>';
+        return `<div style="font-size:14px;font-weight:700;color:var(--bs-body-color);line-height:1.4">${x(_ten)}</div>`;
+      })()}
     </div>
     <div class="ctd-note-blk" style="${_bx};padding:10px 14px">
-      ${_lb('Địa Chỉ / Ghi Chú')}
+      ${_lb('Địa chỉ công trình / Ghi chú')}
       <div class="text-secondary" style="font-size:12px;line-height:1.5">${p.note ? x(p.note) : ''}</div>
     </div>
   </div>`;
@@ -732,7 +762,7 @@ function openCTDetail(id) {
       : '—';
     html += `
   <div class="ctd-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    ${_box(_bx,  'Chi Phí Chung / Chia Tỉ Trọng', cpChungHtml)}
+    ${_box(_bx,  `Chi Phí Chung / Chia Tỉ Trọng (k=${getProjectK(p)})`, cpChungHtml)}
     ${_box(_bxA, 'Tổng Giá Trị Nhà Cung Cấp Ứng',
         ungNccCost ? fmtS(ungNccCost) : '—', CA, _xct('ung'))}
   </div>`;
@@ -778,6 +808,102 @@ function openCTDetail(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  PICKER CHỦ ĐẦU TƯ (KHÁCH HÀNG) — dùng chung modal Tạo & Sửa
+// ══════════════════════════════════════════════════════════════════
+/**
+ * Render khối chọn/thêm khách hàng cho modal công trình.
+ * @param {string} prefix      'new' (tạo) hoặc 'edit' (sửa) — để tạo id duy nhất
+ * @param {string|null} selectedId  customerId đang gán cho công trình (nếu có)
+ * @param {string} inpStyle    style ô input dùng chung của modal
+ * @param {string} lblStyle    style nhãn dùng chung của modal
+ * @returns {string} HTML
+ */
+function _renderCustomerSelect(prefix, selectedId, inpStyle, lblStyle) {
+  // Danh sách option khách hàng + 1 option đặc biệt để thêm mới
+  const hasModel = typeof getCustomerOptions === 'function';
+  const opts = hasModel ? getCustomerOptions(selectedId) : '<option value="">— Chọn khách hàng —</option>';
+  const selStyle = `${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)`;
+  return `
+    <div>
+      <label style="${lblStyle}">Chủ Đầu Tư</label>
+      <select id="ct-${prefix}-customer" style="${selStyle}"
+        onchange="_onCustPickerChange('${prefix}')">
+        ${opts}
+        <option value="__new__">➕ Thêm khách hàng mới...</option>
+      </select>
+    </div>`;
+}
+
+/**
+ * Khối nhập thông tin KH mới (ẩn mặc định, full-width) — hiện khi chọn "➕ Thêm mới".
+ * Đặt NGOÀI grid 2 cột để không phá bố cục.
+ */
+function _renderNewCustPane(prefix, inpStyle, lblStyle) {
+  return `
+    <div id="ct-${prefix}-newcust" style="display:none;flex-direction:column;gap:8px;border:1.5px dashed var(--bs-border-color);border-radius:8px;padding:10px">
+      <div>
+        <label style="${lblStyle}">Tên Khách Hàng *</label>
+        <input id="ct-${prefix}-cust-name" type="text" placeholder="Tên cá nhân / công ty..." autocomplete="off" style="${inpStyle}">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="${lblStyle}">Điện Thoại</label>
+          <input id="ct-${prefix}-cust-phone" type="text" placeholder="SĐT..." autocomplete="off" style="${inpStyle}">
+        </div>
+        <div>
+          <label style="${lblStyle}">Email</label>
+          <input id="ct-${prefix}-cust-email" type="text" placeholder="Email..." autocomplete="off" style="${inpStyle}">
+        </div>
+      </div>
+      <div>
+        <label style="${lblStyle}">Địa Chỉ</label>
+        <input id="ct-${prefix}-cust-address" type="text" placeholder="Địa chỉ..." autocomplete="off" style="${inpStyle}">
+      </div>
+    </div>`;
+}
+
+/**
+ * Toggle hiện/ẩn khối nhập KH mới khi đổi lựa chọn dropdown.
+ * @param {string} prefix 'new' | 'edit'
+ */
+function _onCustPickerChange(prefix) {
+  const sel  = document.getElementById(`ct-${prefix}-customer`);
+  const pane = document.getElementById(`ct-${prefix}-newcust`);
+  if (!sel || !pane) return;
+  const isNew = sel.value === '__new__';
+  pane.style.display = isNew ? 'flex' : 'none';
+  if (isNew) setTimeout(() => document.getElementById(`ct-${prefix}-cust-name`)?.focus(), 50);
+}
+
+/**
+ * Đọc lựa chọn khách hàng từ modal → trả về { customerId, chuDauTu }.
+ * - Chọn KH có sẵn → lấy id + tên.
+ * - Chọn "➕ Thêm mới" + có nhập tên → tạo KH mới, trả id + tên.
+ * - Để trống → customerId null, chuDauTu ''.
+ * @param {string} prefix 'new' | 'edit'
+ * @returns {{customerId: string|null, chuDauTu: string}}
+ */
+function _resolveCustomerFromPicker(prefix) {
+  const val = document.getElementById(`ct-${prefix}-customer`)?.value || '';
+  if (val === '__new__') {
+    const cname = (document.getElementById(`ct-${prefix}-cust-name`)?.value || '').trim();
+    if (!cname || typeof createCustomer !== 'function') return { customerId: null, chuDauTu: '' };
+    const c = createCustomer({
+      name:    cname,
+      phone:   (document.getElementById(`ct-${prefix}-cust-phone`)?.value   || '').trim(),
+      email:   (document.getElementById(`ct-${prefix}-cust-email`)?.value   || '').trim(),
+      address: (document.getElementById(`ct-${prefix}-cust-address`)?.value || '').trim()
+    });
+    return { customerId: c.id, chuDauTu: c.name };
+  }
+  if (val && typeof getCustomerById === 'function') {
+    const c = getCustomerById(val);
+    if (c) return { customerId: c.id, chuDauTu: c.name };
+  }
+  return { customerId: null, chuDauTu: '' };
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  MODAL TẠO MỚI
 // ══════════════════════════════════════════════════════════════════
 function openCTCreateModal() {
@@ -797,13 +923,9 @@ function openCTCreateModal() {
         <input id="ct-new-name" type="text" placeholder="VD: CT Anh Bình - 123 Lê Lai..." autocomplete="off"
           style="${inpStyle};font-size:14px">
       </div>
-      <!-- Hàng 2: Chủ đầu tư | Trạng thái -->
+      <!-- Hàng 2: Chủ đầu tư (dropdown chọn/thêm KH) | Trạng thái -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label style="${lblStyle}">Chủ Đầu Tư</label>
-          <input id="ct-new-chudautu" type="text" placeholder="Tên chủ đầu tư..." autocomplete="off"
-            style="${inpStyle}">
-        </div>
+        ${_renderCustomerSelect('new', null, inpStyle, lblStyle)}
         <div>
           <label style="${lblStyle}">Trạng Thái</label>
           <select id="ct-new-status" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)"
@@ -815,6 +937,8 @@ function openCTCreateModal() {
           </select>
         </div>
       </div>
+      <!-- Pane nhập KH mới (ẩn — hiện khi chọn "➕ Thêm mới") -->
+      ${_renderNewCustPane('new', inpStyle, lblStyle)}
       <!-- Hàng 3: Ngày bắt đầu | Ngày kết thúc -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
@@ -856,10 +980,11 @@ function saveCTCreate() {
   const endDate    = document.getElementById('ct-new-enddate')?.value || '';
   const closedDate = document.getElementById('ct-new-closeddate')?.value || '';
   const note       = (document.getElementById('ct-new-note')?.value || '').trim();
-  const chuDauTu   = (document.getElementById('ct-new-chudautu')?.value || '').trim();
+  // Lấy customerId + tên CĐT từ picker (chọn có sẵn / tạo KH mới / để trống)
+  const { customerId, chuDauTu } = _resolveCustomerFromPicker('new');
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-new-name')?.focus(); return; }
   try {
-    createProject({ name, status, startDate, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu });
+    createProject({ name, status, startDate, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId });
     closeModal();
     toast('✅ Đã thêm: ' + name, 'success');
     renderProjectsPage();
@@ -900,13 +1025,9 @@ function openCTEditModal(id) {
         <input id="ct-edit-name" type="text" value="${x(p.name)}" autocomplete="off"
           style="${inpStyle};font-size:14px">
       </div>
-      <!-- Hàng 2: Chủ đầu tư | Trạng thái -->
+      <!-- Hàng 2: Chủ đầu tư (dropdown chọn/thêm KH) | Trạng thái -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label style="${lblStyle}">Chủ Đầu Tư</label>
-          <input id="ct-edit-chudautu" type="text" value="${x(p.chuDauTu||'')}" placeholder="Tên chủ đầu tư..." autocomplete="off"
-            style="${inpStyle}">
-        </div>
+        ${_renderCustomerSelect('edit', p.customerId || null, inpStyle, lblStyle)}
         <div>
           <label style="${lblStyle}">Trạng Thái</label>
           <select id="ct-edit-status" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)"
@@ -915,6 +1036,8 @@ function openCTEditModal(id) {
           </select>
         </div>
       </div>
+      <!-- Pane nhập KH mới (ẩn — hiện khi chọn "➕ Thêm mới") -->
+      ${_renderNewCustPane('edit', inpStyle, lblStyle)}
       <!-- Hàng 3: Ngày bắt đầu | Ngày kết thúc -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
@@ -931,6 +1054,12 @@ function openCTEditModal(id) {
       <div id="ct-edit-closeddate-wrap" style="${p.status==='closed'?'':'display:none'}">
         <label style="${lblStyle}">Ngày Quyết Toán</label>
         <input id="ct-edit-closeddate" type="date" value="${cld}"
+          style="${inpStyle};font-family:'IBM Plex Mono',monospace">
+      </div>
+      <!-- Hàng 3.5: Hệ số tỉ trọng phân bổ chi phí chung -->
+      <div>
+        <label style="${lblStyle}">Hệ Số Tỉ Trọng <span style="font-weight:400;text-transform:none">(chia chi phí chung — mặc định 1, nhập 0 để không gánh)</span></label>
+        <input id="ct-edit-hesotitrong" type="number" min="0" step="0.1" value="${getProjectK(p)}"
           style="${inpStyle};font-family:'IBM Plex Mono',monospace">
       </div>
       <!-- Hàng 4: Ghi chú -->
@@ -955,7 +1084,11 @@ function saveCTEdit(id) {
   const endDate    = document.getElementById('ct-edit-enddate')?.value || '';
   const closedDate = document.getElementById('ct-edit-closeddate')?.value || '';
   const note       = (document.getElementById('ct-edit-note')?.value || '').trim();
-  const chuDauTu   = (document.getElementById('ct-edit-chudautu')?.value || '').trim();
+  // Lấy customerId + tên CĐT từ picker (chọn có sẵn / tạo KH mới / để trống)
+  const { customerId, chuDauTu } = _resolveCustomerFromPicker('edit');
+  // Hệ số tỉ trọng: parse số, không hợp lệ → 1
+  const _kRaw      = parseFloat(document.getElementById('ct-edit-hesotitrong')?.value);
+  const heSoTiTrong = (isFinite(_kRaw) && _kRaw >= 0) ? _kRaw : 1;
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-edit-name')?.focus(); return; }
 
   // [PATCH] Validation: block nếu status=completed mà thiếu endDate
@@ -981,7 +1114,7 @@ function saveCTEdit(id) {
     ? true
     : (p?.startDateUserEdited || false);
 
-  updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu });
+  updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId, heSoTiTrong });
   closeModal();
   toast('✅ Đã cập nhật công trình', 'success');
   renderProjectsPage();
