@@ -113,6 +113,9 @@ function filterAndRenderUng() {
   buildUngNccFilters();
   filterAndRenderUngTp();
   filterAndRenderUngNcc();
+  // Bảng "Phiếu Ứng Gần Đây" ở subtab Nhập — hook duy nhất tại đây tự phủ mọi
+  // điểm dữ liệu thay đổi (lưu, xóa, mở tab, đổi năm, điều hướng từ tab Công Trình)
+  renderUngMini();
 }
 
 // ══════════════════════════════
@@ -212,6 +215,62 @@ function renderUngTable() {
 
 function goUngTpTo(p) { ungTpPage = p; renderUngTpSection(); }
 function goUngNccTo(p) { ungNccPage = p; renderUngNccSection(); }
+
+// ─── Bảng "Phiếu Ứng Gần Đây" (subtab Nhập Tiền Ứng) ─────────────────────────
+// 10 phiếu mới nhất trộn cả Thầu Phụ + Nhà Cung Cấp, có nút Sửa/Xóa
+// (tái sử dụng editUngRecord/delUngRecord). KHÔNG có checkbox .ung-row-chk
+// để không đụng các hàm xuất phiếu ảnh quét checkbox theo scope.
+function renderUngMini() {
+  const container = document.getElementById('ung-recent-section');
+  if (!container) return;
+  const recs = ungRecords
+    .filter(r => !r.deletedAt && r.loai !== 'congnhan' && inActiveYear(r.ngay))
+    .sort((a,b) => (b.ngay||'').localeCompare(a.ngay||'') || (b.updatedAt||0)-(a.updatedAt||0))
+    .slice(0, 10);
+  if (!recs.length) {
+    container.innerHTML = '<div class="text-secondary" style="text-align:center;padding:32px;font-size:13px">Chưa có phiếu ứng nào</div>';
+    return;
+  }
+  const mono = "font-family:'IBM Plex Mono',monospace";
+  const rowsHtml = recs.map(r => {
+    // Badge phân loại: TP (thầu phụ) xanh dương / NCC (nhà cung cấp) cam
+    const isTp = r.loai === 'thauphu';
+    const badge = isTp
+      ? '<span class="badge text-bg-primary" style="font-size:10px">TP</span>'
+      : '<span class="badge text-bg-warning" style="font-size:10px">NCC</span>';
+    return `<tr data-ung-id="${r.id}" class="${_editingUngId===r.id?'editing-row':''}">
+      <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${fmtISODate(r.ngay)}</td>
+      <td style="text-align:center">${badge}</td>
+      <td style="font-weight:600;font-size:12px;white-space:nowrap">${x(recCatName(r,'ung','tp'))}</td>
+      <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
+      <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
+      <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
+      <td style="white-space:nowrap">
+        <div style="display:flex;gap:4px;justify-content:flex-end">
+          <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  const summaryHtml = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);font-size:12px" class="text-secondary">
+      <span>Hiển thị ${recs.length} phiếu gần nhất · Tổng: <strong class="text-primary" style="${mono}">${numFmt(sumBy(recs,'tien'))} đ</strong></span>
+    </div>`;
+  container.innerHTML = `<div style="overflow-x:auto">
+    <table class="table table-sm table-hover align-middle mb-0" style="min-width:560px">
+      <thead><tr>
+        <th style="white-space:nowrap">Ngày</th>
+        <th style="text-align:center;width:48px">Loại</th>
+        <th style="white-space:nowrap">Thầu Phụ / Nhà CC</th>
+        <th style="white-space:nowrap">Công Trình</th>
+        <th>Nội Dung</th>
+        <th style="text-align:right;white-space:nowrap">Số Tiền Ứng</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  </div>${summaryHtml}`;
+}
 
 // ══════════════════════════════
 //  DELETE & EXPORT

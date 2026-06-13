@@ -114,6 +114,9 @@ function loadCCWeekForm() {
     buildCCTable([]);
   }
   updateCCSaveBtn();
+  // Cập nhật bảng Tổng Lương Tuần mini theo tuần vừa load
+  // (guard typeof vì file này nạp TRƯỚC chamcong.history-reports.js)
+  if (typeof renderCCTLTMini === 'function') renderCCTLTMini();
 }
 
 // ─── build table ─────────────────────────────────────────────────
@@ -632,10 +635,11 @@ function saveCCWeek() {
   if (_histCt) _histCt.value = ct;
   if (_tltCt) _tltCt.value = ct;
   renderCCHistory(); // cập nhật bảng lịch sử và TLT sau khi lưu
-  // Scroll xuống bảng tổng lương để user thấy dữ liệu vừa lưu
+  renderCCTLTMini(); // cập nhật bảng tổng lương mini ở subtab 1
+  // Scroll xuống bảng tổng lương mini (user đang ở subtab 1) để thấy dữ liệu vừa lưu
   setTimeout(() => {
     document
-      .getElementById("cc-tlt-pagination")
+      .getElementById("cc-tlt-mini-summary")
       ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, 150);
   const totalLuong = workers.reduce((s, wk) => {

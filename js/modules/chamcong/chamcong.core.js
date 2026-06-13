@@ -279,3 +279,24 @@ function onCCCtSelChange(){
 
 // _fmtDate — alias của fmtISODate() (tienich.js) với dấu '/' để dùng trong phiếu lương.
 const _fmtDate = (iso) => fmtISODate(iso, '', '/');
+
+// ── Sub-tab navigation trong page-chamcong (bắt chước dtGoSub của tab Doanh Thu) ──
+function ccGoSub(btn, id) {
+  document.querySelectorAll('#page-chamcong .sub-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#page-chamcong .nav-link').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'cc-sub-baocao') {
+    // Refresh báo cáo khi vào subtab 2 — renderCCHistory tự gọi buildCCHistFilters + renderCCTLT
+    renderCCHistory();
+  } else if (id === 'cc-sub-socc') {
+    // Refresh bảng tổng lương mini khi quay lại subtab 1 (dữ liệu có thể đã đổi)
+    renderCCTLTMini();
+  }
+}
+
+// Chuyển về subtab Sổ Chấm Công (dùng cho nút "Tải" ở Lịch Sử & editCCInvoice)
+function ccShowSubSoCC() {
+  const b = document.getElementById('cc-sub-socc-btn');
+  if (b && !b.classList.contains('active')) ccGoSub(b, 'cc-sub-socc');
+}

@@ -82,7 +82,10 @@
       "Bash(ls -la assets/img/)",
       "Bash(node --check js/modules/tienung/tienung.history.js)",
       "Read(//c/Users/tinhn/.claude/**)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm update *)",
+      "Bash(node --check js/modules/tienung/tienung.core.js)",
+      "Bash(node --check js/modules/tienung/tienung.entry.js)"
     ]
   }
 }

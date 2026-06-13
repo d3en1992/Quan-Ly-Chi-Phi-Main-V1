@@ -38,7 +38,6 @@ function renderCCHistory(){
   buildCCHistFilters();
   const fCt=document.getElementById('cc-hist-ct').value; // may be projectId or ct name
   const fWk=document.getElementById('cc-hist-week').value;
-  const fQ=(document.getElementById('cc-hist-search')?.value||'').toLowerCase().trim();
 
   // [MODIFIED] — filter matcher uses projectId
   const _fMatch=w=>{
@@ -68,7 +67,6 @@ function renderCCHistory(){
         d:[0,0,0,0,0,0,0],
         tc:0, tl:0, pc:0, hd:0, tongcong:0,
         luongList:[],
-        names:[],
         ndList:[]
       };
     }
@@ -84,7 +82,6 @@ function renderCCHistory(){
       map[gKey].pc+=pc;
       map[gKey].hd+=hd;
       if(luong>0) map[gKey].luongList.push(luong);
-      if(wk.name) map[gKey].names.push(wk.name);
       if(wk.nd) map[gKey].ndList.push(wk.nd);
     });
     map[gKey].tongcong=map[gKey].tl+map[gKey].pc+map[gKey].hd;
@@ -95,15 +92,8 @@ function renderCCHistory(){
       ? Math.round(r.luongList.reduce((s,v)=>s+v,0)/r.luongList.length)
       : 0;
     const nd=[...new Set(r.ndList.map(v=>(v||'').trim()).filter(Boolean))].join(' | ');
-    const workers=[...new Set(r.names.map(v=>(v||'').trim()).filter(Boolean))];
-    return {...r, avgLuong, nd, workers};
+    return {...r, avgLuong, nd};
   });
-  if(fQ){
-    rows=rows.filter(r=>
-      (r.ct||'').toLowerCase().includes(fQ) ||
-      r.workers.some(n=>n.toLowerCase().includes(fQ))
-    );
-  }
   rows.sort((a,b)=>b.fromDate.localeCompare(a.fromDate)||(a.ct||'').localeCompare(b.ct||'','vi'));
 
   const tbody=document.getElementById('cc-hist-tbody');
@@ -156,6 +146,7 @@ function renderCCTLT(){
   buildCCHistFilters();
   const fWk=document.getElementById('cc-tlt-week').value;
   const fCt2=document.getElementById('cc-tlt-ct')?.value||'';
+  const fQ=(document.getElementById('cc-tlt-search')?.value||'').toLowerCase().trim(); // tìm theo tên CN
 
   // Group by name only khi "tất cả tuần", hoặc (tuần+name) khi lọc tuần cụ thể
   // [MODIFIED] — filter by projectId, resolve CT names for display
@@ -174,6 +165,7 @@ function renderCCTLT(){
     if(fWk&&w.fromDate!==fWk) return;
     const ctDisplay=_resolveCtName(w); // [MODIFIED]
     w.workers.forEach(wk=>{
+      if(fQ && !(wk.name||'').toLowerCase().includes(fQ)) return; // lọc theo tên CN
       const key = fWk ? w.fromDate+'|'+wk.name : wk.name;
       if(!map[key]) map[key]={fromDate:w.fromDate,toDate:w.toDate,name:wk.name,
         d:[0,0,0,0,0,0,0],tc:0,tl:0,pc:0,hdml:0,loan:0,tru:0,cts:[],luongList:[]};
@@ -288,6 +280,79 @@ function renderCCTLT(){
   document.getElementById('cc-tlt-pagination').innerHTML=pag;
 }
 
+// ─── Bảng Tổng Lương Tuần MINI (subtab Sổ Chấm Công) ─────────────────────────
+// Phiên bản rút gọn CHỈ XEM của renderCCTLT: tự bám theo tuần đang chọn ở sổ
+// (#cc-from), gộp TẤT CẢ công trình trong tuần, không checkbox/phân trang/export.
+// LƯU Ý: không dùng class cc-tlt-debt-col / cc-tlt-chk để tránh bị các hàm
+// quét toàn cục của bảng TLT đầy đủ (ẩn cột, tính tổng tick) đụng nhầm.
+function renderCCTLTMini(){
+  const tbody=document.getElementById('cc-tlt-mini-tbody');
+  if(!tbody) return;
+  const sumEl=document.getElementById('cc-tlt-mini-summary');
+  const lblEl=document.getElementById('cc-tlt-mini-week-label');
+  const fWk=document.getElementById('cc-from')?.value||'';
+  if(!fWk){
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="15">Chưa chọn tuần</td></tr>`;
+    if(sumEl) sumEl.innerHTML=''; if(lblEl) lblEl.textContent='';
+    return;
+  }
+  if(lblEl) lblEl.textContent='— Tuần '+weekLabel(fWk);
+
+  // Gom dữ liệu đúng tuần, mọi công trình (không lọc CT, không lọc năm — bám theo sổ)
+  const map={};
+  ccData.forEach(w=>{
+    if(w.deletedAt) return;
+    if(w.fromDate!==fWk) return;
+    const ctDisplay=_resolveCtName(w);
+    w.workers.forEach(wk=>{
+      const key=wk.name;
+      if(!map[key]) map[key]={name:wk.name,d:[0,0,0,0,0,0,0],tc:0,tl:0,pc:0,hdml:0,loan:0,tru:0,cts:[]};
+      wk.d.forEach((v,i)=>{ map[key].d[i]+=v; });
+      const tc=round1(wk.d.reduce((s,v)=>s+v,0));
+      map[key].tc+=tc;
+      map[key].tl+=tc*(wk.luong||0);
+      map[key].pc+=(wk.phucap||0);
+      map[key].hdml+=(wk.hdmuale||0);
+      map[key].loan+=(wk.loanAmount||0);
+      map[key].tru+=(wk.tru||0);
+      if(!map[key].cts.includes(ctDisplay)) map[key].cts.push(ctDisplay);
+    });
+  });
+  Object.values(map).forEach(r=>{ r.tc=round1(r.tc); r.d=r.d.map(v=>round1(v)); });
+
+  const rows=Object.values(map).sort((a,b)=>a.name.localeCompare(b.name,'vi'));
+  if(!rows.length){
+    tbody.innerHTML=`<tr class="empty-row"><td colspan="15">Chưa có chấm công tuần này</td></tr>`;
+    if(sumEl) sumEl.innerHTML='';
+    return;
+  }
+
+  const mono="font-family:'IBM Plex Mono',monospace";
+  let sumTCLuong=0, sumThucLanh=0;
+  tbody.innerHTML=rows.map(r=>{
+    const tcLuong=r.tl+r.pc;
+    const thucLanh_=r.tl+r.pc+r.loan+r.hdml-r.tru;
+    const luongTB=r.tc>0?Math.round(tcLuong/r.tc):0;
+    sumTCLuong+=tcLuong; sumThucLanh+=thucLanh_;
+    const ctDisplay_=r.cts.length<=1
+      ? x(r.cts[0]||'—')
+      : x(r.cts[0])+` <span class="tlt-ct-more" title="${r.cts.map(c=>x(c)).join(', ')}">+${r.cts.length-1}</span>`;
+    return `<tr>
+      <td style="font-weight:700;font-size:13px">${x(r.name||'—')}</td>
+      <td class="text-secondary" style="text-align:center;font-size:12px;font-weight:700">${cnRoles[r.name]||'—'}</td>
+      ${r.d.map(v=>`<td class="${v===1?'text-success':v>0?'text-primary':'text-body-secondary'}" style="text-align:center;${mono};font-weight:600;font-size:12px">${v||'·'}</td>`).join('')}
+      <td class="text-warning" style="text-align:center;${mono};font-weight:700">${r.tc}</td>
+      <td class="text-success" style="text-align:right;${mono};font-weight:700;font-size:13px">${tcLuong?numFmt(tcLuong):'—'}</td>
+      <td class="text-secondary" style="text-align:right;${mono};font-size:12px">${luongTB?numFmt(luongTB):'—'}</td>
+      <td class="text-danger" style="text-align:right;${mono};font-size:12px">${r.tru?numFmt(r.tru):'—'}</td>
+      <td class="text-success fw-bold" style="text-align:right;${mono};background:#f1f8f4">${thucLanh_>0?numFmt(thucLanh_):thucLanh_<0?'('+numFmt(-thucLanh_)+')':'—'}</td>
+      <td class="project-col text-secondary" style="font-size:11px">${ctDisplay_}</td>
+    </tr>`;
+  }).join('');
+
+  if(sumEl) sumEl.innerHTML=`<span>${rows.length} công nhân · Tổng TC Lương: <strong class="text-success font-monospace">${fmtS(sumTCLuong)}</strong> · Tổng Thực Lãnh: <strong class="text-warning font-monospace">${fmtS(sumThucLanh)}</strong></span>`;
+}
+
 // Format nghìn đồng — chỉ dùng cho selected summary (32,620,000 → "32.620 k")
 function fmtK(v){ const k=Math.round((v||0)/1000); return k.toLocaleString('vi-VN')+' k'; }
 
@@ -314,6 +379,7 @@ function updateTLTSelectedSum(){
 function exportCCTLTCSV(){
   const fWk=document.getElementById('cc-tlt-week').value;
   const fCt2=document.getElementById('cc-tlt-ct')?.value||'';
+  const fQ=(document.getElementById('cc-tlt-search')?.value||'').toLowerCase().trim(); // tìm theo tên CN
   const map={};
   // [MODIFIED] — filter by projectId, resolve CT names
   ccData.forEach(w=>{
@@ -323,6 +389,7 @@ function exportCCTLTCSV(){
     if(fWk&&w.fromDate!==fWk) return;
     const ctDisplay=_resolveCtName(w); // [MODIFIED]
     w.workers.forEach(wk=>{
+      if(fQ && !(wk.name||'').toLowerCase().includes(fQ)) return; // lọc theo tên CN (khớp bảng đang hiển thị)
       // Mirror same key logic as renderCCTLT: group by name-only when no week filter
       const key=fWk?w.fromDate+'|'+wk.name:wk.name;
       if(!map[key]) map[key]={fromDate:w.fromDate,toDate:w.toDate,name:wk.name,
@@ -369,6 +436,8 @@ function loadCCWeekById(id, fromDate, ct) {
   document.getElementById('cc-week-label').textContent='Tuần: '+weekLabel(rec.fromDate);
   document.getElementById('cc-ct-sel').value=ctDisplay; // [MODIFIED]
   buildCCTable(rec.workers);
+  renderCCTLTMini();   // cập nhật bảng tổng lương mini theo tuần vừa tải
+  ccShowSubSoCC();     // nút "Tải" nằm ở subtab 2 → tự chuyển về subtab 1 để thấy sổ
   window.scrollTo({top:0,behavior:'smooth'});
   toast('Đã tải tuần '+viShort(rec.fromDate)+' – '+ctDisplay); // [MODIFIED]
 }
@@ -392,6 +461,7 @@ function delCCWeekById(id, fromDate, ct) {
   if (!found) { toast('Không tìm thấy dữ liệu để xóa', 'error'); return; }
   clearInvoiceCache(); save('cc_v2', ccData);
   updateTop(); renderCCHistory(); renderCCTLT();
+  renderCCTLTMini(); // phòng trường hợp tuần bị xóa chính là tuần đang mở ở sổ
   toast('Đã xóa tuần chấm công');
 }
 
@@ -399,7 +469,7 @@ function delCCWorker(wid,name){
   if(!confirm(`Xóa "${name}" khỏi tuần này?`)) return;
   const w=ccData.find(r=>r.id===wid);
   if(w){ w.workers=w.workers.filter(wk=>wk.name!==name); if(!w.workers.length) ccData=ccData.filter(r=>r.id!==wid); }
-  clearInvoiceCache(); save('cc_v2',ccData); renderCCHistory(); toast('Đã xóa');
+  clearInvoiceCache(); save('cc_v2',ccData); renderCCHistory(); renderCCTLTMini(); toast('Đã xóa');
 }
 
 // ─── export ────────────────────────────────────────────────────────
@@ -427,7 +497,6 @@ function exportCCHistCSV(){
   // Xuất đúng dữ liệu đang lọc trong bảng Lịch Sử Chấm Công Tuần
   const fCt=document.getElementById('cc-hist-ct').value;
   const fWk=document.getElementById('cc-hist-week').value;
-  const fQ=(document.getElementById('cc-hist-search')?.value||'').toLowerCase().trim();
   const rows=[['CT','Từ','Đến','CN','T2','T3','T4','T5','T6','T7','TC','Lương/Ngày TB','Tổng Lương','Phụ Cấp','HĐ Mua Lẻ','Nội Dung','Tổng Cộng']];
   const map={};
   // [MODIFIED] — filter + group by projectId, display resolved name
@@ -440,7 +509,7 @@ function exportCCHistCSV(){
     const key=w.fromDate+'|'+(w.projectId||w.ct); // [MODIFIED]
     if(!map[key]) map[key]={
       fromDate:w.fromDate,toDate:w.toDate,ct:ctDisplay, // [MODIFIED]
-      d:[0,0,0,0,0,0,0],tc:0,tl:0,pc:0,hd:0,luongList:[],names:[],ndList:[]
+      d:[0,0,0,0,0,0,0],tc:0,tl:0,pc:0,hd:0,luongList:[],ndList:[]
     };
     w.workers.forEach(wk=>{
       const tc=round1(wk.d.reduce((s,v)=>s+v,0));
@@ -451,7 +520,6 @@ function exportCCHistCSV(){
       map[key].pc+=(wk.phucap||0);
       map[key].hd+=(wk.hdmuale||0);
       if(luong>0) map[key].luongList.push(luong);
-      if(wk.name) map[key].names.push(wk.name);
       if(wk.nd) map[key].ndList.push(wk.nd);
     });
   });
@@ -459,11 +527,9 @@ function exportCCHistCSV(){
   Object.values(map)
     .map(r=>{
       const avgLuong=r.luongList.length?Math.round(r.luongList.reduce((s,v)=>s+v,0)/r.luongList.length):0;
-      const workers=[...new Set(r.names.map(v=>(v||'').trim()).filter(Boolean))];
       const nd=[...new Set(r.ndList.map(v=>(v||'').trim()).filter(Boolean))].join(' | ');
-      return {...r,avgLuong,workers,nd,tong:r.tl+r.pc+r.hd};
+      return {...r,avgLuong,nd,tong:r.tl+r.pc+r.hd};
     })
-    .filter(r=>!fQ||(r.ct||'').toLowerCase().includes(fQ)||r.workers.some(n=>n.toLowerCase().includes(fQ)))
     .sort((a,b)=>b.fromDate.localeCompare(a.fromDate)||(a.ct||'').localeCompare(b.ct||'','vi'))
     .forEach(r=>{
       rows.push([r.ct,viShort(r.fromDate)+'–'+viShort(r.toDate),r.toDate,...r.d,r.tc,r.avgLuong,r.tl,r.pc,r.hd,r.nd,r.tong]);

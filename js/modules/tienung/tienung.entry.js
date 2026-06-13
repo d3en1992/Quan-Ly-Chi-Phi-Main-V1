@@ -211,6 +211,12 @@ function editUngRecord(id) {
     nd: rec.nd
   });
 
+  // Nút Sửa có thể nằm ở bảng báo cáo (subtab 2) → đảm bảo về subtab Nhập để thấy form.
+  // Gọi TRƯỚC phần highlight bên dưới để scrollIntoView dòng mini có tác dụng.
+  if (typeof ungShowSubNhap === 'function') ungShowSubNhap();
+  // Refresh bảng mini để dòng đang sửa có class editing-row
+  if (typeof renderUngMini === 'function') renderUngMini();
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const btn = document.getElementById('ung-save-btn');

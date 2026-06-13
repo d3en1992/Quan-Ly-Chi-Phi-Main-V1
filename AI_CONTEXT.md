@@ -94,17 +94,17 @@ Thứ tự chính xác trong `index.html`:
 | 14 | `js/modules/hoadon/hoadon.detail-entry.js` | Hóa đơn chi tiết nhiều dòng vật tư/nội dung: `goInnerSub`, `_initDetailFormSelects`, `renderDetailRowHTML`, `addDetailRow`, `delDetailRow`, `calcDetailRow`, `calcDetailTotals`, `generateDetailNd`, `saveDetailInvoice`, `clearDetailForm`, `_setSelectFlexible`, `openDetailEdit`, `getDetailRows` |
 | 15 | `js/modules/hoadon/hoadon.list-trash.js` | Filter/render danh sách, sửa/xóa, thùng rác, hóa đơn trong ngày: `switchTatCaView`, `buildFilters`, `filterAndRender`, `renderTable`, `goTo`, `delInvoice`, `editCCInvoice`, `openEntryEdit`, `_resolveInvSource`, `editManualInvoice`, `trash` (global), `trashAdd`, `trashRestore`, `trashDeletePermanent`, `trashClearAll`, `renderTrash`, `renderTodayInvoices`, `refreshHoadonCtDropdowns` |
 | 16 | `js/modules/danhmuc/danhmuc.categories.js` | Danh mục/settings: normalize, render settings, CT page, CN role, tbTen, rebuild selects, dedup cat arrays |
-| 17 | `js/modules/tienung/tienung.core.js` | Tiền Ứng core: `ungRecords`, migration/normalize deletedAt/projectId, shared state cho entry/history |
+| 17 | `js/modules/tienung/tienung.core.js` | Tiền Ứng core: `ungRecords`, migration/normalize deletedAt/projectId, shared state cho entry/history, subtab nav: `ungGoSub`, `ungShowSubNhap`, `ungShowSubBaoCao` |
 | 18 | `js/modules/tienung/tienung.entry.js` | Form nhập tiền ứng nhiều dòng, đổi loại ứng, lưu/xóa dòng, rebuild selects |
-| 19 | `js/modules/tienung/tienung.history.js` | Lịch sử tiền ứng, lọc/tìm kiếm, phân trang, xuất CSV/ảnh phiếu ứng |
+| 19 | `js/modules/tienung/tienung.history.js` | Lịch sử tiền ứng, lọc/tìm kiếm, phân trang, xuất CSV/ảnh phiếu ứng, bảng phiếu gần đây: `renderUngMini` |
 | 20 | `js/modules/danhmuc/danhmuc.tools.js` | Wrapper backup/restore (`toolBackupNow`, `toolRestoreBackup`) |
 | 21 | `js/modules/nhapxuat/nhapxuat.parsers.js` | Helper parse/normalize Excel + parser sheet 1–9: `_normStr`, `_parseDate`, `_pNum`, `_str`, `_sheetRows`, `_hasDiacritics`, `_deduplicateCatNames`, `_buildCanonMap`, `_dayOfWeek`, `_isEmptyRow`, `_formatCatName`, `_markDuplicateInBatch`, `_makeCatLookup`, `_makeCatLookupWithExtra`, `_resolveProvisionalProjectIds`, `_mkErr`, `_fmtErr`, `parseSheet1`–`parseSheet9`, `_DANHMUC_GROUP_MAP` |
 | 22 | `js/modules/nhapxuat/nhapxuat.import.js` | Import session, detect sheet, preview, apply import, log: `_isDupInvQ/D/Ung/Thu/Tb/Tp/CC`, `_detectSheetType`, `_importSession`, `_doImportParse`, `_markDuplicates`, `_showImportPreviewNew`, `_toggleAllImportSheets`, `_applyImport`, `_generateImportLog`, `openImportModal`, `handleImportFile` |
 | 23 | `js/modules/nhapxuat/nhapxuat.export.js` | Export modal, Excel sheet builders, CSV exports: `openExportModal`, `_buildSheet`, `buildHoaDonNhanh/ChiTiet/ChamCong/TienUng/ThietBi/DanhMuc/HopDongChinh/ThuTien/HopDongThauPhu/HuongDan`, `exportExcel`, `_doExport`, `exportEntryCSV`, `exportAllCSV`, `toolImportExcel`, `toolExportExcel` |
 | 24 | `js/legacy/datatools.js` | Dashboard, reset/delete-year, data health, migration tools |
-| 25 | `js/modules/chamcong/chamcong.core.js` | Global data (`ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`), constants (`CC_DAY_LABELS`, `CC_DATE_OFFSETS`), date/week helpers, normalize/category helpers, CT selector helpers: `_dedupCC`, `round1`, `toggleCCDebtCols`, `_calcDebtBefore`, `isoFromParts`, `ccSundayISO`, `ccSaturdayISO`, `snapToSunday`, `weekLabel`, `ccAllNames`, `rebuildCCNameList`, `normalizeAllChamCong`, `rebuildCCCategories`, `updateTopFromCC`, `populateCCCtSel`, `updateCCSaveBtn`, `onCCCtSelChange`, `_fmtDate` |
+| 25 | `js/modules/chamcong/chamcong.core.js` | Global data (`ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`), constants (`CC_DAY_LABELS`, `CC_DATE_OFFSETS`), date/week helpers, normalize/category helpers, CT selector helpers: `_dedupCC`, `round1`, `toggleCCDebtCols`, `_calcDebtBefore`, `isoFromParts`, `ccSundayISO`, `ccSaturdayISO`, `snapToSunday`, `weekLabel`, `ccAllNames`, `rebuildCCNameList`, `normalizeAllChamCong`, `rebuildCCCategories`, `updateTopFromCC`, `populateCCCtSel`, `updateCCSaveBtn`, `onCCCtSelChange`, `_fmtDate`, `ccGoSub`, `ccShowSubSoCC` |
 | 26 | `js/modules/chamcong/chamcong.week-form.js` | Form nhập tuần, build table, row handlers, lưu/copy/paste: `initCC`, `ccGoToWeek`, `ccPrevWeek`, `ccNextWeek`, `onCCFromChange`, `loadCCWeekForm`, `buildCCTable`, `addCCWorker`, `addCCRow`, `buildCCRow`, `onCCNameInput`, `onCCDayKey`, `onCCWageKey`, `onCCMoneyKey`, `calcCCRow`, `delCCRow`, `renumberCC`, `updateCCSumRow`, `saveCCWeek`, `clearCCWeek`, `copyCCWeek`, `pasteCCWeek`; global `ccClipboard` |
-| 27 | `js/modules/chamcong/chamcong.history-reports.js` | Lịch sử, tổng lương tuần, load/delete, CSV exports, phiếu lương/ảnh: `buildCCHistFilters`, `renderCCHistory`, `ccHistGoTo`, `renderCCTLT`, `fmtK`, `updateTLTSelectedSum`, `exportCCTLTCSV`, `ccTltGoTo`, `loadCCWeekById`, `delCCWeekById`, `delCCWorker`, `exportCCWeekCSV`, `exportCCHistCSV`, `removeVietnameseTones`, `xuatPhieuLuong`, `exportUngToImage` |
+| 27 | `js/modules/chamcong/chamcong.history-reports.js` | Lịch sử, tổng lương tuần, load/delete, CSV exports, phiếu lương/ảnh: `buildCCHistFilters`, `renderCCHistory`, `ccHistGoTo`, `renderCCTLT`, `renderCCTLTMini`, `fmtK`, `updateTLTSelectedSum`, `exportCCTLTCSV`, `ccTltGoTo`, `loadCCWeekById`, `delCCWeekById`, `delCCWorker`, `exportCCWeekCSV`, `exportCCHistCSV`, `removeVietnameseTones`, `xuatPhieuLuong`, `exportUngToImage` |
 | 28 | `js/legacy/thietbi.js` | Quản lý thiết bị/kho tổng |
 | 29 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
 | 30 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
@@ -316,16 +316,16 @@ Metadata chuẩn cho record nghiệp vụ:
 | `js/modules/hoadon/hoadon.list-trash.js` | `trash` (global shared state — gán lại bởi `_reloadGlobals()`) | `switchTatCaView()`, `buildFilters()`, `filterAndRender()`, `renderTable()`, `goTo()`, `delInvoice()`, `editCCInvoice()`, `openEntryEdit()`, `_resolveInvSource()`, `editManualInvoice()`, `trashAdd()`, `trashRestore()`, `trashDeletePermanent()`, `trashClearAll()`, `renderTrash()`, `renderTodayInvoices()`, `refreshHoadonCtDropdowns()` |
 | `js/modules/danhmuc/danhmuc.categories.js` | `_catNamesMigrated`, `normalizeName`, `normalizeKey` | `renderCtPage()`, `showCtModal()`, `closeModal()`, `normalizeName()`, `normalizeKey()`, `_isDmItemUsedInYear()`, `_isDmItemUsedAnytime()`, `scanAndFixAllDataFormats()`, `_migrateCatNamesFormat()`, `renderSettings()`, `_dmFilterCard()`, `renderCTItem()`, `renderItem()`, `renderCNItem()`, `updateCNRole()`, `renderTbTenItem()`, `syncCNRoles()`, `startEdit()`, `cancelEdit()`, `finishEdit()`, `addItem()`, `isItemInUse()`, `delItem()`, `_dedupCatArr()`, `rebuildEntrySelects()` |
 | `js/modules/danhmuc/danhmuc.tools.js` | _(không có global riêng)_ | `toolBackupNow()`, `toolRestoreBackup()` |
-| `js/modules/tienung/tienung.core.js` | `ungRecords`, `filteredUng`, `filteredUngTp`, `filteredUngNcc`, `ungPage`, `ungNccPage`, `UNG_TP_PG`, `ungTpPage`, `_editingUngId` | `_normalizeUngDeletedAt()`, `_normalizeUngProjectIds()`, `_syncFilteredUng()`, shared Tiền Ứng state/migration helpers |
+| `js/modules/tienung/tienung.core.js` | `ungRecords`, `filteredUng`, `filteredUngTp`, `filteredUngNcc`, `ungPage`, `ungNccPage`, `UNG_TP_PG`, `ungTpPage`, `_editingUngId` | `_normalizeUngDeletedAt()`, `_normalizeUngProjectIds()`, `_syncFilteredUng()`, `ungGoSub()`, `ungShowSubNhap()`, `ungShowSubBaoCao()`, shared Tiền Ứng state/migration helpers |
 | `js/modules/tienung/tienung.entry.js` | _(không có global riêng)_ | `renderUngPage()`, entry row builders, `saveAllUngRows()`, add/delete/clear tiền ứng rows, rebuild selects |
-| `js/modules/tienung/tienung.history.js` | _(không có global riêng)_ | `buildUngTpFilters()`, `buildUngNccFilters()`, `renderUngTpSection()`, `renderUngNccSection()`, `filterAndRenderUngTp()`, `filterAndRenderUngNcc()`, `_ungTableHTML()`, `renderUngTable()` (backward-compat), `renderUngThauPhuPage()`, `editUngRecord()`, history filter/pagination, CSV/export image helpers |
+| `js/modules/tienung/tienung.history.js` | _(không có global riêng)_ | `buildUngTpFilters()`, `buildUngNccFilters()`, `renderUngTpSection()`, `renderUngNccSection()`, `filterAndRenderUngTp()`, `filterAndRenderUngNcc()`, `_ungTableHTML()`, `renderUngTable()` (backward-compat), `renderUngMini()`, `renderUngThauPhuPage()`, `editUngRecord()`, history filter/pagination, CSV/export image helpers |
 | `js/modules/nhapxuat/nhapxuat.parsers.js` | `_DANHMUC_GROUP_MAP` | `_normStr()`, `_parseDate()`, `_pNum()`, `_str()`, `_sheetRows()`, `_hasDiacritics()`, `_deduplicateCatNames()`, `_buildCanonMap()`, `_dayOfWeek()`, `_isEmptyRow()`, `_formatCatName()`, `_markDuplicateInBatch()`, `_makeCatLookup()`, `_makeCatLookupWithExtra()`, `_resolveProvisionalProjectIds()`, `_mkErr()`, `_fmtErr()`, `parseSheet1()`–`parseSheet9()` |
 | `js/modules/nhapxuat/nhapxuat.import.js` | `_importSession` | `_isDupInvQ()`, `_isDupInvD()`, `_isDupUng()`, `_isDupThu()`, `_isDupTb()`, `_isDupTp()`, `_isDupCC()`, `_detectSheetType()`, `_doImportParse()`, `_markDuplicates()`, `_showImportPreviewNew()`, `_toggleAllImportSheets()`, `_applyImport()`, `_generateImportLog()`, `openImportModal()`, `handleImportFile()` |
 | `js/modules/nhapxuat/nhapxuat.export.js` | _(không có global riêng)_ | `openExportModal()`, `_buildSheet()`, `buildHoaDonNhanh()`, `buildHoaDonChiTiet()`, `buildChamCong()`, `buildTienUng()`, `buildThietBi()`, `buildDanhMuc()`, `buildHopDongChinh()`, `buildThuTien()`, `buildHopDongThauPhu()`, `buildHuongDan()`, `exportExcel()`, `_doExport()`, `exportEntryCSV()`, `exportAllCSV()`, `toolImportExcel()`, `toolExportExcel()` |
 | `js/legacy/datatools.js` | `selectedCT`, migration dry-run reports | `renderDashboard()`, `_dbBarChart()`, `_dbBarChartWeekly()`, `_dbCalcWeeklyData()`, `_dbSelectWeek()`, `toolDeleteYear()`, `_doDeleteYear()`, `toolResetAll()`, `_doResetAll()`, `scanDataHealth()`, `normalizeProjectLinks()`, `migrateIdsToUUID()` |
-| `js/modules/chamcong/chamcong.core.js` | `ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`, `CC_PG_HIST`, `CC_PG_TLT`, `CC_DAY_LABELS`, `CC_DATE_OFFSETS`, `_ccDebtColsHidden` | `_dedupCC()`, `round1()`, `toggleCCDebtCols()`, `_applyCCDebtColsVisibility()`, `_calcDebtBefore()`, `isoFromParts()`, `ccSundayISO()`, `ccSaturdayISO()`, `snapToSunday()`, `viShort()`, `weekLabel()`, `iso()`, `ccAllNames()`, `rebuildCCNameList()`, `normalizeAllChamCong()`, `rebuildCCCategories()`, `updateTopFromCC()`, `populateCCCtSel()`, `updateCCSaveBtn()`, `onCCCtSelChange()`, `_fmtDate` |
+| `js/modules/chamcong/chamcong.core.js` | `ccData`, `ccOffset`, `ccHistPage`, `ccTltPage`, `CC_PG_HIST`, `CC_PG_TLT`, `CC_DAY_LABELS`, `CC_DATE_OFFSETS`, `_ccDebtColsHidden` | `_dedupCC()`, `round1()`, `toggleCCDebtCols()`, `_applyCCDebtColsVisibility()`, `_calcDebtBefore()`, `isoFromParts()`, `ccSundayISO()`, `ccSaturdayISO()`, `snapToSunday()`, `viShort()`, `weekLabel()`, `iso()`, `ccAllNames()`, `rebuildCCNameList()`, `normalizeAllChamCong()`, `rebuildCCCategories()`, `updateTopFromCC()`, `populateCCCtSel()`, `updateCCSaveBtn()`, `onCCCtSelChange()`, `_fmtDate`, `ccGoSub()`, `ccShowSubSoCC()` |
 | `js/modules/chamcong/chamcong.week-form.js` | `ccClipboard` | `initCC()`, `ccGoToWeek()`, `ccPrevWeek()`, `ccNextWeek()`, `onCCFromChange()`, `loadCCWeekForm()`, `buildCCTable()`, `addCCWorker()`, `addCCRow()`, `buildCCRow()`, `onCCNameInput()`, `onCCDayKey()`, `onCCWageKey()`, `onCCMoneyKey()`, `calcCCRow()`, `delCCRow()`, `renumberCC()`, `updateCCSumRow()`, `saveCCWeek()`, `clearCCWeek()`, `copyCCWeek()`, `pasteCCWeek()` |
-| `js/modules/chamcong/chamcong.history-reports.js` | _(không có global riêng)_ | `buildCCHistFilters()`, `renderCCHistory()`, `ccHistGoTo()`, `renderCCTLT()`, `fmtK()`, `updateTLTSelectedSum()`, `exportCCTLTCSV()`, `ccTltGoTo()`, `loadCCWeekById()`, `delCCWeekById()`, `delCCWorker()`, `exportCCWeekCSV()`, `exportCCHistCSV()`, `removeVietnameseTones()`, `xuatPhieuLuong()`, `exportUngToImage()` |
+| `js/modules/chamcong/chamcong.history-reports.js` | _(không có global riêng)_ | `buildCCHistFilters()`, `renderCCHistory()`, `ccHistGoTo()`, `renderCCTLT()`, `renderCCTLTMini()`, `fmtK()`, `updateTLTSelectedSum()`, `exportCCTLTCSV()`, `ccTltGoTo()`, `loadCCWeekById()`, `delCCWeekById()`, `delCCWorker()`, `exportCCWeekCSV()`, `exportCCHistCSV()`, `removeVietnameseTones()`, `xuatPhieuLuong()`, `exportUngToImage()` |
 | `js/legacy/thietbi.js` | `tbData`, `tbPage`, `khoPage` | `migrateTbData()`, `tbSaveRows()`/device save helpers, `tbRenderList()`, `renderKhoTong()` |
 | `js/modules/doanhthu/doanhthu.core.js` | `hopDongData`, `thuRecords`, `thauPhuContracts`, `_hdcItems`, `_hdtpItems`, `_hdcPage`, `_hdtpPage`, `_thuPage`, `DT_PG`, `_dtCtFilter` | `calcHopDongValue()`, `_migrateHopDongSL()`, `_normalizeThuProjectIds()`, `_initDoanhThuAddons()`, `updateGlobalTotals()`, `bindItemsToTable()`, `fmtInputMoney()`, `_readMoneyInput()`, `_dtInYear()`, `_dtPaginationHtml()`, `_dtMatchProjFilter()`, `_dtMatchHDCFilter()`, `dtPopulateCtFilter()`, `dtSetCtFilter()`, `dtGoSub()`, `dtEnsureCongNoSubtab()`, `dtPopulateSels()`, `openDtModal()`, `closeDtModal()`, `_dtAddCT()`, `_dtAddTP()` |
 | `js/modules/doanhthu/doanhthu.forms.js` | _(không có global riêng)_ | `hdcUpdateTotal()`, `saveHopDongChinh()`, `hdcSyncChuDauTu()`, `_hdcResetForm()`, `editHopDongChinh()`, `delHopDongChinh()`, `renderHdcTable()`, `saveThuRecord()`, `editThuRecord()`, `_thuCancelEdit()`, `_thuResetForm()`, `delThuRecord()`, `renderThuTable()`, `hdtpUpdateTotal()`, `saveHopDongThauPhu()`, `_hdtpResetForm()`, `editHopDongThauPhu()`, `delHopDongThauPhu()`, `renderHdtpTable()` |
@@ -893,6 +893,66 @@ Ba việc: tách Chủ Đầu Tư thành model dữ liệu độc lập (hướn
 **Vấn đề:** trọng số phân bổ chi phí chung cũ = `_PROJ_FACTORS` cứng theo tên loại (CT=1.6/SC=1.0/OTHER=1.2) — không chỉnh được.
 
 **Giải pháp (`js/modules/projects/projects.model.js`):** bỏ `_PROJ_FACTORS`; thêm `getProjectK(p)` (đọc `p.heSoTiTrong`, mặc định 1, `k=0` → không gánh chi phí chung); `getProjectWeight(p) = getProjectDays(p) × getProjectK(p)`. `createProject`/`updateProject` nhận & validate `heSoTiTrong` (số ≥ 0, không hợp lệ → 1). UI: modal Sửa thêm ô `ct-edit-hesotitrong`; nhãn box phân bổ trong chi tiết hiện `(k=...)`.
+
+---
+
+### 9.12. Tách tab Chấm Công thành 2 subtab + bảng Tổng Lương Tuần mini (13/06/2026)
+
+**Yêu cầu:** tab Chấm Công quá dài (3 khối dọc nối tiếp) → tách thành 2 subtab theo pattern của tab Doanh Thu (`dtGoSub`):
+
+1. **Subtab 1 `cc-sub-socc` "📝 SỔ CHẤM CÔNG"** (mặc định active): form nhập tuần + bảng **Tổng Lương Tuần mini** mới (chỉ xem — không checkbox/filter/export/phân trang; tự bám theo tuần đang chọn ở `#cc-from`, gộp **tất cả công trình** trong tuần, luôn hiện cột Trừ Nợ/Thực Lãnh).
+2. **Subtab 2 `cc-sub-baocao` "📊 TỔNG LƯƠNG & LỊCH SỬ"**: bảng Tổng Lương Tuần đầy đủ + Lịch Sử Chấm Công Tuần — giữ nguyên 100% ID và hành vi cũ.
+
+**File đã sửa:**
+
+- `index.html` (trong `#page-chamcong`): thêm nav-pills `#cc-sub-nav` (2 nút `#cc-sub-socc-btn`, `#cc-sub-baocao-btn`); bọc nội dung vào 2 `div.sub-page`; thêm khối bảng mini với ID mới: `#cc-tlt-mini-week-label` (nhãn tuần), `#cc-tlt-mini-tbody`, `#cc-tlt-mini-summary`.
+- `chamcong.core.js`: thêm `ccGoSub(btn, id)` (chuyển subtab, scope `#page-chamcong`; vào subtab 2 gọi `renderCCHistory()`, về subtab 1 gọi `renderCCTLTMini()`) + `ccShowSubSoCC()` (helper nhảy về subtab 1).
+- `chamcong.history-reports.js`: thêm `renderCCTLTMini()` (sau `renderCCTLT`) — gom `ccData` theo `fromDate === #cc-from`, group theo tên CN, không lọc CT/năm. Hook thêm `renderCCTLTMini()` vào `loadCCWeekById` (+ `ccShowSubSoCC()` vì nút "Tải" ở subtab 2), `delCCWeekById`, `delCCWorker`.
+- `chamcong.week-form.js`: cuối `loadCCWeekForm()` gọi `renderCCTLTMini()` (guard `typeof` vì load order) — phủ mọi đường đổi tuần/CT; `saveCCWeek()` gọi thêm `renderCCTLTMini()` và đổi target scroll từ `#cc-tlt-pagination` (nằm trong subtab 2 ẩn → scrollIntoView vô tác dụng) sang `#cc-tlt-mini-summary`.
+- `js/app/main.js`: `goPage` case `chamcong` (dòng ~182) và `renderActiveTab` case `chamcong` (dòng ~370) thêm `renderCCTLTMini()`.
+- `js/modules/hoadon/hoadon.list-trash.js`: `editCCInvoice` gọi `ccShowSubSoCC()` sau `loadCCWeekForm()`.
+
+**Lưu ý bảo trì:**
+- Bảng mini **cố ý KHÔNG dùng** class `cc-tlt-debt-col` (bị `renderCCTLT` ẩn/hiện toàn cục theo filter tuần) và `cc-tlt-chk` (bị `xuatPhieuLuong`/`updateTLTSelectedSum` quét toàn cục).
+- Trong `#page-chamcong` giờ có `.nav-link` (nav-pills subtab) — nav chính của app dùng `.nav-btn` nên không đụng độ; mọi querySelector mới trong page này nên scope theo `#page-chamcong`.
+- Trạng thái subtab được GIỮ khi chuyển qua lại tab khác (`goPage` không reset `.sub-page`), giống tab Doanh Thu.
+
+---
+
+### 9.13. Tách tab Tiền Ứng thành 2 subtab + bảng Phiếu Ứng Gần Đây + fix _goTabWithCT (13/06/2026)
+
+**Yêu cầu:** làm tương tự changelog 9.12 (Chấm Công) cho tab Tiền Ứng (`#page-nhapung`):
+
+1. **Subtab 1 `ung-sub-nhap` "📝 NHẬP TIỀN ỨNG"** (mặc định active): form nhập + summary bar + bảng **"Phiếu Ứng Gần Đây"** mới (`#ung-recent-section`, render bởi `renderUngMini()`): 10 phiếu mới nhất trộn cả TP + NCC (lọc `inActiveYear`, sort ngày giảm dần rồi `updatedAt`), có badge phân loại TP/NCC và nút ✏️/✕ tái sử dụng `editUngRecord`/`delUngRecord`. **Không có checkbox** `.ung-row-chk` (tránh đụng hàm xuất phiếu ảnh quét checkbox theo scope).
+2. **Subtab 2 `ung-sub-baocao` "📊 BÁO CÁO"**: 2 bảng Thầu Phụ + Nhà Cung Cấp — giữ nguyên 100% ID/hành vi.
+
+**File đã sửa:**
+
+- `index.html`: nav-pills `#ung-sub-nav` (2 nút `#ung-sub-nhap-btn`, `#ung-sub-baocao-btn`), bọc 2 `div.sub-page`, khối mini mới.
+- `tienung.core.js`: thêm `ungGoSub(btn, id)` (vào subtab 2 → `filterAndRenderUng()`, về subtab 1 → `renderUngMini()`), `ungShowSubNhap()`, `ungShowSubBaoCao()`.
+- `tienung.history.js`: thêm `renderUngMini()` (sau `goUngNccTo`); hook **duy nhất** `renderUngMini()` ở cuối `filterAndRenderUng()` — tự phủ lưu/xóa/mở tab/đổi năm (không cần sửa main.js vì goPage + renderActiveTab case nhapung đều đã gọi `filterAndRenderUng()`).
+- `tienung.entry.js`: `editUngRecord` gọi `ungShowSubNhap()` + `renderUngMini()` trước phần highlight `editing-row` (nút Sửa ở subtab 2 → tự về subtab 1; `document.querySelector('[data-ung-id]')` lấy match đầu tiên trong DOM = dòng ở bảng mini).
+- `projects.ui.js` → `_goTabWithCT` case `'ung'`: **sửa lỗi cũ** — code set filter vào `#uf-ct` là ID đã chết từ khi tách 2 bảng TP/NCC (nút xem Tiền Ứng theo CT từ tab Công Trình không lọc gì). Giờ: gọi `ungShowSubBaoCao()` rồi set `#uf-tp-ct` + `#uf-ncc-ct` và gọi `filterAndRenderUngTp()`/`filterAndRenderUngNcc()`.
+
+**Lưu ý bảo trì:**
+- Bảng mini giữ `data-ung-id` trên mỗi `<tr>` + class `editing-row` theo `_editingUngId` để cơ chế highlight của `editUngRecord` hoạt động.
+- Trong `#page-nhapung` giờ có `.nav-link` (nav-pills subtab) — querySelector mới trong page này nên scope theo `#page-nhapung`.
+- Trạng thái subtab được giữ khi chuyển qua lại tab khác (goPage không reset `.sub-page`).
+
+---
+
+### 9.14. Chuyển ô tìm tên CN từ Lịch Sử lên bảng Tổng Lương Tuần (13/06/2026)
+
+**Yêu cầu:** ô tìm kiếm trước đây nằm ở bảng Lịch Sử Chấm Công Tuần (`#cc-hist-search`) — chuyển lên bảng Tổng Lương Tuần (theo Công Nhân) và thu hẹp mục đích: **chỉ tìm theo tên công nhân**.
+
+**File đã sửa:**
+
+- `index.html`: xóa search-box `#cc-hist-search` khỏi toolbar Lịch Sử; thêm search-box **`#cc-tlt-search`** (placeholder "Tìm tên CN...", oninput `ccTltPage=1; renderCCTLT()`) vào toolbar bảng Tổng Lương Tuần, đứng trước dropdown `#cc-tlt-ct`.
+- `chamcong.history-reports.js`:
+  - `renderCCTLT()` + `exportCCTLTCSV()`: đọc `fQ` từ `#cc-tlt-search`, lọc ở cấp worker `if(fQ && !(wk.name||'').toLowerCase().includes(fQ)) return;` — CSV xuất đúng dữ liệu đang hiển thị.
+  - `renderCCHistory()` + `exportCCHistCSV()`: gỡ toàn bộ logic `fQ`/`cc-hist-search` (lọc theo tên CT + tên CN cũ); dọn luôn trường dẫn xuất `workers` và mảng `names` giờ không còn nơi nào dùng.
+
+**Lưu ý:** bảng TLT mini (`renderCCTLTMini`, subtab 1) KHÔNG bị ảnh hưởng bởi ô tìm kiếm này — nó luôn hiện đủ công nhân của tuần đang chọn ở sổ.
 
 ---
 

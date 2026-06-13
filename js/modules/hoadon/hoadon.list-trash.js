@@ -189,6 +189,8 @@ function editCCInvoice(ccKeyOrId) {
       ctSel.value=ct;
     }
     loadCCWeekForm();
+    // Đảm bảo đang ở subtab Sổ Chấm Công (form nhập nằm ở subtab 1)
+    if (typeof ccShowSubSoCC === 'function') ccShowSubSoCC();
     toast('✏️ Đang xem tuần '+viShort(sunISO)+' — '+ct,'success');
   },50);
 }

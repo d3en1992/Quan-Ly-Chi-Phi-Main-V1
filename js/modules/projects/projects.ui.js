@@ -40,9 +40,13 @@ function _goTabWithCT(tabId, ctName) {
       if (sel) { sel.value = ctName; filterAndRender(); }
 
     } else if (tabId === 'ung') {
-      // nhapung đã gọi buildUngFilters() trong goPage — giờ chỉ cần set CT filter
-      const sel = document.getElementById('uf-ct');
-      if (sel) { sel.value = ctName; filterAndRenderUng(); }
+      // Chuyển sang subtab Báo Cáo rồi set filter CT cho cả 2 bảng TP + NCC
+      // (sửa lỗi cũ: #uf-ct không còn tồn tại từ khi tách 2 bảng riêng)
+      if (typeof ungShowSubBaoCao === 'function') ungShowSubBaoCao();
+      const selTp  = document.getElementById('uf-tp-ct');
+      const selNcc = document.getElementById('uf-ncc-ct');
+      if (selTp)  { selTp.value = ctName;  filterAndRenderUngTp(); }
+      if (selNcc) { selNcc.value = ctName; filterAndRenderUngNcc(); }
 
     } else if (tabId === 'doanhthu') {
       _dtCtFilter = ctName;
