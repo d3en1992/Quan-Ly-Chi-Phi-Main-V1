@@ -267,6 +267,53 @@ function _trashRestore(compositeId) {
   renderThungRac();
 }
 
+// ── ĐẨY LỆNH XÓA VĨNH VIỄN LÊN CLOUD (ghi đè thẳng, KHÔNG gộp lại) ────────────
+// VÌ SAO CẦN RIÊNG (đây là chỗ sửa lỗi "xóa rồi vẫn hồi về"):
+//   save() ở core.storage.js sau khi lưu sẽ TỰ ĐỘNG lên lịch một lần push "thường".
+//   Lần push thường đó có bước B1 = ĐỌC cloud rồi GỘP (merge) ngược vào local.
+//   Bản ghi vừa bị xóa HẲN khỏi mảng local nhưng TRÊN CLOUD vẫn còn (kèm deletedAt)
+//   → bước gộp KÉO NGƯỢC nó về local → ghi lại lên cloud → bản ghi "sống lại"
+//   trong thùng rác ngay khi F5 / đồng bộ.
+//   Ở đây ta HUỶ lần push thường đó, rồi tự GHI ĐÈ từng document cloud bằng dữ liệu
+//   local hiện tại (đã bỏ bản ghi xóa) — KHÔNG đọc-gộp cloud trước. Nhờ vậy lệnh xóa
+//   thật sự thắng, kể cả khi slice của một năm trở thành rỗng sau khi xóa.
+async function _trashPushPurge() {
+  // Huỷ lần push "thường" (có bước gộp) mà save() vừa lên lịch
+  if (typeof cancelScheduledPush === 'function') cancelScheduledPush();
+
+  // Offline / chưa cấu hình Firebase: chỉ giữ thay đổi ở local, không đẩy được
+  if (typeof fbReady !== 'function' || !fbReady()) {
+    if (typeof _resetPending === 'function') _resetPending();
+    return;
+  }
+
+  try {
+    // Tất cả năm đang có dữ liệu local (gồm cả năm vừa trở nên trống sau khi xóa)
+    const years = (typeof _getAllLocalYears === 'function')
+      ? _getAllLocalYears()
+      : [String((typeof activeYear !== 'undefined' && activeYear) || new Date().getFullYear())];
+
+    // GHI ĐÈ từng hạng mục theo năm bằng dữ liệu local hiện tại (đã loại bản ghi xóa).
+    // Không gộp cloud → lệnh xóa "thắng" tuyệt đối, kể cả khi records rỗng.
+    for (const yr of years) {
+      const yrInt = parseInt(yr);
+      for (const { cat, key, dateField } of _YEAR_CATS) {
+        await fsSet(fbDocYearCat(yrInt, cat), fbYearCatPayload(yrInt, key, dateField));
+      }
+    }
+    // Ghi đè meta hợp đồng (HĐ chính + thầu phụ) — cho trường hợp xóa vĩnh viễn hợp đồng
+    await fsSet(fbDocMetaHD(), fbMetaHDPayload());
+
+    if (typeof _resetPending === 'function') _resetPending();
+    if (typeof LAST_SYNC_KEY !== 'undefined') localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+    if (typeof _updateSyncBtnBadge === 'function') _updateSyncBtnBadge();
+    console.log('[Trash] ✅ Đã ghi đè cloud sau khi xóa vĩnh viễn — bản ghi sẽ không hồi về');
+  } catch (e) {
+    console.warn('[Trash] Ghi đè cloud lỗi:', e);
+    if (typeof toast === 'function') toast('⚠️ Đã xóa ở máy này nhưng đẩy cloud lỗi — thử bấm 🔄 Sync', 'error');
+  }
+}
+
 // ── Xóa vĩnh viễn 1 bản ghi ───────────────────────────────────────────────────
 function _trashHardDelete(compositeId) {
   if (!confirm('⚠️ Xóa vĩnh viễn?\nDữ liệu sẽ KHÔNG THỂ khôi phục!')) return;
@@ -300,7 +347,7 @@ function _trashHardDelete(compositeId) {
     save('thauphu_v1', thauPhuContracts);
   } else { return; }
 
-  if (typeof schedulePush === 'function') schedulePush();
+  _trashPushPurge();
   toast('Đã xóa vĩnh viễn', 'success');
   renderThungRac();
 }
@@ -349,7 +396,7 @@ function _trashEmptyCurrentTab() {
     }
   }
 
-  if (typeof schedulePush === 'function') schedulePush();
+  _trashPushPurge();
   toast(`Đã xóa vĩnh viễn ${recs.length} bản ghi`, 'success');
   renderThungRac();
 }
@@ -405,7 +452,7 @@ function _trashEmptyAll() {
     save('thauphu_v1', thauPhuContracts);
   }
 
-  if (typeof schedulePush === 'function') schedulePush();
+  _trashPushPurge();
   toast('🧹 Đã làm sạch toàn bộ thùng rác!', 'success');
   renderThungRac();
 }

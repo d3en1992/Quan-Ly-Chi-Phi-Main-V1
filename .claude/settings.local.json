@@ -85,7 +85,8 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(npm update *)",
       "Bash(node --check js/modules/tienung/tienung.core.js)",
-      "Bash(node --check js/modules/tienung/tienung.entry.js)"
+      "Bash(node --check js/modules/tienung/tienung.entry.js)",
+      "Bash(node --check \"d:/NGUYEN HUU/APP QUAN LY CONG TRINH/Claude \\(Old ver\\)/js/modules/thungrac/thungrac.js\")"
     ]
   }
 }

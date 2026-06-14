@@ -34,6 +34,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.8 Chủ Đầu Tư + Hide Closed Projects (24/05/2026)](#98-chủ-đầu-tư--hide-closed-projects-24052026)
    - [9.9 Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026)](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)
    - [9.10 Hóa đơn trong ngày + Chấm công copy + Tiền Ứng (11/06/2026)](#910-hóa-đơn-trong-ngày--chấm-công-copy--tiền-ứng-11062026)
+   - [9.11 Fix lỗi Thùng Rác "xóa rồi vẫn hồi về" (13/06/2026)](#911-fix-lỗi-thùng-rác-xóa-rồi-vẫn-hồi-về-13062026)
 
 **Phụ lục**
 
@@ -953,6 +954,25 @@ Ba việc: tách Chủ Đầu Tư thành model dữ liệu độc lập (hướn
   - `renderCCHistory()` + `exportCCHistCSV()`: gỡ toàn bộ logic `fQ`/`cc-hist-search` (lọc theo tên CT + tên CN cũ); dọn luôn trường dẫn xuất `workers` và mảng `names` giờ không còn nơi nào dùng.
 
 **Lưu ý:** bảng TLT mini (`renderCCTLTMini`, subtab 1) KHÔNG bị ảnh hưởng bởi ô tìm kiếm này — nó luôn hiện đủ công nhân của tuần đang chọn ở sổ.
+
+---
+
+### 9.11. Fix lỗi Thùng Rác "xóa rồi vẫn hồi về" (13/06/2026)
+
+**Triệu chứng:** Trong tab Thùng Rác, bấm "Làm sạch thùng rác" / "Xóa tất cả trong tab" / nút ✕ (xóa vĩnh viễn từng bản ghi) đều báo đã xóa, nhưng sau khi F5 / đồng bộ thì các bản ghi **quay trở lại** thùng rác, không mất đi.
+
+**Nguyên nhân gốc (bug kiến trúc sync):**
+- Hệ thống dùng **soft-delete tombstone** để lan truyền lệnh xóa giữa các máy. Xóa mềm (vào thùng rác) giữ bản ghi trong mảng kèm `deletedAt` → merge giữ được tombstone → đồng bộ đúng.
+- Nhưng **xóa cứng** (xóa hẳn khỏi mảng) **không tạo tombstone**. Khi đó `save()` ([core.storage.js:285](js/core/core.storage.js#L285)) tự lên lịch một lần `pushChanges()` "thường", mà bước **B1 của push** ([sync.js:332-343](js/sync/sync.js#L332-L343)) lại **ĐỌC cloud rồi GỘP (`mergeDatasets`) ngược vào local**. Bản ghi đã xóa khỏi local nhưng **vẫn còn trên cloud** (kèm `deletedAt`) → bị **kéo ngược về** local → ghi đè lại lên cloud → bản ghi "sống lại".
+
+**Cách sửa:** Thêm hàm `_trashPushPurge()` trong [thungrac.js](js/modules/thungrac/thungrac.js) — thay cho `schedulePush()` ở **3 hàm xóa cứng** (`_trashHardDelete`, `_trashEmptyCurrentTab`, `_trashEmptyAll`). Hàm này:
+1. `cancelScheduledPush()` — huỷ lần push "thường" (có bước gộp) mà `save()` vừa hẹn.
+2. **Ghi đè thẳng** từng document cloud (`fsSet` + `fbYearCatPayload` cho mọi năm × `_YEAR_CATS`, và `fbMetaHDPayload` cho hợp đồng) bằng dữ liệu local hiện tại — **KHÔNG đọc-gộp cloud trước**. Nhờ vậy lệnh xóa thắng tuyệt đối, kể cả khi slice một năm trở nên rỗng.
+3. Reset bộ đếm pending + cập nhật badge nút Sync.
+
+**Lưu ý:** `_trashRestore()` (khôi phục) **vẫn giữ `schedulePush()`** — vì khôi phục để lại bản ghi trong mảng (`deletedAt=null`), merge thường xử lý đúng. Khi offline, `_trashPushPurge()` chỉ giữ thay đổi ở local; cần có mạng để lệnh xóa được đẩy ghi đè lên cloud (không thì lần push thường sau vẫn có thể kéo bản ghi về).
+
+**File đã sửa:** `js/modules/thungrac/thungrac.js` (thêm `_trashPushPurge`, thay 3 lời gọi `schedulePush` → `_trashPushPurge` trong các hàm xóa cứng).
 
 ---
 
