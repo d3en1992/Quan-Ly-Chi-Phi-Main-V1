@@ -35,6 +35,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.9 Bỏ Offline-first → Online-only + Cấu trúc B + Normalize (29/05/2026)](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)
    - [9.10 Hóa đơn trong ngày + Chấm công copy + Tiền Ứng (11/06/2026)](#910-hóa-đơn-trong-ngày--chấm-công-copy--tiền-ứng-11062026)
    - [9.11 Fix lỗi Thùng Rác "xóa rồi vẫn hồi về" (13/06/2026)](#911-fix-lỗi-thùng-rác-xóa-rồi-vẫn-hồi-về-13062026)
+   - [9.12 Tách Tab Công Nợ + Doanh Thu 2 subtab + UI Công Nợ mới (16/06/2026)](#912-tách-tab-công-nợ--doanh-thu-2-subtab--ui-công-nợ-mới-16062026)
 
 **Phụ lục**
 
@@ -109,7 +110,8 @@ Thứ tự chính xác trong `index.html`:
 | 28 | `js/legacy/thietbi.js` | Quản lý thiết bị/kho tổng |
 | 29 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
 | 30 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
-| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Công nợ, Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderCongNoThauPhu`, `_renderCongNoTable`, `renderCongNoNhaCungCap`, `renderLaiLo`, `initDoanhThu`, `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub` |
+| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderLaiLo`, `initDoanhThu` (set up 2 subtab KHAI BÁO/THỐNG KÊ), `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub`. (`renderCongNoThauPhu`/`renderCongNoNhaCungCap`/`_renderCongNoTable` còn lại nhưng **DEPRECATED** — xem 9.12) |
+| 31b | `js/modules/doanhthu/doanhthu.congno.js` | Page **CÔNG NỢ** (tab chính độc lập): `initCongNo`, `cnRenderTable`, `cnApplyFilters`, `cnResetFilters`, `cnPopulateCtFilter`, `cnPopulateMonthFilter`, `_cnBuildRows` (chỉ đối tác có `daUng>0`), `_cnRenderKpis`, `_cnProgressBar`, `_cnStatusBadge`, `_cnGroupBadge`, `_cnMatchCt`, `_cnInMonth`; state lọc `_cnCt`/`_cnGroup`/`_cnMonth`/`_cnSearch`. Nạp sau `doanhthu.reports-export.js`. |
 | 32 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 4 meta doc), `pullChanges` (REPLACE local bằng cloud), `_pullMeta`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
 | 33 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
 | 34 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`) |
@@ -166,6 +168,7 @@ js/
       doanhthu.core.js
       doanhthu.forms.js
       doanhthu.reports-export.js
+      doanhthu.congno.js        ← Page CÔNG NỢ (tab chính độc lập)
 
   legacy/                     ← File chưa tách module, vẫn ở dạng đơn khối
     tienich.js
@@ -973,6 +976,43 @@ Ba việc: tách Chủ Đầu Tư thành model dữ liệu độc lập (hướn
 **Lưu ý:** `_trashRestore()` (khôi phục) **vẫn giữ `schedulePush()`** — vì khôi phục để lại bản ghi trong mảng (`deletedAt=null`), merge thường xử lý đúng. Khi offline, `_trashPushPurge()` chỉ giữ thay đổi ở local; cần có mạng để lệnh xóa được đẩy ghi đè lên cloud (không thì lần push thường sau vẫn có thể kéo bản ghi về).
 
 **File đã sửa:** `js/modules/thungrac/thungrac.js` (thêm `_trashPushPurge`, thay 3 lời gọi `schedulePush` → `_trashPushPurge` trong các hàm xóa cứng).
+
+---
+
+### 9.12. Tách Tab Công Nợ + Doanh Thu 2 subtab + UI Công Nợ mới (16/06/2026)
+
+Tái cấu trúc lớn phần Doanh Thu / Công Nợ theo yêu cầu nâng cấp UI/UX.
+
+**1) Công Nợ tách thành Tab chính độc lập (`page-congno`):**
+- Thêm nút nav `💳 CÔNG NỢ` trong sidebar ([index.html](index.html)) sau nút Doanh Thu.
+- Thêm `congno: '💳 Công Nợ'` vào `_PAGE_LABELS`, hook `if (id==='congno') initCongNo();` trong `goPage()` và `case 'congno': initCongNo();` trong `renderActiveTab()` ([main.js](js/app/main.js)).
+- Ẩn tab với role `ketoan` (cùng nhóm `dashboard`/`doanhthu`) trong `applyRoleUI()` ([auth.js](js/app/auth.js#L743)).
+- File mới **`js/modules/doanhthu/doanhthu.congno.js`** (nạp sau `doanhthu.reports-export.js`): logic page Công Nợ.
+
+**2) Tab Doanh Thu chia 2 subtab:**
+- **KHAI BÁO** (`dt-sub-khaibao`): không gian làm việc hàng ngày — form nhập (modal HĐ Chính/Thu Tiền/HĐ Thầu Phụ) + mini dashboard + 3 bảng lịch sử **giới hạn 30 ngày gần nhất** (`renderHdcTable`/`renderHdtpTable`/`renderThuTable`, đã thêm `_dtWithinRecent()`), có nút Sửa/Xóa + checkbox xuất phiếu + filter `_dtCtFilter`/`_dtSearch`.
+- **THỐNG KÊ** (`dt-sub-thongke`): không gian đối soát — 3 bảng **toàn bộ** ID `hdctk-`/`hdtptk-`/`thutk-` (`renderHdcTableTk`/`renderHdtpTableTk`/`renderThuTableTk`), không checkbox, vẫn có Sửa/Xóa, filter riêng `_dtTkCtFilter`/`_dtTkSearch` + `_dtMatchTkProjFilter`/`_dtMatchTkHDCFilter`, pagination riêng `_hdcTkPage`/`_hdtpTkPage`/`_thuTkPage`.
+- Mọi hàm save/edit/delete HĐ Chính/Thu/HĐ TP gọi render **cả 2** scope (kb + tk) để đồng bộ.
+- Đã **xóa** `dtEnsureCongNoSubtab()` (tạo subtab Công Nợ động) và lời gọi của nó; cập nhật `dtGoSub`, `dtPopulateSels`, `dtPopulateCtFilter`, `initDoanhThu`.
+
+**3) UI Công Nợ mới (page-congno):**
+- **Phần A — Thẻ KPI:** Tổng nợ Thầu Phụ (đỏ), Tổng nợ NCC (cam), Tổng đã ứng (xanh) — `_cnRenderKpis()`.
+- **Phần B — Bộ lọc nâng cao:** Công trình, Nhóm đối tác (Thầu phụ/NCC), **Tháng** (dropdown chỉ liệt kê tháng có phát sinh tiền ứng — `cnPopulateMonthFilter()`), tìm kiếm → `cnApplyFilters()`/`cnResetFilters()`.
+- **Phần C — Bảng trực quan:** gộp Thầu Phụ + NCC, có **thanh tiến độ %** đã ứng (`_cnProgressBar`) và **badge màu trạng thái** (`_cnStatusBadge`: ✅ Đã xong / ● Đang nợ / ⚠ Nợ lớn / ↑ Ứng dư). Dữ liệu dựng từ `thauPhuContracts` + `ungRecords` + hóa đơn (`getInvoicesCached`) qua `_cnBuildRows()`.
+- **[Điều chỉnh 16/06/2026 — đợt 2]** Bảng + thẻ KPI **chỉ tính đối tác đã có phát sinh tiền ứng** (`daUng > 0`): `_cnBuildRows()` lọc `.filter(row => (row.daUng||0) > 0)`, và `_cnRenderKpis()` dùng chính tập `allRows` đó → số liệu 3 thẻ luôn đồng bộ với bảng. Bộ lọc ngày Từ/Đến đã thay bằng dropdown **Tháng** (`_cnMonth='yyyy-mm'`, `_cnInMonth()` so khớp `ngay.slice(0,7)`).
+- `nhapxuat.import.js`: refresh sau import đổi `renderCongNoThauPhu()` → `initCongNo()`.
+
+**Lưu ý dọn dẹp:** `renderCongNoThauPhu`/`renderCongNoNhaCungCap`/`_renderCongNoTable` trong `doanhthu.reports-export.js` + `_dtCnCtFilter`/`_dtMatchCnProjFilter` trong `doanhthu.core.js` nay là **legacy không còn dùng** (trỏ tới `#congno-tbody` đã bị xóa khỏi DOM → tự early-return). Đã đánh dấu `[DEPRECATED]`, sẽ xóa hẳn ở đợt sau.
+
+**Hàm/biến global mới:** `initCongNo`, `cnApplyFilters`, `cnResetFilters`, `cnRenderTable`, `cnPopulateCtFilter`, `cnPopulateMonthFilter`, `_cnBuildRows`, `_cnRenderKpis`, `_cnProgressBar`, `_cnStatusBadge`, `_cnGroupBadge`, `_cnMatchCt`, `_cnInMonth`, state `_cnCt`/`_cnGroup`/`_cnMonth`/`_cnSearch`; `renderHdcTableTk`/`renderHdtpTableTk`/`renderThuTableTk`, `dtSetTkCtFilter`/`dtSetTkSearch`, `_dtMatchTkProjFilter`/`_dtMatchTkHDCFilter`, `_dtWithinRecent`, `DT_RECENT_DAYS`, `_dtTkCtFilter`/`_dtTkSearch`, `_hdcTkPage`/`_hdtpTkPage`/`_thuTkPage`.
+
+**File đã sửa:** `index.html`, `js/app/main.js`, `js/app/auth.js`, `js/modules/doanhthu/doanhthu.core.js`, `doanhthu.forms.js`, `doanhthu.reports-export.js`, `js/modules/nhapxuat/nhapxuat.import.js`; **file mới:** `js/modules/doanhthu/doanhthu.congno.js`.
+
+#### Điều chỉnh đợt 3 (16/06/2026) — Gộp bảng KHAI BÁO + dời nút xuất phiếu
+
+- **KHAI BÁO gộp 1 bảng:** 3 bảng riêng (HĐ Chính/HĐ Thầu Phụ/Thu Tiền) gộp thành **một bảng tổng hợp** `renderKhaiBaoTable()` (tbody `#kb-tbody`, badge `#kb-count-badge`, pagination `#kb-pagination`, state `_kbPage`): gom 3 nguồn (30 ngày gần nhất), mỗi dòng có **nhãn Loại** (📋 HĐ Chính / 🤝 HĐ Thầu Phụ / 💰 Thu Tiền) + cột Đối Tác/Người + nút Sửa/Xóa gọi đúng hàm theo loại. Sắp theo `ngay` giảm dần.
+- 3 hàm cũ `renderHdcTable`/`renderHdtpTable`/`renderThuTable` nay là **delegator** → `renderKhaiBaoTable(0)` (mọi nơi gọi sẵn từ save/edit/delete/init/populate tự refresh bảng gộp). Đã **bỏ** bộ lọc "Lọc Công Trình" + ô tìm kiếm khỏi KHAI BÁO (xóa khỏi DOM; `dtPopulateCtFilter` giờ chỉ populate select THỐNG KÊ; `dtSetCtFilter`/`dtSetSearch`/`_dtMatchProjFilter`/`_dtMatchHDCFilter`/`_dtCtFilter`/`_dtSearch` thành orphan, giữ tạm).
+- **Dời nút xuất phiếu sang THỐNG KÊ:** các nút `exportHdcToImage`/`exportHdtpToImage`/`exportThuToImage` + **cột checkbox** (`.hdc-row-chk`/`.hdtp-row-chk`/`.thu-row-chk`) chuyển từ KHAI BÁO sang 3 bảng THỐNG KÊ (thêm checkbox vào `renderHdcTableTk`/`renderHdtpTableTk`/`renderThuTableTk`). KHAI BÁO không còn checkbox/xuất phiếu.
 
 ---
 

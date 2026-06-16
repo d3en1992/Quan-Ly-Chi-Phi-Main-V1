@@ -84,6 +84,7 @@ function saveHopDongChinh() {
   _hdcResetForm();
   closeDtModal('hdc');
   renderHdcTable(0);
+  renderHdcTableTk(_hdcTkPage);
   renderDashboard();
   _dtRenderDashboardMini();
 }
@@ -170,75 +171,16 @@ function delHopDongChinh(keyId) {
   hopDongData[keyId] = { ...(hopDongData[keyId] || {}), deletedAt: now, updatedAt: now, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('hopdong_v1', hopDongData);
   renderHdcTable(_hdcPage);
+  renderHdcTableTk(_hdcTkPage);
   renderDashboard();
   toast('Đã xóa hợp đồng: ' + ctName, 'success');
 }
 
-// ── Render bảng Hợp Đồng Chính ────────────────────────────────
-function renderHdcTable(page) {
-  page = page || 0;
-  _hdcPage = page;
-  const tbody  = document.getElementById('hdc-tbody');
-  const empty  = document.getElementById('hdc-empty');
-  const pgWrap = document.getElementById('hdc-pagination');
-  if (!tbody) return;
-
-  // Resolve keyId → tên CT cho sắp xếp và hiển thị
-  const _allProjs = (typeof projects !== 'undefined') ? projects : [];
-  const _resolveCtName = (keyId) => {
-    const p = _allProjs.find(proj => proj.id === keyId);
-    return p ? p.name : keyId;
-  };
-  let entries = Object.entries(hopDongData)
-    .filter(([keyId, v]) => !v.deletedAt && _dtInYear(v.ngay) && _dtMatchHDCFilter(keyId, v))
-    .sort((a, b) => _resolveCtName(a[0]).localeCompare(_resolveCtName(b[0]), 'vi'));
-
-  if (_dtSearch) {
-    const q = _dtSearch;
-    entries = entries.filter(([keyId, v]) =>
-      (_resolveCtName(keyId) || '').toLowerCase().includes(q) ||
-      recCatName(v,'hopdong','nguoi').toLowerCase().includes(q)
-    );
-  }
-
-  if (!entries.length) {
-    tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
-    if (pgWrap) pgWrap.innerHTML = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-
-  const total = entries.length;
-  const slice = entries.slice(page * DT_PG, (page + 1) * DT_PG);
-
-  tbody.innerHTML = slice.map(([keyId, hd]) => {
-    const ctName = _resolveCtName(keyId);
-    // CĐT hiển thị: ưu tiên project.chuDauTu (đồng bộ realtime), fallback hd.khachHang (legacy)
-    const _hdcProjRow = _allProjs.find(pr => !pr.deletedAt && (pr.id === keyId || pr.name === ctName));
-    const _cdt = (_hdcProjRow && _hdcProjRow.chuDauTu) ? _hdcProjRow.chuDauTu : (hd.khachHang || '');
-    const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
-    return `<tr>
-      <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
-      <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(ctName)}</td>
-      <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(_cdt || '—')}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
-      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
-      <td class="action-col">
-        <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
-            onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
-            onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderHdcTable');
-}
+// ── [KHAI BÁO] 3 hàm render cũ → delegate sang bảng GỘP CHUNG ──
+// Sub-tab KHAI BÁO nay dùng MỘT bảng tổng hợp duy nhất (renderKhaiBaoTable).
+// Giữ nguyên tên 3 hàm này để mọi nơi gọi sẵn (save/edit/delete/init) tự refresh
+// bảng gộp; mọi lần gọi đưa về trang 0 (bản ghi mới nhất lên đầu).
+function renderHdcTable(_page)  { renderKhaiBaoTable(0); }
 
 // ══ PHẦN 2: GHI NHẬN THU TIỀN ═════════════════════════════════
 
@@ -279,6 +221,7 @@ function saveThuRecord() {
     _thuResetForm();
     closeDtModal('thu');
     renderThuTable(_thuPage);
+    renderThuTableTk(_thuTkPage);
     renderDashboard();
     _dtRenderDashboardMini();
     toast('✅ Đã cập nhật thu tiền: ' + fmtM(tien) + ' — ' + ct, 'success');
@@ -298,6 +241,7 @@ function saveThuRecord() {
     if (loaiThuEl) loaiThuEl.value = '';
 
     renderThuTable(0);
+    renderThuTableTk(_thuTkPage);
     renderDashboard();
     _dtRenderDashboardMini();
     toast('✅ Đã ghi nhận thu ' + fmtM(tien) + ' từ ' + ct, 'success');
@@ -383,73 +327,13 @@ function delThuRecord(id) {
   thuRecords[idx] = { ...thuRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('thu_v1', thuRecords);
   renderThuTable(_thuPage);
+  renderThuTableTk(_thuTkPage);
   renderDashboard();
   toast('Đã xóa bản ghi thu tiền', 'success');
 }
 
-// ── Render bảng lịch sử thu ───────────────────────────────────
-function renderThuTable(page) {
-  if (page === undefined) page = _thuPage;
-  _thuPage = page;
-  const tbody  = document.getElementById('thu-tbody');
-  const empty  = document.getElementById('thu-empty');
-  const badge  = document.getElementById('thu-count-badge');
-  const pgWrap = document.getElementById('thu-pagination');
-  if (!tbody) return;
-
-  const _LOAI_BADGE = { tamung: ['Tạm ứng','badge bg-warning text-dark'], giaidoan: ['Giai đoạn','badge bg-info text-dark'], quyettoan: ['Quyết toán','badge bg-success'] };
-
-  let filtered = thuRecords
-    .filter(r => !r.deletedAt && inActiveYear(r.ngay) && _dtMatchProjFilter(r))
-    .sort((a, b) => b.ngay.localeCompare(a.ngay));
-
-  if (_dtSearch) {
-    const q = _dtSearch;
-    filtered = filtered.filter(r =>
-      (_resolveCtName(r) || '').toLowerCase().includes(q) ||
-      recCatName(r,'thu','nguoi').toLowerCase().includes(q) ||
-      (r.nd || '').toLowerCase().includes(q) ||
-      (r.loaiThu || '').toLowerCase().includes(q)
-    );
-  }
-
-  if (badge) badge.textContent = filtered.length ? `(${filtered.length} đợt)` : '';
-
-  if (!filtered.length) {
-    tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
-    if (pgWrap) pgWrap.innerHTML = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-
-  const total = filtered.length;
-  const slice = filtered.slice(page * DT_PG, (page + 1) * DT_PG);
-
-  tbody.innerHTML = slice.map(r => {
-    const [loaiLabel, loaiCls] = _LOAI_BADGE[r.loaiThu] || ['',''];
-    const loaiBadge = loaiLabel ? `<span class="${loaiCls}" style="font-size:11px">${loaiLabel}</span>` : '<span class="text-body-secondary">—</span>';
-    return `<tr>
-      <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="thu-row-chk" data-id="${r.id}"></td>
-      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
-      <td style="white-space:nowrap">${loaiBadge}</td>
-      <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
-      <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r,'thu','nguoi') || '—')}</td>
-      <td class="text-body-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
-      <td class="action-col">
-        <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
-            onclick="editThuRecord('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
-            onclick="delThuRecord('${r.id}')"><i class="bi bi-trash-fill"></i></button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderThuTable');
-}
+// ── [KHAI BÁO] render lịch sử thu cũ → delegate sang bảng GỘP CHUNG ──
+function renderThuTable(_page) { renderKhaiBaoTable(0); }
 
 // ══ PHẦN 3: HỢP ĐỒNG THẦU PHỤ ════════════════════════════════
 
@@ -503,6 +387,7 @@ function saveHopDongThauPhu() {
   _hdtpResetForm();
   closeDtModal('hdtp');
   renderHdtpTable(0);
+  renderHdtpTableTk(_hdtpTkPage);
   _dtRenderDashboardMini();
 }
 
@@ -577,24 +462,216 @@ function delHopDongThauPhu(id) {
   thauPhuContracts[idx] = { ...thauPhuContracts[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('thauphu_v1', thauPhuContracts);
   renderHdtpTable(_hdtpPage);
+  renderHdtpTableTk(_hdtpTkPage);
   toast('Đã xóa hợp đồng thầu phụ', 'success');
 }
 
-// ── Render bảng Hợp Đồng Thầu Phụ ────────────────────────────
-function renderHdtpTable(page) {
+// ── [KHAI BÁO] render HĐ Thầu Phụ cũ → delegate sang bảng GỘP CHUNG ──
+function renderHdtpTable(_page) { renderKhaiBaoTable(0); }
+
+// ══ BẢNG GỘP CHUNG KHAI BÁO (30 ngày gần nhất) ═══════════════
+// Gộp HĐ Chính + HĐ Thầu Phụ + Thu Tiền vào MỘT bảng, sắp theo ngày giảm dần.
+// Mỗi dòng có nhãn Loại + nút Sửa/Xóa gọi đúng hàm theo loại bản ghi.
+let _kbPage = 0;
+
+function renderKhaiBaoTable(page) {
   page = page || 0;
-  _hdtpPage = page;
-  const tbody  = document.getElementById('hdtp-tbody');
-  const empty  = document.getElementById('hdtp-empty');
-  const pgWrap = document.getElementById('hdtp-pagination');
+  _kbPage = page;
+  const tbody  = document.getElementById('kb-tbody');
+  const empty  = document.getElementById('kb-empty');
+  const badge  = document.getElementById('kb-count-badge');
+  const pgWrap = document.getElementById('kb-pagination');
+  if (!tbody) return;
+
+  const _LOAI_BADGE = {
+    tamung:   ['Tạm ứng',  'badge bg-warning text-dark'],
+    giaidoan: ['Giai đoạn','badge bg-info text-dark'],
+    quyettoan:['Quyết toán','badge bg-success'],
+  };
+
+  const items = []; // { type, ngay, sortTs, ct, doiTac, nd, tien, actions }
+
+  // ── HĐ Chính ──
+  const _kbProjs = (typeof projects !== 'undefined') ? projects : [];
+  Object.entries(hopDongData)
+    .filter(([keyId, v]) => !v.deletedAt && _dtInYear(v.ngay) && _dtWithinRecent(v.ngay))
+    .forEach(([keyId, hd]) => {
+      const _p = _kbProjs.find(p => p.id === keyId);
+      const ctName = _p ? _p.name : keyId;
+      const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
+      items.push({
+        type: 'hdc',
+        ngay: hd.ngay,
+        sortTs: hd.updatedAt || hd.createdAt || 0,
+        ct: ctName,
+        doiTac: recCatName(hd, 'hopdong', 'nguoi') || '—',
+        nd: hd.nd || '—',
+        tien: tong,
+        tienCls: 'text-warning',
+        loaiBadge: '<span class="badge bg-primary" style="font-size:10px">📋 HĐ Chính</span>',
+        actions: `
+          <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>`,
+      });
+    });
+
+  // ── HĐ Thầu Phụ ──
+  thauPhuContracts
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtWithinRecent(r.ngay))
+    .forEach(r => {
+      const tong = (r.giaTri || 0) + (r.phatSinh || 0);
+      items.push({
+        type: 'hdtp',
+        ngay: r.ngay,
+        sortTs: r.updatedAt || r.createdAt || 0,
+        ct: _resolveCtName(r) || '—',
+        doiTac: recCatName(r, 'thauphu', 'thauphu') || '—',
+        nd: r.nd || '—',
+        tien: tong,
+        tienCls: 'text-warning',
+        loaiBadge: '<span class="badge bg-warning text-dark" style="font-size:10px">🤝 HĐ Thầu Phụ</span>',
+        actions: `
+          <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongThauPhu('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongThauPhu('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
+      });
+    });
+
+  // ── Thu Tiền ──
+  thuRecords
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay) && _dtWithinRecent(r.ngay))
+    .forEach(r => {
+      const [loaiLabel, loaiCls] = _LOAI_BADGE[r.loaiThu] || ['', ''];
+      const loaiExtra = loaiLabel ? ` <span class="${loaiCls}" style="font-size:10px">${loaiLabel}</span>` : '';
+      items.push({
+        type: 'thu',
+        ngay: r.ngay,
+        sortTs: r.updatedAt || r.createdAt || 0,
+        ct: _resolveCtName(r) || '—',
+        doiTac: recCatName(r, 'thu', 'nguoi') || '—',
+        nd: r.nd || '—',
+        tien: r.tien || 0,
+        tienCls: 'text-success',
+        loaiBadge: '<span class="badge bg-success" style="font-size:10px">💰 Thu Tiền</span>' + loaiExtra,
+        actions: `
+          <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editThuRecord('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delThuRecord('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
+      });
+    });
+
+  // Sắp xếp: ngày mới nhất lên đầu (tie-break theo thời điểm cập nhật)
+  items.sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || (b.sortTs - a.sortTs));
+
+  if (badge) badge.textContent = items.length ? `(${items.length} mục)` : '';
+
+  if (!items.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
+    if (pgWrap) pgWrap.innerHTML = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const total = items.length;
+  const slice = items.slice(page * DT_PG, (page + 1) * DT_PG);
+
+  tbody.innerHTML = slice.map(it => `<tr>
+    <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(it.ngay)}</td>
+    <td style="white-space:nowrap">${it.loaiBadge}</td>
+    <td style="font-weight:600;white-space:nowrap">${x(it.ct)}</td>
+    <td class="text-secondary" style="white-space:nowrap">${x(it.doiTac)}</td>
+    <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(it.nd)}">${x(it.nd)}</td>
+    <td class="text-end font-monospace fw-semibold ${it.tienCls}" style="white-space:nowrap">${it.tien ? fmtM(it.tien) : '—'}</td>
+    <td class="action-col">
+      <div class="d-flex gap-1 justify-content-center">${it.actions}</div>
+    </td>
+  </tr>`).join('');
+
+  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderKhaiBaoTable');
+}
+
+// ══ PHẦN 4: BẢNG THỐNG KÊ (toàn bộ — phục vụ đối soát) ════════
+// Dùng chung hàm sửa/xóa với KHAI BÁO; chỉ khác: KHÔNG giới hạn 30 ngày,
+// KHÔNG có cột checkbox, dùng state filter/search/pagination riêng (_dtTk*).
+
+// ── Render bảng Hợp Đồng Chính (toàn bộ) ─────────────────────
+function renderHdcTableTk(page) {
+  page = page || 0;
+  _hdcTkPage = page;
+  const tbody  = document.getElementById('hdctk-tbody');
+  const empty  = document.getElementById('hdctk-empty');
+  const pgWrap = document.getElementById('hdctk-pagination');
+  if (!tbody) return;
+
+  const _allProjs = (typeof projects !== 'undefined') ? projects : [];
+  const _resolveName = (keyId) => {
+    const p = _allProjs.find(proj => proj.id === keyId);
+    return p ? p.name : keyId;
+  };
+  let entries = Object.entries(hopDongData)
+    .filter(([keyId, v]) => !v.deletedAt && _dtInYear(v.ngay) && _dtMatchTkHDCFilter(keyId, v))
+    .sort((a, b) => _resolveName(a[0]).localeCompare(_resolveName(b[0]), 'vi'));
+
+  if (_dtTkSearch) {
+    const q = _dtTkSearch;
+    entries = entries.filter(([keyId, v]) =>
+      (_resolveName(keyId) || '').toLowerCase().includes(q) ||
+      recCatName(v,'hopdong','nguoi').toLowerCase().includes(q)
+    );
+  }
+
+  if (!entries.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
+    if (pgWrap) pgWrap.innerHTML = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const total = entries.length;
+  const slice = entries.slice(page * DT_PG, (page + 1) * DT_PG);
+
+  tbody.innerHTML = slice.map(([keyId, hd]) => {
+    const ctName = _resolveName(keyId);
+    const _proj = _allProjs.find(pr => !pr.deletedAt && (pr.id === keyId || pr.name === ctName));
+    const _cdt = (_proj && _proj.chuDauTu) ? _proj.chuDauTu : (hd.khachHang || '');
+    const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
+    return `<tr>
+      <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
+      <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap">${x(ctName)}</td>
+      <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(_cdt || '—')}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
+      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
+      <td class="action-col">
+        <div class="d-flex gap-1 justify-content-center">
+          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
+            onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
+            onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderHdcTableTk');
+}
+
+// ── Render bảng Hợp Đồng Thầu Phụ (toàn bộ) ──────────────────
+function renderHdtpTableTk(page) {
+  page = page || 0;
+  _hdtpTkPage = page;
+  const tbody  = document.getElementById('hdtptk-tbody');
+  const empty  = document.getElementById('hdtptk-empty');
+  const pgWrap = document.getElementById('hdtptk-pagination');
   if (!tbody) return;
 
   let filtered = thauPhuContracts
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchProjFilter(r))
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTkProjFilter(r))
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  if (_dtSearch) {
-    const q = _dtSearch;
+  if (_dtTkSearch) {
+    const q = _dtTkSearch;
     filtered = filtered.filter(r =>
       (_resolveCtName(r) || '').toLowerCase().includes(q) ||
       (recCatName(r,'thauphu','thauphu') || '').toLowerCase().includes(q) ||
@@ -633,5 +710,69 @@ function renderHdtpTable(page) {
     </tr>`;
   }).join('');
 
-  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderHdtpTable');
+  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderHdtpTableTk');
+}
+
+// ── Render bảng Lịch Sử Thu Tiền (toàn bộ) ───────────────────
+function renderThuTableTk(page) {
+  if (page === undefined) page = _thuTkPage;
+  _thuTkPage = page;
+  const tbody  = document.getElementById('thutk-tbody');
+  const empty  = document.getElementById('thutk-empty');
+  const badge  = document.getElementById('thutk-count-badge');
+  const pgWrap = document.getElementById('thutk-pagination');
+  if (!tbody) return;
+
+  const _LOAI_BADGE = { tamung: ['Tạm ứng','badge bg-warning text-dark'], giaidoan: ['Giai đoạn','badge bg-info text-dark'], quyettoan: ['Quyết toán','badge bg-success'] };
+
+  let filtered = thuRecords
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay) && _dtMatchTkProjFilter(r))
+    .sort((a, b) => b.ngay.localeCompare(a.ngay));
+
+  if (_dtTkSearch) {
+    const q = _dtTkSearch;
+    filtered = filtered.filter(r =>
+      (_resolveCtName(r) || '').toLowerCase().includes(q) ||
+      recCatName(r,'thu','nguoi').toLowerCase().includes(q) ||
+      (r.nd || '').toLowerCase().includes(q) ||
+      (r.loaiThu || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (badge) badge.textContent = filtered.length ? `(${filtered.length} đợt)` : '';
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
+    if (pgWrap) pgWrap.innerHTML = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const total = filtered.length;
+  const slice = filtered.slice(page * DT_PG, (page + 1) * DT_PG);
+
+  tbody.innerHTML = slice.map(r => {
+    const [loaiLabel, loaiCls] = _LOAI_BADGE[r.loaiThu] || ['',''];
+    const loaiBadge = loaiLabel ? `<span class="${loaiCls}" style="font-size:11px">${loaiLabel}</span>` : '<span class="text-body-secondary">—</span>';
+    return `<tr>
+      <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="thu-row-chk" data-id="${r.id}"></td>
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
+      <td style="white-space:nowrap">${loaiBadge}</td>
+      <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
+      <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r,'thu','nguoi') || '—')}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="action-col">
+        <div class="d-flex gap-1 justify-content-center">
+          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
+            onclick="editThuRecord('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
+            onclick="delThuRecord('${r.id}')"><i class="bi bi-trash-fill"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderThuTableTk');
 }

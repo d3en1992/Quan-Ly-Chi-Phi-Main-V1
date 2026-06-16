@@ -740,7 +740,7 @@ function applyRoleUI() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const page = btn.dataset.page;
     let visible = true;
-    if (user.role === 'ketoan' && ['dashboard', 'doanhthu'].includes(page)) {
+    if (user.role === 'ketoan' && ['dashboard', 'doanhthu', 'congno'].includes(page)) {
       visible = false;
     }
     btn.style.display = visible ? '' : 'none';

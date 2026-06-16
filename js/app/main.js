@@ -167,7 +167,7 @@ function goPage(btn, id) {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
     thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
     nhapung: '💰 Tiền Ứng', thietbi: '🔧 Theo Dõi TB',
-    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', dashboard: '📊 Dashboard',
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', congno: '💳 Công Nợ', dashboard: '📊 Dashboard',
     thungrac: '🗑️ Thùng Rác'
   };
   _setTopbarTabTitle(_PAGE_LABELS[id] || '');
@@ -178,6 +178,7 @@ function goPage(btn, id) {
   if (id==='danhmuc') renderSettings();
   if (id==='dashboard') renderDashboard();
   if (id==='doanhthu') initDoanhThu();
+  if (id==='congno') initCongNo();
   if (id==='nhapung') { initUngTableIfEmpty(); buildUngFilters(); filterAndRenderUng(); }
   if (id==='chamcong') { populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); renderCCTLTMini(); }
   if (id==='thietbi') { tbPopulateSels(); tbBuildRows(5); tbRenderList(); renderKhoTong(); }
@@ -383,8 +384,12 @@ function renderActiveTab() {
       buildFilters(); filterAndRender();
       break;
     case 'doanhthu':
-      // dtPopulateSels() gọi renderHdcTable + renderHdtpTable + renderCongNoThauPhu bên trong
+      // dtPopulateSels() gọi renderHdcTable + renderHdtpTable bên trong
       dtPopulateSels(); renderThuTable();
+      break;
+    case 'congno':
+      // Render lại toàn bộ page Công Nợ khi đổi năm
+      initCongNo();
       break;
     case 'dashboard':
     default:

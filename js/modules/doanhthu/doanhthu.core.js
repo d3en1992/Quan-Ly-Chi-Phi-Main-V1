@@ -173,15 +173,34 @@ function bindItemsToTable(prefix, getItemsArr) {
 bindItemsToTable('hdtp', () => _hdtpItems);
 
 // Pagination state cho tab Doanh Thu
+// _hdcPage/_hdtpPage/_thuPage  → subtab KHAI BÁO (30 ngày gần nhất)
+// _hdcTkPage/_hdtpTkPage/_thuTkPage → subtab THỐNG KÊ (toàn bộ)
 let _hdcPage  = 0;
 let _hdtpPage = 0;
 let _thuPage  = 0;
+let _hdcTkPage  = 0;
+let _hdtpTkPage = 0;
+let _thuTkPage  = 0;
 const DT_PG   = 7;
 
-// CT filter cho sub-tab THỐNG KÊ ('' = tất cả)
+// Số ngày coi là "gần nhất" cho subtab KHAI BÁO
+const DT_RECENT_DAYS = 30;
+
+// CT filter cho sub-tab KHAI BÁO ('' = tất cả)
 let _dtCtFilter = '';
-// CT filter riêng cho sub-tab CÔNG NỢ — cô lập hoàn toàn với Thống Kê
+// CT filter riêng cho sub-tab THỐNG KÊ — cô lập với Khai Báo
+let _dtTkCtFilter = '';
+// (Giữ lại cho tương thích — sub-tab CÔNG NỢ cũ đã tách sang page riêng)
 let _dtCnCtFilter = '';
+
+// ── Helper: record có nằm trong DT_RECENT_DAYS ngày gần nhất không ──
+function _dtWithinRecent(ngay) {
+  if (!ngay) return false;
+  const d = new Date(ngay);
+  if (isNaN(d.getTime())) return false;
+  const diffDays = (Date.now() - d.getTime()) / 86400000;
+  return diffDays <= DT_RECENT_DAYS;
+}
 
 // ── Match record với CT filter Thống Kê ────────────────────────────────────
 function _dtMatchProjFilter(record) {
@@ -222,15 +241,38 @@ function _dtMatchHDCFilter(keyId, hd) {
   return false;
 }
 
-// ── Populate CT filter select — mỗi sub-tab dùng state riêng ──────────────
-function dtPopulateCtFilter() {
-  const tkSel = document.getElementById('dt-ct-filter-sel');
-  if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
-  const cnSel = document.getElementById('dt-cn-ct-filter-sel');
-  if (cnSel) cnSel.innerHTML = _buildProjFilterOpts(_dtCnCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
+// ── Match record với CT filter THỐNG KÊ ───────────────────────────────────
+function _dtMatchTkProjFilter(record) {
+  if (!_dtTkCtFilter) return true;
+  if (record.projectId) {
+    const proj = getAllProjects().find(p => p.name === _dtTkCtFilter);
+    if (proj) return record.projectId === proj.id;
+  }
+  return (record.congtrinh || '') === _dtTkCtFilter;
 }
 
-// ── Áp dụng CT filter → CHỈ re-render bảng THỐNG KÊ ──────────────────────
+// ── Match hopDongData entry với CT filter THỐNG KÊ ─────────────────────────
+function _dtMatchTkHDCFilter(keyId, hd) {
+  if (!_dtTkCtFilter) return true;
+  if (keyId === _dtTkCtFilter) return true;
+  const filterProj = getAllProjects().find(p => p.name === _dtTkCtFilter);
+  if (filterProj) {
+    if (keyId === filterProj.id) return true;
+    if (hd.projectId && hd.projectId === filterProj.id) return true;
+  }
+  const keyProj = getAllProjects().find(p => p.id === keyId);
+  if (keyProj && keyProj.name === _dtTkCtFilter) return true;
+  return false;
+}
+
+// ── Populate CT filter select cho sub-tab THỐNG KÊ ───────────────────────
+// (KHAI BÁO không còn bộ lọc CT — đã gộp thành 1 bảng tổng hợp.)
+function dtPopulateCtFilter() {
+  const tkSel = document.getElementById('dt-tk-ct-filter-sel');
+  if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtTkCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
+}
+
+// ── Áp dụng CT filter → CHỈ re-render bảng KHAI BÁO (30 ngày) ─────────────
 function dtSetCtFilter(val) {
   _dtCtFilter = val || '';
   _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
@@ -239,11 +281,13 @@ function dtSetCtFilter(val) {
   renderThuTable(0);
 }
 
-// ── Áp dụng CT filter → CHỈ re-render bảng CÔNG NỢ ───────────────────────
-function dtSetCnCtFilter(val) {
-  _dtCnCtFilter = val || '';
-  renderCongNoThauPhu();
-  renderCongNoNhaCungCap();
+// ── Áp dụng CT filter → CHỈ re-render bảng THỐNG KÊ (toàn bộ) ─────────────
+function dtSetTkCtFilter(val) {
+  _dtTkCtFilter = val || '';
+  _hdcTkPage = 0; _hdtpTkPage = 0; _thuTkPage = 0;
+  renderHdcTableTk(0);
+  renderHdtpTableTk(0);
+  renderThuTableTk(0);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -287,7 +331,7 @@ function _dtPaginationHtml(total, curPage, onClickFn) {
   return `<ul class="pagination pagination-sm mb-0">${items.join('')}</ul>`;
 }
 
-// ── Text search state (THỐNG KÊ) ─────────────────────────────
+// ── Text search state (KHAI BÁO) ─────────────────────────────
 let _dtSearch = '';
 
 function dtSetSearch(val) {
@@ -296,6 +340,17 @@ function dtSetSearch(val) {
   renderHdcTable(0);
   renderHdtpTable(0);
   renderThuTable(0);
+}
+
+// ── Text search state (THỐNG KÊ) ─────────────────────────────
+let _dtTkSearch = '';
+
+function dtSetTkSearch(val) {
+  _dtTkSearch = (val || '').trim().toLowerCase();
+  _hdcTkPage = 0; _hdtpTkPage = 0; _thuTkPage = 0;
+  renderHdcTableTk(0);
+  renderHdtpTableTk(0);
+  renderThuTableTk(0);
 }
 
 // ── Dashboard mini: 3 stat cards trên sub-tab TỔNG QUAN ──────
@@ -425,102 +480,12 @@ function dtGoSub(btn, id) {
   btn.classList.add('active');
   if (id === 'dt-sub-khaibao') {
     _dtRenderDashboardMini();
-    _hdcPage = 0; _hdtpPage = 0; _thuPage = 0;
-    _dtSearch = '';
-    const srch = document.getElementById('dt-search-input');
-    if (srch) srch.value = '';
-    const tkSel = document.getElementById('dt-ct-filter-sel');
-    if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
-    renderHdcTable(0);
-    renderHdtpTable(0);
-    renderThuTable(0);
-  } else if (id === 'dt-sub-congno') {
-    const cnSel = document.getElementById('dt-cn-ct-filter-sel');
-    if (cnSel) cnSel.innerHTML = _buildProjFilterOpts(_dtCnCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
-    renderCongNoThauPhu();
-    renderCongNoNhaCungCap();
-  }
-}
-
-// Đảm bảo sub-tab Công Nợ tồn tại (button + page) và di chuyển bảng cũ sang đó
-function dtEnsureCongNoSubtab() {
-  const page = document.getElementById('page-doanhthu');
-  const subNav = document.getElementById('dt-sub-nav');
-  if (!page || !subNav) return;
-
-  // Tạo nút sub-tab nếu chưa có
-  if (!document.getElementById('dt-sub-congno-btn')) {
-    const btn = document.createElement('button');
-    btn.className = 'nav-link';
-    btn.id = 'dt-sub-congno-btn';
-    btn.innerHTML = '💳 CÔNG NỢ';
-    btn.setAttribute('onclick', "dtGoSub(this,'dt-sub-congno')");
-    const hopdongBtn = document.getElementById('dt-sub-khaibao-btn');
-    if (hopdongBtn) hopdongBtn.insertAdjacentElement('afterend', btn);
-    else subNav.appendChild(btn);
-  }
-
-  // Tạo trang sub-tab nếu chưa có
-  let cnPage = document.getElementById('dt-sub-congno');
-  if (!cnPage) {
-    cnPage = document.createElement('div');
-    cnPage.className = 'sub-page';
-    cnPage.id = 'dt-sub-congno';
-    page.appendChild(cnPage);
-  }
-
-  // Filter CT (re-use component)
-  if (!document.getElementById('dt-cn-filter-row')) {
-    const filterRow = document.createElement('div');
-    filterRow.id = 'dt-cn-filter-row';
-    filterRow.style = 'margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
-    filterRow.innerHTML = `
-      <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
-      <select id="dt-cn-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px"
-        onchange="dtSetCnCtFilter(this.value)">
-        <option value="">-- Tất cả công trình --</option>
-      </select>`;
-    cnPage.appendChild(filterRow);
-  }
-
-  // Di chuyển bảng Công Nợ Thầu Phụ từ sub-tab Thống Kê sang đây
-  const congnoTbody = document.getElementById('congno-tbody');
-  const congnoWrap = congnoTbody ? congnoTbody.closest('.records-wrap') : null;
-  const congnoHeader = congnoWrap ? congnoWrap.previousElementSibling : null;
-  if (congnoWrap && congnoHeader && cnPage && !cnPage.contains(congnoWrap)) {
-    cnPage.appendChild(congnoHeader);
-    cnPage.appendChild(congnoWrap);
-  }
-
-  // Thêm bảng Công Nợ Nhà Cung Cấp (nếu chưa có)
-  if (!document.getElementById('congno-ncc-tbody')) {
-    const header = document.createElement('div');
-    header.className = 'section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3';
-    header.innerHTML = `<div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>🟠 Công Nợ Nhà Cung Cấp</div>`;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'records-wrap card shadow-sm overflow-hidden';
-    wrap.style = 'margin-bottom:24px';
-    wrap.innerHTML = `
-      <div style="overflow-x:auto">
-        <table class="table table-sm table-hover align-middle mb-0">
-          <thead>
-            <tr class="text-secondary" style="font-size:11px;border-bottom:2px solid var(--bs-border-color)">
-              <th style="text-align:left;padding:8px 12px;font-weight:700">Nhà Cung Cấp</th>
-              <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
-              <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Tổng Đã Ứng</th>
-              <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Tổng Số Tiền</th>
-              <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Còn Phải TT</th>
-            </tr>
-          </thead>
-          <tbody id="congno-ncc-tbody"></tbody>
-        </table>
-      </div>
-      <div id="congno-ncc-empty" class="text-secondary" style="text-align:center;padding:32px;font-size:13px;display:none">Chưa có dữ liệu công nợ nhà cung cấp</div>
-    `;
-
-    cnPage.appendChild(header);
-    cnPage.appendChild(wrap);
+    renderKhaiBaoTable(_kbPage);
+  } else if (id === 'dt-sub-thongke') {
+    dtPopulateCtFilter();
+    renderHdcTableTk(_hdcTkPage);
+    renderHdtpTableTk(_hdtpTkPage);
+    renderThuTableTk(_thuTkPage);
   }
 }
 
@@ -563,11 +528,11 @@ function dtPopulateSels() {
     if (cur) sel.value = cur;
   });
 
-  // Refresh bảng THỐNG KÊ khi năm thay đổi
-  renderHdcTable(_hdcPage);
-  renderHdtpTable(_hdtpPage);
-  renderCongNoThauPhu();
-  renderCongNoNhaCungCap();
+  // Refresh bảng KHAI BÁO (gộp) + 3 bảng THỐNG KÊ khi năm thay đổi
+  renderKhaiBaoTable(0);
+  renderHdcTableTk(_hdcTkPage);
+  renderHdtpTableTk(_hdtpTkPage);
+  renderThuTableTk(_thuTkPage);
 }
 
 // ── Tab Doanh Thu KHÔNG tạo công trình — chỉ tab CÔNG TRÌNH mới được quản lý ──

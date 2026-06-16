@@ -625,7 +625,7 @@ function _applyImport() {
   if (typeof updateTop            === 'function') updateTop();
   if (typeof dtPopulateSels       === 'function') dtPopulateSels();
   if (typeof renderLaiLo          === 'function') renderLaiLo();
-  if (typeof renderCongNoThauPhu  === 'function') renderCongNoThauPhu();
+  if (typeof initCongNo           === 'function') initCongNo();
 
   // ── 5. Force push: import là nguồn sự thật ─────────────────
   // Block auto-pull 15s → tránh cloud đè lên data vừa import

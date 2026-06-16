@@ -1,9 +1,13 @@
 // doanhthu.reports-export.js — Công nợ, Lãi/Lỗ, initDoanhThu, copy/paste KLCT, xuất phiếu ảnh
 // Load order: sau doanhthu.forms.js
 
-// ══ BẢNG CÔNG NỢ THẦU PHỤ ════════════════════════════════════
+// ══ BẢNG CÔNG NỢ (LEGACY — KHÔNG CÒN DÙNG) ═══════════════════
+// [DEPRECATED 16/06/2026] Công Nợ đã tách thành tab chính độc lập
+// (page-congno) với UI mới — xem js/modules/doanhthu/doanhthu.congno.js.
+// Các hàm dưới trỏ tới #congno-tbody / #congno-ncc-tbody không còn tồn tại
+// trong DOM nên tự early-return; giữ lại tạm để tham chiếu, sẽ dọn sau.
 
-// ── Render bảng Công Nợ Thầu Phụ ─────────────────────────────
+// ── Render bảng Công Nợ Thầu Phụ (legacy) ────────────────────
 function renderCongNoThauPhu() {
   const tbody = document.getElementById('congno-tbody');
   const empty = document.getElementById('congno-empty');
@@ -313,7 +317,6 @@ function initDoanhThu() {
 
   _dtRenderDashboardMini();
 
-  dtEnsureCongNoSubtab();
   dtPopulateSels();
   dtPopulateCtFilter();
 
@@ -325,20 +328,18 @@ function initDoanhThu() {
   const hdtpNgayEl = document.getElementById('hdtp-ngay');
   if (hdtpNgayEl && !hdtpNgayEl.value) hdtpNgayEl.value = today();
 
-  // Set HỢP ĐỒNG là sub-tab active mặc định
-  const kbBtn = document.getElementById('dt-sub-khaibao-btn');
+  // Set KHAI BÁO là sub-tab active mặc định
+  const kbBtn  = document.getElementById('dt-sub-khaibao-btn');
   const kbPage = document.getElementById('dt-sub-khaibao');
-  const cnBtn  = document.getElementById('dt-sub-congno-btn');
-  const cnPage = document.getElementById('dt-sub-congno');
   document.querySelectorAll('#page-doanhthu .sub-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
   if (kbBtn && kbPage) { kbPage.classList.add('active'); kbBtn.classList.add('active'); }
-  if (cnPage) cnPage.classList.remove('active');
-  if (cnBtn) cnBtn.classList.remove('active');
 
-  renderHdcTable(0);
-  renderHdtpTable(0);
-  renderThuTable(0);
+  // Render cả hai subtab: KHAI BÁO (bảng gộp 30 ngày) + THỐNG KÊ (3 bảng toàn bộ)
+  renderKhaiBaoTable(0);
+  renderHdcTableTk(0);
+  renderHdtpTableTk(0);
+  renderThuTableTk(0);
 
   // Reset edit state
   _hdcResetForm();

@@ -981,6 +981,12 @@
               💵 DOANH THU
             </button>
             <button class="nav-btn"
+                    data-page="congno"
+                    onclick="goPage(this,'congno')"
+                    data-bs-dismiss="offcanvas">
+              💳 CÔNG NỢ
+            </button>
+            <button class="nav-btn"
                     data-page="dashboard"
                     onclick="goPage(this,'dashboard')"
                     data-bs-dismiss="offcanvas">
@@ -2523,14 +2529,21 @@
 
       <!-- PAGE: DOANH THU & CÔNG NỢ -->
       <div class="page" id="page-doanhthu">
-        <!-- Sub-nav -->
+        <!-- Sub-nav: KHAI BÁO (làm việc hàng ngày) · THỐNG KÊ (đối soát tổng hợp) -->
         <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="dt-sub-nav">
           <button
             class="nav-link active"
             id="dt-sub-khaibao-btn"
             onclick="dtGoSub(this, 'dt-sub-khaibao')"
           >
-            📋 HỢP ĐỒNG
+            📝 KHAI BÁO
+          </button>
+          <button
+            class="nav-link"
+            id="dt-sub-thongke-btn"
+            onclick="dtGoSub(this, 'dt-sub-thongke')"
+          >
+            📊 THỐNG KÊ
           </button>
         </div>
 
@@ -2583,16 +2596,50 @@
               </button>
             </div>
           </div>
-          <!-- Filter CT + search -->
-          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">
-            <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
-            <select id="dt-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetCtFilter(this.value)">
-              <option value="">-- Tất cả công trình --</option>
-            </select>
-            <input type="text" id="dt-search-input" class="form-control form-control-sm" style="max-width:220px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetSearch(this.value)">
+          <!-- Bảng GỘP CHUNG: mọi khai báo 30 ngày gần nhất (HĐ Chính + HĐ Thầu Phụ + Thu Tiền) -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>📑 Khai Báo Gần Đây
+              <span class="text-secondary" style="font-size:11px;font-weight:400">(30 ngày gần nhất)</span>
+              <span id="kb-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:680px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Đối Tác / Người</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="kb-tbody"></tbody>
+              </table>
+            </div>
+            <div id="kb-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có khai báo nào trong 30 ngày gần nhất</div>
+            <div id="kb-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
 
-          <!-- BẢNG 1: Hợp đồng chính -->
+        </div>
+        <!-- /dt-sub-khaibao -->
+
+        <!-- ── SUB TAB 2: THỐNG KÊ (đối soát tổng hợp — bảng đầy đủ) ───── -->
+        <div class="sub-page" id="dt-sub-thongke">
+          <!-- Bộ lọc đối soát: Công trình + tìm kiếm -->
+          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
+            <select id="dt-tk-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetTkCtFilter(this.value)">
+              <option value="">-- Tất cả công trình --</option>
+            </select>
+            <input type="text" id="dt-tk-search-input" class="form-control form-control-sm" style="max-width:220px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetTkSearch(this.value)">
+          </div>
+
+          <!-- TK BẢNG 1: Hợp đồng chính (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>📋 Hợp Đồng Chính Công Ty
@@ -2607,26 +2654,26 @@
                     <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"/></th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
                     <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">C&#272;T</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">CĐT</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Chính</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Phụ</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ</th>
                     <th class="action-col"></th>
                   </tr>
                 </thead>
-                <tbody id="hdc-tbody"></tbody>
+                <tbody id="hdctk-tbody"></tbody>
               </table>
             </div>
-            <div id="hdc-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng nào</div>
-            <div id="hdc-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+            <div id="hdctk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng nào</div>
+            <div id="hdctk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
 
-          <!-- BẢNG 2: Hợp đồng thầu phụ -->
+          <!-- TK BẢNG 2: Hợp đồng thầu phụ (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>🤝 Hợp Đồng Thầu Phụ
             </div>
-            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn các HĐ thầu phụ rồi bấm để xuất phiếu PNG">📤 Xuất phiếu HĐ TP</button>
+            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG">📤 Xuất phiếu HĐ TP</button>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
@@ -2642,205 +2689,41 @@
                     <th class="action-col"></th>
                   </tr>
                 </thead>
-                <tbody id="hdtp-tbody"></tbody>
+                <tbody id="hdtptk-tbody"></tbody>
               </table>
             </div>
-            <div id="hdtp-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng thầu phụ</div>
-            <div id="hdtp-pagination" style="padding:8px 16px;
-                border-top: 1px solid var(--bs-border-color);
-                display: flex;
-                gap: 5px;
-                justify-content: center;
-                flex-wrap: wrap;
-                min-height: 1px;
-              "
-            ></div>
+            <div id="hdtptk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng thầu phụ</div>
+            <div id="hdtptk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
 
-          <!-- BẢNG 3: Lịch sử thu tiền -->
+          <!-- TK BẢNG 3: Lịch sử thu tiền (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span>💰 Lịch Sử Thu Tiền
-              <span
-                id="thu-count-badge"
-                style="
-                  font-size: 12px;
-                  font-weight: 400;
-                  color: var(--bs-secondary-color);
-                  margin-left: 4px;
-                "
-              ></span>
+              <span id="thutk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
             </div>
-            <button
-              class="btn btn-sm"
-              onclick="exportThuToImage()"
-              style="
-                background: #2563eb;
-                color: #fff;
-                border: none;
-                font-weight: 700;
-                padding: 6px 12px;
-                margin-left: 10px;
-              "
-              title="Chọn các lần thu tiền rồi bấm để xuất phiếu PNG"
-            >
-              📤 Xuất phiếu thu
-            </button>
+            <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG">📤 Xuất phiếu thu</button>
           </div>
-          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom: 24px">
-            <div style="overflow-x: auto">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
               <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
                 <thead class="table-light">
-                  <tr
-                    style="
-                      font-size: 11px;
-                      color: var(--bs-secondary-color);
-                      border-bottom: 2px solid var(--bs-border-color);
-                    "
-                  >
-                    <th style="padding: 8px 6px; text-align: center">
-                      <input
-                        type="checkbox"
-                        onchange="
-                          document
-                            .querySelectorAll('.thu-row-chk')
-                            .forEach((c) => (c.checked = this.checked))
-                        "
-                      />
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 8px 12px;
-                        font-weight: 700;
-                      "
-                    >
-                      Ngày
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 8px 10px;
-                        font-weight: 700;
-                      "
-                    >
-                      Công Trình
-                    </th>
-                                        <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Lo&#7841;i</th>
-<th
-                      style="
-                        text-align: right;
-                        padding: 8px 10px;
-                        font-weight: 700;
-                      "
-                    >
-                      Số Tiền
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 8px 10px;
-                        font-weight: 700;
-                      "
-                    >
-                      Người TH
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 8px 10px;
-                        font-weight: 700;
-                      "
-                    >
-                      Nội Dung
-                    </th>
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.thu-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Ngày</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Người TH</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
                     <th class="action-col"></th>
                   </tr>
                 </thead>
-                <tbody id="thu-tbody"></tbody>
+                <tbody id="thutk-tbody"></tbody>
               </table>
             </div>
-            <div
-              id="thu-empty"
-              style="
-                text-align: center;
-                padding: 32px;
-                color: var(--bs-secondary-color);
-                font-size: 13px;
-                display: none;
-              "
-            >
-              Chưa có lịch sử thu tiền
-            </div>
-            <div
-              id="thu-pagination"
-              style="
-                padding: 8px 16px;
-                border-top: 1px solid var(--bs-border-color);
-                display: flex;
-                gap: 5px;
-                justify-content: center;
-                flex-wrap: wrap;
-                min-height: 1px;
-              "
-            ></div>
-          </div>
-
-          <!-- BẢNG 4: Công Nợ Thầu Phụ -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>🔴 Công Nợ Thầu Phụ
-            </div>
-          </div>
-          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom: 24px">
-            <div style="overflow-x: auto">
-              <table class="table table-sm table-hover align-middle mb-0">
-                <thead class="table-light">
-                  <tr
-                    style="
-                      font-size: 11px;
-                      color: var(--bs-secondary-color);
-                      border-bottom: 2px solid var(--bs-border-color);
-                    "
-                  >
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 8px 12px;
-                        font-weight: 700;
-                      "
-                    >
-                      Thầu Phụ
-                    </th>
-                    <th
-                      style="
-                        text-align: left;
-                        padding: 8px 10px;
-                        font-weight: 700;
-                      "
-                    >
-                      Công Trình
-                    </th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Tổng Đã Ứng</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Tổng HĐ TP</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700;min-width:140px;white-space:nowrap">Còn Phải TT</th>
-                  </tr>
-                </thead>
-                <tbody id="congno-tbody"></tbody>
-              </table>
-            </div>
-            <div
-              id="congno-empty"
-              style="
-                text-align: center;
-                padding: 32px;
-                color: var(--bs-secondary-color);
-                font-size: 13px;
-                display: none;
-              "
-            >
-              Chưa có dữ liệu công nợ thầu phụ
-            </div>
+            <div id="thutk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có lịch sử thu tiền</div>
+            <div id="thutk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
         </div>
         <!-- /dt-sub-thongke -->
@@ -3004,6 +2887,95 @@
         <!-- /MODALS: DOANH THU =========================================== -->
       </div>
 
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- PAGE: CÔNG NỢ (tab chính độc lập)                              -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <div class="page" id="page-congno">
+
+        <!-- PHẦN A: Thẻ tổng quan (Summary Cards / KPIs) ──────────────── -->
+        <div class="row g-3 mb-4" id="cn-summary-cards">
+          <div class="col-12 col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="border-left:4px solid #dc3545 !important;background:var(--bs-danger-bg-subtle)">
+              <div class="card-body py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🔴 Tổng Nợ Thầu Phụ</div>
+                <div id="cn-kpi-no-tp" class="fw-bold text-danger" style="font-size:24px">—</div>
+                <div id="cn-kpi-no-tp-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="border-left:4px solid #fd7e14 !important;background:var(--bs-warning-bg-subtle)">
+              <div class="card-body py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🟠 Tổng Nợ Nhà Cung Cấp</div>
+                <div id="cn-kpi-no-ncc" class="fw-bold" style="font-size:24px;color:#fd7e14">—</div>
+                <div id="cn-kpi-no-ncc-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="border-left:4px solid #198754 !important;background:var(--bs-success-bg-subtle)">
+              <div class="card-body py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🟢 Tổng Tiền Đã Ứng</div>
+                <div id="cn-kpi-da-ung" class="fw-bold text-success" style="font-size:24px">—</div>
+                <div id="cn-kpi-da-ung-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHẦN B: Bộ lọc nâng cao (Advanced Filters) ───────────────── -->
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-body py-3" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+            <div>
+              <label class="text-secondary d-block" style="font-size:11px;font-weight:600;margin-bottom:3px">Công Trình</label>
+              <select id="cn-filter-ct" class="form-select form-select-sm" style="min-width:200px" onchange="cnApplyFilters()">
+                <option value="">-- Tất cả công trình --</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-secondary d-block" style="font-size:11px;font-weight:600;margin-bottom:3px">Nhóm Đối Tác</label>
+              <select id="cn-filter-group" class="form-select form-select-sm" style="min-width:160px" onchange="cnApplyFilters()">
+                <option value="">-- Tất cả --</option>
+                <option value="thauphu">Thầu Phụ</option>
+                <option value="nhacungcap">Nhà Cung Cấp</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-secondary d-block" style="font-size:11px;font-weight:600;margin-bottom:3px">Tháng</label>
+              <select id="cn-filter-month" class="form-select form-select-sm" style="min-width:150px" onchange="cnApplyFilters()">
+                <option value="">-- Tất cả tháng --</option>
+              </select>
+            </div>
+            <div>
+              <input type="text" id="cn-filter-search" class="form-control form-control-sm" style="min-width:180px" placeholder="🔍 Tìm đối tác..." oninput="cnApplyFilters()">
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" onclick="cnResetFilters()" title="Xóa bộ lọc">↺ Đặt lại</button>
+          </div>
+        </div>
+
+        <!-- PHẦN C: Bảng dữ liệu chi tiết (Data Table) ───────────────── -->
+        <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+          <div style="overflow-x:auto">
+            <table class="table table-sm table-hover align-middle mb-0" style="min-width:820px">
+              <thead class="table-light">
+                <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                  <th style="text-align:left;padding:8px 12px;font-weight:700">Đối Tác</th>
+                  <th style="text-align:center;padding:8px 8px;font-weight:700;white-space:nowrap">Nhóm</th>
+                  <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
+                  <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Tổng Giá Trị</th>
+                  <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Đã Ứng</th>
+                  <th style="text-align:left;padding:8px 10px;font-weight:700;min-width:160px">Tiến Độ</th>
+                  <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Còn Phải TT</th>
+                  <th style="text-align:center;padding:8px 10px;font-weight:700;white-space:nowrap">Trạng Thái</th>
+                </tr>
+              </thead>
+              <tbody id="cn-tbody"></tbody>
+            </table>
+          </div>
+          <div id="cn-empty" style="text-align:center;padding:40px;color:var(--bs-secondary-color);font-size:13px;display:none">Không có đối tác nào đã phát sinh tiền ứng phù hợp bộ lọc</div>
+        </div>
+      </div>
+
       <!-- ── PAGE: CÔNG TRÌNH ──────────────────────────────────────── -->
       <div class="page active" id="page-congtrinh">
         <div id="ct-overview-wrap"></div>
@@ -3073,6 +3045,7 @@
     <script src="js/modules/doanhthu/doanhthu.core.js"></script>
     <script src="js/modules/doanhthu/doanhthu.forms.js"></script>
     <script src="js/modules/doanhthu/doanhthu.reports-export.js"></script>
+    <script src="js/modules/doanhthu/doanhthu.congno.js"></script>
     <script src="js/modules/thungrac/thungrac.js"></script>
     <script src="js/sync/sync.js"></script>
     <script src="js/app/auth.js"></script>
