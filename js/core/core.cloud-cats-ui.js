@@ -21,15 +21,17 @@ function fsUnwrap(doc) {
 }
 
 // ── Doc ID helpers ─────────────────────────────────────────
-// ── CẤU TRÚC MỚI (B): mỗi hạng mục theo năm = 1 document, + 4 doc danh mục dùng chung ──
+// ── CẤU TRÚC MỚI (B): mỗi hạng mục theo năm = 1 document, + 5 doc danh mục dùng chung ──
 // Tên field bên trong viết ĐẦY ĐỦ (không nén) cho dễ đọc trên Firebase Console.
 //   cpct_data/meta_cong_trinh  → { projects }
+//   cpct_data/meta_khach_hang  → { customers }   (CRM/Chủ đầu tư — tách riêng từ 19/06/2026)
 //   cpct_data/meta_danh_muc    → { cats, catItems, cnRoles, ctYears }
 //   cpct_data/meta_tai_khoan   → { users }
-//   cpct_data/meta_hop_dong    → { hopDong, thauPhu }
+//   cpct_data/meta_hop_dong    → { hopDong, thauPhu, quyetToan }
 //   cpct_data/y2025_hoa_don / _tien_ung / _cham_cong / _thiet_bi / _thu_tien → { records }
 function fbDocYearCat(yr, cat) { return `y${yr}_${cat}`; }
 function fbDocMetaCT() { return 'meta_cong_trinh'; }
+function fbDocMetaKH() { return 'meta_khach_hang'; }
 function fbDocMetaDM() { return 'meta_danh_muc'; }
 function fbDocMetaTK() { return 'meta_tai_khoan'; }
 function fbDocMetaHD() { return 'meta_hop_dong'; }
@@ -52,8 +54,12 @@ function fbYearCatPayload(yr, key, dateField) {
 
 // Payload 4 doc danh mục dùng chung
 function fbMetaCTPayload() {
-  // Đẩy kèm customers (Chủ đầu tư/CRM) trong cùng doc meta_cong_trinh
-  return { v: 4, projects: load('projects_v1', []), customers: load('customers_v1', []) };
+  // Chỉ còn projects — customers đã tách sang doc riêng meta_khach_hang (19/06/2026)
+  return { v: 4, projects: load('projects_v1', []) };
+}
+function fbMetaKHPayload() {
+  // Khách hàng (Chủ đầu tư/CRM) — doc riêng meta_khach_hang
+  return { v: 4, customers: load('customers_v1', []) };
 }
 function fbMetaDMPayload() {
   return { v: 4,
@@ -69,7 +75,7 @@ function fbMetaTKPayload() {
   return { v: 4, users: load('users_v1', []) };
 }
 function fbMetaHDPayload() {
-  return { v: 4, hopDong: load('hopdong_v1', {}), thauPhu: load('thauphu_v1', []) };
+  return { v: 4, hopDong: load('hopdong_v1', {}), thauPhu: load('thauphu_v1', []), quyetToan: load('quyettoan_v1', []) };
 }
 
 // ── Firestore quota counter ──────────────────────────────────

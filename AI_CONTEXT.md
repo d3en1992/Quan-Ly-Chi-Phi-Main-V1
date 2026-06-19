@@ -36,6 +36,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.10 Hóa đơn trong ngày + Chấm công copy + Tiền Ứng (11/06/2026)](#910-hóa-đơn-trong-ngày--chấm-công-copy--tiền-ứng-11062026)
    - [9.11 Fix lỗi Thùng Rác "xóa rồi vẫn hồi về" (13/06/2026)](#911-fix-lỗi-thùng-rác-xóa-rồi-vẫn-hồi-về-13062026)
    - [9.12 Tách Tab Công Nợ + Doanh Thu 2 subtab + UI Công Nợ mới (16/06/2026)](#912-tách-tab-công-nợ--doanh-thu-2-subtab--ui-công-nợ-mới-16062026)
+   - [9.13 Tách meta_khach_hang + Quyết Toán Chi Phí + Subtab Lợi Nhuận (19/06/2026)](#913-tách-meta_khach_hang--quyết-toán-chi-phí--subtab-lợi-nhuận-19062026)
 
 **Phụ lục**
 
@@ -85,7 +86,7 @@ Thứ tự chính xác trong `index.html`:
 | 4 | `js/core/core.storage.js` | Lớp nền thấp nhất: `DEFAULTS`, `CATS`, `FB_CONFIG`, Dexie `db`, `DB_KEY_MAP`, `_mem`, `load/save`, pending sync counter (`_pendingChanges`, `_SYNC_DATA_KEYS`, `_incPending`, `_resetPending`, `_updateSyncBtnBadge`), `LAST_SYNC_KEY`, `mkRecord`, `mkUpdate`, autocomplete |
 | 5 | `js/core/core.normalize.js` | Module chuẩn hóa record về 6 field tiêu chuẩn (`id`, `createdAt`, `updatedAt`, `deletedAt`, `deviceId`, `projectId`) dùng cho import/restore: `normalizeRecord`, `normalizeDataset`, `normalizeImportStore`, `_NORM_CT_FIELD`. Nạp sau `core.storage.js`, trước `core.state-backup.js`. |
 | 6 | `js/core/core.state-backup.js` | State orchestration: `DATA_VERSION`, `migrateData`, `_migrateHopDongKeys`, project lookup helpers, `BACKUP_KEYS`, backup/restore (`_snapshotNow`, `restoreFromBackup`, `renderBackupList`), `exportJSON`, `importJSON`, `importJSONFull` (push cloud cấu trúc B), `_normalizeImportData` (wrapper gọi `normalizeImportStore`), `clearAllCache`, `afterDataChange`, `_reloadGlobals`, khởi tạo global `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` |
-| 7 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, `fsWrap/fsUnwrap`, Firebase REST (`fsGet/fsSet/fsDelete`), cấu trúc B (`fbDocYearCat`, `fbDocMetaCT/DM/TK/HD`, `_YEAR_CATS`, `fbYearCatPayload`, `fbMetaCT/DM/TK/HDPayload`), `_wipeOrphanCloudDocs` (dọn doc rác cấu trúc cũ), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `normalizeCatDisplayName`, `showSyncBanner`, `_setSyncState` |
+| 7 | `js/core/core.cloud-cats-ui.js` | Cloud helpers: `fbReady`, `fsWrap/fsUnwrap`, Firebase REST (`fsGet/fsSet/fsDelete`), cấu trúc B (`fbDocYearCat`, `fbDocMetaCT/KH/DM/TK/HD`, `_YEAR_CATS`, `fbYearCatPayload`, `fbMetaCT/KH/DM/TK/HDPayload` — `fbMetaKHPayload` = customers doc riêng, `fbMetaHDPayload` thêm `quyetToan`), `_wipeOrphanCloudDocs` (dọn doc rác cấu trúc cũ), `gsLoadAll`, sync dot UI, modal Firebase config (`openBinModal`, `fbSaveConfig`, `fbDisconnect`), `buildYearSelect`, `saveCats`, cat items soft-delete (`_syncCatItems`, `_rebuildCatArrsFromItems`, `_migrateCatItemsIfNeeded`), `normalizeCatDisplayName`, `showSyncBanner`, `_setSyncState` |
 | 8 | `js/modules/projects/projects.model.js` | Domain model công trình: `PROJECT_STATUS`, `PROJECT_COMPANY`, `let projects = []`, `_saveProjects`, `rebuildCatCTFromProjects`, `createProject` (có param `customerId`), `updateProject`, `getProjectById`, `findProjectIdByName`, `getSortedProjects`, `getAllProjects`, `getProjectOptions`, `getProjectDays`, `getProjectK`, `getProjectFactor` (=k, tương thích cũ), `getProjectWeight` (=ngày×k), `getCompanyCost`, `allocateCompanyCost`, `canDeleteProject`, `resolveProjectName`. Project có thêm field `customerId` (FK → khách hàng) và `heSoTiTrong` (k). |
 | 8b | `js/modules/khachhang/khachhang.model.js` | Model Khách Hàng (Chủ đầu tư/CRM): `let customers = []`, `_saveCustomers`, `_normCustomerName`, `getCustomerById`, `findCustomerByName`, `getAllCustomers`, `createCustomer`, `updateCustomer`, `deleteCustomer` (xóa mềm), `getOrCreateCustomerByName`, `getCustomerOptions`, `_migrateCustomersFromProjects`. Nạp sau `projects.model.js`, trước `projects.migration-selects.js`. |
 | 9 | `js/modules/projects/projects.migration-selects.js` | Migration linking + shared select helpers: `migrateProjectLinks`, `deduplicateProjects`, `_buildProjOpts`, `_buildProjFilterOpts`, `_readPidFromSel`, `_checkProjectClosed` |
@@ -108,11 +109,11 @@ Thứ tự chính xác trong `index.html`:
 | 26 | `js/modules/chamcong/chamcong.week-form.js` | Form nhập tuần, build table, row handlers, lưu/copy/paste: `initCC`, `ccGoToWeek`, `ccPrevWeek`, `ccNextWeek`, `onCCFromChange`, `loadCCWeekForm`, `buildCCTable`, `addCCWorker`, `addCCRow`, `buildCCRow`, `onCCNameInput`, `onCCDayKey`, `onCCWageKey`, `onCCMoneyKey`, `calcCCRow`, `delCCRow`, `renumberCC`, `updateCCSumRow`, `saveCCWeek`, `clearCCWeek`, `copyCCWeek`, `pasteCCWeek`; global `ccClipboard` |
 | 27 | `js/modules/chamcong/chamcong.history-reports.js` | Lịch sử, tổng lương tuần, load/delete, CSV exports, phiếu lương/ảnh: `buildCCHistFilters`, `renderCCHistory`, `ccHistGoTo`, `renderCCTLT`, `renderCCTLTMini`, `fmtK`, `updateTLTSelectedSum`, `exportCCTLTCSV`, `ccTltGoTo`, `loadCCWeekById`, `delCCWeekById`, `delCCWorker`, `exportCCWeekCSV`, `exportCCHistCSV`, `removeVietnameseTones`, `xuatPhieuLuong`, `exportUngToImage` |
 | 28 | `js/legacy/thietbi.js` | Quản lý thiết bị/kho tổng |
-| 29 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub`, `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
-| 30 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable` |
-| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Lãi/Lỗ, init, copy/paste KLCT, xuất phiếu ảnh: `renderLaiLo`, `initDoanhThu` (set up 2 subtab KHAI BÁO/THỐNG KÊ), `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub`. (`renderCongNoThauPhu`/`renderCongNoNhaCungCap`/`_renderCongNoTable` còn lại nhưng **DEPRECATED** — xem 9.12) |
+| 29 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`, `quyetToanRecords`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub` (3 subtab: KHAI BÁO/THỐNG KÊ/LỢI NHUẬN), `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `fmtInputMoneySigned`/`_readMoneySigned` (cho phép số âm — dùng Quyết Toán), `_thuOnCtChange`, `_qtOnCtChange`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
+| 30 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable`, `renderKhaiBaoTable` (gộp HĐ Chính + Thầu Phụ + Thu + **Quyết Toán**), `saveQuyetToan`/`editQuyetToan`/`delQuyetToan`/`_qtResetForm`/`renderQtTableTk` (Quyết Toán Chi Phí) |
+| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Lãi/Lỗ, Lợi Nhuận, init, copy/paste KLCT, xuất phiếu ảnh: `renderLaiLo` (dashboard cũ), `renderLoiNhuan` + helpers `_lnContractsB`/`_lnRevenueX` (subtab **TỔNG QUAN LỢI NHUẬN**: A hóa đơn + B thầu phụ + C phân bổ chung vs X HĐ gốc + Y quyết toán), `initDoanhThu` (set up 3 subtab KHAI BÁO/THỐNG KÊ/LỢI NHUẬN, nạp `quyetToanRecords`), `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub`. (`renderCongNoThauPhu`/`renderCongNoNhaCungCap`/`_renderCongNoTable` còn lại nhưng **DEPRECATED** — xem 9.12) |
 | 31b | `js/modules/doanhthu/doanhthu.congno.js` | Page **CÔNG NỢ** (tab chính độc lập): `initCongNo`, `cnRenderTable`, `cnApplyFilters`, `cnResetFilters`, `cnPopulateCtFilter`, `cnPopulateMonthFilter`, `_cnBuildRows` (chỉ đối tác có `daUng>0`), `_cnRenderKpis`, `_cnProgressBar`, `_cnStatusBadge`, `_cnGroupBadge`, `_cnMatchCt`, `_cnInMonth`; state lọc `_cnCt`/`_cnGroup`/`_cnMonth`/`_cnSearch`. Nạp sau `doanhthu.reports-export.js`. |
-| 32 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 4 meta doc), `pullChanges` (REPLACE local bằng cloud), `_pullMeta`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
+| 32 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 5 meta doc: thêm `meta_khach_hang`), `pullChanges` (REPLACE local bằng cloud), `_pullMeta` (customers đọc `meta_khach_hang`, fallback `meta_cong_trinh.customers`; quyetToan trong `meta_hop_dong`), `_mergeMetaForPush`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
 | 33 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
 | 34 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`) |
 | 35 | `https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js` | Bootstrap bundle (nạp ở cuối body, sau toàn bộ JS app) |
@@ -212,7 +213,7 @@ Dexie physical schema:
 | `equipment` | `id, updatedAt` | `tb_v1` |
 | `ung` | `id, updatedAt` | `ung_v1` |
 | `revenue` | `id, updatedAt` | `thu_v1` |
-| `settings` | `id` | `projects_v1`, `customers_v1`, `hopdong_v1`, `thauphu_v1`, `trash_v1`, `users_v1`, `cat_ct_years`, `cat_cn_roles`, `cat_items_v1` |
+| `settings` | `id` | `projects_v1`, `customers_v1`, `hopdong_v1`, `thauphu_v1`, `quyettoan_v1`, `trash_v1`, `users_v1`, `cat_ct_years`, `cat_cn_roles`, `cat_items_v1` |
 
 Online-only data flow (cloud-authoritative):
 
@@ -240,12 +241,13 @@ sequenceDiagram
 
 ### Cấu trúc B (collection `cpct_data`)
 
-Mỗi **năm × hạng mục = 1 doc** + **4 doc meta dùng chung**, tên field **đầy đủ (không nén)**:
+Mỗi **năm × hạng mục = 1 doc** + **5 doc meta dùng chung**, tên field **đầy đủ (không nén)**:
 
-- `meta_cong_trinh` → `{ projects, customers }`
+- `meta_cong_trinh` → `{ projects }`
+- `meta_khach_hang` → `{ customers }` (tách riêng 19/06/2026; pull có fallback đọc `customers` cũ trong `meta_cong_trinh` khi doc mới chưa tồn tại)
 - `meta_danh_muc` → `{ cats, catItems, cnRoles, ctYears }`
 - `meta_tai_khoan` → `{ users }`
-- `meta_hop_dong` → `{ hopDong, thauPhu }`
+- `meta_hop_dong` → `{ hopDong, thauPhu, quyetToan }`
 - `y{YYYY}_hoa_don` / `_tien_ung` / `_cham_cong` / `_thiet_bi` / `_thu_tien` → `{ v:4, yr, cat, records:[...] }`
 - Ánh xạ năm×hạng mục: `_YEAR_CATS` trong `core.cloud-cats-ui.js`.
 
@@ -1013,6 +1015,27 @@ Tái cấu trúc lớn phần Doanh Thu / Công Nợ theo yêu cầu nâng cấp
 - **KHAI BÁO gộp 1 bảng:** 3 bảng riêng (HĐ Chính/HĐ Thầu Phụ/Thu Tiền) gộp thành **một bảng tổng hợp** `renderKhaiBaoTable()` (tbody `#kb-tbody`, badge `#kb-count-badge`, pagination `#kb-pagination`, state `_kbPage`): gom 3 nguồn (30 ngày gần nhất), mỗi dòng có **nhãn Loại** (📋 HĐ Chính / 🤝 HĐ Thầu Phụ / 💰 Thu Tiền) + cột Đối Tác/Người + nút Sửa/Xóa gọi đúng hàm theo loại. Sắp theo `ngay` giảm dần.
 - 3 hàm cũ `renderHdcTable`/`renderHdtpTable`/`renderThuTable` nay là **delegator** → `renderKhaiBaoTable(0)` (mọi nơi gọi sẵn từ save/edit/delete/init/populate tự refresh bảng gộp). Đã **bỏ** bộ lọc "Lọc Công Trình" + ô tìm kiếm khỏi KHAI BÁO (xóa khỏi DOM; `dtPopulateCtFilter` giờ chỉ populate select THỐNG KÊ; `dtSetCtFilter`/`dtSetSearch`/`_dtMatchProjFilter`/`_dtMatchHDCFilter`/`_dtCtFilter`/`_dtSearch` thành orphan, giữ tạm).
 - **Dời nút xuất phiếu sang THỐNG KÊ:** các nút `exportHdcToImage`/`exportHdtpToImage`/`exportThuToImage` + **cột checkbox** (`.hdc-row-chk`/`.hdtp-row-chk`/`.thu-row-chk`) chuyển từ KHAI BÁO sang 3 bảng THỐNG KÊ (thêm checkbox vào `renderHdcTableTk`/`renderHdtpTableTk`/`renderThuTableTk`). KHAI BÁO không còn checkbox/xuất phiếu.
+
+---
+
+### 9.13 Tách `meta_khach_hang` + Quyết Toán Chi Phí + Subtab Lợi Nhuận (19/06/2026)
+
+Ba mảng tính năng cho tab **Doanh Thu** và tầng dữ liệu cloud:
+
+**1. Tách collection `meta_khach_hang`.** Khách hàng (CRM) trước đây đồng bộ chung trong doc `meta_cong_trinh` (`{ projects, customers }`) nay tách thành **doc Firestore riêng** `cpct_data/meta_khach_hang` → `{ customers }`.
+- `core.cloud-cats-ui.js`: thêm `fbDocMetaKH()` + `fbMetaKHPayload()`; bỏ `customers` khỏi `fbMetaCTPayload()` (chỉ còn `{ projects }`).
+- `sync.js`: thêm doc vào mảng `metas` của `pushChanges`; tách block customers trong `_pullMeta()` và `_mergeMetaForPush()` sang đọc `meta_khach_hang`. **Fallback migration**: nếu cloud chưa có doc mới → đọc `customers` cũ trong `meta_cong_trinh` (không mất dữ liệu; lần push kế tiếp tạo doc mới). Model/UI khách hàng (`js/modules/khachhang/*`) **không đổi**.
+
+**2. Quyết Toán Chi Phí** (mảng mới `quyettoan_v1`, gộp vào doc `meta_hop_dong` → `{ hopDong, thauPhu, quyetToan }`).
+- Bản ghi: `{ id, projectId, congtrinh, giaTri (CHO PHÉP ÂM = giảm trừ), nd, ngay, nguoi, createdAt, updatedAt, deletedAt }`. Global `quyetToanRecords`.
+- Nút **+ Quyết Toán Chi Phí** (subtab KHAI BÁO) mở modal `#dt-modal-qt-ov` (kế thừa layout HĐ Chính): chọn CT → `_qtOnCtChange()` hiện Tổng HĐ ban đầu + Đã thu (kế thừa `_thuOnCtChange`); ô **Giá trị phát sinh** dùng `fmtInputMoneySigned`/`_readMoneySigned` (cho phép dấu trừ); textarea **Nội dung**.
+- CRUD: `saveQuyetToan`/`editQuyetToan`/`delQuyetToan`/`_qtResetForm`. Hiển thị: dòng "🧾 Quyết Toán" trong bảng KHAI BÁO gộp (số âm tô đỏ) + bảng riêng THỐNG KÊ `renderQtTableTk` (tbody `#qttk-tbody`, state `_qtTkPage`). Sync: `quyettoan_v1` trong `_META_TRIGGER_KEYS`, gộp bằng `mergeDatasets` ở pull/merge.
+
+**3. Subtab "TỔNG QUAN LỢI NHUẬN"** (`#dt-sub-loinhuan`, nút `#dt-sub-loinhuan-btn`, wrap `#dt-loinhuan-wrap`).
+- `renderLoiNhuan()` + helper `_lnContractsB`/`_lnRevenueX`: mỗi công trình tính **Tổng Chi = (A) hóa đơn + (B) thầu phụ + (C) chi phí chung phân bổ** (`allocateCompanyCost`) vs **Doanh Thu = (X) HĐ chính ban đầu + (Y) quyết toán cộng dồn**; **Lợi Nhuận = DT − Chi** (class `ll-pos` xanh / `ll-neg` đỏ). Báo cáo **theo năm đang lọc** — chọn "Tất cả năm" để xem toàn vòng đời (hóa đơn 1 CT có thể nằm rải nhiều năm). `dtGoSub` thêm nhánh `dt-sub-loinhuan`; `initDoanhThu` nạp `quyetToanRecords`.
+- ⚠️ **Cảnh báo trùng tính**: nếu 1 khoản thầu phụ (B) cũng được nhập như hóa đơn (A) sẽ bị cộng 2 lần — cần đối soát khi nhập liệu (đã ghi chú trong code).
+
+**File đã sửa:** `js/core/core.cloud-cats-ui.js`, `js/sync/sync.js`, `js/modules/doanhthu/doanhthu.core.js`, `doanhthu.forms.js`, `doanhthu.reports-export.js`, `index.html`.
 
 ---
 

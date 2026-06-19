@@ -4,9 +4,9 @@
 // KIẾN TRÚC (B) — chia theo HẠNG MỤC cho dễ đọc trên Firebase Console:
 //   • Mỗi HẠNG MỤC theo NĂM = 1 document (tên field đầy đủ, không nén):
 //       cpct_data/y{NĂM}_hoa_don · _tien_ung · _cham_cong · _thiet_bi · _thu_tien
-//   • 4 document DANH MỤC dùng chung:
-//       meta_cong_trinh (projects) · meta_danh_muc (cat/role/năm-CT)
-//       meta_tai_khoan (users)     · meta_hop_dong (HĐ chính + thầu phụ)
+//   • 5 document DANH MỤC dùng chung:
+//       meta_cong_trinh (projects) · meta_khach_hang (customers) · meta_danh_muc (cat/role/năm-CT)
+//       meta_tai_khoan (users)     · meta_hop_dong (HĐ chính + thầu phụ + quyết toán)
 //   → Đổi lại để dễ nhìn; cái giá là đọc/ghi nhiều hơn (mỗi hạng mục 1 lượt).
 //
 //   • CLOUD LÀ DUY NHẤT ĐÚNG (online 100%):
@@ -303,11 +303,12 @@ async function pushChanges(opts = {}) {
     : _YEAR_CATS;
   // Các key kích hoạt từng doc meta (gộp theo payload tương ứng)
   const _META_TRIGGER_KEYS = new Set([
-    'projects_v1','customers_v1','cat_ct',                    // → meta_cong_trinh
+    'projects_v1','cat_ct',                                   // → meta_cong_trinh
+    'customers_v1',                                           // → meta_khach_hang
     'cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb',
     'cat_items_v1','cat_cn_roles','cat_ct_years',             // → meta_danh_muc
     'users_v1',                                               // → meta_tai_khoan
-    'hopdong_v1','thauphu_v1',                                // → meta_hop_dong
+    'hopdong_v1','thauphu_v1','quyettoan_v1',                 // → meta_hop_dong
   ]);
   const _pushMeta = _scoped
     ? [..._dirtyKeys].some(k => _META_TRIGGER_KEYS.has(k))
@@ -361,6 +362,7 @@ async function pushChanges(opts = {}) {
         if (!skipPull) await _mergeMetaForPush();
         const metas = [
           [fbDocMetaCT(), fbMetaCTPayload()],
+          [fbDocMetaKH(), fbMetaKHPayload()],
           [fbDocMetaDM(), fbMetaDMPayload()],
           [fbDocMetaTK(), fbMetaTKPayload()],
           [fbDocMetaHD(), fbMetaHDPayload()],
@@ -408,21 +410,31 @@ async function _pullMeta() {
   let changed = false;
 
   // ── meta_cong_trinh: projects (công trình) — nguồn gốc của cat_ct ──
+  let _ctDoc = null;
   try {
-    const d = fsUnwrap(await fsGet(fbDocMetaCT()));
-    if (d && Array.isArray(d.projects)) {
-      _memSet('projects_v1', d.projects);
-      if (typeof projects !== 'undefined') projects = d.projects;
+    _ctDoc = fsUnwrap(await fsGet(fbDocMetaCT()));
+    if (_ctDoc && Array.isArray(_ctDoc.projects)) {
+      _memSet('projects_v1', _ctDoc.projects);
+      if (typeof projects !== 'undefined') projects = _ctDoc.projects;
       if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
       changed = true;
     }
-    // customers (Chủ đầu tư/CRM) đi kèm trong cùng doc — thay thế local bằng cloud
-    if (d && Array.isArray(d.customers)) {
-      _memSet('customers_v1', d.customers);
-      if (typeof customers !== 'undefined') customers = d.customers;
+  } catch (e) { console.warn('[Sync] meta_cong_trinh pull lỗi:', e.message || e); }
+
+  // ── meta_khach_hang: customers (Chủ đầu tư/CRM) — doc riêng (tách 19/06/2026) ──
+  // Ưu tiên doc mới; nếu cloud CHƯA có doc này thì fallback đọc customers cũ
+  // nằm trong meta_cong_trinh (dữ liệu trước khi tách) để không mất khách hàng.
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaKH()));
+    let custs = (d && Array.isArray(d.customers)) ? d.customers
+              : (_ctDoc && Array.isArray(_ctDoc.customers)) ? _ctDoc.customers
+              : null;
+    if (custs) {
+      _memSet('customers_v1', custs);
+      if (typeof customers !== 'undefined') customers = custs;
       changed = true;
     }
-  } catch (e) { console.warn('[Sync] meta_cong_trinh pull lỗi:', e.message || e); }
+  } catch (e) { console.warn('[Sync] meta_khach_hang pull lỗi:', e.message || e); }
 
   // ── meta_danh_muc: catItems (source of truth), vai trò CN, năm theo CT ──
   try {
@@ -476,6 +488,10 @@ async function _pullMeta() {
         _memSet('thauphu_v1', d.thauPhu);
         if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = d.thauPhu;
       }
+      if (Array.isArray(d.quyetToan)) {
+        _memSet('quyettoan_v1', d.quyetToan);
+        if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = d.quyetToan;
+      }
       changed = true;
     }
   } catch (e) { console.warn('[Sync] meta_hop_dong pull lỗi:', e.message || e); }
@@ -508,20 +524,29 @@ async function _pullMeta() {
 // ══════════════════════════════════════════════════════════════
 async function _mergeMetaForPush() {
   // ── meta_cong_trinh: projects (mảng) ──
+  let _ctDoc = null;
   try {
-    const d = fsUnwrap(await fsGet(fbDocMetaCT()));
-    if (d && Array.isArray(d.projects)) {
-      const merged = mergeDatasets(load('projects_v1', []), d.projects);
+    _ctDoc = fsUnwrap(await fsGet(fbDocMetaCT()));
+    if (_ctDoc && Array.isArray(_ctDoc.projects)) {
+      const merged = mergeDatasets(load('projects_v1', []), _ctDoc.projects);
       _memSet('projects_v1', merged);
       if (typeof projects !== 'undefined') projects = merged;
     }
-    // customers (Chủ đầu tư/CRM): LWW + tombstone merge giống projects
-    if (d && Array.isArray(d.customers)) {
-      const mergedC = mergeDatasets(load('customers_v1', []), d.customers);
+  } catch (e) { console.warn('[Sync] merge-push meta_cong_trinh lỗi:', e.message || e); }
+
+  // ── meta_khach_hang: customers (doc riêng) — LWW + tombstone merge giống projects ──
+  // Fallback: nếu doc mới chưa có customers thì gộp với customers cũ trong meta_cong_trinh.
+  try {
+    const d = fsUnwrap(await fsGet(fbDocMetaKH()));
+    const cloudCusts = (d && Array.isArray(d.customers)) ? d.customers
+                     : (_ctDoc && Array.isArray(_ctDoc.customers)) ? _ctDoc.customers
+                     : null;
+    if (cloudCusts) {
+      const mergedC = mergeDatasets(load('customers_v1', []), cloudCusts);
       _memSet('customers_v1', mergedC);
       if (typeof customers !== 'undefined') customers = mergedC;
     }
-  } catch (e) { console.warn('[Sync] merge-push meta_cong_trinh lỗi:', e.message || e); }
+  } catch (e) { console.warn('[Sync] merge-push meta_khach_hang lỗi:', e.message || e); }
 
   // ── meta_danh_muc: catItems (per-item), cnRoles + ctYears (object map) ──
   try {
@@ -569,6 +594,11 @@ async function _mergeMetaForPush() {
         const merged = mergeDatasets(load('thauphu_v1', []), d.thauPhu);
         _memSet('thauphu_v1', merged);
         if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = merged;
+      }
+      if (Array.isArray(d.quyetToan)) {
+        const merged = mergeDatasets(load('quyettoan_v1', []), d.quyetToan);
+        _memSet('quyettoan_v1', merged);
+        if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = merged;
       }
     }
   } catch (e) { console.warn('[Sync] merge-push meta_hop_dong lỗi:', e.message || e); }

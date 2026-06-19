@@ -5,6 +5,7 @@
 let hopDongData      = load('hopdong_v1', {});
 let thuRecords       = load('thu_v1', []);
 let thauPhuContracts = load('thauphu_v1', []);
+let quyetToanRecords = load('quyettoan_v1', []); // Quyết toán chi phí (phát sinh tăng/giảm, cho phép âm)
 
 // [ADDED] — Normalize thuRecords to projectId at runtime
 function _normalizeThuProjectIds() {
@@ -309,6 +310,22 @@ function _readMoneyInput(id) {
   return parseInt(raw) || 0;
 }
 
+// ── Biến thể CHO PHÉP SỐ ÂM (dùng cho Quyết Toán: phát sinh giảm) ──
+// Giữ dấu trừ ở đầu nếu có, phần còn lại format nghìn như bình thường.
+function fmtInputMoneySigned(el) {
+  const neg = /^\s*-/.test(el.value) || el.dataset.raw && el.dataset.raw.startsWith('-');
+  const digits = el.value.replace(/[^0-9]/g, '');
+  el.dataset.raw = (neg && digits ? '-' : '') + digits;
+  el.value = digits ? (neg ? '-' : '') + parseInt(digits).toLocaleString('vi-VN') : (neg ? '-' : '');
+}
+
+function _readMoneySigned(id) {
+  const el = document.getElementById(id);
+  if (!el) return 0;
+  const raw = el.dataset.raw || el.value.replace(/[^0-9-]/g, '');
+  return parseInt(raw) || 0;
+}
+
 // ── Helper: kiểm tra record có thuộc năm đang chọn không ──────
 function _dtInYear(ngay) {
   if (!activeYears || activeYears.size === 0) return true;
@@ -377,7 +394,7 @@ function _dtRenderDashboardMini() {
 
 // ── Modal open/close helpers ──────────────────────────────────
 function openDtModal(type) {
-  ['hdc','thu','hdtp'].forEach(t => {
+  ['hdc','thu','hdtp','qt'].forEach(t => {
     const ov = document.getElementById('dt-modal-' + t + '-ov');
     if (ov) ov.classList.remove('open');
   });
@@ -393,10 +410,10 @@ function openDtModal(type) {
 }
 
 function closeDtModal(type) {
-  const ids = type ? ['dt-modal-' + type + '-ov'] : ['dt-modal-hdc-ov','dt-modal-thu-ov','dt-modal-hdtp-ov'];
+  const ids = type ? ['dt-modal-' + type + '-ov'] : ['dt-modal-hdc-ov','dt-modal-thu-ov','dt-modal-hdtp-ov','dt-modal-qt-ov'];
   ids.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('open'); });
   // Mở khóa cuộn trang nền nếu không còn modal nào đang open
-  const anyOpen = ['hdc','thu','hdtp'].some(t => {
+  const anyOpen = ['hdc','thu','hdtp','qt'].some(t => {
     const el = document.getElementById('dt-modal-' + t + '-ov');
     return el && el.classList.contains('open');
   });
@@ -447,6 +464,45 @@ function _thuOnCtChange(ctName) {
   infoEl.style.display = 'flex';
 }
 
+// ── Progress info khi chọn CT trong modal Quyết Toán ──────────
+// Kế thừa logic _thuOnCtChange(): hiện Tổng giá trị HĐ ban đầu + Đã thu.
+function _qtOnCtChange(ctName) {
+  const infoEl = document.getElementById('qt-progress-info');
+  if (!infoEl) return;
+  if (!ctName) { infoEl.style.display = 'none'; return; }
+
+  const proj = (typeof getAllProjects === 'function' ? getAllProjects() : []).find(p => p.name === ctName) || null;
+  const pid  = proj ? proj.id : null;
+
+  // Tìm HĐ chính của CT (ưu tiên theo projectId, fallback theo tên)
+  let hdKey = null;
+  if (pid && hopDongData[pid] && !hopDongData[pid].deletedAt) {
+    hdKey = pid;
+  } else {
+    hdKey = Object.keys(hopDongData).find(k => {
+      const hd = hopDongData[k];
+      if (hd.deletedAt) return false;
+      const p2 = (typeof projects !== 'undefined' ? projects : []).find(pr => pr.id === k);
+      return p2 ? p2.name === ctName : k === ctName;
+    }) || null;
+  }
+
+  const hd     = hdKey ? hopDongData[hdKey] : null;
+  const tongHD = hd ? (hd.giaTri||0) + (hd.giaTriphu||0) + (hd.phatSinh||0) : 0;
+
+  let tongThu = 0;
+  thuRecords.forEach(r => {
+    if (r.deletedAt) return;
+    if ((pid && r.projectId === pid) || (!pid && (r.congtrinh||'') === ctName)) tongThu += (r.tien||0);
+  });
+
+  const hdSpan  = document.getElementById('qt-prog-hd');
+  const thuSpan = document.getElementById('qt-prog-dathu');
+  if (hdSpan)  hdSpan.textContent  = tongHD ? fmtM(tongHD) : 'Chưa có HĐ';
+  if (thuSpan) thuSpan.textContent = fmtM(tongThu);
+  infoEl.style.display = 'flex';
+}
+
 // ── Populate hdtp-hdcid khi chọn CT trong modal HĐ Thầu Phụ ──
 function _hdtpOnCtChange(ctName) {
   const sel = document.getElementById('hdtp-hdcid');
@@ -486,6 +542,9 @@ function dtGoSub(btn, id) {
     renderHdcTableTk(_hdcTkPage);
     renderHdtpTableTk(_hdtpTkPage);
     renderThuTableTk(_thuTkPage);
+    if (typeof renderQtTableTk === 'function') renderQtTableTk(_qtTkPage);
+  } else if (id === 'dt-sub-loinhuan') {
+    if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
   }
 }
 
@@ -496,11 +555,14 @@ function dtPopulateSels() {
   // nhưng vẫn giữ giá trị đang chọn (cur) để edit dữ liệu cũ không mất.
   const projForYear = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => activeYear === 0 || _ctInActiveYear(p.name));
-  ['hdc-ct-input','thu-ct-input','hdtp-ct-input'].forEach(id => {
+  ['hdc-ct-input','thu-ct-input','hdtp-ct-input','qt-ct-input'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel || sel.tagName !== 'SELECT') return;
     const cur = sel.value;
-    const visible = projForYear.filter(p => p.status !== 'closed' || p.name === cur);
+    // Quyết toán thường làm sau khi đóng công trình → vẫn cho chọn CT đã đóng
+    const visible = id === 'qt-ct-input'
+      ? projForYear
+      : projForYear.filter(p => p.status !== 'closed' || p.name === cur);
     sel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
       visible.map(p => `<option value="${x(p.name)}">${x(p.name)}</option>`).join('');
     if (cur) sel.value = cur;
@@ -520,7 +582,7 @@ function dtPopulateSels() {
   const allNguoi = [...new Set([...cats.nguoiTH].filter(Boolean))].sort((a,b) => a.localeCompare(b,'vi'));
   const nguoiOpts = '<option value="">-- Chọn --</option>' +
     allNguoi.map(v => `<option value="${x(v)}">${x(v)}</option>`).join('');
-  ['thu-nguoi','hdc-nguoi'].forEach(id => {
+  ['thu-nguoi','hdc-nguoi','qt-nguoi'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel || sel.tagName !== 'SELECT') return;
     const cur = sel.value;
@@ -528,11 +590,12 @@ function dtPopulateSels() {
     if (cur) sel.value = cur;
   });
 
-  // Refresh bảng KHAI BÁO (gộp) + 3 bảng THỐNG KÊ khi năm thay đổi
+  // Refresh bảng KHAI BÁO (gộp) + các bảng THỐNG KÊ khi năm thay đổi
   renderKhaiBaoTable(0);
   renderHdcTableTk(_hdcTkPage);
   renderHdtpTableTk(_hdtpTkPage);
   renderThuTableTk(_thuTkPage);
+  if (typeof renderQtTableTk === 'function') renderQtTableTk(_qtTkPage);
 }
 
 // ── Tab Doanh Thu KHÔNG tạo công trình — chỉ tab CÔNG TRÌNH mới được quản lý ──

@@ -558,6 +558,29 @@ function renderKhaiBaoTable(page) {
       });
     });
 
+  // ── Quyết Toán Chi Phí ──
+  quyetToanRecords
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtWithinRecent(r.ngay))
+    .forEach(r => {
+      const v = r.giaTri || 0;
+      items.push({
+        type: 'qt',
+        ngay: r.ngay,
+        sortTs: r.updatedAt || r.createdAt || 0,
+        ct: _resolveCtName(r) || '—',
+        doiTac: r.nguoi || '—',
+        nd: r.nd || '—',
+        tien: v,
+        // Phát sinh giảm (âm) tô đỏ, tăng tô xanh
+        tienCls: v < 0 ? 'text-danger' : 'text-success',
+        tienTxt: v ? (v > 0 ? '+' : '') + fmtM(v) : '—',
+        loaiBadge: '<span class="badge bg-dark" style="font-size:10px">🧾 Quyết Toán</span>',
+        actions: `
+          <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editQuyetToan('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delQuyetToan('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
+      });
+    });
+
   // Sắp xếp: ngày mới nhất lên đầu (tie-break theo thời điểm cập nhật)
   items.sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || (b.sortTs - a.sortTs));
 
@@ -580,7 +603,7 @@ function renderKhaiBaoTable(page) {
     <td style="font-weight:600;white-space:nowrap">${x(it.ct)}</td>
     <td class="text-secondary" style="white-space:nowrap">${x(it.doiTac)}</td>
     <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(it.nd)}">${x(it.nd)}</td>
-    <td class="text-end font-monospace fw-semibold ${it.tienCls}" style="white-space:nowrap">${it.tien ? fmtM(it.tien) : '—'}</td>
+    <td class="text-end font-monospace fw-semibold ${it.tienCls}" style="white-space:nowrap">${it.tienTxt !== undefined ? it.tienTxt : (it.tien ? fmtM(it.tien) : '—')}</td>
     <td class="action-col">
       <div class="d-flex gap-1 justify-content-center">${it.actions}</div>
     </td>
@@ -775,4 +798,183 @@ function renderThuTableTk(page) {
   }).join('');
 
   if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderThuTableTk');
+}
+
+// ══ PHẦN 5: QUYẾT TOÁN CHI PHÍ ═══════════════════════════════
+// Mỗi bản ghi là 1 lần phát sinh (tăng hoặc GIẢM — cho phép giá trị âm) kèm lý do.
+// Doanh thu thực tế = HĐ chính ban đầu + tổng cộng dồn các giá trị quyết toán.
+let _qtTkPage = 0;
+
+// ── Lưu / Cập nhật một bản ghi Quyết Toán ────────────────────
+function saveQuyetToan() {
+  const ct = document.getElementById('qt-ct-input')?.value.trim();
+  if (!ct) { toast('Vui lòng chọn Công Trình!', 'error'); return; }
+
+  // Chỉ cho phép CT đã tồn tại (tạo CT phải qua tab Công Trình)
+  const _qtProj = (typeof getAllProjects === 'function')
+    ? getAllProjects().find(p => p.id !== 'COMPANY' && p.name === ct)
+    : null;
+  if (!_qtProj) { toast('Chỉ được tạo công trình tại tab Công Trình', 'error'); return; }
+
+  const giaTri = _readMoneySigned('qt-giatri');          // CHO PHÉP ÂM (giảm trừ)
+  const nd     = document.getElementById('qt-nd')?.value.trim() || '';
+  if (!giaTri) { toast('Vui lòng nhập Giá Trị Phát Sinh (dương hoặc âm)!', 'error'); return; }
+  if (!nd)     { toast('Vui lòng nhập Nội Dung lý do phát sinh!', 'error'); return; }
+
+  const ngay   = document.getElementById('qt-ngay')?.value || today();
+  const nguoi  = (document.getElementById('qt-nguoi')?.value || '').trim();
+  const editId = document.getElementById('qt-edit-id')?.value || '';
+  const _qtPid = _qtProj.id;
+
+  if (editId) {
+    const idx = quyetToanRecords.findIndex(r => r.id === editId);
+    if (idx >= 0) {
+      quyetToanRecords[idx] = mkUpdate(quyetToanRecords[idx], { ngay, congtrinh: ct, projectId: _qtPid, giaTri, nd, nguoi });
+    }
+    toast('✅ Đã cập nhật quyết toán', 'success');
+  } else {
+    quyetToanRecords.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _qtPid, giaTri, nd, nguoi }));
+    toast('✅ Đã lưu quyết toán: ' + ct, 'success');
+  }
+
+  save('quyettoan_v1', quyetToanRecords);
+  _qtResetForm();
+  closeDtModal('qt');
+  renderKhaiBaoTable(0);
+  renderQtTableTk(_qtTkPage);
+  _dtRenderDashboardMini();
+  if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
+}
+
+// ── Reset form Quyết Toán ────────────────────────────────────
+function _qtResetForm() {
+  ['qt-giatri','qt-nd'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = '';
+    if (el.dataset) el.dataset.raw = '';
+  });
+  const ctSel = document.getElementById('qt-ct-input');
+  if (ctSel) ctSel.value = '';
+  const nguoiSel = document.getElementById('qt-nguoi');
+  if (nguoiSel) nguoiSel.value = '';
+  const ngayEl = document.getElementById('qt-ngay');
+  if (ngayEl) ngayEl.value = today();
+  const progInfo = document.getElementById('qt-progress-info');
+  if (progInfo) progInfo.style.display = 'none';
+  const editEl = document.getElementById('qt-edit-id');
+  if (editEl) editEl.value = '';
+  const saveBtn = document.getElementById('qt-save-btn');
+  if (saveBtn) saveBtn.textContent = '💾 Lưu';
+  const cancelBtn = document.getElementById('qt-cancel-btn');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
+// ── Sửa Quyết Toán (mở modal) ────────────────────────────────
+function editQuyetToan(id) {
+  const r = quyetToanRecords.find(r => String(r.id) === String(id));
+  if (!r) return;
+
+  const ctName = resolveProjectName(r) || r.congtrinh || '';
+  const ctSel = document.getElementById('qt-ct-input');
+  if (ctSel) ctSel.value = ctName;
+  const ngayEl = document.getElementById('qt-ngay');
+  if (ngayEl) ngayEl.value = r.ngay || today();
+  const nguoiSel = document.getElementById('qt-nguoi');
+  if (nguoiSel) nguoiSel.value = r.nguoi || '';
+  const ndEl = document.getElementById('qt-nd');
+  if (ndEl) ndEl.value = r.nd || '';
+
+  // Set giá trị có dấu (giữ dấu trừ nếu âm)
+  const giaEl = document.getElementById('qt-giatri');
+  if (giaEl) {
+    const v = r.giaTri || 0;
+    giaEl.dataset.raw = String(v);
+    giaEl.value = v ? v.toLocaleString('vi-VN') : '';
+  }
+
+  const editEl = document.getElementById('qt-edit-id');
+  if (editEl) editEl.value = id;
+  const saveBtn = document.getElementById('qt-save-btn');
+  if (saveBtn) saveBtn.textContent = '✏️ Cập nhật';
+  const cancelBtn = document.getElementById('qt-cancel-btn');
+  if (cancelBtn) cancelBtn.style.display = '';
+
+  _qtOnCtChange(ctName);
+  openDtModal('qt');
+}
+
+// ── Xóa mềm Quyết Toán ───────────────────────────────────────
+function delQuyetToan(id) {
+  if (!confirm('Xóa bản ghi quyết toán này?')) return;
+  const idx = quyetToanRecords.findIndex(r => String(r.id) === String(id));
+  if (idx < 0) return;
+  const now = Date.now();
+  quyetToanRecords[idx] = { ...quyetToanRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
+  save('quyettoan_v1', quyetToanRecords);
+  renderKhaiBaoTable(0);
+  renderQtTableTk(_qtTkPage);
+  _dtRenderDashboardMini();
+  if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
+  toast('Đã xóa quyết toán', 'success');
+}
+
+// ── Render bảng Quyết Toán (THỐNG KÊ — toàn bộ) ──────────────
+function renderQtTableTk(page) {
+  page = page || 0;
+  _qtTkPage = page;
+  const tbody  = document.getElementById('qttk-tbody');
+  const empty  = document.getElementById('qttk-empty');
+  const badge  = document.getElementById('qttk-count-badge');
+  const pgWrap = document.getElementById('qttk-pagination');
+  if (!tbody) return;
+
+  let filtered = quyetToanRecords
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTkProjFilter(r))
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || (b.createdAt - a.createdAt));
+
+  if (_dtTkSearch) {
+    const q = _dtTkSearch;
+    filtered = filtered.filter(r =>
+      (_resolveCtName(r) || '').toLowerCase().includes(q) ||
+      (r.nguoi || '').toLowerCase().includes(q) ||
+      (r.nd || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (badge) badge.textContent = filtered.length ? `(${filtered.length} mục)` : '';
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
+    if (pgWrap) pgWrap.innerHTML = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const total = filtered.length;
+  const slice = filtered.slice(page * DT_PG, (page + 1) * DT_PG);
+
+  tbody.innerHTML = slice.map(r => {
+    const v = r.giaTri || 0;
+    const cls = v < 0 ? 'text-danger' : 'text-success';
+    const txt = (v > 0 ? '+' : '') + fmtS(v);
+    return `<tr>
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
+      <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="text-end font-monospace fw-bold ${cls}" style="white-space:nowrap">${v ? txt : '—'}</td>
+      <td class="action-col">
+        <div class="d-flex gap-1 justify-content-center">
+          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
+            onclick="editQuyetToan('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
+            onclick="delQuyetToan('${r.id}')"><i class="bi bi-trash-fill"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderQtTableTk');
 }

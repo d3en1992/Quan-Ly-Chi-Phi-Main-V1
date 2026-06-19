@@ -309,11 +309,151 @@ function renderLaiLo() {
     </div>`;
 }
 
+// ══ SUBTAB: TỔNG QUAN LỢI NHUẬN ══════════════════════════════
+// Bức tranh Lời/Lỗ từng công trình:
+//   [1] Tổng Chi Phí   = (A) Hóa đơn/vật tư + (B) Thầu phụ + (C) Chi phí chung phân bổ
+//   [2] Doanh Thu Thực = (X) HĐ chính ban đầu + (Y) Quyết toán (cộng dồn dương/âm)
+//   [3] Lợi Nhuận      = [2] − [1]   (xanh nếu lời, đỏ nếu lỗ)
+// LƯU Ý: báo cáo theo NĂM ĐANG LỌC. Chọn "Tất cả năm" để xem toàn vòng đời công trình
+// (vì hóa đơn 1 công trình có thể nằm rải ở nhiều năm).
+// CẢNH BÁO trùng tính: nếu 1 khoản thầu phụ (B) cũng được nhập như hóa đơn (A) thì
+// có thể bị cộng 2 lần — cần đối soát khi nhập liệu.
+function renderLoiNhuan() {
+  const wrap = document.getElementById('dt-loinhuan-wrap');
+  if (!wrap) return;
+
+  const _lnProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
+    .filter(p => p && p.id !== 'COMPANY');
+
+  // Map phân bổ chi phí chung CÔNG TY theo projectId (tôn trọng năm đang lọc)
+  const allocMap = {};
+  if (typeof allocateCompanyCost === 'function') {
+    allocateCompanyCost().forEach(a => { if (a && a.p) allocMap[a.p.id] = a.allocated || 0; });
+  }
+
+  // Helper: 1 bản ghi (hóa đơn / thầu phụ / quyết toán) có thuộc công trình p không
+  const _matchProj = (rec, p) =>
+    (rec.projectId && rec.projectId === p.id) ||
+    (!rec.projectId && ((resolveProjectName(rec) === p.name) || (rec.congtrinh === p.name)));
+
+  // (A) Hóa đơn/vật tư theo công trình (năm đang lọc)
+  const invs = getInvoicesCached().filter(i => !i.deletedAt && _dtInYear(i.ngay));
+
+  let tA = 0, tB = 0, tC = 0, tX = 0, tY = 0;
+
+  const rowsData = _lnProjs.map(p => {
+    // (A)
+    const A = invs.filter(i => _matchProj(i, p))
+      .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+    // (B)
+    const B = _lnContractsB(p);
+    // (C)
+    const C = allocMap[p.id] || 0;
+    // (X) HĐ chính ban đầu
+    const X = _lnRevenueX(p);
+    // (Y) Quyết toán (cộng dồn có dấu)
+    const Y = quyetToanRecords
+      .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _matchProj(r, p))
+      .reduce((s, r) => s + (r.giaTri || 0), 0);
+
+    return { name: p.name, A, B, C, X, Y };
+  }).filter(r => r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
+
+  rowsData.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
+  if (!rowsData.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px">Chưa có dữ liệu</div>';
+    return;
+  }
+
+  const rows = rowsData.map(r => {
+    const chi    = r.A + r.B + r.C;
+    const dt     = r.X + r.Y;
+    const loiNhuan = dt - chi;
+    const llClass  = loiNhuan > 0 ? 'll-pos' : loiNhuan < 0 ? 'll-neg' : 'll-zero';
+    const llPrefix = loiNhuan > 0 ? '+' : '';
+    tA += r.A; tB += r.B; tC += r.C; tX += r.X; tY += r.Y;
+    return `<tr>
+      <td style="text-align:left;font-weight:600">${x(r.name)}</td>
+      <td class="text-danger">${r.A ? fmtS(r.A) : '<span class="text-secondary">—</span>'}</td>
+      <td class="text-danger">${r.B ? fmtS(r.B) : '<span class="text-secondary">—</span>'}</td>
+      <td class="text-danger">${r.C ? fmtS(Math.round(r.C)) : '<span class="text-secondary">—</span>'}</td>
+      <td class="text-danger fw-semibold">${chi ? fmtS(Math.round(chi)) : '—'}</td>
+      <td>${r.X ? fmtS(r.X) : '<span class="text-secondary">—</span>'}</td>
+      <td>${r.Y ? (r.Y > 0 ? '+' : '') + fmtS(r.Y) : '<span class="text-secondary">—</span>'}</td>
+      <td class="fw-semibold">${dt ? fmtS(dt) : '—'}</td>
+      <td class="${llClass}">${(chi || dt) ? llPrefix + fmtS(Math.round(loiNhuan)) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const tChi = tA + tB + tC;
+  const tDt  = tX + tY;
+  const tLN  = tDt - tChi;
+  const tLNClass = tLN > 0 ? 'll-pos' : tLN < 0 ? 'll-neg' : 'll-zero';
+
+  wrap.innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="table table-sm table-hover align-middle mb-0" style="min-width:860px">
+        <thead class="table-light">
+          <tr style="font-size:11px">
+            <th style="text-align:left;min-width:140px">Công Trình</th>
+            <th>A · Hóa đơn</th>
+            <th>B · Thầu phụ</th>
+            <th>C · CP chung</th>
+            <th>Tổng Chi</th>
+            <th>X · HĐ gốc</th>
+            <th>Y · Quyết toán</th>
+            <th>Doanh Thu</th>
+            <th>Lợi Nhuận</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--bs-border-color)">
+            <td style="text-align:left">TỔNG CỘNG</td>
+            <td class="text-danger">${fmtS(tA)}</td>
+            <td class="text-danger">${fmtS(tB)}</td>
+            <td class="text-danger">${fmtS(Math.round(tC))}</td>
+            <td class="text-danger fw-bold">${fmtS(Math.round(tChi))}</td>
+            <td>${fmtS(tX)}</td>
+            <td>${tY ? (tY > 0 ? '+' : '') + fmtS(tY) : fmtS(0)}</td>
+            <td class="fw-bold">${fmtS(tDt)}</td>
+            <td class="${tLNClass}">${(tChi || tDt) ? (tLN >= 0 ? '+' : '') + fmtS(Math.round(tLN)) : '—'}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+}
+
+// (B) Tổng giá trị thầu phụ thuộc công trình p (năm đang lọc)
+function _lnContractsB(p) {
+  return thauPhuContracts
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) &&
+      ((r.projectId && r.projectId === p.id) ||
+       (!r.projectId && ((resolveProjectName(r) === p.name) || (r.congtrinh === p.name)))))
+    .reduce((s, r) => s + (r.giaTri || 0) + (r.phatSinh || 0), 0);
+}
+
+// (X) Tổng giá trị HĐ chính ban đầu của công trình p (giaTri + giaTriphu + phatSinh legacy)
+function _lnRevenueX(p) {
+  let total = 0;
+  Object.entries(hopDongData).forEach(([keyId, hd]) => {
+    if (hd.deletedAt || !_dtInYear(hd.ngay)) return;
+    const _p = (typeof projects !== 'undefined' ? projects : []).find(pr => pr.id === keyId);
+    const ctName = _p ? _p.name : keyId;
+    if (keyId === p.id || ctName === p.name) {
+      total += (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
+    }
+  });
+  return total;
+}
+
 // ── Init tab Doanh Thu khi mở ─────────────────────────────────
 function initDoanhThu() {
   // Reload dữ liệu mới nhất từ _mem (đã được dbInit() populate từ IDB)
   hopDongData      = load('hopdong_v1', {});
   thauPhuContracts = load('thauphu_v1', []);
+  quyetToanRecords = load('quyettoan_v1', []);
 
   _dtRenderDashboardMini();
 
@@ -335,11 +475,12 @@ function initDoanhThu() {
   document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
   if (kbBtn && kbPage) { kbPage.classList.add('active'); kbBtn.classList.add('active'); }
 
-  // Render cả hai subtab: KHAI BÁO (bảng gộp 30 ngày) + THỐNG KÊ (3 bảng toàn bộ)
+  // Render KHAI BÁO (bảng gộp 30 ngày) + THỐNG KÊ (các bảng toàn bộ)
   renderKhaiBaoTable(0);
   renderHdcTableTk(0);
   renderHdtpTableTk(0);
   renderThuTableTk(0);
+  if (typeof renderQtTableTk === 'function') renderQtTableTk(0);
 
   // Reset edit state
   _hdcResetForm();
