@@ -272,7 +272,10 @@ function renderCTOverview() {
   wrap.innerHTML = `
     <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px">
       <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Tổng Quan Công Trình</div>
-      <button class="btn btn-primary btn-sm" onclick="openCTCreateModal()">+ Thêm Công Trình</button>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="openKhachHangModal()">👥 Quản Lý Khách Hàng</button>
+        <button class="btn btn-primary btn-sm" onclick="openCTCreateModal()">+ Thêm Công Trình</button>
+      </div>
     </div>
 
     <!-- KPI 1: Số lượng theo trạng thái -->
@@ -596,7 +599,9 @@ function openCTDetail(id) {
     return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
   }).reduce((s,r) => s+(r.giaTri||0)+(r.phatSinh||0), 0) : 0;
 
-  const laiLo = tongThu - tongChiCongTrinh;
+  // ── Tổng chi phí dự toán = Tổng chi phí hóa đơn của CT + Tổng giá trị HĐ thầu phụ ──
+  // (Màn hình chi tiết giờ chỉ tập trung theo dõi chi phí, đã bỏ Lãi/Lỗ)
+  const tongChiPhiDuToan = (c.total || 0) + tongHDTP;
 
   // ── Bổ sung data nhỏ ─────────────────────────────────────────────────
   const soDotThu = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
@@ -612,9 +617,6 @@ function openCTDetail(id) {
     return inv.projectId === 'COMPANY' || inv.congtrinh === PROJECT_COMPANY.name;
   }).reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
 
-  // ── Màu lãi/lỗ ───────────────────────────────────────────────────────
-  const llColor    = laiLo > 0 ? 'var(--bs-success)' : laiLo < 0 ? 'var(--bs-danger)' : 'var(--bs-secondary-color)';
-  const llPrefix   = laiLo > 0 ? '+' : '';
   const conPhaiThu = tongGiaTriHD - tongThu;
 
   // ── Fix 4: Ngày bắt đầu chính xác — priority: startDate → first CC inv → null
@@ -685,7 +687,6 @@ function openCTDetail(id) {
     <div style="${_bx};padding:10px 14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.6px">Chủ Đầu Tư</div>
-        <button class="btn btn-outline-secondary btn-sm" style="font-size:10px;padding:1px 7px;line-height:1.5" onclick="openKhachHangModal()">👥 +KH</button>
       </div>
       ${(() => {
         // Ưu tiên bản ghi khách hàng (CRM) nếu công trình đã liên kết customerId
@@ -701,19 +702,16 @@ function openCTDetail(id) {
     </div>
   </div>`;
 
-  // ── Row 1: Tổng chi CT (đỏ) + Lãi/Lỗ (xanh/đỏ theo dấu) ───────────
+  // ── Row 1: Tổng chi CT (đỏ) + Tổng chi phí dự toán (xanh dương) ───────────
+  // Màn hình chi tiết chỉ tập trung theo dõi chi phí → đã thay ô Lãi/Lỗ bằng Tổng chi phí dự toán
   html += `
-  <div class="ctd-grid" style="display:grid;grid-template-columns:${!isCompany && isKetoan() ? '1fr' : '1fr 1fr'};gap:10px;margin-bottom:10px">
+  <div class="ctd-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     ${_box(_bxR, 'Tổng Chi Công Trình', _chiPhiChungFixed > 0
         ? fmtS(tongChiCongTrinh) + `<span class="text-secondary" style="font-size:12px;font-weight:400"> / ${fmtS(tongChiCongTrinh + _chiPhiChungFixed)}</span>`
         : fmtS(tongChiCongTrinh), CR)}
     ${!isCompany
-      ? (isKetoan() ? '' : _box(
-          laiLo >= 0 ? _bxG : _bxR,
-          'Lãi / Lỗ Hiện Tại',
-          (tongThu || tongGiaTriHD) ? llPrefix + fmtS(laiLo) : '—',
-          laiLo >= 0 ? CG : CR
-        )) // [ROLE KETOAN HIDE]
+      ? _box(_bxB, 'Tổng Chi Phí Dự Toán',
+          tongChiPhiDuToan ? fmtS(tongChiPhiDuToan) : '—', CB)
       : `<div style="${_bx}">${_lb('Tổng Hóa Đơn')}${_vl(c.count + ' HĐ')}</div>`}
   </div>`;
 

@@ -37,6 +37,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.11 Fix lỗi Thùng Rác "xóa rồi vẫn hồi về" (13/06/2026)](#911-fix-lỗi-thùng-rác-xóa-rồi-vẫn-hồi-về-13062026)
    - [9.12 Tách Tab Công Nợ + Doanh Thu 2 subtab + UI Công Nợ mới (16/06/2026)](#912-tách-tab-công-nợ--doanh-thu-2-subtab--ui-công-nợ-mới-16062026)
    - [9.13 Tách meta_khach_hang + Quyết Toán Chi Phí + Subtab Lợi Nhuận (19/06/2026)](#913-tách-meta_khach_hang--quyết-toán-chi-phí--subtab-lợi-nhuận-19062026)
+   - [9.14 Đưa Quản Lý Khách Hàng ra Tổng Quan + Chi tiết CT chỉ theo dõi chi phí (19/06/2026)](#914-đưa-quản-lý-khách-hàng-ra-tổng-quan--chi-tiết-ct-chỉ-theo-dõi-chi-phí-19062026)
 
 **Phụ lục**
 
@@ -111,7 +112,7 @@ Thứ tự chính xác trong `index.html`:
 | 28 | `js/legacy/thietbi.js` | Quản lý thiết bị/kho tổng |
 | 29 | `js/modules/doanhthu/doanhthu.core.js` | Global data (`hopDongData`, `thuRecords`, `thauPhuContracts`, `quyetToanRecords`), state, shared helpers: `calcHopDongValue`, `_migrateHopDongSL`, `_normalizeThuProjectIds`, `bindItemsToTable`, `dtGoSub` (3 subtab: KHAI BÁO/THỐNG KÊ/LỢI NHUẬN), `dtPopulateSels`, `fmtInputMoney`, `_readMoneyInput`, `fmtInputMoneySigned`/`_readMoneySigned` (cho phép số âm — dùng Quyết Toán), `_thuOnCtChange`, `_qtOnCtChange`, `_dtPaginationHtml`, `_dtMatchProjFilter`, `_dtMatchHDCFilter`, pagination state, CT filter |
 | 30 | `js/modules/doanhthu/doanhthu.forms.js` | Form save/edit/delete và render tables: `hdcUpdateTotal`, `saveHopDongChinh`, `editHopDongChinh`, `delHopDongChinh`, `renderHdcTable`, `saveThuRecord`, `editThuRecord`, `delThuRecord`, `renderThuTable`, `hdtpUpdateTotal`, `saveHopDongThauPhu`, `editHopDongThauPhu`, `delHopDongThauPhu`, `renderHdtpTable`, `renderKhaiBaoTable` (gộp HĐ Chính + Thầu Phụ + Thu + **Quyết Toán**), `saveQuyetToan`/`editQuyetToan`/`delQuyetToan`/`_qtResetForm`/`renderQtTableTk` (Quyết Toán Chi Phí) |
-| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Lãi/Lỗ, Lợi Nhuận, init, copy/paste KLCT, xuất phiếu ảnh: `renderLaiLo` (dashboard cũ), `renderLoiNhuan` + helpers `_lnContractsB`/`_lnRevenueX` (subtab **TỔNG QUAN LỢI NHUẬN**: A hóa đơn + B thầu phụ + C phân bổ chung vs X HĐ gốc + Y quyết toán), `initDoanhThu` (set up 3 subtab KHAI BÁO/THỐNG KÊ/LỢI NHUẬN, nạp `quyetToanRecords`), `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub`. (`renderCongNoThauPhu`/`renderCongNoNhaCungCap`/`_renderCongNoTable` còn lại nhưng **DEPRECATED** — xem 9.12) |
+| 31 | `js/modules/doanhthu/doanhthu.reports-export.js` | Lãi/Lỗ, Lợi Nhuận, init, copy/paste KLCT, xuất phiếu ảnh: `renderLaiLo` (dashboard cũ), `renderLoiNhuan` + helpers `_lnContractsB`/`_lnRevenueX`/`_lnBuildDashboard` (donut + Top5 lãi/lỗ bằng CSS thuần)/`_lnBadge` (badge nền màu)/`_lnChiCell` (progress bar nền theo %DT)/`toggleLoiNhuanDetail` (ẩn/hiện cột bóc tách, state `_lnShowDetail`) (subtab **TỔNG QUAN LỢI NHUẬN**: A hóa đơn + B thầu phụ + C phân bổ chung vs X HĐ gốc + Y quyết toán), `initDoanhThu` (set up 3 subtab KHAI BÁO/THỐNG KÊ/LỢI NHUẬN, nạp `quyetToanRecords`), `copyKLCT`, `pasteKLCT`, `exportHdcToImage`, `exportHdtpToImage`, `exportThuToImage`; gán `window.initDoanhThu`, `window.dtGoSub`. (`renderCongNoThauPhu`/`renderCongNoNhaCungCap`/`_renderCongNoTable` còn lại nhưng **DEPRECATED** — xem 9.12) |
 | 31b | `js/modules/doanhthu/doanhthu.congno.js` | Page **CÔNG NỢ** (tab chính độc lập): `initCongNo`, `cnRenderTable`, `cnApplyFilters`, `cnResetFilters`, `cnPopulateCtFilter`, `cnPopulateMonthFilter`, `_cnBuildRows` (chỉ đối tác có `daUng>0`), `_cnRenderKpis`, `_cnProgressBar`, `_cnStatusBadge`, `_cnGroupBadge`, `_cnMatchCt`, `_cnInMonth`; state lọc `_cnCt`/`_cnGroup`/`_cnMonth`/`_cnSearch`. Nạp sau `doanhthu.reports-export.js`. |
 | 32 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 5 meta doc: thêm `meta_khach_hang`), `pullChanges` (REPLACE local bằng cloud), `_pullMeta` (customers đọc `meta_khach_hang`, fallback `meta_cong_trinh.customers`; quyetToan trong `meta_hop_dong`), `_mergeMetaForPush`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
 | 33 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
@@ -1035,7 +1036,25 @@ Ba mảng tính năng cho tab **Doanh Thu** và tầng dữ liệu cloud:
 - `renderLoiNhuan()` + helper `_lnContractsB`/`_lnRevenueX`: mỗi công trình tính **Tổng Chi = (A) hóa đơn + (B) thầu phụ + (C) chi phí chung phân bổ** (`allocateCompanyCost`) vs **Doanh Thu = (X) HĐ chính ban đầu + (Y) quyết toán cộng dồn**; **Lợi Nhuận = DT − Chi** (class `ll-pos` xanh / `ll-neg` đỏ). Báo cáo **theo năm đang lọc** — chọn "Tất cả năm" để xem toàn vòng đời (hóa đơn 1 CT có thể nằm rải nhiều năm). `dtGoSub` thêm nhánh `dt-sub-loinhuan`; `initDoanhThu` nạp `quyetToanRecords`.
 - ⚠️ **Cảnh báo trùng tính**: nếu 1 khoản thầu phụ (B) cũng được nhập như hóa đơn (A) sẽ bị cộng 2 lần — cần đối soát khi nhập liệu (đã ghi chú trong code).
 
+**3b. Trực quan hóa subtab Lợi Nhuận (cùng đợt).**
+- **Mini dashboard** (`#dt-ln-dashboard`, `_lnBuildDashboard`): donut Doanh thu vs Chi phí (CSS `conic-gradient`, tâm hiện lợi nhuận) + 2 thẻ Top 5 lãi cao nhất / Top 5 đang lỗ (bar ngang CSS thuần — **không thêm thư viện chart**).
+- **Toggle cột** (`#dt-ln-toggle-btn`, `toggleLoiNhuanDetail`, state `_lnShowDetail`): mặc định chỉ hiện Công Trình · Tổng Chi · Doanh Thu · Lợi Nhuận; bấm "Hiện chi tiết" mới hiện 5 cột bóc tách (Hóa đơn/Thầu phụ/CP chung/HĐ gốc/Quyết toán). **Đã bỏ tiền tố A/B/C/X/Y** ở tên cột.
+- **Progress bar nền** (`_lnChiCell`): ô Tổng Chi có nền `linear-gradient` đỏ nhạt lấp đầy theo tỷ lệ chi/doanh thu (+ dòng "% DT"). **Badge nền màu** (`_lnBadge`): cột Lợi Nhuận dùng nền xanh nhạt/chữ xanh đậm (dương), nền đỏ nhạt/chữ đỏ đậm (âm).
+- **Modal Quyết Toán**: cân lại grid (Người TH 38% / Giá trị phát sinh 62%), dời hướng dẫn "nhập số âm" xuống dòng helper text nhỏ nghiêng dưới ô nhập (gọn bố cục).
+
 **File đã sửa:** `js/core/core.cloud-cats-ui.js`, `js/sync/sync.js`, `js/modules/doanhthu/doanhthu.core.js`, `doanhthu.forms.js`, `doanhthu.reports-export.js`, `index.html`.
+
+---
+
+## 9.14 Đưa Quản Lý Khách Hàng ra Tổng Quan + Chi tiết CT chỉ theo dõi chi phí (19/06/2026)
+
+Ba thay đổi UI trong tab Công Trình (`js/modules/projects/projects.ui.js`):
+
+1. **Chuyển nút Quản Lý Khách Hàng ra màn hình Tổng Quan.** Trong `renderCTOverview()`, header "Tổng Quan Công Trình" giờ có nhóm 2 nút: `👥 Quản Lý Khách Hàng` (gọi `openKhachHangModal()`) đặt ngay cạnh `+ Thêm Công Trình`. Đã **gỡ nút `👥 +KH`** khỏi ô "Chủ Đầu Tư" trong modal chi tiết công trình (`openCTDetail`) — quản lý khách hàng không còn nằm trong phạm vi từng công trình đơn lẻ.
+2. **Bỏ hoàn toàn ô "Lãi / Lỗ Hiện Tại"** khỏi modal chi tiết công trình. Màn hình chi tiết giờ chỉ tập trung theo dõi chi phí. Đã xóa các biến không còn dùng `laiLo`/`llColor`/`llPrefix` trong `openCTDetail` (biến `laiLo`/filter `_ctFLaiLo` ở **lưới Tổng Quan** vẫn giữ — không liên quan).
+3. **Thêm ô "Tổng Chi Phí Dự Toán"** thay chỗ ô Lãi/Lỗ ở Row 1. Công thức: `tongChiPhiDuToan = (c.total || 0) + tongHDTP` = **Tổng chi phí hóa đơn của CT** (`c.total`) + **Tổng giá trị hợp đồng thầu phụ** (`tongHDTP` = Σ `giaTri+phatSinh` các `thauPhuContracts` của CT). Ô dùng style `_bxB` (xanh dương) màu `CB`. Hiển thị cho mọi vai trò (kể cả kế toán) vì là chỉ số chi phí; grid Row 1 đổi cố định 2 cột `1fr 1fr`.
+
+**File đã sửa:** `js/modules/projects/projects.ui.js`.
 
 ---
 
