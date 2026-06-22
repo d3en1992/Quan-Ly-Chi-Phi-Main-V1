@@ -13,7 +13,7 @@ function switchTatCaView(val) {
   if(activeWrap) activeWrap.style.display = isTrash ? 'none' : '';
   if(trashWrap)  trashWrap.style.display  = isTrash ? ''     : 'none';
   // Ẩn/hiện search + filters theo chế độ
-  const filterIds = ['tc-search-box','f-ct','f-loai','f-ncc','f-month'];
+  const filterIds = ['tc-search-box','f-ct','f-loai','f-ncc','f-month','f-week'];
   filterIds.forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = isTrash ? 'none' : '';
@@ -55,6 +55,16 @@ function buildFilters() {
   const months=[...new Set(yearInvs.map(i=>i.ngay?.slice(0,7)))].filter(Boolean).sort().reverse();
   const mSel=document.getElementById('f-month'); const mv=mSel.value;
   mSel.innerHTML='<option value="">Tất cả tháng</option>'+months.map(m=>`<option ${m===mv?'selected':''} value="${m}">${m}</option>`).join('');
+
+  // Tuần dropdown — gom theo tuần CN→T7 (chuẩn Chấm Công), mới nhất lên đầu
+  // value = ngày Chủ Nhật (ISO), label = nhãn tuần dễ đọc (weekLabel)
+  const wSel=document.getElementById('f-week');
+  if(wSel && typeof snapToSunday==='function'){
+    const weeks=[...new Set(yearInvs.map(i=>i.ngay?snapToSunday(i.ngay):'').filter(Boolean))].sort().reverse();
+    const wv=wSel.value;
+    const wLabel=(typeof weekLabel==='function')?weekLabel:(k=>k);
+    wSel.innerHTML='<option value="">Tất cả tuần</option>'+weeks.map(w=>`<option ${w===wv?'selected':''} value="${w}">Tuần ${x(wLabel(w))}</option>`).join('');
+  }
 }
 
 function filterAndRender() {
@@ -65,12 +75,14 @@ function filterAndRender() {
   const fLoai=document.getElementById('f-loai')?.value||'';
   const fNcc=document.getElementById('f-ncc')?.value||'';
   const fMonth=document.getElementById('f-month')?.value||'';
+  const fWeek=document.getElementById('f-week')?.value||'';
   filteredInvs = getInvoicesCached().filter(inv => {
     if(!inActiveYear(inv.ngay)) return false;
     if(fCt && resolveProjectName(inv)!==fCt) return false;
     if(fLoai && recCatName(inv,'inv','loai')!==fLoai) return false;
     if(fNcc && (recCatName(inv,'inv','ncc')||'')!==fNcc) return false;
     if(fMonth && !inv.ngay.startsWith(fMonth)) return false;
+    if(fWeek && (typeof snapToSunday==='function') && snapToSunday(inv.ngay)!==fWeek) return false;
     if(q) { const t=[inv.ngay,resolveProjectName(inv),recCatName(inv,'inv','loai'),recCatName(inv,'inv','nguoi'),recCatName(inv,'inv','ncc'),inv.nd,String(inv.thanhtien||inv.tien||0)].join(' ').toLowerCase(); if(!t.includes(q)) return false; }
     return true;
   });

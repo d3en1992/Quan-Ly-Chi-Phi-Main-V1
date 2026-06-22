@@ -38,6 +38,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.12 Tách Tab Công Nợ + Doanh Thu 2 subtab + UI Công Nợ mới (16/06/2026)](#912-tách-tab-công-nợ--doanh-thu-2-subtab--ui-công-nợ-mới-16062026)
    - [9.13 Tách meta_khach_hang + Quyết Toán Chi Phí + Subtab Lợi Nhuận (19/06/2026)](#913-tách-meta_khach_hang--quyết-toán-chi-phí--subtab-lợi-nhuận-19062026)
    - [9.14 Đưa Quản Lý Khách Hàng ra Tổng Quan + Chi tiết CT chỉ theo dõi chi phí (19/06/2026)](#914-đưa-quản-lý-khách-hàng-ra-tổng-quan--chi-tiết-ct-chỉ-theo-dõi-chi-phí-19062026)
+   - [9.15 Lọc tuần + Sort DESC + Fix dropdown đổi tên + Số ngày thi công + Biểu đồ 52 tuần đa năm (22/06/2026)](#915-lọc-tuần--sort-desc--fix-dropdown-đổi-tên--số-ngày-thi-công--biểu-đồ-52-tuần-đa-năm-22062026)
 
 **Phụ lục**
 
@@ -1055,6 +1056,24 @@ Ba thay đổi UI trong tab Công Trình (`js/modules/projects/projects.ui.js`):
 3. **Thêm ô "Tổng Chi Phí Dự Toán"** thay chỗ ô Lãi/Lỗ ở Row 1. Công thức: `tongChiPhiDuToan = (c.total || 0) + tongHDTP` = **Tổng chi phí hóa đơn của CT** (`c.total`) + **Tổng giá trị hợp đồng thầu phụ** (`tongHDTP` = Σ `giaTri+phatSinh` các `thauPhuContracts` của CT). Ô dùng style `_bxB` (xanh dương) màu `CB`. Hiển thị cho mọi vai trò (kể cả kế toán) vì là chỉ số chi phí; grid Row 1 đổi cố định 2 cột `1fr 1fr`.
 
 **File đã sửa:** `js/modules/projects/projects.ui.js`.
+
+---
+
+## 9.15 Lọc tuần + Sort DESC + Fix dropdown đổi tên + Số ngày thi công + Biểu đồ 52 tuần đa năm (22/06/2026)
+
+Năm sửa đổi độc lập theo yêu cầu người dùng:
+
+**1. Bộ lọc "Tuần" ở trang Thống Kê CP/HĐ.** Thêm `<select id="f-week">` cạnh `#f-month` trong `index.html` (toolbar `page-thongkecphd`). `hoadon.list-trash.js`: `buildFilters()` build options tuần từ `snapToSunday(i.ngay)` (value = CN ISO, label = `Tuần ` + `weekLabel(key)`), sort giảm dần; `filterAndRender()` thêm điều kiện `snapToSunday(inv.ngay) === fWeek`; thêm `'f-week'` vào `filterIds` (reset đúng khi sang thùng rác). Bổ sung — KHÔNG thay thế `f-month`.
+
+**2. Chuẩn hóa sort theo Ngày mới nhất (DESC).** `doanhthu.forms.js`: `renderHdcTableTk` (trước sort theo TÊN CT) và `renderHdtpTableTk` (trước sort theo `createdAt`) → đổi sang `ngay` DESC + tie-break `updatedAt/createdAt`. `renderThuTableTk`, `renderQtTableTk`, `renderKhaiBaoTable` vốn đã DESC — giữ nguyên.
+
+**3. Fix dropdown form Sửa khi đổi tên danh mục (dùng ID).** Lớp phân giải ID đã có sẵn (`recCatName`/`stampCatIds`/`catName` — records tự stamp `*Id` trong `save()`), nên BẢNG đã hiển thị tên mới đúng; lỗi chỉ ở FORM SỬA do set `select.value = <text>` trực tiếp. Sửa cả 4 hàm `editHopDongChinh`/`editThuRecord`/`editHopDongThauPhu`/`editQuyetToan`: (a) gọi `dtPopulateSels()` đầu hàm để rebuild options theo danh mục hiện hành; (b) thay `el.value = ...` bằng `_setSelectFlexible(el, recCatName(rec, kind, which))` (helper ở `hoadon.detail-entry.js` — tự thêm option "orphan" nếu thiếu → không bao giờ trắng). QT lưu `nguoi` dạng text (không gắn id) → dùng `_setSelectFlexible(el, r.nguoi)`.
+
+**4. Fix sai "Số ngày thi công" (lệch múi giờ).** `projects.ui.js`: thêm helper `_daysInclusiveLocal(startISO, endISO)` — parse cả 2 mốc về **nửa đêm LOCAL** (`new Date(y, m-1, d)`) rồi trừ, TÍNH CẢ ngày bắt đầu (bắt đầu hôm nay → 1 ngày). Trước đây `new Date("YYYY-MM-DD")` là nửa đêm UTC trừ cho `Date.now()` local → lệch tới 1 ngày ở VN (UTC+7). Áp dụng cho `_ptDurationDays` và biến `durationDays` inline trong `openCTDetail`. KHÔNG đụng `getProjectDays` (model, dùng cho phân bổ chi phí).
+
+**5. Biểu đồ chi phí đa năm: gộp theo SỐ TUẦN, 52 cột cố định.** `datatools.js`: chế độ Nhiều năm/Toàn bộ năm trước đây dùng `_dbBarChart` (theo tháng, trung bình cùng tháng giữa các năm — gây "cộng gộp sai"). Nay thay bằng hàm mới `_dbBarChartWeekly52(years, invoiceData, ungData)`: dựng 52 bucket, cộng dồn theo số tuần (1..52) xuyên TẤT CẢ năm chọn (cột T_N = Σ tuần N của từng năm; tuần 53 gộp vào T52); render SVG cột chồng giống `_dbBarChartWeekly` nhưng cố định T1..T52, không click-chọn tuần. Thêm state `_dbChartMode` ('single'|'multi') + cache `_dbLastWeeklyYears`; `renderDashboard` nhánh đa năm set mode='multi' và gọi hàm mới (đổi tiêu đề thành "Chi Phí Theo Tuần"); `_dbSetWeekFilter` re-render đúng theo mode. Bộ lọc range: `all`=52 cột, `12/8/4`=N tuần cuối. Hàm cũ `_dbBarChart` còn định nghĩa nhưng KHÔNG còn được gọi.
+
+**File đã sửa:** `index.html`, `js/modules/hoadon/hoadon.list-trash.js`, `js/modules/doanhthu/doanhthu.forms.js`, `js/modules/projects/projects.ui.js`, `js/legacy/datatools.js`.
 
 ---
 

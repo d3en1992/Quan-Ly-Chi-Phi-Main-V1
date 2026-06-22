@@ -187,6 +187,28 @@ function _ptStatBox(label, value, color, bg) {
   </div>`;
 }
 
+// ── Đếm số ngày theo lịch (LOCAL), TÍNH CẢ ngày bắt đầu ────────────
+// Sửa lỗi lệch múi giờ: new Date("YYYY-MM-DD") là nửa đêm UTC, trừ cho
+// Date.now() (local) sẽ lệch tới 1 ngày ở VN (UTC+7). Ở đây ta parse cả
+// 2 mốc về nửa đêm LOCAL rồi mới trừ → ra số ngày nguyên, không trôi giờ.
+// Quy ước: ngày bắt đầu = Ngày 1 (bắt đầu hôm nay → trả về 1).
+function _daysInclusiveLocal(startISO, endISO) {
+  if (!startISO) return 0;
+  const toLocalMidnight = s => {
+    const [y, m, d] = String(s).split('-').map(Number);
+    return new Date(y, m - 1, d); // nửa đêm theo giờ địa phương
+  };
+  const start = toLocalMidnight(startISO);
+  let end;
+  if (endISO) {
+    end = toLocalMidnight(endISO);
+  } else {
+    const n = new Date();
+    end = new Date(n.getFullYear(), n.getMonth(), n.getDate()); // hôm nay, nửa đêm local
+  }
+  return Math.max(0, Math.floor((end - start) / 86400000) + 1);
+}
+
 // ── Tính số ngày thi công (trả về số) ──────────────────────────────
 // Priority: p.startDate → first "Nhân Công" invoice → 0
 function _ptDurationDays(p, invList) {
@@ -197,9 +219,8 @@ function _ptDurationDays(p, invList) {
     return first ? first.ngay : null;
   })();
   if (!sd) return 0;
-  const endMs = (p.endDate && p.status === 'closed')
-    ? new Date(p.endDate).getTime() : Date.now();
-  return Math.max(0, Math.floor((endMs - new Date(sd).getTime()) / 86400000));
+  const endISO = (p.endDate && p.status === 'closed') ? p.endDate : null;
+  return _daysInclusiveLocal(sd, endISO);
 }
 
 // ── State filter của grid công trình (giữ giữa các lần render) ─────
@@ -625,11 +646,9 @@ function openCTDetail(id) {
                           .sort((a, b) => a.ngay.localeCompare(b.ngay))[0];
     return firstCC ? firstCC.ngay : null;
   })();
-  const _ctEndMs     = (p.endDate && p.status === 'closed')
-                       ? new Date(p.endDate).getTime() : Date.now();
-  const durationDays = _ctStartDate
-    ? Math.max(0, Math.floor((_ctEndMs - new Date(_ctStartDate).getTime()) / 86400000))
-    : 0;
+  // Đếm ngày theo lịch local, tính cả ngày bắt đầu (tránh lệch múi giờ — xem _daysInclusiveLocal)
+  const _ctEndISO    = (p.endDate && p.status === 'closed') ? p.endDate : null;
+  const durationDays = _daysInclusiveLocal(_ctStartDate, _ctEndISO);
   const _durLabel    = durationDays > 0 ? `${durationDays} ngày` : '';
   const _sd          = _ctStartDate;
 

@@ -120,17 +120,22 @@ function editHopDongChinh(keyId) {
   const hd = hopDongData[keyId];
   if (!hd) return;
 
+  // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
+  if (typeof dtPopulateSels === 'function') dtPopulateSels();
+
   // Resolve keyId → tên CT để hiển thị trên form
   const projs = (typeof projects !== 'undefined') ? projects : [];
   const p = projs.find(proj => proj.id === keyId);
   const ctName = p ? p.name : keyId;
 
   const ctSel = document.getElementById('hdc-ct-input');
-  if (ctSel) ctSel.value = ctName;
+  // _setSelectFlexible: tự thêm option nếu thiếu → không bao giờ trắng
+  if (ctSel) _setSelectFlexible(ctSel, ctName);
   const ngayEl = document.getElementById('hdc-ngay');
   if (ngayEl) ngayEl.value = hd.ngay || '';
   const nguoiSel = document.getElementById('hdc-nguoi');
-  if (nguoiSel) nguoiSel.value = recCatName(hd,'hopdong','nguoi') || '';
+  // Tên Người TH resolve theo ID (mới nhất), fallback text cũ
+  if (nguoiSel) _setSelectFlexible(nguoiSel, recCatName(hd,'hopdong','nguoi'));
   // Hiển thị Chủ Đầu Tư (read-only) — ưu tiên project.chuDauTu, fallback hd.khachHang legacy
   const khEl = document.getElementById('hdc-khachhang');
   if (khEl) {
@@ -253,15 +258,19 @@ function editThuRecord(id) {
   const r = thuRecords.find(r => String(r.id) === String(id));
   if (!r) return;
 
+  // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
+  if (typeof dtPopulateSels === 'function') dtPopulateSels();
+
   const ctName = resolveProjectName(r) || r.congtrinh || '';
 
-  // Điền dữ liệu vào form
+  // Điền dữ liệu vào form — _setSelectFlexible: tự thêm option nếu thiếu → không bao giờ trắng
   const ctSel = document.getElementById('thu-ct-input');
-  if (ctSel) ctSel.value = ctName;
+  if (ctSel) _setSelectFlexible(ctSel, ctName);
   const ngayEl = document.getElementById('thu-ngay');
   if (ngayEl) ngayEl.value = r.ngay || '';
   const nguoiSel = document.getElementById('thu-nguoi');
-  if (nguoiSel) nguoiSel.value = recCatName(r,'thu','nguoi') || '';
+  // Tên Người TH resolve theo ID (mới nhất), fallback text cũ
+  if (nguoiSel) _setSelectFlexible(nguoiSel, recCatName(r,'thu','nguoi'));
   const ndEl = document.getElementById('thu-nd');
   if (ndEl) ndEl.value = r.nd || '';
   const loaiThuEl = document.getElementById('thu-loaithu');
@@ -422,11 +431,16 @@ function editHopDongThauPhu(id) {
   const r = thauPhuContracts.find(r => r.id === id);
   if (!r) return;
 
+  // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
+  if (typeof dtPopulateSels === 'function') dtPopulateSels();
+
   const ctName = resolveProjectName(r) || r.congtrinh || '';
   const ctSel = document.getElementById('hdtp-ct-input');
-  if (ctSel) ctSel.value = ctName;
+  // _setSelectFlexible: tự thêm option nếu thiếu → không bao giờ trắng
+  if (ctSel) _setSelectFlexible(ctSel, ctName);
   const tpSel = document.getElementById('hdtp-thauphu');
-  if (tpSel) tpSel.value = recCatName(r,'thauphu','thauphu') || '';
+  // Tên Thầu Phụ resolve theo ID (mới nhất), fallback text cũ
+  if (tpSel) _setSelectFlexible(tpSel, recCatName(r,'thauphu','thauphu'));
   const ngayEl = document.getElementById('hdtp-ngay');
   if (ngayEl) ngayEl.value = r.ngay || '';
   const ndInput = document.getElementById('hdtp-nd');
@@ -630,9 +644,11 @@ function renderHdcTableTk(page) {
     const p = _allProjs.find(proj => proj.id === keyId);
     return p ? p.name : keyId;
   };
+  // Sắp xếp: ngày mới nhất lên đầu (DESC), tie-break theo thời điểm cập nhật/tạo
   let entries = Object.entries(hopDongData)
     .filter(([keyId, v]) => !v.deletedAt && _dtInYear(v.ngay) && _dtMatchTkHDCFilter(keyId, v))
-    .sort((a, b) => _resolveName(a[0]).localeCompare(_resolveName(b[0]), 'vi'));
+    .sort((a, b) => (b[1].ngay || '').localeCompare(a[1].ngay || '')
+      || ((b[1].updatedAt || b[1].createdAt || 0) - (a[1].updatedAt || a[1].createdAt || 0)));
 
   if (_dtTkSearch) {
     const q = _dtTkSearch;
@@ -689,9 +705,11 @@ function renderHdtpTableTk(page) {
   const pgWrap = document.getElementById('hdtptk-pagination');
   if (!tbody) return;
 
+  // Sắp xếp: ngày mới nhất lên đầu (DESC), tie-break theo thời điểm tạo
   let filtered = thauPhuContracts
     .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTkProjFilter(r))
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '')
+      || ((b.createdAt || 0) - (a.createdAt || 0)));
 
   if (_dtTkSearch) {
     const q = _dtTkSearch;
@@ -875,13 +893,18 @@ function editQuyetToan(id) {
   const r = quyetToanRecords.find(r => String(r.id) === String(id));
   if (!r) return;
 
+  // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
+  if (typeof dtPopulateSels === 'function') dtPopulateSels();
+
   const ctName = resolveProjectName(r) || r.congtrinh || '';
   const ctSel = document.getElementById('qt-ct-input');
-  if (ctSel) ctSel.value = ctName;
+  // _setSelectFlexible: tự thêm option nếu thiếu → không bao giờ trắng
+  if (ctSel) _setSelectFlexible(ctSel, ctName);
   const ngayEl = document.getElementById('qt-ngay');
   if (ngayEl) ngayEl.value = r.ngay || today();
   const nguoiSel = document.getElementById('qt-nguoi');
-  if (nguoiSel) nguoiSel.value = r.nguoi || '';
+  // QT lưu nguoi dạng text (không gắn id) — dùng _setSelectFlexible để không trắng dropdown
+  if (nguoiSel) _setSelectFlexible(nguoiSel, r.nguoi);
   const ndEl = document.getElementById('qt-nd');
   if (ndEl) ndEl.value = r.nd || '';
 

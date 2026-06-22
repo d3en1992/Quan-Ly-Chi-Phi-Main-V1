@@ -308,6 +308,10 @@ var _dbWeekFilter        = '8';
 var _dbLastWeeklyYr      = 0;
 var _dbLastWeeklyInvData = null;
 var _dbLastWeeklyUngData = null;
+// Chế độ biểu đồ tuần hiện tại: 'single' (1 năm) | 'multi' (nhiều năm, gộp 52 tuần)
+// + cache danh sách năm cho chế độ multi để nút filter tuần re-render đúng
+var _dbChartMode         = 'single';
+var _dbLastWeeklyYears   = [];
 
 // ══════════════════════════════════════════════════════════════
 // [MODULE: DASHBOARD] — KPI · Bar chart · Pie · Top5 · By CT
@@ -369,6 +373,7 @@ function renderDashboard() {
     if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
 
     // Cache data để filter/select tuần không cần chạy lại renderDashboard
+    _dbChartMode         = 'single';
     _dbLastWeeklyYr      = yr;
     _dbLastWeeklyInvData = dataYear;
     _dbLastWeeklyUngData = ungAllYear;
@@ -377,10 +382,21 @@ function renderDashboard() {
     _dbBarChartWeekly(yr, dataYear, ungAllYear);
     _dbPieChartWeekly(dataYear, ungAllYear);
   } else {
-    // ── CHẾ ĐỘ NHIỀU NĂM / TẤT CẢ: biểu đồ theo tháng ───────
-    if (barTitle) barTitle.textContent = 'Chi Phí Theo Tháng';
+    // ── CHẾ ĐỘ NHIỀU NĂM / TẤT CẢ: biểu đồ theo tuần, gộp 52 tuần xuyên năm ──
+    if (barTitle) barTitle.textContent = 'Chi Phí Theo Tuần';
+    if (pieTitle) pieTitle.textContent = 'Tỷ Trọng Chi Phí';
+
+    // Danh sách năm được chọn (rỗng = "Tất cả năm" → hàm chart tự suy từ dữ liệu)
+    const selectedYears = [...ay].sort((a, b) => a - b);
+
+    // Cache cho nút filter tuần re-render đúng chế độ multi
+    _dbChartMode         = 'multi';
+    _dbLastWeeklyYears   = selectedYears;
+    _dbLastWeeklyInvData = dataYear;
+    _dbLastWeeklyUngData = ungAllYear;
+
     _dbKPI(dataYear, yr, thauPhuTotal);
-    _dbBarChart(dataYear);
+    _dbBarChartWeekly52(selectedYears, dataYear, ungAllYear);
     _dbPieChart(dataYear);
   }
 
@@ -931,11 +947,163 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
      ${weekDetailHtml}`;
 }
 
+// ── Biểu đồ cột chồng theo tuần — CHẾ ĐỘ NHIỀU NĂM (52 cột cố định) ──
+// Gộp dữ liệu theo SỐ TUẦN (1..52) xuyên TẤT CẢ năm được chọn:
+//   cột [Tuần N] = Σ (Tuần N của từng năm).  VD chọn 2025+2026:
+//   T23 = dữ liệu T23/2025 + T23/2026.  Tuần 53 (nếu có) gộp vào T52.
+// Khác bản 1 năm (_dbBarChartWeekly): không click-chọn tuần (vì gộp nhiều năm),
+// trục X cố định T1..T52, tooltip hiển thị tổng đã gộp + top CT.
+function _dbBarChartWeekly52(years, invoiceData, ungData) {
+  const el = document.getElementById('db-bar-chart');
+  if (!el) return;
+
+  const C_INV = '#c2913a'; // amber — Hóa đơn / CP-HĐ
+  const C_TP  = '#8B4513'; // nâu   — Ứng thầu phụ
+  const C_NCC = '#8e9ca6'; // xám   — Ứng nhà cung cấp
+
+  // Danh sách năm cần gộp: dùng tham số, nếu rỗng ("Tất cả năm") thì suy từ dữ liệu
+  let yrs = (years && years.length) ? years.slice() : [];
+  if (!yrs.length) {
+    const s = new Set();
+    invoiceData.forEach(i => { if (i.ngay) s.add(+i.ngay.slice(0, 4)); });
+    ungData.forEach(r => { if (r.ngay) s.add(+r.ngay.slice(0, 4)); });
+    yrs = [...s].sort((a, b) => a - b);
+  }
+
+  const weeklyData = _dbCalcWeeklyData(invoiceData, ungData); // key = CN ISO đầy đủ (đã phân biệt năm)
+
+  // 52 bucket cố định, cộng dồn theo số tuần xuyên các năm
+  const buckets = Array.from({ length: 52 }, () => ({ inv: 0, ungTP: 0, ungNCC: 0, total: 0, byCT: {} }));
+  yrs.forEach(yr => {
+    const weeks = _dbGetWeeksInYear(yr);
+    weeks.forEach((w, i) => {
+      const wkNum = Math.min(i + 1, 52); // gộp tuần 53 (nếu có) vào tuần 52
+      const v = weeklyData[w.key];
+      if (!v) return;
+      const b = buckets[wkNum - 1];
+      b.inv += v.inv; b.ungTP += v.ungTP; b.ungNCC += v.ungNCC; b.total += v.total;
+      Object.entries(v.byCT || {}).forEach(([ct, amt]) => { b.byCT[ct] = (b.byCT[ct] || 0) + amt; });
+    });
+  });
+
+  // Bộ lọc range tuần: 'all' = đủ 52 cột; '12'/'8'/'4' = N tuần cuối (T... → T52)
+  let startIdx = 0;
+  if (_dbWeekFilter === '4')  startIdx = 48;
+  if (_dbWeekFilter === '8')  startIdx = 44;
+  if (_dbWeekFilter === '12') startIdx = 40;
+  const dispNums = [];
+  for (let i = startIdx; i < 52; i++) dispNums.push(i + 1);
+  const dispVals = dispNums.map(num => buckets[num - 1]);
+  const maxVal   = Math.max(...dispVals.map(v => v.total), 1);
+  const n        = dispNums.length;
+
+  // colW/gap thích nghi theo số cột (52 cột → cột mảnh, cuộn ngang)
+  const colW = n <= 4 ? 52 : n <= 8 ? 46 : n <= 12 ? 34 : 22;
+  const gap  = n <= 4 ? 8  : n <= 8 ? 6  : n <= 12 ? 5  : 3;
+  const H    = 130;
+  const H_SCALE = H - 18;
+  const svgW = n * (colW + gap);
+  const lblStep = n <= 8 ? 1 : 2; // nhãn mỗi 1 tuần (<=8) hoặc mỗi 2 tuần
+
+  const bars = dispNums.map((wkNum, i) => {
+    const v   = dispVals[i];
+    const cx  = i * (colW + gap);
+    const lbl = (i % lblStep === 0) ? `T${wkNum}` : '';
+
+    const top3Lines = Object.entries(v.byCT || {})
+      .sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([ct, amt]) => `  • ${ct.slice(0, 22)}: ${amt >= 1e6 ? Math.round(amt / 1e6) + 'tr' : fmtM(amt)}`)
+      .join('\n');
+
+    if (!v.total) {
+      return `<g>
+        <rect x="${cx}" y="${H-2}" width="${colW}" height="2" rx="1" fill="var(--bs-border-color)" opacity=".3">
+          <title>Tuần ${wkNum} (gộp ${yrs.join(', ')})\nKhông có phát sinh</title>
+        </rect>
+        <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="#333" font-weight="600">${lbl}</text>
+      </g>`;
+    }
+
+    const MIN_H = 4;
+    const hInv = v.inv    > 0 ? Math.max(MIN_H, Math.round((v.inv    / maxVal) * H_SCALE)) : 0;
+    const hTP  = v.ungTP  > 0 ? Math.max(MIN_H, Math.round((v.ungTP  / maxVal) * H_SCALE)) : 0;
+    const hNCC = v.ungNCC > 0 ? Math.max(MIN_H, Math.round((v.ungNCC / maxVal) * H_SCALE)) : 0;
+    const yNCC = H - hNCC;
+    const yTP  = yNCC - hTP;
+    const yInv = yTP  - hInv;
+    const hTot = hInv + hTP + hNCC || 2;
+    const yTop = H - hTot;
+
+    const titleTxt = [
+      `Tuần ${wkNum} — gộp các năm: ${yrs.join(', ')}`,
+      `─────────────────────`,
+      `Hóa đơn : ${fmtM(v.inv)}`,
+      `Ứng TP  : ${fmtM(v.ungTP)}`,
+      `Ứng NCC : ${fmtM(v.ungNCC)}`,
+      `Tổng    : ${fmtM(v.total)}`,
+      top3Lines ? `\nTop CT:\n${top3Lines}` : ''
+    ].filter(Boolean).join('\n');
+
+    const amt = v.total >= 1e9 ? (v.total/1e9).toFixed(1) + 'tỷ' : v.total >= 1e6 ? String(Math.round(v.total/1e6)) : '';
+
+    return `<g>
+      ${hNCC>0 ? `<rect x="${cx}" y="${yNCC}" width="${colW}" height="${hNCC}" fill="${C_NCC}" opacity=".85"/>` : ''}
+      ${hTP >0 ? `<rect x="${cx}" y="${yTP}"  width="${colW}" height="${hTP}"  fill="${C_TP}"  opacity=".85"/>` : ''}
+      ${hInv>0 ? `<rect x="${cx}" y="${yInv}" width="${colW}" height="${hInv}" fill="${C_INV}" opacity=".85"/>` : ''}
+      <rect x="${cx}" y="${yTop}" width="${colW}" height="${hTot}" fill="transparent">
+        <title>${titleTxt}</title>
+      </rect>
+      ${amt && hTot>18 ? `<text x="${cx+colW/2}" y="${yTop < 16 ? yTop+13 : yTop-5}" text-anchor="middle" font-size="10" fill="${yTop < 16 ? '#fff' : '#222'}" font-weight="700">${amt}</text>` : ''}
+      <text x="${cx+colW/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="#333" font-weight="600">${lbl}</text>
+    </g>`;
+  }).join('');
+
+  // Filter buttons (giống chế độ 1 năm; nhãn "Toàn bộ" = đủ 52 tuần)
+  const filterBtns = [
+    { f:'all', label:'Toàn bộ (52 tuần)' },
+    { f:'12',  label:'12 tuần cuối'      },
+    { f:'8',   label:'8 tuần cuối'       },
+    { f:'4',   label:'4 tuần cuối'       },
+  ].map(({ f, label }) => {
+    const active = _dbWeekFilter === f;
+    return `<button onclick="_dbSetWeekFilter('${f}')"
+      style="padding:3px 11px;border-radius:12px;font-size:10px;cursor:pointer;
+             border:1px solid ${active ? 'var(--bs-warning)' : 'var(--bs-border-color)'};
+             background:${active ? 'var(--bs-warning)' : 'transparent'};
+             color:${active ? '#fff' : '#333'};font-weight:${active?'700':'400'}">${label}</button>`;
+  }).join('');
+
+  const yrNote = `<span style="font-size:10px;color:var(--bs-secondary-color);margin-left:auto">
+                    Gộp ${yrs.length} năm: ${yrs.join(', ')} · cùng số tuần được cộng dồn
+                  </span>`;
+
+  el.innerHTML =
+    `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+       ${filterBtns}${yrNote}
+     </div>
+     <div style="overflow-x:auto">
+       <svg viewBox="0 -22 ${svgW} ${H+44}" width="${svgW}" style="min-height:${H+44}px;display:block">
+         ${bars}
+         <line x1="0" y1="${H}" x2="${svgW}" y2="${H}" stroke="var(--bs-border-color)" stroke-width="1"/>
+       </svg>
+     </div>
+     <div style="display:flex;gap:12px;font-size:10px;margin-top:8px;flex-wrap:wrap;color:#444">
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_INV};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Hóa đơn/CP-HĐ</span>
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_TP};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng thầu phụ</span>
+       <span><span style="display:inline-block;width:10px;height:10px;background:${C_NCC};border-radius:2px;margin-right:4px;vertical-align:middle"></span>Ứng NCC</span>
+     </div>`;
+}
+
 // ── Handler bộ lọc thời gian (gọi từ onclick filter buttons) ──
 function _dbSetWeekFilter(f) {
   _dbWeekFilter = f;
   selectedDashboardWeekKey = ''; // reset tuần đang chọn khi đổi filter
-  if (_dbLastWeeklyInvData && _dbLastWeeklyYr) {
+  if (_dbChartMode === 'multi') {
+    // Chế độ nhiều năm: re-render biểu đồ 52 tuần gộp (không có pie theo tuần)
+    if (_dbLastWeeklyInvData) {
+      _dbBarChartWeekly52(_dbLastWeeklyYears, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
+    }
+  } else if (_dbLastWeeklyInvData && _dbLastWeeklyYr) {
     _dbBarChartWeekly(_dbLastWeeklyYr, _dbLastWeeklyInvData, _dbLastWeeklyUngData);
     _dbPieChartWeekly(_dbLastWeeklyInvData, _dbLastWeeklyUngData); // reset về tổng quan
   }
