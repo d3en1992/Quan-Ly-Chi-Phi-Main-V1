@@ -315,7 +315,7 @@ function reloadFromCloud() {
     _reloadGlobals();
     buildYearSelect();
     rebuildEntrySelects(); rebuildUngSelects();
-    buildFilters(); filterAndRender(); renderTrash();
+    buildFilters(); filterAndRender();
     renderCCHistory(); renderCCTLT();
     buildUngFilters(); filterAndRenderUng();
     renderCtPage(); updateTop(); renderSettings();

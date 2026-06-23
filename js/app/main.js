@@ -50,7 +50,6 @@ function init() {
   migrateData();
 
   buildYearSelect(true); // skipCloud=true: chỉ render local, chờ gsLoadAll fetch cloud
-  renderTrash();
   renderTodayInvoices();
   applyNavPermissions();
   syncAuthUI();
@@ -203,7 +202,6 @@ function goSubPage(btn, id) {
   btn.classList.add('active');
   if (id === 'sub-hom-nay') { renderTodayInvoices(); }
   if (id === 'sub-tat-ca')  { buildFilters(); filterAndRender(); }
-  if (id === 'sub-da-xoa')  { renderTrash(); }
 }
 
 // Toggle 1 năm trong activeYears (gọi từ checkbox trong dropdown)
@@ -320,7 +318,6 @@ function _refreshAllTabs() {
 
   // Tầng 2: Render lại nội dung TẤT CẢ các tab
   filterAndRender();        // Tất cả CP
-  renderTrash();
   filterAndRenderUng();     // Tiền Ứng
   renderCtPage();           // Tổng CP CT
   renderCCHistory();        // Lịch sử CC
@@ -360,7 +357,6 @@ function renderActiveTab() {
       const sub = document.querySelector('#page-nhap .sub-page.active');
       if (!sub || sub.id === 'sub-hom-nay') renderTodayInvoices();
       else if (sub.id === 'sub-tat-ca')     { buildFilters(); filterAndRender(); }
-      else if (sub.id === 'sub-da-xoa')     renderTrash();
       else renderTodayInvoices();
       break;
     }
@@ -434,7 +430,6 @@ window._dataReady = false;
 
   await dbInit();
   // Re-load globals từ _mem (đã được dbInit() populate từ IDB)
-  trash       = load('trash_v1', []);
   invoices    = load('inv_v3', []);
   ungRecords  = load('ung_v1', []);
   ccData      = load('cc_v2', []);

@@ -5,25 +5,6 @@
 // INVOICE LIST
 // ══════════════════════════════
 
-// Toggle giữa "Tất cả HĐ" và "🗑 Đã xóa" trong sub-tat-ca
-function switchTatCaView(val) {
-  const activeWrap = document.getElementById('active-inv-wrap');
-  const trashWrap  = document.getElementById('inline-trash-wrap');
-  const isTrash = val === 'trash';
-  if(activeWrap) activeWrap.style.display = isTrash ? 'none' : '';
-  if(trashWrap)  trashWrap.style.display  = isTrash ? ''     : 'none';
-  // Ẩn/hiện search + filters theo chế độ
-  const filterIds = ['tc-search-box','f-ct','f-loai','f-ncc','f-month','f-week'];
-  filterIds.forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.style.display = isTrash ? 'none' : '';
-  });
-  const exportBtn = document.getElementById('btn-export-csv');
-  if(exportBtn) exportBtn.style.display = isTrash ? 'none' : '';
-  if(isTrash) renderTrash();
-  else { buildFilters(); filterAndRender(); }
-}
-
 function buildFilters() {
   const allInvs = getInvoicesCached();
   const yearInvs = allInvs.filter(i=>inActiveYear(i.ngay));
@@ -161,8 +142,7 @@ function delInvoice(id) {
     invoices[idx] = { ...invoices[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   }
   clearInvoiceCache(); save('inv_v3', invoices);
-  trashAdd({...inv}); // giữ trong trash để UI "Thùng Rác" vẫn hoạt động
-  updateTop(); buildFilters(); filterAndRender(); renderTrash();
+  updateTop(); buildFilters(); filterAndRender();
   renderTodayInvoices(); // cập nhật lại bảng "Hóa đơn đã nhập trong ngày" để dòng vừa xóa biến mất
   toast('Đã xóa (có thể khôi phục trong Thùng Rác)');
 }
@@ -259,82 +239,6 @@ function editManualInvoice(id) {
   if (!inv) return;
   if (_resolveInvSource(inv) === 'detail') { openDetailEdit(inv); return; }
   openEntryEdit(inv);
-}
-
-// ══════════════════════════════════════════════════════════════════
-// TRASH SYSTEM
-// ══════════════════════════════════════════════════════════════════
-let trash = load('trash_v1', []);
-
-function trashAdd(inv) {
-  inv._deletedAt = new Date().toISOString();
-  trash.unshift(inv);
-  // Giữ tối đa 200 HĐ trong thùng rác
-  if(trash.length>200) trash=trash.slice(0,200);
-  save('trash_v1', trash);
-}
-
-function trashRestore(id) {
-  const idx=trash.findIndex(i=>String(i.id)===String(id));
-  if(idx<0) return;
-  const now = Date.now();
-  // Xóa deletedAt trên record đang có trong invoices (soft-delete tombstone)
-  const invIdx = invoices.findIndex(i => String(i.id) === String(id));
-  if (invIdx >= 0) {
-    invoices[invIdx] = { ...invoices[invIdx], deletedAt: null, updatedAt: now, deviceId: DEVICE_ID };
-  } else {
-    // Fallback: record chưa có trong invoices (import cũ) — thêm mới
-    const inv = { ...trash[idx] };
-    delete inv._deletedAt;
-    inv.deletedAt = null;
-    inv.updatedAt = now;
-    inv.deviceId = DEVICE_ID;
-    invoices.unshift(inv);
-  }
-  trash.splice(idx, 1);
-  clearInvoiceCache(); save('inv_v3', invoices);
-  save('trash_v1', trash);
-  updateTop(); buildFilters(); filterAndRender(); renderTrash();
-  toast('✅ Đã khôi phục hóa đơn!', 'success');
-}
-
-function trashDeletePermanent(id) {
-  trash=trash.filter(i=>String(i.id)!==String(id));
-  save('trash_v1', trash);
-  renderTrash();
-  toast('Đã xóa vĩnh viễn','success');
-}
-
-function trashClearAll() {
-  if(!trash.length) return;
-  if(!confirm(`Xóa vĩnh viễn ${trash.length} hóa đơn trong thùng rác?\nKhông thể khôi phục!`)) return;
-  trash=[];
-  save('trash_v1', trash);
-  renderTrash();
-  toast('Đã xóa toàn bộ thùng rác','success');
-}
-
-function renderTrash() {
-  const wrap=document.getElementById('trash-wrap');
-  const empty=document.getElementById('trash-empty');
-  const tbody=document.getElementById('trash-tbody');
-  if(!wrap||!tbody||!empty) return;
-  if(!trash.length) {
-    wrap.style.display='none'; empty.style.display='';
-    return;
-  }
-  wrap.style.display=''; empty.style.display='none';
-  tbody.innerHTML=trash.slice(0,100).map(inv=>`<tr>
-    <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${inv.ngay||''}</td>
-    <td style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.congtrinh||'—')}</td>
-    <td><span class="tag tag-gold">${x(inv.loai||'—')}</span></td>
-    <td class="text-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
-    <td class="text-end font-monospace fw-semibold text-success">${numFmt(inv.tien||0)}</td>
-    <td style="white-space:nowrap;display:flex;gap:4px;padding:5px 4px">
-      <button class="btn btn-outline-secondary btn-sm" onclick="trashRestore('${inv.id}')" title="Khôi phục">↩ Khôi phục</button>
-      <button class="btn btn-danger btn-sm" onclick="trashDeletePermanent('${inv.id}')" title="Xóa vĩnh viễn">✕</button>
-    </td>
-  </tr>`).join('');
 }
 
 // ══════════════════════════════════════════════════════════════════

@@ -614,7 +614,6 @@ function _applyImport() {
   if (typeof rebuildUngSelects    === 'function') rebuildUngSelects();
   if (typeof buildFilters         === 'function') buildFilters();
   if (typeof filterAndRender      === 'function') filterAndRender();
-  if (typeof renderTrash          === 'function') renderTrash();
   if (typeof renderCCHistory      === 'function') renderCCHistory();
   if (typeof renderCCTLT          === 'function') renderCCTLT();
   if (typeof buildUngFilters      === 'function') buildUngFilters();
