@@ -313,7 +313,7 @@ Metadata chuẩn cho record nghiệp vụ:
 | `js/core/core.normalize.js` | `_NORM_CT_FIELD`, `_NORM_UUID_RE` | `_normIsUUID()`, `_normDeviceId()`, `normalizeRecord(rec, key, ctByName)`, `normalizeDataset(key, arr, ctByName)`, `normalizeImportStore(data)` |
 | `js/core/core.state-backup.js` | `DATA_VERSION`, `DATA_VERSION_KEY`, `BACKUP_KEYS`, `BACKUP_KEY`, `cats`, `cnRoles`, `invoices`, `filteredInvs`, `curPage`, `PG` | `migrateData()`, `_migrateHopDongKeys()`, `_hdLookup()`, `_hdKeyOf()`, `_getProjectById()`, `_getProjectNameById()`, `_resolveCtName()`, `_restoreStore()`, `clearAllCache()`, `getState()`, `afterDataChange()`, `_reloadGlobals()`, `_snapshotNow()`, `getBackupList()`, `restoreFromBackup()`, `renderBackupList()`, `exportJSON()`, `importJSON()`, `importJSONFull()`, `_normalizeImportData()` (wrapper gọi `normalizeImportStore`) |
 | `js/core/core.cloud-cats-ui.js` | `lastSyncUI`, `_CATITEM_TYPE_MAP`, `_YEAR_CATS`, `_fsReads`, `_fsWrites` | `fbReady()`, `fsWrap()`, `fsUnwrap()`, `fbDocYearCat(yr,cat)`, `fbDocMetaCT()`, `fbDocMetaDM()`, `fbDocMetaTK()`, `fbDocMetaHD()`, `fbYearCatPayload(yr,key,dateField)`, `fbMetaCTPayload()`, `fbMetaDMPayload()`, `fbMetaTKPayload()`, `fbMetaHDPayload()`, `_fsCountRead()`, `_fsCountWrite()`, `getFsCounter()`, `fsUrl()`, `fsGet()`, `fsSet()`, `fsDelete()`, `_wipeOrphanCloudDocs()`, `estimateYearKb()`, `gsLoadAll()`, `updateJbBtn()`, `_ensureSyncDot()`, `_setSyncDot()`, `openBinModal()`, `closeBinModal()`, `renderBinModal()`, `_createModalOverlay()`, `fbSaveConfig()`, `fbDisconnect()`, `reloadFromCloud()`, `syncNow()`, `buildYearSelect()`, `_renderYearSelect()`, `_updateYearBtn()`, `saveCats()`, `_catNormKey()`, `_dedupCatItemsNow()`, `normalizeCatDisplayName(catIdOrType,name)`, `_syncCatItems()`, `_rebuildCatArrsFromItems()`, `_migrateCatItemsIfNeeded()`, `showSyncBanner()`, `hideSyncBanner()`, `_setSyncState()` |
-| `js/app/main.js` | `activeYears`, `activeYear`, `currentUser`, `_roleObserver`, `_userHeartbeatTimer`, `window._dataReady` | `init()`, `initAuth()`, `goPage()`, `renderActiveTab()`, `buildYearSelect()`, `onYearChange()`, `applyRoleUI()`, `loadUsers()`, `saveUsers()`, `_showOfflineBlock()`, `_migrateProjectDates()`, `_migrateChuDauTuFromHopDong()`, `_migrateCustomersFromProjects()` (nạp `customers` global ở cả 2 block load) |
+| `js/app/main.js` | `activeYears`, `activeYear`, `currentUser`, `_roleObserver`, `_userHeartbeatTimer`, `window._dataReady`, `_VALID_PAGES` | `init()`, `initAuth()`, `goPage()` (chấp nhận `btn` rỗng + tự set `location.hash`), `initHashRouter()`, `_routeFromHash()`, `_pageIdFromHash()`, `loadAllPartials()` (nạp `pages/*.html`), `renderActiveTab()`, `buildYearSelect()`, `onYearChange()`, `applyRoleUI()`, `loadUsers()`, `saveUsers()`, `_showOfflineBlock()`, `_migrateProjectDates()`, `_migrateChuDauTuFromHopDong()`, `_migrateCustomersFromProjects()` (nạp `customers` global ở cả 2 block load) |
 | `js/modules/projects/projects.model.js` | `PROJECT_STATUS`, `PROJECT_COMPANY`, `projects`, `_PROJ_DATE_RE`, `_VALID_STATUSES`, `_PROJ_VALID_TYPES` | `_projTypeByName()`, `_isValidProject()`, `cleanupInvalidProjects()`, `_saveProjects()`, `rebuildCatCTFromProjects()`, `_migrateProjectDates()`, `getProjectAutoStartDate()`, `createProject(...customerId, heSoTiTrong)`, `updateProject()`, `_syncChuDauTuToHopDong()`, `getProjectById()`, `findProjectIdByName()`, `getSortedProjects()`, `getAllProjects()`, `getProjectOptions()`, `getProjectDays()`, `getProjectK()` (k phân bổ, mặc định 1), `getProjectFactor()` (=k, tương thích cũ), `getProjectWeight()` (=ngày×k), `getCompanyCost()`, `allocateCompanyCost()`, `canDeleteProject()`, `resolveProjectName()`. _(Đã bỏ `_PROJ_FACTORS` cứng CT/SC/OTHER.)_ |
 | `js/modules/khachhang/khachhang.model.js` | `customers` | `_saveCustomers()`, `_normCustomerName()` (bỏ dấu, không phân biệt hoa/thường), `getCustomerById()`, `findCustomerByName()`, `getAllCustomers()`, `createCustomer()`, `updateCustomer()`, `deleteCustomer()` (xóa mềm), `getOrCreateCustomerByName()`, `getCustomerOptions(selectedId)`, `_migrateCustomersFromProjects()` |
 | `js/modules/projects/projects.migration-selects.js` | _(không có global riêng)_ | `migrateProjectLinks()`, `deduplicateProjects()`, `_buildProjOpts(selected, placeholder, { includeCompany, excludeClosed })`, `_buildProjFilterOpts()`, `_readPidFromSel()`, `_checkProjectClosed()` |
@@ -1097,6 +1097,43 @@ Rà soát sâu cơ chế **tên** của Tab Danh Mục (id-based qua `cat_items_
 **Tham chiếu hiện hành cần cập nhật:** `projects.model.js` thêm globals/hàm `_normProjName`, `_isProjectNameTaken`, `_isReservedCatName`, `_assertProjectNameOk`, `_propagateProjectRename`, `_rekeyHopDongOnRename`.
 
 **File đã sửa:** `js/modules/projects/projects.model.js`, `js/modules/projects/projects.ui.js`, `js/modules/danhmuc/danhmuc.categories.js`.
+
+---
+
+## 9.17 Hash router — URL đổi theo tab (23/06/2026)
+
+**Yêu cầu:** thêm định tuyến để URL phản ánh tab đang xem (vd `index.html#/chamcong`), giúp **refresh giữ nguyên tab**, **nút Back/Forward** của trình duyệt hoạt động, và **bookmark/chia sẻ link** mở đúng tab. Vẫn giữ nguyên kiến trúc SPA (không tải lại trang, không đổi sang multi-page).
+
+**Phương án:** dùng **hash routing** (`#/...`) thay vì History API — hash chạy được cả khi mở bằng `file://` lẫn qua web server, không cần cấu hình server.
+
+**Thay đổi (chỉ [main.js](js/app/main.js)):**
+1. `goPage(btn, id)`: (a) nếu gọi không có `btn` (từ router) → tự tìm nút nav qua `document.querySelector('.nav-btn[data-page="..."]')`, `btn.classList.add('active')` bọc `if (btn)`; (b) cuối hàm `if (location.hash !== '#/' + id) location.hash = '#/' + id;` để đồng bộ URL.
+2. Thêm `_VALID_PAGES` (Set 11 id tab), `_pageIdFromHash()`, `_routeFromHash()` (đọc hash → mở tab; nếu vai trò không được xem tab đó (nút nav `display:none`) hoặc hash trống/sai → fallback `congtrinh`; nếu tab đã active thì thoát sớm → **chống vòng lặp** với việc `goPage` tự set hash), và `initHashRouter()` (đăng ký `hashchange` + gọi `_routeFromHash()` lúc vào app).
+3. Bootstrap: gọi `initHashRouter()` ngay sau `init()`. Đăng nhập tương tác vốn `location.reload()` (auth.js) nên router tự chạy lại đúng cho cả phiên mới.
+
+**Tham chiếu hiện hành cần cập nhật:** `js/app/main.js` thêm hàm/biến global `_VALID_PAGES`, `_pageIdFromHash`, `_routeFromHash`, `initHashRouter`; `goPage()` nay chấp nhận `btn` rỗng và tự cập nhật `location.hash`.
+
+**File đã sửa:** `js/app/main.js`.
+
+---
+
+## 9.18 Tách markup các page ra `pages/*.html` (HTML partials) (23/06/2026)
+
+**Yêu cầu:** `index.html` (3.042 dòng) quá to, khó tìm/sửa. Tách markup mỗi tab ra file riêng để gọn, vẫn giữ nguyên SPA (không đổi sang multi-page).
+
+**Phương án (rủi ro thấp):** mỗi `<div class="page" id="page-X">` trong `.content` được thay bằng **placeholder rỗng** `<div class="page" id="page-X" data-partial="pages/X.html"></div>`; nội dung inner chuyển sang `pages/X.html`. Lúc khởi động, **nạp sẵn toàn bộ** partial (song song) **trước `init()`** → mọi render hook vẫn thấy đủ DOM, **không đổi timing**.
+- Tách **9 page**: `nhap, thongkecphd, thietbi, danhmuc, nhapung, chamcong, dashboard, doanhthu, congno`. **Giữ inline** `page-congtrinh` (chỉ có `#ct-overview-wrap`, JS render) và `page-thungrac` (rỗng, JS render).
+- `index.html`: **3.042 → 1.234 dòng**.
+
+**Thay đổi ([main.js](js/app/main.js)):** thêm `loadAllPartials()` — `querySelectorAll('.page[data-partial]')` → `fetch()` đổ vào `innerHTML`, gắn `dataset.loaded='1'`; lỗi thì hiện thông báo trong ô. Bootstrap gọi `await loadAllPartials()` ngay **sau `initAuth()` và trước `init()`**. Đăng nhập tương tác vốn `location.reload()` nên phiên mới tự nạp lại.
+
+**⚠️ Điều kiện vận hành:** `fetch()` file cục bộ **bị chặn trên `file://`** → app **phải chạy qua web server (http/https)**. Hiện app deploy trên hosting nên OK. **Khi deploy phải upload kèm thư mục `pages/`.**
+
+**Lưu ý kỹ thuật đã kiểm:** không có `<script>` inline trong page markup (innerHTML không chạy script); không có code top-level nào truy cập phần tử bên trong page (mọi binding nằm trong hàm chạy sau `init()`); div cân bằng tuyệt đối (473 div bảo toàn, không mất dữ liệu).
+
+**Tham chiếu hiện hành cần cập nhật:** thêm thư mục `pages/` (9 file partial); `js/app/main.js` thêm hàm `loadAllPartials()`; cấu trúc `.content` trong `index.html` nay chỉ còn placeholder cho 9 page.
+
+**File đã sửa/thêm:** `index.html`, `js/app/main.js`, **mới:** `pages/{nhap,thongkecphd,thietbi,danhmuc,nhapung,chamcong,dashboard,doanhthu,congno}.html`.
 
 ---
 

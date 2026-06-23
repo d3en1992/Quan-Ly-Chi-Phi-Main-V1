@@ -1,0 +1,283 @@
+<!-- Partial: page-nhap (tách từ index.html — Phase 2) -->
+
+        <!-- ── Nhập HĐ/CP ── -->
+        <div class="sub-page active" id="sub-nhap-hd">
+          <!-- Inner sub-nav: Nhập nhanh vs Hóa đơn chi tiết -->
+          <div class="nav nav-pills gap-2 mb-3 flex-wrap">
+            <button
+              class="nav-link key-action-btn active"
+              onclick="goInnerSub(this, 'inr-nhap-nhanh')"
+            >
+              ⚡ Nhập nhanh
+            </button>
+            <button
+              class="nav-link key-action-btn"
+              onclick="goInnerSub(this, 'inr-hd-chitiet')"
+            >
+              📋 Hóa đơn chi tiết
+            </button>
+          </div>
+
+          <!-- ── Inner sub-page 1: Nhập nhanh (giữ nguyên) ── -->
+          <div class="inner-sub-page active" id="inr-nhap-nhanh">
+            <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+                <span class="dot"></span>Nhập Hóa Đơn
+              </div>
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <button class="btn btn-outline-secondary" onclick="clearTable()">
+                  🗑 Xóa bảng
+                </button>
+              </div>
+            </div>
+
+            <div class="entry-date-bar">
+              <span class="bar-label">Ngày</span>
+              <input
+                type="date"
+                id="entry-date"
+                class="form-control form-control-sm w-auto"
+                onchange="renderTodayInvoices()"
+              />
+            </div>
+
+            <div class="entry-table-wrap">
+              <div class="table-scroll">
+                <table class="entry-table">
+                  <thead>
+                    <tr>
+                      <th class="col-num">#</th>
+                      <th class="col-loai">Loại Chi Phí *</th>
+                      <th class="col-ct">Công Trình *</th>
+                      <th class="col-tien">Số Tiền (đ)</th>
+                      <th class="col-nd">Nội Dung / Ghi Chú</th>
+                      <th class="col-nguoi">Người TH</th>
+                      <th class="col-ncc">Nhà Cung Cấp</th>
+                      <th class="col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="entry-tbody"></tbody>
+                </table>
+              </div>
+              <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addRows(1)">
+                  + 1 dòng
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="addRows(5)">
+                  + 5 dòng
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="addRows(10)">
+                  + 10 dòng
+                </button>
+                <span
+                  class="text-secondary" style="font-size: 11px; margin-left: 8px"
+                  >Tab để di chuyển giữa các ô</span
+                >
+              </div>
+            </div>
+
+            <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
+              <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
+                <span>Dòng có dữ liệu: <strong id="row-count">0</strong></span>
+                <span
+                  >Tổng thành tiền:
+                  <span class="hi" id="entry-total">0 đ</span></span
+                >
+              </div>
+              <button
+                id="entry-save-btn"
+                class="btn btn-success"
+                onclick="saveAllRows()"
+              >
+                💾 Lưu Hóa Đơn
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Inner sub-page 2: Hóa đơn chi tiết ── -->
+          <div class="inner-sub-page" id="inr-hd-chitiet">
+            <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+                <span class="dot"></span>Hóa Đơn Chi Tiết
+              </div>
+              <button class="btn btn-outline-secondary" onclick="clearDetailForm()">
+                🗑 Xóa form
+              </button>
+            </div>
+
+            <!-- Header: Ngày · Loại CP · Công Trình · NCC · Người TH — 1 hàng ngang, không nhãn -->
+            <div class="detail-inv-header">
+              <input
+                type="date"
+                id="detail-ngay"
+                class="form-control form-control-sm w-auto"
+                onchange="renderTodayInvoices()"
+              />
+              <select
+                id="detail-loai"
+                class="form-select form-select-sm w-auto"
+                style="min-width: 180px"
+              ></select>
+              <select
+                id="detail-ct"
+                class="form-select form-select-sm w-auto"
+                style="min-width: 220px; max-width: 100%"
+              ></select>
+              <select
+                id="detail-ncc"
+                class="form-select form-select-sm w-auto"
+                style="min-width: 170px"
+              ></select>
+              <select
+                id="detail-nguoi"
+                class="form-select form-select-sm w-auto"
+                style="min-width: 160px"
+              ></select>
+            </div>
+
+            <!-- Bảng chi tiết hàng hóa -->
+            <div
+              class="entry-table-wrap"
+              style="margin-top: 0; border-radius: 0"
+            >
+              <div class="table-scroll">
+                <table class="entry-table" style="min-width: 820px">
+                  <thead>
+                    <tr>
+                      <th class="col-num">#</th>
+                      <th style="min-width: 200px">TÊN HÀNG HÓA / VẬT TƯ</th>
+                      <th style="width: 72px; text-align: center">ĐVT</th>
+                      <th style="width: 80px; text-align: center">SL</th>
+                      <th style="width: 145px; text-align: right">
+                        ĐƠN GIÁ (đ)
+                      </th>
+                      <th style="width: 120px">CHIẾT KHẤU</th>
+                      <th style="width: 145px; text-align: right">
+                        THÀNH TIỀN (đ)
+                      </th>
+                      <th class="col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="detail-tbody"></tbody>
+                </table>
+              </div>
+              <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addDetailRow()">
+                  + 1 dòng
+                </button>
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  onclick="for (let i = 0; i < 5; i++) addDetailRow();"
+                >
+                  + 5 dòng
+                </button>
+                <span
+                  class="text-secondary" style="font-size: 11px; margin-left: 8px"
+                  >CK: nhập % (vd: 5%) hoặc số tiền (vd: 50000)</span
+                >
+              </div>
+            </div>
+
+            <!-- Footer: TC, chiết khấu tổng, tổng thành tiền -->
+            <div class="detail-invoice-footer">
+              <div class="detail-footer-row">
+                <span class="detail-footer-label">Tổng Cộng (TC)</span>
+                <span class="detail-footer-val" id="detail-tc">0</span>
+              </div>
+              <div class="detail-footer-row">
+                <span class="detail-footer-label">Chiết Khấu Tổng</span>
+                <input
+                  class="form-control form-control-sm text-end"
+                  style="width:140px"
+                  id="detail-footer-ck"
+                  placeholder="% hoặc số tiền..."
+                  oninput="calcDetailTotals()"
+                />
+              </div>
+              <div class="detail-footer-row detail-footer-total-row">
+                <span class="detail-footer-label">Tổng Thành Tiền</span>
+                <span class="detail-footer-val hi" id="detail-tong">0</span>
+              </div>
+            </div>
+
+            <!-- Nội dung (tự sinh từ tên hàng) -->
+            <div class="detail-nd-bar">
+              <span class="bar-label" style="white-space: nowrap"
+                >Nội Dung</span
+              >
+              <input
+                type="text"
+                id="detail-nd"
+                class="form-control form-control-sm"
+                placeholder="Tự động từ tên hàng hóa..."
+              />
+            </div>
+
+            <!-- Save bar -->
+            <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4" style="margin-top: 12px">
+              <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
+                <span
+                  >Tổng thành tiền:
+                  <span class="hi" id="detail-tong-save">0 đ</span></span
+                >
+              </div>
+              <button
+                class="btn btn-success"
+                id="detail-save-btn"
+                onclick="saveDetailInvoice()"
+              >
+                💾 Lưu Hóa Đơn
+              </button>
+            </div>
+          </div>
+
+          <!-- Hóa đơn đã nhập trong ngày (gộp trong tab Nhập HĐ/CP) -->
+          <div id="today-invoices-wrap" style="margin-top: 20px">
+            <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
+                <span class="dot"></span>Hóa Đơn Đã Nhập Trong Ngày
+                <span
+                  id="today-inv-date"
+                  class="text-warning" style="font-size: 13px"
+                ></span>
+              </div>
+              <button
+                class="btn btn-outline-secondary btn-sm"
+                onclick="renderTodayInvoices()"
+              >
+                ↻ Làm mới
+              </button>
+            </div>
+            <div class="records-wrap card shadow-sm overflow-hidden">
+              <div style="overflow-x: auto">
+                <table class="table table-sm table-hover align-middle mb-0" style="min-width: 600px">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Loại</th>
+                      <th>Công Trình</th>
+                      <th style="text-align: right">Số Tiền</th>
+                      <th>Người TH</th>
+                      <th>Nội Dung</th>
+                      <th>NCC</th>
+                      <th class="text-center">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="today-inv-tbody"></tbody>
+                </table>
+              </div>
+              <div
+                id="today-inv-footer"
+                style="
+                  padding: 8px 16px;
+                  border-top: 1px solid var(--bs-border-color);
+                  background: var(--bs-tertiary-bg);
+                  font-size: 12px;
+                  color: var(--bs-secondary-color);
+                  display: flex;
+                  justify-content: space-between;
+                "
+              ></div>
+            </div>
+          </div>
+        </div>
+      

@@ -1,0 +1,164 @@
+<!-- Partial: page-danhmuc (tách từ index.html — Phase 2) -->
+
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>Quản Lý Danh Mục
+          </div>
+          <span class="text-secondary" style="font-size: 12px"
+            >Nhấn ✏️ hoặc nhấp đúp để sửa tên • Thay đổi sẽ tự cập nhật vào hóa
+            đơn đã lưu</span
+          >
+        </div>
+        <div id="dm-grid" class="settings-grid"></div>
+
+        <!-- ── Panel Tools ── -->
+        <div id="dm-tools-section" style="margin-top: 28px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>🔧 Tools</div>
+            <span
+              class="text-secondary" style="font-size: 12px"
+              id="backup-status-label"
+            ></span>
+          </div>
+
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 16px 20px">
+            <!-- DATA -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--bs-secondary-color);
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                Data
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  class="btn btn-outline-secondary"
+                  onclick="toolExportJSON()"
+                  title="Xuất snapshot toàn bộ hệ thống ra file .json"
+                >
+                  📦 Xuất snapshot hệ thống
+                </button>
+                <button
+                  class="btn btn-outline-secondary"
+                  onclick="toolImportJSON()"
+                  title="Khôi phục toàn bộ hệ thống từ file snapshot .json — xóa và ghi đè toàn bộ dữ liệu"
+                >
+                  📥 Import JSON
+                </button>
+              </div>
+            </div>
+
+            <!-- EXCEL -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--bs-secondary-color);
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                Excel
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  class="btn btn-outline-secondary"
+                  onclick="toolImportExcel()"
+                  title="Import dữ liệu từ file Excel (.xlsx/.xls)"
+                >
+                  📥 Import Excel
+                </button>
+                <button
+                  class="btn btn-outline-secondary"
+                  onclick="toolExportExcel()"
+                  title="Xuất toàn bộ dữ liệu ra file Excel (.xlsx)"
+                >
+                  📤 Export Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- NGUY HIỂM -->
+            <div style="margin-bottom: 20px">
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--bs-danger);
+                  margin-bottom: 8px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.8px;
+                "
+              >
+                ⚠ Quản Lý Dữ Liệu
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  class="btn"
+                  style="
+                    background: #f8d7da;
+                    color: #721c24;
+                    border: 1px solid #f5c6cb;
+                    font-weight: 600;
+                  "
+                  onclick="toolResetAll()"
+                  title="Xóa TOÀN BỘ dữ liệu — không thể hoàn tác"
+                >
+                  ⚠️ Reset toàn bộ dữ liệu
+                </button>
+                <button
+                  class="btn"
+                  style="
+                    background: #fff3cd;
+                    color: #664d03;
+                    border: 1px solid #ffc107;
+                    font-weight: 600;
+                  "
+                  onclick="openProjectClearModal()"
+                  title="Xóa dữ liệu theo từng hạng mục của một công trình cụ thể"
+                >
+                  🗑 Xóa theo công trình
+                </button>
+              </div>
+            </div>
+
+            <!-- Mô tả -->
+            <div
+              style="
+                padding: 10px 14px;
+                background: var(--bs-tertiary-bg);
+                border-radius: 6px;
+                border: 1px solid var(--bs-border-color);
+                font-size: 12px;
+                color: var(--bs-secondary-color);
+                line-height: 1.7;
+              "
+            >
+              <strong class="text-secondary">Cách hoạt động:</strong><br />
+              • <b>Xuất snapshot</b>: Tải toàn bộ dữ liệu ra file .json — dùng
+              để chuyển thiết bị hoặc lưu trữ<br />
+              • <b>Import JSON</b>: Khôi phục từ snapshot — xóa toàn bộ dữ liệu
+              hiện tại và ghi đè lên cloud<br />
+              • <b>Data version</b>:
+              <span
+                id="data-version-badge"
+                style="
+                  background: var(--bs-success);
+                  color: #fff;
+                  padding: 1px 7px;
+                  border-radius: 10px;
+                  font-weight: 700;
+                "
+              ></span>
+            </div>
+          </div>
+        </div>
+      

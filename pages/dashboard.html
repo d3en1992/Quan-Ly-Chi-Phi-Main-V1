@@ -1,0 +1,133 @@
+<!-- Partial: page-dashboard (tách từ index.html — Phase 2) -->
+
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>📊 Dashboard Tổng Quan
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" onclick="renderDashboard()">
+            ↻ Làm mới
+          </button>
+        </div>
+
+        <!-- Hàng 1: KPI cards -->
+        <div
+          id="db-kpi-row"
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 22px;
+          "
+        ></div>
+
+        <!-- Hàng 2: Biểu đồ cột tháng/tuần (full width — Pie tỷ trọng đã ẩn) -->
+        <div id="db-charts-row" style="margin-bottom: 22px;">
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
+            <div
+              id="db-bar-title"
+              style="font-size: 13px; font-weight: 700; color: var(--bs-body-color); margin-bottom: 14px;"
+            >
+              Chi Phí Theo Tháng
+            </div>
+            <div id="db-bar-chart" style="width: 100%; overflow-x: auto"></div>
+          </div>
+        </div>
+        <!-- #db-pie-chart & #db-pie-title: ẩn khỏi giao diện nhưng giữ lại để JS không lỗi -->
+        <div id="db-pie-title" style="display:none"></div>
+        <div id="db-pie-chart" style="display:none"></div>
+
+        <!-- Tầng 2: Chi tiết theo Công Trình -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-bottom: 14px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>🔍 Chi Tiết Theo Công Trình
+          </div>
+          <select
+            class="form-select form-select-sm w-auto"
+            id="db-filter-ct"
+            onchange="
+              selectedCT = this.value;
+              renderDashboard();
+            "
+            style="font-size: 12px; min-width: 160px"
+          >
+            <option value="">-- Tất cả công trình --</option>
+          </select>
+        </div>
+
+        <!-- Hàng 3: Top 5 + Tiền Ứng -->
+        <div
+          style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+          "
+        >
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--bs-body-color);
+                margin-bottom: 14px;
+              "
+            >
+              🏆 Top 5 Chi Phí Lớn Nhất
+            </div>
+            <div id="db-top5"></div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
+            <div
+              style="
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--bs-body-color);
+                margin-bottom: 14px;
+              "
+            >
+              💰 Tổng Tiền Ứng Theo Công Trình
+            </div>
+            <div id="db-ung-ct"></div>
+          </div>
+        </div>
+
+        <!-- Hàng 3b: Thiết Bị -->
+        <div
+          class="records-wrap card shadow-sm overflow-hidden"
+          style="padding: 18px 20px; margin-bottom: 22px"
+        >
+          <div
+            style="
+              font-size: 13px;
+              font-weight: 700;
+              color: var(--bs-body-color);
+              margin-bottom: 14px;
+            "
+          >
+            🔧 Thiết Bị Theo Công Trình
+          </div>
+          <div id="db-tb-ct"></div>
+        </div>
+
+        <!-- Hàng 5: Chi tiết từng Công Trình (từ tab Tổng CP CT) -->
+        <div>
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-bottom: 14px">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>🏗️ Chi Tiết Từng Công Trình
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span class="text-secondary" style="font-size: 12px">Sắp xếp:</span>
+              <select
+                class="form-select form-select-sm w-auto"
+                id="ct-sort"
+                onchange="renderCtPage()"
+                style="font-size: 12px"
+              >
+                <option value="value">Theo giá trị (cao → thấp)</option>
+                <option value="name">Theo tên (A → Z)</option>
+              </select>
+            </div>
+          </div>
+          <div id="ct-grid" class="ct-summary-grid"></div>
+        </div>
+      

@@ -1,0 +1,86 @@
+<!-- Partial: page-congno (tách từ index.html — Phase 2) -->
+
+
+        <!-- PHẦN A: Thẻ tổng quan (Summary Cards / KPIs) ──────────────── -->
+        <div class="row g-3 mb-4" id="cn-summary-cards">
+          <div class="col-12 col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="border-left:4px solid #dc3545 !important;background:var(--bs-danger-bg-subtle)">
+              <div class="card-body py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🔴 Tổng Nợ Thầu Phụ</div>
+                <div id="cn-kpi-no-tp" class="fw-bold text-danger" style="font-size:24px">—</div>
+                <div id="cn-kpi-no-tp-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="border-left:4px solid #fd7e14 !important;background:var(--bs-warning-bg-subtle)">
+              <div class="card-body py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🟠 Tổng Nợ Nhà Cung Cấp</div>
+                <div id="cn-kpi-no-ncc" class="fw-bold" style="font-size:24px;color:#fd7e14">—</div>
+                <div id="cn-kpi-no-ncc-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="border-left:4px solid #198754 !important;background:var(--bs-success-bg-subtle)">
+              <div class="card-body py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🟢 Tổng Tiền Đã Ứng</div>
+                <div id="cn-kpi-da-ung" class="fw-bold text-success" style="font-size:24px">—</div>
+                <div id="cn-kpi-da-ung-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHẦN B: Bộ lọc nâng cao (Advanced Filters) ───────────────── -->
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-body py-3" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+            <div>
+              <label class="text-secondary d-block" style="font-size:11px;font-weight:600;margin-bottom:3px">Công Trình</label>
+              <select id="cn-filter-ct" class="form-select form-select-sm" style="min-width:200px" onchange="cnApplyFilters()">
+                <option value="">-- Tất cả công trình --</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-secondary d-block" style="font-size:11px;font-weight:600;margin-bottom:3px">Nhóm Đối Tác</label>
+              <select id="cn-filter-group" class="form-select form-select-sm" style="min-width:160px" onchange="cnApplyFilters()">
+                <option value="">-- Tất cả --</option>
+                <option value="thauphu">Thầu Phụ</option>
+                <option value="nhacungcap">Nhà Cung Cấp</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-secondary d-block" style="font-size:11px;font-weight:600;margin-bottom:3px">Tháng</label>
+              <select id="cn-filter-month" class="form-select form-select-sm" style="min-width:150px" onchange="cnApplyFilters()">
+                <option value="">-- Tất cả tháng --</option>
+              </select>
+            </div>
+            <div>
+              <input type="text" id="cn-filter-search" class="form-control form-control-sm" style="min-width:180px" placeholder="🔍 Tìm đối tác..." oninput="cnApplyFilters()">
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" onclick="cnResetFilters()" title="Xóa bộ lọc">↺ Đặt lại</button>
+          </div>
+        </div>
+
+        <!-- PHẦN C: Bảng dữ liệu chi tiết (Data Table) ───────────────── -->
+        <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+          <div style="overflow-x:auto">
+            <table class="table table-sm table-hover align-middle mb-0" style="min-width:820px">
+              <thead class="table-light">
+                <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                  <th style="text-align:left;padding:8px 12px;font-weight:700">Đối Tác</th>
+                  <th style="text-align:center;padding:8px 8px;font-weight:700;white-space:nowrap">Nhóm</th>
+                  <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
+                  <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Tổng Giá Trị</th>
+                  <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Đã Ứng</th>
+                  <th style="text-align:left;padding:8px 10px;font-weight:700;min-width:160px">Tiến Độ</th>
+                  <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Còn Phải TT</th>
+                  <th style="text-align:center;padding:8px 10px;font-weight:700;white-space:nowrap">Trạng Thái</th>
+                </tr>
+              </thead>
+              <tbody id="cn-tbody"></tbody>
+            </table>
+          </div>
+          <div id="cn-empty" style="text-align:center;padding:40px;color:var(--bs-secondary-color);font-size:13px;display:none">Không có đối tác nào đã phát sinh tiền ứng phù hợp bộ lọc</div>
+        </div>
+      

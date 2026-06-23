@@ -1,0 +1,203 @@
+<!-- Partial: page-thietbi (tách từ index.html — Phase 2) -->
+
+        <!-- Bảng 2: Danh sách thiết bị đã lưu -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>Danh Sách Thiết Bị Tại Công Trình
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <div class="search-box" style="min-width: 140px">
+              <span class="ico">🔍</span>
+              <input
+                type="text"
+                id="tb-search"
+                placeholder="Tìm thiết bị..."
+                oninput="
+                  tbPage = 1;
+                  tbRenderList();
+                "
+              />
+            </div>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="tb-filter-ct"
+              onchange="
+                tbPage = 1;
+                tbRenderList();
+              "
+            >
+              <option value="">Tất cả công trình</option>
+            </select>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="tb-filter-tt"
+              onchange="
+                tbPage = 1;
+                tbRenderList();
+              "
+            >
+              <option value="">Tất cả tình trạng</option>
+              <option value="Đang hoạt động">Đang hoạt động</option>
+              <option value="Cần bảo trì">Cần bảo trì</option>
+              <option value="Cần sửa chữa">Cần sửa chữa</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm" onclick="tbExportCSV()">
+              ⬇ Xuất CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="records-wrap card shadow-sm overflow-hidden">
+          <div style="overflow-x: auto">
+            <table class="table table-sm table-hover align-middle mb-0" id="tb-list-table">
+              <thead class="table-light">
+                <tr>
+                  <th class="tb-ct-col">Công Trình</th>
+                  <th class="tb-name-col">Tên Thiết Bị</th>
+                  <th style="text-align: center; width: 70px">SL</th>
+                  <th style="width: 130px">Tình Trạng</th>
+                  <th>Ghi Chú</th>
+                  <th style="width: 120px"></th>
+                </tr>
+              </thead>
+              <tbody id="tb-list-tbody"></tbody>
+            </table>
+          </div>
+          <div class="app-pagination" id="tb-pagination"></div>
+        </div>
+
+        <!-- Bảng 2b: Kho Tổng Thiết Bị -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>📦 Kho Tổng Thiết Bị
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <div class="search-box" style="min-width: 140px">
+              <span class="ico">🔍</span>
+              <input
+                type="text"
+                id="kho-search"
+                placeholder="Tìm thiết bị..."
+                oninput="filterKhoTable()"
+              />
+            </div>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="kho-filter-ten"
+              onchange="
+                khoPage = 1;
+                renderKhoTong();
+              "
+            >
+              <option value="">Tất cả thiết bị</option>
+            </select>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="kho-filter-tt"
+              onchange="
+                khoPage = 1;
+                renderKhoTong();
+              "
+            >
+              <option value="">Tất cả tình trạng</option>
+              <option value="Đang hoạt động">Đang hoạt động</option>
+              <option value="Cần bảo trì">Cần bảo trì</option>
+              <option value="Cần sửa chữa">Cần sửa chữa</option>
+            </select>
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              onclick="
+                khoPage = 1;
+                renderKhoTong();
+              "
+            >
+              ↻ Làm mới
+            </button>
+          </div>
+        </div>
+        <div class="records-wrap card shadow-sm overflow-hidden">
+          <div style="overflow-x: auto">
+            <table class="table table-sm table-hover align-middle mb-0" id="kho-list-table">
+              <thead class="table-light">
+                <tr>
+                  <th class="tb-name-col">Tên Thiết Bị</th>
+                  <th style="text-align: center; width: 70px">SL</th>
+                  <th style="width: 130px">Tình Trạng</th>
+                  <th style="width: 110px">Ghi Chú</th>
+                  <th style="width: 70px">Cập Nhật</th>
+                  <th style="width: 160px"></th>
+                </tr>
+              </thead>
+              <tbody id="kho-list-tbody"></tbody>
+            </table>
+          </div>
+          <div class="app-pagination" id="kho-pagination"></div>
+        </div>
+
+        <!-- Bảng 1: Nhập thiết bị -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>Nhập Máy Móc, Thiết Bị, Giàn Giáo
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" onclick="tbClearRows()">
+              🗑 Xóa bảng
+            </button>
+            <button
+              id="tb-save-btn"
+              class="btn btn-success btn-sm"
+              onclick="tbSave()"
+            >
+              💾 Lưu thiết bị
+            </button>
+          </div>
+        </div>
+
+        <div id="thietbi-form">
+          <div class="entry-date-bar" style="flex-wrap: wrap; gap: 10px">
+            <span class="bar-label">Công Trình</span>
+            <select
+              id="tb-ct-sel"
+              class="form-select form-select-sm w-auto"
+              style="min-width: 260px; font-size: 13px"
+            >
+              <option value="">-- Chọn công trình --</option>
+            </select>
+          </div>
+
+          <div class="entry-table-wrap">
+            <div class="table-scroll">
+              <table
+                class="entry-table tb-entry-table"
+                style="min-width: 680px"
+              >
+                <thead>
+                  <tr>
+                    <th class="col-num">#</th>
+                    <th class="tb-name-col" style="min-width: 224px">
+                      Tên Máy/TB/GG
+                    </th>
+                    <th style="width: 80px; text-align: center">Số Lượng</th>
+                    <th style="width: 150px">Tình Trạng</th>
+                    <th style="min-width: 140px">Ghi Chú</th>
+                    <th class="col-del"></th>
+                  </tr>
+                </thead>
+                <tbody id="tb-tbody"></tbody>
+              </table>
+            </div>
+            <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+              <button class="btn btn-outline-secondary btn-sm" onclick="tbAddRows(1)">
+                + 1 dòng
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="tbAddRows(5)">
+                + 5 dòng
+              </button>
+              <span
+                class="text-secondary" style="font-size: 11px; margin-left: 8px"
+                >Mặc định tình trạng: Đang hoạt động</span
+              >
+            </div>
+          </div>
+        </div>
+      

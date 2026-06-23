@@ -157,10 +157,12 @@ function goPage(btn, id) {
     toggleUserDropdown(true);
     return;
   }
+  // Khi router (hashchange / lúc khởi động) gọi sẽ không truyền btn → tự tìm nút nav theo data-page
+  if (!btn) btn = document.querySelector('.nav-btn[data-page="' + id + '"]');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
   // Dynamic topbar title
   const _PAGE_LABELS = {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
@@ -184,6 +186,75 @@ function goPage(btn, id) {
   if (id==='congtrinh') renderProjectsPage();
   if (id==='thungrac') renderThungRac();
   queueApplyRoleUI();
+
+  // Cập nhật URL hash → refresh/Back/bookmark giữ đúng tab (KHÔNG tải lại trang).
+  // Việc gán hash kích hoạt sự kiện 'hashchange', nhưng _routeFromHash() sẽ thấy
+  // tab này đã active nên thoát ngay → không gây vòng lặp.
+  if (location.hash !== '#/' + id) location.hash = '#/' + id;
+}
+
+// ══════════════════════════════
+//  HASH ROUTER — URL đổi theo tab (vd index.html#/chamcong)
+//  Mục tiêu: refresh giữ nguyên tab, nút Back/Forward hoạt động, bookmark được.
+//  Dùng hash (#/) để chạy được cả khi mở bằng file:// lẫn qua web server.
+// ══════════════════════════════
+// Danh sách id tab hợp lệ — khớp với data-page trong index.html
+const _VALID_PAGES = new Set([
+  'congtrinh', 'nhap', 'thongkecphd', 'chamcong', 'nhapung',
+  'thietbi', 'danhmuc', 'doanhthu', 'congno', 'dashboard', 'thungrac'
+]);
+
+// Đọc id tab từ location.hash, vd '#/chamcong' → 'chamcong' (trả '' nếu không hợp lệ)
+function _pageIdFromHash() {
+  const raw = (location.hash || '').replace(/^#\/?/, '').trim();
+  return _VALID_PAGES.has(raw) ? raw : '';
+}
+
+// Mở đúng tab theo hash hiện tại — gọi lúc khởi động và mỗi khi hash thay đổi
+function _routeFromHash() {
+  if (!getCurrentUser()) return;              // chưa đăng nhập → bỏ qua (sẽ route lại sau khi login)
+  let id  = _pageIdFromHash() || 'congtrinh'; // hash trống/sai → tab mặc định
+  let btn = document.querySelector('.nav-btn[data-page="' + id + '"]');
+  // Vai trò hiện tại không được phép xem tab này (nút nav bị ẩn) → quay về mặc định
+  if (!btn || btn.style.display === 'none') {
+    id  = 'congtrinh';
+    btn = document.querySelector('.nav-btn[data-page="congtrinh"]');
+  }
+  // Tab này đã đang hiển thị → không làm gì (tránh re-render thừa và vòng lặp với goPage)
+  const cur = document.querySelector('.page.active');
+  if (cur && cur.id === 'page-' + id) return;
+  goPage(btn, id);
+}
+
+// Khởi tạo router: lắng nghe hashchange + mở tab theo hash ngay khi vào app
+function initHashRouter() {
+  window.addEventListener('hashchange', _routeFromHash);
+  _routeFromHash();
+}
+
+// ══════════════════════════════
+//  PAGE PARTIALS (Phase 2) — nạp markup từng tab từ pages/<id>.html
+//  Mỗi <div class="page" data-partial="pages/x.html"></div> trong index.html là
+//  placeholder rỗng; ở đây fetch nội dung và đổ vào innerHTML.
+//  Nạp SẴN toàn bộ (song song) trước init() → không đổi timing render, rủi ro thấp.
+//  Lưu ý: fetch() file cục bộ cần chạy qua web server (http/https), không phải file://.
+// ══════════════════════════════
+async function loadAllPartials() {
+  const holders = document.querySelectorAll('.page[data-partial]');
+  await Promise.all([...holders].map(async el => {
+    if (el.dataset.loaded === '1') return;        // đã nạp rồi → bỏ qua
+    try {
+      const res = await fetch(el.dataset.partial, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      el.innerHTML = await res.text();
+      el.dataset.loaded = '1';
+    } catch (e) {
+      console.error('[partials] Không nạp được', el.dataset.partial, e);
+      el.innerHTML =
+        '<div class="p-4 text-danger">Không tải được nội dung trang (' +
+        el.dataset.partial + '). Cần mở app qua web server (http/https).</div>';
+    }
+  }));
 }
 
 function _setTopbarTabTitle(label) {
@@ -484,7 +555,13 @@ window._dataReady = false;
 
   if (!initAuth()) return;
 
+  // Phase 2: nạp markup các page (pages/*.html) TRƯỚC init() để mọi render hook đủ DOM
+  await loadAllPartials();
+
   init();
+
+  // Khởi tạo hash router → mở đúng tab theo URL (#/...) và theo dõi Back/Forward
+  initHashRouter();
 
   // Reset pending counter sau init (tránh migration/startup saves làm badge sai)
   if (typeof _resetPending === 'function') _resetPending();

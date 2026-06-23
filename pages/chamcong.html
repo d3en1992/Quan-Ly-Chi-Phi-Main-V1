@@ -1,0 +1,338 @@
+<!-- Partial: page-chamcong (tách từ index.html — Phase 2) -->
+
+        <!-- Sub-tab navigation: Sổ Chấm Công / Tổng Lương & Lịch Sử -->
+        <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="cc-sub-nav">
+          <button class="nav-link active" id="cc-sub-socc-btn" onclick="ccGoSub(this,'cc-sub-socc')">📝 SỔ CHẤM CÔNG</button>
+          <button class="nav-link" id="cc-sub-baocao-btn" onclick="ccGoSub(this,'cc-sub-baocao')">📊 TỔNG LƯƠNG & LỊCH SỬ</button>
+        </div>
+
+        <!-- ══ SUBTAB 1: Sổ Chấm Công + bảng Tổng Lương Tuần mini ══ -->
+        <div class="sub-page active" id="cc-sub-socc">
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Sổ Chấm Công</div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearCCWeek()">
+              🗑 Xóa bảng
+            </button>
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              id="cc-copy-btn"
+              onclick="copyCCWeek()"
+              title="Copy toàn bộ CN + ngày công + lương tuần này"
+            >
+              📋 Copy tuần
+            </button>
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              id="cc-paste-btn"
+              onclick="pasteCCWeek()"
+              title="Dán toàn bộ CN + ngày công đã copy"
+              style="display: none"
+            >
+              📌 Dán
+            </button>
+            <button
+              id="cc-save-btn"
+              class="btn btn-success btn-sm"
+              onclick="saveCCWeek()"
+            >
+              💾 Lưu tuần này
+            </button>
+          </div>
+        </div>
+
+        <!-- Week navigator -->
+        <div
+          class="entry-date-bar"
+          style="gap: 10px; flex-wrap: wrap; align-items: center"
+        >
+          <button class="btn btn-outline-secondary btn-sm" onclick="ccPrevWeek()">
+            ← Tuần trước
+          </button>
+          <span
+            id="cc-week-label"
+            style="
+              font-size: 13px;
+              font-weight: 700;
+              min-width: 200px;
+              text-align: center;
+              color: var(--bs-warning);
+            "
+          ></span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="ccNextWeek()">
+            Tuần sau →
+          </button>
+          <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
+          <span class="bar-label">Từ ngày</span>
+          <input
+            type="date"
+            id="cc-from"
+            class="form-control form-control-sm w-auto"
+            onchange="onCCFromChange()"
+          />
+          <span class="bar-label">–</span>
+          <input
+            type="date"
+            id="cc-to"
+            class="form-control form-control-sm w-auto"
+            readonly
+            class="text-secondary" style="background: var(--bs-tertiary-bg); cursor: default"
+          />
+          <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
+          <span class="bar-label">Công trình</span>
+          <select
+            id="cc-ct-sel"
+            class="form-select form-select-sm w-auto"
+            style="min-width: 240px; font-size: 12px"
+            onchange="onCCCtSelChange()"
+          >
+            <option value="">-- Chọn công trình --</option>
+          </select>
+        </div>
+
+        <!-- Attendance table -->
+        <div class="entry-table-wrap">
+          <div class="table-scroll">
+            <table class="entry-table cc-grid-table" style="min-width: 1220px">
+              <thead>
+                <tr id="cc-thead-row"></tr>
+              </thead>
+              <tbody id="cc-tbody"></tbody>
+            </table>
+          </div>
+          <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+            <button class="btn btn-outline-secondary btn-sm" onclick="addCCWorker()">
+              + Thêm công nhân
+            </button>
+            <span class="text-secondary" style="font-size: 11px; margin-left: 8px">
+              <strong>1</strong> = 1 công &nbsp;·&nbsp; <strong>0.5</strong> =
+              nửa công &nbsp;·&nbsp; để trống = nghỉ
+            </span>
+          </div>
+        </div>
+
+        <!-- Summary bar (no duplicate save button) -->
+        <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
+          <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
+            <span>Tổng công: <strong id="cc-sum-tc">0</strong></span>
+            <span
+              >Tổng lương: <span class="hi" id="cc-sum-luong">0 đ</span></span
+            >
+            <span
+              >Tổng cộng tuần:
+              <span class="hi text-warning" id="cc-sum-tongcong"
+                >0 đ</span
+              ></span
+            >
+          </div>
+        </div>
+
+        <!-- Bảng Tổng Lương Tuần MINI (chỉ xem) — theo tuần đang chọn ở sổ, tất cả công trình. Render bởi renderCCTLTMini() -->
+        <div style="margin-top: 20px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
+              <span class="dot"></span>Tổng Lương Tuần theo Công Nhân
+              <span id="cc-tlt-mini-week-label" class="text-secondary" style="font-size: 12px; font-weight: 400"></span>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div style="overflow-x: auto">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Tên CN</th>
+                    <th style="text-align: center; width: 36px">T/P</th>
+                    <th style="text-align: center">CN</th>
+                    <th style="text-align: center">T2</th>
+                    <th style="text-align: center">T3</th>
+                    <th style="text-align: center">T4</th>
+                    <th style="text-align: center">T5</th>
+                    <th style="text-align: center">T6</th>
+                    <th style="text-align: center">T7</th>
+                    <th style="text-align: center">TC</th>
+                    <th style="text-align: right; min-width: 100px; white-space: nowrap">TC Lương</th>
+                    <th style="text-align: right; white-space: nowrap">Lương TB/Ngày</th>
+                    <th class="text-danger" style="text-align: right; white-space: nowrap">Trừ Nợ</th>
+                    <th style="text-align: right; min-width: 100px; white-space: nowrap">Thực Lãnh</th>
+                    <th>Công Trình</th>
+                  </tr>
+                </thead>
+                <tbody id="cc-tlt-mini-tbody"></tbody>
+              </table>
+            </div>
+            <div class="app-pagination" id="cc-tlt-mini-summary"></div>
+          </div>
+        </div>
+        </div>
+        <!-- ══ /SUBTAB 1 ══ -->
+
+        <!-- ══ SUBTAB 2: Tổng Lương Tuần đầy đủ + Lịch Sử Chấm Công ══ -->
+        <div class="sub-page" id="cc-sub-baocao">
+        <!-- Tổng Lương Tuần (theo tên CN) — đưa lên TRÊN lịch sử -->
+        <div style="margin-top: 20px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
+              <span class="dot"></span>Tổng Lương Tuần (theo Công Nhân)
+            </div>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <div class="search-box" style="min-width: 140px">
+                <span class="ico">🔍</span>
+                <input
+                  type="text"
+                  id="cc-tlt-search"
+                  placeholder="Tìm tên CN..."
+                  oninput="
+                    ccTltPage = 1;
+                    renderCCTLT();
+                  "
+                />
+              </div>
+              <select
+                class="form-select form-select-sm w-auto"
+                id="cc-tlt-ct"
+                onchange="
+                  ccTltPage = 1;
+                  renderCCTLT();
+                "
+              >
+                <option value="">Tất cả CT</option>
+              </select>
+              <select
+                class="form-select form-select-sm w-auto"
+                id="cc-tlt-week"
+                onchange="
+                  ccTltPage = 1;
+                  renderCCTLT();
+                "
+              >
+                <option value="">Tất cả tuần</option>
+              </select>
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportCCTLTCSV()">
+                ⬇ Xuất CSV
+              </button>
+              <button
+                class="btn btn-sm"
+                onclick="xuatPhieuLuong()"
+                style="
+                  background: #2563eb;
+                  color: #fff;
+                  border: none;
+                  font-weight: 700;
+                "
+                title="Tick chọn công nhân trong bảng rồi bấm để xuất phiếu lương PNG"
+              >
+                📸 Xuất Phiếu Lương
+              </button>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div id="cc-tlt-table-wrap" style="overflow-x: auto">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 32px; text-align: center">
+                      <input
+                        type="checkbox"
+                        id="cc-tlt-chk-all"
+                        title="Chọn tất cả"
+                        onchange="
+                          document
+                            .querySelectorAll('.cc-tlt-chk')
+                            .forEach((x) => (x.checked = this.checked))
+                        "
+                      />
+                    </th>
+                    <th>Tuần</th>
+                    <th>Tên CN</th>
+                    <th style="text-align: center; width: 36px">T/P</th>
+                    <th style="text-align: center">CN</th>
+                    <th style="text-align: center">T2</th>
+                    <th style="text-align: center">T3</th>
+                    <th style="text-align: center">T4</th>
+                    <th style="text-align: center">T5</th>
+                    <th style="text-align: center">T6</th>
+                    <th style="text-align: center">T7</th>
+                    <th style="text-align: center">TC</th>
+                    <th style="text-align: right">TC Lương</th>
+                    <th style="text-align: right">Lương TB/Ngày</th>
+                    <th class="text-danger cc-tlt-debt-col" style="text-align: right">Trừ</th>
+                    <th class="cc-tlt-debt-col" style="text-align: right">Thực Lãnh</th>
+                    <th>Công Trình</th>
+                  </tr>
+                </thead>
+                <tbody id="cc-tlt-tbody"></tbody>
+              </table>
+            </div>
+            <div id="cc-tlt-cards" style="display: none; padding: 4px"></div>
+            <div class="app-pagination" id="cc-tlt-pagination"></div>
+          </div>
+        </div>
+
+        <!-- Lịch sử chấm công TUẦN -->
+        <div style="margin-top: 20px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
+              <span class="dot"></span>Lịch Sử Chấm Công Tuần
+            </div>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <select
+                class="form-select form-select-sm w-auto"
+                id="cc-hist-ct"
+                onchange="
+                  ccHistPage = 1;
+                  renderCCHistory();
+                "
+              >
+                <option value="">Tất cả CT</option>
+              </select>
+              <select
+                class="form-select form-select-sm w-auto"
+                id="cc-hist-week"
+                onchange="
+                  ccHistPage = 1;
+                  renderCCHistory();
+                "
+              >
+                <option value="">Tất cả tuần</option>
+              </select>
+              <button
+                class="btn btn-outline-secondary btn-sm"
+                onclick="exportCCHistCSV()"
+              >
+                ⬇ Xuất CSV
+              </button>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div style="overflow-x: auto">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Tuần</th>
+                    <th>Công Trình</th>
+                    <th style="text-align: center">CN</th>
+                    <th style="text-align: center">T2</th>
+                    <th style="text-align: center">T3</th>
+                    <th style="text-align: center">T4</th>
+                    <th style="text-align: center">T5</th>
+                    <th style="text-align: center">T6</th>
+                    <th style="text-align: center">T7</th>
+                    <th style="text-align: center">TC</th>
+                    <th style="text-align: right">Lương/Ngày</th>
+                    <th style="text-align:right;min-width:110px;white-space:nowrap">Tổng Lương</th>
+                    <th style="text-align:right;min-width:95px;white-space:nowrap">Phụ Cấp</th>
+                    <th style="text-align:right;min-width:110px;white-space:nowrap">HĐ Mua Lẻ</th>
+                    <th>Nội Dung</th>
+                    <th style="text-align: right">Tổng Cộng</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="cc-hist-tbody"></tbody>
+              </table>
+            </div>
+            <div class="app-pagination" id="cc-hist-pagination"></div>
+          </div>
+        </div>
+        </div>
+        <!-- ══ /SUBTAB 2 ══ -->
+      

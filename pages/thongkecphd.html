@@ -1,0 +1,79 @@
+<!-- Partial: page-thongkecphd (tách từ index.html — Phase 2) -->
+
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>Thống Kê Chi Phí / Hóa Đơn
+          </div>
+          <button
+            class="btn btn-outline-secondary"
+            id="btn-export-csv"
+            onclick="exportAllCSV()"
+          >
+            ⬇ Xuất CSV
+          </button>
+        </div>
+        <div class="records-wrap card shadow-sm overflow-hidden">
+          <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
+            <div class="search-box" id="tc-search-box">
+              <span class="ico">🔍</span>
+              <input
+                type="text"
+                id="search"
+                placeholder="Tìm kiếm..."
+                oninput="filterAndRender()"
+              />
+            </div>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="f-ct"
+              onchange="
+                buildFilters();
+                filterAndRender();
+              "
+            >
+              <option value="">Tất cả công trình</option>
+            </select>
+            <select class="form-select form-select-sm w-auto" id="f-loai" onchange="filterAndRender()">
+              <option value="">Tất cả loại</option>
+            </select>
+            <select class="form-select form-select-sm w-auto" id="f-ncc" onchange="filterAndRender()">
+              <option value="">Tất cả NCC</option>
+            </select>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="f-month"
+              onchange="filterAndRender()"
+            >
+              <option value="">Tất cả tháng</option>
+            </select>
+            <select
+              class="form-select form-select-sm w-auto"
+              id="f-week"
+              onchange="filterAndRender()"
+            >
+              <option value="">Tất cả tuần</option>
+            </select>
+          </div>
+          <!-- Danh sách hóa đơn hoạt động -->
+          <div id="active-inv-wrap">
+            <div style="overflow-x: auto">
+              <table class="table table-sm table-hover align-middle mb-0" id="all-table">
+                <thead class="table-light">
+                  <tr>
+                    <th>Ngày</th>
+                    <th>Công Trình</th>
+                    <th>Loại Chi Phí</th>
+                    <th class="hide-mobile">Người TH</th>
+                    <th class="hide-mobile">Nhà Cung Cấp</th>
+                    <th>Nội Dung</th>
+                    <th style="text-align: right">Số Tiền</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="all-tbody"></tbody>
+              </table>
+            </div>
+            <div class="app-pagination" id="pagination"></div>
+          </div>
+        </div>
+      

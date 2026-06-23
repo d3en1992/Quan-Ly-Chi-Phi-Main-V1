@@ -1,0 +1,468 @@
+<!-- Partial: page-doanhthu (tách từ index.html — Phase 2) -->
+
+        <!-- Sub-nav: KHAI BÁO (làm việc hàng ngày) · THỐNG KÊ (đối soát tổng hợp) -->
+        <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="dt-sub-nav">
+          <button
+            class="nav-link active"
+            id="dt-sub-khaibao-btn"
+            onclick="dtGoSub(this, 'dt-sub-khaibao')"
+          >
+            📝 KHAI BÁO
+          </button>
+          <button
+            class="nav-link"
+            id="dt-sub-thongke-btn"
+            onclick="dtGoSub(this, 'dt-sub-thongke')"
+          >
+            📊 THỐNG KÊ
+          </button>
+          <button
+            class="nav-link"
+            id="dt-sub-loinhuan-btn"
+            onclick="dtGoSub(this, 'dt-sub-loinhuan')"
+          >
+            💰 LỢI NHUẬN
+          </button>
+        </div>
+
+        <!-- ── SUB TAB 1: KHAI BÁO ─────────────────────────────── -->
+        <div class="sub-page active" id="dt-sub-khaibao">
+          <!-- Dashboard mini: 3 stat cards -->
+          <div class="row g-3 mb-4" id="dt-mini-dash">
+            <!-- Mobile: chiếm toàn hàng; sm+: 1/3 -->
+            <div class="col-12 col-sm-4">
+              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-primary-bg-subtle)">
+                <div class="card-body text-center py-3">
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Giá Trị HĐ</div>
+                  <div id="dt-mini-tonghd" class="fw-bold text-primary" style="font-size:20px">—</div>
+                </div>
+              </div>
+            </div>
+            <!-- Mobile: mỗi card chiếm 50%; sm+: 1/3 -->
+            <div class="col-6 col-sm-4">
+              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-success-bg-subtle)">
+                <div class="card-body text-center py-3">
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Đã Thu</div>
+                  <div id="dt-mini-dathu" class="fw-bold text-success" style="font-size:20px">—</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4">
+              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-warning-bg-subtle)">
+                <div class="card-body text-center py-3">
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Còn Phải Thu</div>
+                  <div id="dt-mini-con" class="fw-bold text-warning" style="font-size:20px">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Action buttons: Hàng 1 = HĐ Chính + Thu Tiền (50/50); Hàng 2 = HĐ TP (full) -->
+          <div class="row g-2 mb-4">
+            <div class="col-6">
+              <button class="btn btn-primary w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdcResetForm();openDtModal('hdc')">
+                <i class="bi bi-file-earmark-text me-1"></i>+ Khai Báo HĐ Chính
+              </button>
+            </div>
+            <div class="col-6">
+              <button class="btn btn-success w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_thuResetForm();openDtModal('thu')">
+                <i class="bi bi-cash-coin me-1"></i>+ Ghi Nhận Thu Tiền
+              </button>
+            </div>
+            <div class="col-6">
+              <button class="btn btn-warning w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdtpResetForm();openDtModal('hdtp')">
+                <i class="bi bi-people me-1"></i>+ HĐ Thầu Phụ
+              </button>
+            </div>
+            <div class="col-6">
+              <button class="btn btn-dark w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_qtResetForm();openDtModal('qt')">
+                <i class="bi bi-clipboard-check me-1"></i>+ Quyết Toán Chi Phí
+              </button>
+            </div>
+          </div>
+          <!-- Bảng GỘP CHUNG: mọi khai báo 30 ngày gần nhất (HĐ Chính + HĐ Thầu Phụ + Thu Tiền) -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>📑 Khai Báo Gần Đây
+              <span class="text-secondary" style="font-size:11px;font-weight:400">(30 ngày gần nhất)</span>
+              <span id="kb-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:680px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Đối Tác / Người</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="kb-tbody"></tbody>
+              </table>
+            </div>
+            <div id="kb-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có khai báo nào trong 30 ngày gần nhất</div>
+            <div id="kb-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+          </div>
+
+        </div>
+        <!-- /dt-sub-khaibao -->
+
+        <!-- ── SUB TAB 2: THỐNG KÊ (đối soát tổng hợp — bảng đầy đủ) ───── -->
+        <div class="sub-page" id="dt-sub-thongke">
+          <!-- Bộ lọc đối soát: Công trình + tìm kiếm -->
+          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
+            <select id="dt-tk-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetTkCtFilter(this.value)">
+              <option value="">-- Tất cả công trình --</option>
+            </select>
+            <input type="text" id="dt-tk-search-input" class="form-control form-control-sm" style="max-width:220px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetTkSearch(this.value)">
+          </div>
+
+          <!-- TK BẢNG 1: Hợp đồng chính (toàn bộ) -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>📋 Hợp Đồng Chính Công Ty
+            </div>
+            <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG">📤 Xuất phiếu HĐ Chính</button>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:560px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">CĐT</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Chính</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Phụ</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="hdctk-tbody"></tbody>
+              </table>
+            </div>
+            <div id="hdctk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng nào</div>
+            <div id="hdctk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+          </div>
+
+          <!-- TK BẢNG 2: Hợp đồng thầu phụ (toàn bộ) -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>🤝 Hợp Đồng Thầu Phụ
+            </div>
+            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG">📤 Xuất phiếu HĐ TP</button>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdtp-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Thầu Phụ</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Giá Trị HĐ</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="hdtptk-tbody"></tbody>
+              </table>
+            </div>
+            <div id="hdtptk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng thầu phụ</div>
+            <div id="hdtptk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+          </div>
+
+          <!-- TK BẢNG 3: Lịch sử thu tiền (toàn bộ) -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>💰 Lịch Sử Thu Tiền
+              <span id="thutk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+            </div>
+            <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG">📤 Xuất phiếu thu</button>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.thu-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Ngày</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Người TH</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="thutk-tbody"></tbody>
+              </table>
+            </div>
+            <div id="thutk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có lịch sử thu tiền</div>
+            <div id="thutk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+          </div>
+
+          <!-- TK BẢNG 4: Quyết toán chi phí (toàn bộ) -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>🧾 Quyết Toán Chi Phí
+              <span id="qttk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+              <span class="text-secondary" style="font-size:11px;font-weight:400">(số âm = giảm trừ)</span>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:560px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
+                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Người TH</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700">Giá Trị Phát Sinh</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="qttk-tbody"></tbody>
+              </table>
+            </div>
+            <div id="qttk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có bản ghi quyết toán</div>
+            <div id="qttk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+          </div>
+        </div>
+        <!-- /dt-sub-thongke -->
+
+        <!-- ── SUB TAB 3: TỔNG QUAN LỢI NHUẬN ──────────────────── -->
+        <div class="sub-page" id="dt-sub-loinhuan">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>💰 Tổng Quan Lợi Nhuận
+              <span class="text-secondary" style="font-size:11px;font-weight:400">(theo năm đang lọc — chọn "Tất cả năm" để xem toàn vòng đời)</span>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" id="dt-ln-toggle-btn" onclick="toggleLoiNhuanDetail()">
+              <i class="bi bi-list-columns-reverse"></i> Hiện chi tiết
+            </button>
+          </div>
+          <!-- Mini dashboard: donut Doanh thu/Chi phí + Top 5 lãi / Top 5 lỗ -->
+          <div id="dt-ln-dashboard" class="mb-3"></div>
+          <!-- Bảng chi tiết Lợi Nhuận -->
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div id="dt-loinhuan-wrap"></div>
+          </div>
+        </div>
+        <!-- /dt-sub-loinhuan -->
+        <!-- MODALS: DOANH THU ============================================ -->
+
+        <!-- Modal: Khai Bao HD Chinh -->
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-hdc-ov" class="overlay">
+          <div class="app-modal" style="max-width:660px">
+            <div class="app-modal-head">
+              <h3>&#x1F4CB; Khai B&#225;o H&#7907;p &#272;&#7891;ng Ch&#237;nh</h3>
+              <button class="close-btn" onclick="closeDtModal('hdc')">&#x2715;</button>
+            </div>
+            <div class="app-modal-body">
+              <div class="dt-form-grid">
+                <div class="dt-field"><label>Ng&#224;y</label><input type="date" id="hdc-ngay" /></div>
+                <div class="dt-field">
+                  <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
+                  <select id="hdc-ct-input" onchange="if(typeof hdcSyncChuDauTu==='function')hdcSyncChuDauTu()" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
+                  </select>
+                </div>
+                <div class="dt-field">
+                  <label>Ch&#7911; &#272;&#7847;u T&#432; / C&#272;T <span style="font-weight:400;font-size:10px;color:var(--bs-secondary-color)">(t&#7921; &#273;&#7897;ng t&#7915; C&#244;ng Tr&#236;nh)</span></label>
+                  <input type="text" id="hdc-khachhang" placeholder="C&#225;c h&#227;y nh&#7853;p &#7903; tab C&#244;ng Tr&#236;nh..." readonly style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-tertiary-bg);color:var(--bs-body-color);cursor:not-allowed" />
+                </div>
+                <div class="dt-field">
+                  <label>Ng&#432;&#7901;i TH</label>
+                  <select id="hdc-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                    <option value="">-- Ch&#7885;n --</option>
+                  </select>
+                </div>
+                <div class="dt-field">
+                  <label>Gi&#225; Tr&#7883; H&#272; Ch&#237;nh (&#273;)</label>
+                  <input type="text" id="hdc-giatri" placeholder="0" oninput="fmtInputMoney(this);hdcUpdateTotal()" />
+                </div>
+                <div class="dt-field"><label>Gi&#225; Tr&#7883; H&#272; Ph&#7909; (&#273;)</label><input type="text" id="hdc-giatriphu" placeholder="0" oninput="fmtInputMoney(this);hdcUpdateTotal()" /></div>
+                <div class="dt-field" style="grid-column:1/-1"><label>N&#7897;i Dung</label><input type="text" id="hdc-nd" placeholder="VD: X&#226;y d&#7921;ng ph&#7847;n th&#244;, ho&#224;n thi&#7879;n..." style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" /></div>
+              </div>
+              <input type="hidden" id="hdc-edit-id" />
+            </div>
+            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <span id="hdc-tong-label" class="text-secondary" style="font-size:12px"></span>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" onclick="closeDtModal('hdc')">H&#7911;y</button>
+                <button class="btn btn-warning" id="hdc-save-btn" onclick="saveHopDongChinh()">&#x1F4BE; L&#432;u</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Ghi Nhan Thu Tien -->
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-thu-ov" class="overlay">
+          <div class="app-modal" style="max-width:580px">
+            <div class="app-modal-head">
+              <h3>&#x1F4B0; Ghi Nh&#7853;n Thu Ti&#7873;n</h3>
+              <button class="close-btn" onclick="closeDtModal('thu')">&#x2715;</button>
+            </div>
+            <div class="app-modal-body">
+              <div class="dt-form-grid">
+                <div class="dt-field"><label>Ng&#224;y Thu *</label><input type="date" id="thu-ngay" /></div>
+                <div class="dt-field">
+                  <label>C&#244;ng Tr&#236;nh *</label>
+                  <select id="thu-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="_thuOnCtChange(this.value)">
+                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
+                  </select>
+                </div>
+              </div>
+              <div id="thu-progress-info" style="display:none;gap:16px;flex-wrap:wrap;align-items:center;background:var(--bs-tertiary-bg);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:12px;border:1px solid var(--bs-border-color)">
+                <span class="text-secondary">T&#7893;ng H&#272;: <span id="thu-prog-hd" class="fw-bold text-body">&#x2014;</span></span>
+                <span class="text-secondary">&#272;&#227; thu: <span id="thu-prog-dathu" class="fw-bold text-success">&#x2014;</span></span>
+                <span class="text-secondary">C&#242;n l&#7841;i: <span id="thu-prog-con" class="fw-bold text-warning">&#x2014;</span></span>
+              </div>
+              <div class="dt-form-grid" style="margin-top:8px">
+                <div class="dt-field">
+                  <label>Lo&#7841;i Kho&#7843;n Thu</label>
+                  <select id="thu-loaithu" class="form-select form-select-sm" style="height:auto;padding:8px 10px">
+                    <option value="">-- Ch&#7885;n lo&#7841;i --</option>
+                    <option value="tamung">T&#7841;m &#7913;ng</option>
+                    <option value="giaidoan">Thanh to&#225;n giai &#273;o&#7841;n</option>
+                    <option value="quyettoan">Quy&#7871;t to&#225;n</option>
+                  </select>
+                </div>
+                <div class="dt-field">
+                  <label>Ng&#432;&#7901;i TH</label>
+                  <select id="thu-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                    <option value="">-- Ch&#7885;n --</option>
+                  </select>
+                </div>
+                <div class="dt-field"><label>S&#7889; Ti&#7873;n Thu (&#273;) *</label><input type="text" id="thu-tien" placeholder="0" oninput="fmtInputMoney(this)" /></div>
+                <div class="dt-field"><label>Ghi Ch&#250; / &#272;&#7907;t</label><input type="text" id="thu-nd" placeholder="VD: &#272;&#7907;t 1, Nghi&#7879;m thu m&#243;ng..." /></div>
+              </div>
+              <input type="hidden" id="thu-edit-id" />
+            </div>
+            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:flex-end;gap:8px;align-items:center">
+              <button class="btn btn-outline-secondary btn-sm" id="thu-cancel-btn" style="display:none" onclick="_thuCancelEdit()">&#x2715; H&#7911;y s&#7917;a</button>
+              <button class="btn btn-outline-secondary" onclick="closeDtModal('thu')">&#272;&#243;ng</button>
+              <button class="btn btn-success" id="thu-save-btn" onclick="saveThuRecord()">+ Ghi nh&#7853;n Thu</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Khai Bao HD Thau Phu -->
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-hdtp-ov" class="overlay">
+          <div class="app-modal" style="max-width:660px">
+            <div class="app-modal-head">
+              <h3>&#x1F91D; Khai B&#225;o H&#7907;p &#272;&#7891;ng Th&#7847;u Ph&#7909;</h3>
+              <button class="close-btn" onclick="closeDtModal('hdtp')">&#x2715;</button>
+            </div>
+            <div class="app-modal-body">
+              <div class="dt-form-grid">
+                <div class="dt-field"><label>Ng&#224;y *</label><input type="date" id="hdtp-ngay" /></div>
+                <div class="dt-field">
+                  <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
+                  <select id="hdtp-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="_hdtpOnCtChange(this.value)">
+                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
+                  </select>
+                </div>
+                <div class="dt-field">
+                  <label>T&#234;n Th&#7847;u Ph&#7909; *</label>
+                  <select id="hdtp-thauphu" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                    <option value="">-- Ch&#7885;n th&#7847;u ph&#7909; --</option>
+                  </select>
+                </div>
+                <div class="dt-field">
+                  <label>Gi&#225; Tr&#7883; H&#272; Th&#7847;u Ph&#7909; (&#273;)</label>
+                  <input type="text" id="hdtp-giatri" placeholder="0" oninput="fmtInputMoney(this);hdtpUpdateTotal()" />
+                </div>
+                <div class="dt-field"><label>N&#7897;i Dung</label><input type="text" id="hdtp-nd" placeholder="VD: &#201;p c&#7885;c, M&#243;ng, Th&#244;..." /></div>
+              </div>
+              <div style="margin-top:10px">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="hdtp-btn-chitiet" onclick="window.togglehdtpChiTiet&&window.togglehdtpChiTiet()">&#x1F4CA; Kh&#7889;i l&#432;&#7907;ng chi ti&#7871;t</button>
+                <div id="hdtp-chitiet-wrap" style="display:none;margin-top:10px;border:1px solid var(--bs-border-color);padding:10px;border-radius:6px;background:var(--bs-tertiary-bg)">
+                  <div style="overflow-x:auto"><table class="entry-table" style="width:100%;min-width:400px"><thead><tr>
+                    <th style="text-align:left">T&#234;n h&#7841;ng m&#7909;c</th>
+                    <th style="width:50px;text-align:center">&#272;&#417;n v&#7883;</th>
+                    <th style="width:56px;text-align:center">Kh&#7889;i l&#432;&#7907;ng</th>
+                    <th style="width:98px;text-align:right">&#272;&#417;n gi&#225; (&#273;)</th>
+                    <th style="width:150px;text-align:right">Th&#224;nh ti&#7873;n (&#273;)</th>
+                    <th style="width:40px"></th>
+                  </tr></thead><tbody id="hdtp-chitiet-tbody"></tbody></table></div>
+                  <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.addhdtpChiTietRow&&window.addhdtpChiTietRow()">+ Th&#234;m d&#242;ng</button>
+                    <div style="font-weight:bold;font-size:13px"><span class="text-body-secondary">T&#7893;ng chi ti&#7871;t: </span><span id="hdtp-chitiet-tong" class="text-warning">0</span></div>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" id="hdtp-edit-id" />
+            </div>
+            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <span id="hdtp-tong-label" class="text-secondary" style="font-size:12px"></span>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" onclick="closeDtModal('hdtp')">H&#7911;y</button>
+                <button class="btn btn-warning" id="hdtp-save-btn" onclick="saveHopDongThauPhu()">&#x1F4BE; L&#432;u</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Quyet Toan Chi Phi (ke thua layout HD Chinh) -->
+        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+        <div id="dt-modal-qt-ov" class="overlay">
+          <div class="app-modal" style="max-width:580px">
+            <div class="app-modal-head">
+              <h3>&#x1F9FE; Quy&#7871;t To&#225;n Chi Ph&#237;</h3>
+              <button class="close-btn" onclick="closeDtModal('qt')">&#x2715;</button>
+            </div>
+            <div class="app-modal-body">
+              <div class="dt-form-grid">
+                <div class="dt-field"><label>Ng&#224;y *</label><input type="date" id="qt-ngay" /></div>
+                <div class="dt-field">
+                  <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
+                  <select id="qt-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="_qtOnCtChange(this.value)">
+                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
+                  </select>
+                </div>
+              </div>
+              <div id="qt-progress-info" style="display:none;gap:16px;flex-wrap:wrap;align-items:center;background:var(--bs-tertiary-bg);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:12px;border:1px solid var(--bs-border-color)">
+                <span class="text-secondary">T&#7893;ng gi&#225; tr&#7883; H&#272; ban &#273;&#7847;u: <span id="qt-prog-hd" class="fw-bold text-body">&#x2014;</span></span>
+                <span class="text-secondary">&#272;&#227; thu ti&#7873;n: <span id="qt-prog-dathu" class="fw-bold text-success">&#x2014;</span></span>
+              </div>
+              <div class="dt-form-grid" style="margin-top:8px;grid-template-columns:0.38fr 0.62fr">
+                <div class="dt-field">
+                  <label>Ng&#432;&#7901;i TH</label>
+                  <select id="qt-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                    <option value="">-- Ch&#7885;n --</option>
+                  </select>
+                </div>
+                <div class="dt-field">
+                  <label>Gi&#225; Tr&#7883; Ph&#225;t Sinh (&#273;) *</label>
+                  <input type="text" id="qt-giatri" placeholder="VD: 50.000.000" oninput="fmtInputMoneySigned(this)" />
+                  <span style="font-size:10px;font-style:italic;color:var(--bs-secondary-color);margin-top:2px">Nh&#7853;p s&#7889; &#226;m (VD: -20.000.000) &#273;&#7875; gi&#7843;m tr&#7915; doanh thu</span>
+                </div>
+                <div class="dt-field" style="grid-column:1/-1">
+                  <label>N&#7897;i Dung *</label>
+                  <textarea id="qt-nd" rows="2" placeholder="VD: Gi&#7843;m tr&#7915; chi ph&#237; kh&#244;ng l&#224;m h&#7841;ng m&#7909;c C / Ph&#225;t sinh th&#234;m &#7889;p l&#225;t g&#7841;ch..." style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color);resize:vertical"></textarea>
+                </div>
+              </div>
+              <input type="hidden" id="qt-edit-id" />
+            </div>
+            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:flex-end;gap:8px;align-items:center">
+              <button class="btn btn-outline-secondary btn-sm" id="qt-cancel-btn" style="display:none" onclick="_qtResetForm()">&#x2715; H&#7911;y s&#7917;a</button>
+              <button class="btn btn-outline-secondary" onclick="closeDtModal('qt')">&#272;&#243;ng</button>
+              <button class="btn btn-warning" id="qt-save-btn" onclick="saveQuyetToan()">&#x1F4BE; L&#432;u</button>
+            </div>
+          </div>
+        </div>
+        <!-- /MODALS: DOANH THU =========================================== -->
+      

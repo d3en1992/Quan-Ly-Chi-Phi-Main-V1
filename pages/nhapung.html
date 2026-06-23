@@ -1,0 +1,161 @@
+<!-- Partial: page-nhapung (tách từ index.html — Phase 2) -->
+
+        <!-- Sub-tab navigation: Nhập Tiền Ứng / Báo Cáo -->
+        <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="ung-sub-nav">
+          <button class="nav-link active" id="ung-sub-nhap-btn" onclick="ungGoSub(this,'ung-sub-nhap')">📝 NHẬP TIỀN ỨNG</button>
+          <button class="nav-link" id="ung-sub-baocao-btn" onclick="ungGoSub(this,'ung-sub-baocao')">📊 THỐNG KÊ ỨNG</button>
+        </div>
+
+        <!-- ══ SUBTAB 1: Nhập Tiền Ứng + Phiếu Ứng Gần Đây ══ -->
+        <div class="sub-page active" id="ung-sub-nhap">
+        <!-- Bảng 1: Nhập tiền ứng -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span>Nhập Tiền Ứng
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <button class="btn btn-outline-secondary" onclick="clearUngTable()">
+              🗑 Xóa bảng
+            </button>
+            <button
+              class="btn btn-success"
+              id="ung-save-btn"
+              onclick="saveAllUngRows()"
+            >
+              💾 Lưu tất cả
+            </button>
+          </div>
+        </div>
+
+        <div class="entry-date-bar">
+          <span class="bar-label">Ngày</span>
+          <input type="date" id="ung-date" class="form-control form-control-sm w-auto" />
+        </div>
+
+        <div class="entry-table-wrap">
+          <div class="table-scroll">
+            <table class="entry-table">
+              <thead>
+                <tr>
+                  <th class="col-num">#</th>
+                  <th style="width: 110px">Đối Tượng</th>
+                  <th style="width: 200px">
+                    Thầu Phụ / Công Nhân
+                    <span class="text-warning">*</span>
+                  </th>
+                  <th style="width: 220px">Công Trình</th>
+                  <th style="width: 140px">Số Tiền Ứng (đ)</th>
+                  <th style="min-width: 220px">Nội Dung / Ghi Chú</th>
+                  <th class="col-del"></th>
+                </tr>
+              </thead>
+              <tbody id="ung-tbody"></tbody>
+            </table>
+          </div>
+          <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(1)">
+              + 1 dòng
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(5)">
+              + 5 dòng
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(10)">
+              + 10 dòng
+            </button>
+            <span class="text-secondary" style="font-size: 11px; margin-left: 8px"
+              >Tab để di chuyển giữa các ô</span
+            >
+          </div>
+        </div>
+
+        <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
+          <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
+            <span>Dòng có dữ liệu: <strong id="ung-row-count">0</strong></span>
+            <span
+              >Tổng tiền ứng:
+              <span class="hi" id="ung-entry-total">0 đ</span></span
+            >
+          </div>
+        </div>
+
+        <!-- Phiếu Ứng Gần Đây (10 phiếu mới nhất TP + NCC) — render bởi renderUngMini() -->
+        <div style="margin-top: 20px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
+              <span class="dot"></span>🕓 Phiếu Ứng Gần Đây
+              <span class="text-secondary" style="font-size: 12px; font-weight: 400">(10 phiếu mới nhất)</span>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div id="ung-recent-section"></div>
+          </div>
+        </div>
+        </div>
+        <!-- ══ /SUBTAB 1 ══ -->
+
+        <!-- ══ SUBTAB 2: Báo Cáo (Thầu Phụ + Nhà Cung Cấp) ══ -->
+        <div class="sub-page" id="ung-sub-baocao">
+        <!-- Bảng 2a: Thầu Phụ -->
+        <div style="margin-top: 24px">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>🤝 Thầu Phụ
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngTpCSV()">⬇ CSV</button>
+              <button class="btn btn-sm" onclick="exportUngTpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Thầu Phụ rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng TP</button>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
+              <div class="search-box">
+                <span class="ico">🔍</span>
+                <input type="text" id="ung-tp-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngTp()" />
+              </div>
+              <select class="form-select form-select-sm w-auto" id="uf-tp-tp" onchange="filterAndRenderUngTp()">
+                <option value="">Tất cả thầu phụ</option>
+              </select>
+              <select class="form-select form-select-sm w-auto" id="uf-tp-ct" onchange="filterAndRenderUngTp()">
+                <option value="">Tất cả công trình</option>
+              </select>
+              <select class="form-select form-select-sm w-auto" id="uf-tp-month" onchange="filterAndRenderUngTp()">
+                <option value="">Tất cả tháng</option>
+              </select>
+            </div>
+            <div id="ung-tp-section"></div>
+            <div class="app-pagination" id="ung-tp-pagination"></div>
+          </div>
+
+          <!-- Bảng 2b: Nhà Cung Cấp -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span>🏪 Nhà Cung Cấp
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngNccCSV()">⬇ CSV</button>
+              <button class="btn btn-sm" onclick="exportUngNccToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Nhà Cung Cấp rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng NCC</button>
+            </div>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
+              <div class="search-box">
+                <span class="ico">🔍</span>
+                <input type="text" id="ung-ncc-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngNcc()" />
+              </div>
+              <select class="form-select form-select-sm w-auto" id="uf-ncc-ncc" onchange="filterAndRenderUngNcc()">
+                <option value="">Tất cả nhà CC</option>
+              </select>
+              <select class="form-select form-select-sm w-auto" id="uf-ncc-ct" onchange="filterAndRenderUngNcc()">
+                <option value="">Tất cả công trình</option>
+              </select>
+              <select class="form-select form-select-sm w-auto" id="uf-ncc-month" onchange="filterAndRenderUngNcc()">
+                <option value="">Tất cả tháng</option>
+              </select>
+            </div>
+            <div id="ung-ncc-section"></div>
+            <div class="app-pagination" id="ung-ncc-pagination"></div>
+          </div>
+        </div>
+        </div>
+        <!-- ══ /SUBTAB 2 ══ -->
+      
