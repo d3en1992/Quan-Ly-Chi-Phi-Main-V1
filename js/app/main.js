@@ -551,9 +551,15 @@ window._dataReady = false;
   // Đánh dấu data đã sẵn sàng — các render sau đây mới được phép chạy
   window._dataReady = true;
 
+  // Phương án A: với người dùng quay lại, hàm này TRẢ VỀ NGAY (không chờ cloud)
   await trySyncUsersBeforeAuth();
 
-  if (!initAuth()) return;
+  if (!initAuth()) {
+    // Khách (chưa đăng nhập): đồng bộ tài khoản từ cloud chạy NGẦM (không chặn),
+    // để khi bấm đăng nhập là dùng đúng tài khoản mới nhất. App hiện form ngay tức thì.
+    if (typeof _backgroundUsersSync === 'function') _backgroundUsersSync();
+    return;
+  }
 
   // Phase 2: nạp markup các page (pages/*.html) TRƯỚC init() để mọi render hook đủ DOM
   await loadAllPartials();

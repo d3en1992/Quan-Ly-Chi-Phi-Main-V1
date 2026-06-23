@@ -340,7 +340,7 @@ Metadata chuẩn cho record nghiệp vụ:
 | `js/modules/doanhthu/doanhthu.forms.js` | _(không có global riêng)_ | `hdcUpdateTotal()`, `saveHopDongChinh()`, `hdcSyncChuDauTu()`, `_hdcResetForm()`, `editHopDongChinh()`, `delHopDongChinh()`, `renderHdcTable()`, `saveThuRecord()`, `editThuRecord()`, `_thuCancelEdit()`, `_thuResetForm()`, `delThuRecord()`, `renderThuTable()`, `hdtpUpdateTotal()`, `saveHopDongThauPhu()`, `_hdtpResetForm()`, `editHopDongThauPhu()`, `delHopDongThauPhu()`, `renderHdtpTable()` |
 | `js/modules/doanhthu/doanhthu.reports-export.js` | `window.initDoanhThu`, `window.dtGoSub` (top-level assignments) | `renderCongNoThauPhu()`, `_renderCongNoTable()`, `renderCongNoNhaCungCap()`, `renderLaiLo()`, `initDoanhThu()`, `copyKLCT()`, `pasteKLCT()`, `exportHdcToImage()`, `exportHdtpToImage()`, `exportThuToImage()` |
 | `js/sync/sync.js` | `DEVICE_ID`, `_syncPushing`, `_syncPulling`, `_pushTimer`, `_lastFlushTs`, `_YEAR_FIELD`, `_TS_EPOCH` | `softDeleteRecord()`, `resolveConflict()`, `mergeDatasets()`, `_mergeUsersSafe()`, `_getAllLocalYears()`, `_safeTs()`, `_fillCCProjectId()`, `normalizeCC()`, `isSyncing()`, `_mergeKey()`, `_replaceYearData()`, `_mergeHopDong()`, `_mergeCatItems()`, `_applyCatItemArrays()`, `pushChanges(opts)`, `_pullMeta()`, `pullChanges(yr, callback, opts)`, `cancelScheduledPush()`, `schedulePush()`, `manualSync()`, `processQueue()` + IIFE flush-on-hide (`visibilitychange`/`pagehide`) + listener `online` |
-| `js/app/auth.js` | `currentUser`, role/session helpers | `initAuth()`, login/logout/account settings, `saveUsers(arr, opts)` (propagate `skipSync`), `_startSessionHeartbeat()` (dùng `saveUsers(users,{skipSync:true})`), user/session persistence, role UI helpers |
+| `js/app/auth.js` | `currentUser`, role/session helpers | `initAuth()`, login/logout/account settings, `saveUsers(arr, opts)` (propagate `skipSync`), `_startSessionHeartbeat()` (dùng `saveUsers(users,{skipSync:true})`), `trySyncUsersBeforeAuth()` (không chặn khi đã có tài khoản local — Phương án A), `_backgroundUsersSync()` (pull cloud ngầm cho khách), user/session persistence, role UI helpers |
 
 Lưu ý đặc biệt: `buildInvoices()` không chỉ đọc `inv_v3`; nó tạo hóa đơn tổng hợp từ hóa đơn manual và dữ liệu chấm công (`cc_v2`) gồm `hdmuale` và tiền công nhân. Các render/report hóa đơn nên dùng `getInvoicesCached()` hoặc `buildInvoices()` thay vì chỉ đọc `invoices`.
 
@@ -1134,6 +1134,25 @@ Rà soát sâu cơ chế **tên** của Tab Danh Mục (id-based qua `cat_items_
 **Tham chiếu hiện hành cần cập nhật:** thêm thư mục `pages/` (9 file partial); `js/app/main.js` thêm hàm `loadAllPartials()`; cấu trúc `.content` trong `index.html` nay chỉ còn placeholder cho 9 page.
 
 **File đã sửa/thêm:** `index.html`, `js/app/main.js`, **mới:** `pages/{nhap,thongkecphd,thietbi,danhmuc,nhapung,chamcong,dashboard,doanhthu,congno}.html`.
+
+---
+
+## 9.19 Render-local-first — bỏ chặn cloud lúc khởi động (23/06/2026)
+
+**Vấn đề:** mỗi lần F5, app trắng màn hình ~4s rồi mới hiện. Nguyên nhân: bootstrap `await trySyncUsersBeforeAuth()` ([main.js](js/app/main.js)) chặn chờ `await pullChanges(null,...)` (kéo toàn bộ Firestore qua mạng) **trước khi vẽ gì**. Đây là 4s mạng, **không liên quan** Phase 1/2; Phase 3 (lazy-load script) **không** giải quyết được vì nút thắt là network bị `await`, không phải parse JS.
+
+**Sửa (Phương án A — không chặn first paint):**
+- `trySyncUsersBeforeAuth()` ([auth.js](js/app/auth.js)): nếu **đã có tài khoản local** (`loadUsers().length>0` — người dùng quay lại, gần như mọi lần) → **`return` ngay**, không chờ cloud. Chỉ giữ pull **chặn** cho trường hợp **thiết bị mới/local trống** (hiếm, cần cloud để lấy tài khoản thật trước khi tạo default).
+- Thêm `_backgroundUsersSync()` ([auth.js](js/app/auth.js)): `pullChanges(null, silent)` chạy **ngầm** + `_reloadGlobals` + `afterSync`. Bootstrap gọi nó khi **khách** (`initAuth()===false`) để lần đăng nhập kế dùng tài khoản mới nhất.
+- Với **đã đăng nhập**: `init()` vẫn render local ngay, rồi `gsLoadAll()` (vốn đã ngầm) pull **năm đang xem** + meta(gồm tài khoản) và re-render.
+
+**Kết quả:** F5 hiện giao diện gần như **tức thì**; đồng bộ cloud chạy nền (banner "⬇ Đang tải" nhỏ, app vẫn dùng được).
+
+**Tradeoff (nhỏ):** lúc khởi động chỉ pull **năm đang xem** thay vì **tất cả năm** như trước. Năm khác đã có local sẽ không tự refresh khi mở app; muốn refresh toàn bộ → bấm 🔄 (manualSync) hoặc đổi sang năm còn thiếu (onYearChange tự pull năm thiếu). Phù hợp mục tiêu "nhanh/nhẹ".
+
+**Tham chiếu hiện hành cần cập nhật:** `js/app/auth.js` thêm `_backgroundUsersSync()`; `trySyncUsersBeforeAuth()` nay **không chặn** khi có tài khoản local.
+
+**File đã sửa:** `js/app/auth.js`, `js/app/main.js`.
 
 ---
 

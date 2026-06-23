@@ -855,8 +855,17 @@ async function trySyncUsersBeforeAuth() {
 
   const canCloud = (typeof fbReady === 'function' && fbReady()
                     && typeof pullChanges === 'function');
+  const haveLocalUsers = (loadUsers() || []).length > 0;
 
-  // Đã cấu hình cloud → luôn đồng bộ tài khoản từ cloud (KHÔNG early-return theo local)
+  // ⚡ Phương án A — Render-local-first (KHÔNG chặn màn hình chờ cloud):
+  // Nếu trong máy đã có tài khoản (người dùng quay lại — gần như mọi lần F5) thì
+  // TRẢ VỀ NGAY để app dựng giao diện từ dữ liệu local. Việc đồng bộ cloud (gồm cả
+  // tài khoản) chạy NGẦM sau đó: qua gsLoadAll() trong init() khi đã đăng nhập,
+  // hoặc qua _backgroundUsersSync() khi còn là khách (xem bootstrap ở main.js).
+  if (canCloud && haveLocalUsers) return;
+
+  // Thiết bị mới / chưa có tài khoản local → BẮT BUỘC chờ cloud lấy tài khoản thật
+  // trước khi quyết định tạo bộ mặc định (trường hợp hiếm, chỉ lần đầu trên máy này).
   if (canCloud) {
     await new Promise(resolve => pullChanges(null, () => resolve(), { silent: true }));
     if (typeof _reloadGlobals === 'function') _reloadGlobals();
@@ -872,6 +881,24 @@ async function trySyncUsersBeforeAuth() {
 
   // Local + cloud đều trống → lần khởi tạo đầu tiên: tạo bộ tài khoản mặc định
   await ensureDefaultUsers();
+}
+
+// Đồng bộ tài khoản + dữ liệu từ cloud chạy NGẦM (không chặn giao diện).
+// Dùng cho trạng thái KHÁCH (chưa đăng nhập) — vì init()/gsLoadAll() chỉ chạy sau khi
+// đăng nhập. Khi xong: nạp lại globals + re-validate session, để lần đăng nhập kế tiếp
+// dùng đúng tài khoản mới nhất từ cloud.
+async function _backgroundUsersSync() {
+  const canCloud = (typeof fbReady === 'function' && fbReady()
+                    && typeof pullChanges === 'function');
+  if (!canCloud) return;
+  try {
+    await new Promise(resolve => pullChanges(null, () => resolve(), { silent: true }));
+    if (typeof _reloadGlobals === 'function') _reloadGlobals();
+    await migrateUsersToHash();
+    if (typeof afterSync === 'function') afterSync();
+  } catch (e) {
+    console.warn('[bgSync] Đồng bộ tài khoản ngầm lỗi:', e);
+  }
 }
 
 // Bọc manualSync để afterSync() luôn được gọi sau mỗi lần sync
