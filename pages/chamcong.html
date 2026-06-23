@@ -5,9 +5,9 @@
           <button class="nav-link active" id="cc-sub-socc-btn" onclick="ccGoSub(this,'cc-sub-socc')">📝 SỔ CHẤM CÔNG</button>
           <button class="nav-link" id="cc-sub-ung-btn" onclick="ccGoSub(this,'cc-sub-ung')">💵 ỨNG CÔNG NHÂN</button>
           <button class="nav-link" id="cc-sub-baocao-btn" onclick="ccGoSub(this,'cc-sub-baocao')">📊 TỔNG LƯƠNG & LỊCH SỬ</button>
-          <!-- Nút Nhập Tiền Ứng nhanh — luôn hiển thị ở mọi sub-tab -->
-          <button class="btn btn-warning btn-sm fw-bold ms-auto" onclick="openCCUngModal()" title="Nhập tiền ứng cho công nhân (bấm được ở mọi tab)">
-            ➕ Nhập Tiền Ứng
+          <!-- Nút Tiền ứng CN — luôn hiển thị ở mọi sub-tab; gộp Ứng tiền + Trả nợ -->
+          <button class="btn btn-warning btn-sm fw-bold ms-auto" onclick="openCCUngModal()" title="Ghi nhận ứng tiền / trả nợ cho công nhân (bấm được ở mọi tab)">
+            💵 Tiền ứng CN
           </button>
         </div>
 
@@ -177,16 +177,16 @@
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Ứng Công Nhân — Sổ Cái Công Nợ</div>
           </div>
 
-          <!-- Bộ chọn tuần riêng cho sổ cái -->
+          <!-- Bộ lọc gọn: Tháng / Tuần / Tìm tên -->
           <div class="entry-date-bar" style="gap: 10px; flex-wrap: wrap; align-items: center">
-            <button class="btn btn-outline-secondary btn-sm" onclick="ccUngPrevWeek()">← Tuần trước</button>
-            <span id="cc-ung-week-label" style="font-size: 13px; font-weight: 700; min-width: 200px; text-align: center; color: var(--bs-warning)"></span>
-            <button class="btn btn-outline-secondary btn-sm" onclick="ccUngNextWeek()">Tuần sau →</button>
-            <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
-            <span class="bar-label">Từ ngày</span>
-            <input type="date" id="cc-ung-from" class="form-control form-control-sm w-auto" onchange="onCCUngFromChange()" />
-            <span class="bar-label">–</span>
-            <input type="date" id="cc-ung-to" class="form-control form-control-sm w-auto" readonly style="background: var(--bs-tertiary-bg); cursor: default" />
+            <span class="bar-label">Tháng</span>
+            <select id="cc-ung-month" class="form-select form-select-sm w-auto" onchange="onCCUngMonthChange()">
+              <option value="">Tất cả tháng</option>
+            </select>
+            <span class="bar-label">Tuần</span>
+            <select id="cc-ung-week" class="form-select form-select-sm w-auto" onchange="renderCCUngLedger()">
+              <option value="">Tất cả tuần</option>
+            </select>
             <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
             <div class="search-box" style="min-width: 160px">
               <span class="ico">🔍</span>
@@ -201,8 +201,9 @@
                   <tr>
                     <th>Tên Công Nhân</th>
                     <th style="text-align: center; width: 36px">T/P</th>
-                    <th style="text-align: right; min-width: 120px; white-space: nowrap">Nợ Cũ Mang Sang</th>
-                    <th style="text-align: right; min-width: 120px; white-space: nowrap">Ứng Trong Tuần</th>
+                    <th style="text-align: right; min-width: 110px; white-space: nowrap">Nợ Cũ Mang Sang</th>
+                    <th class="text-warning" style="text-align: right; min-width: 110px; white-space: nowrap">Ứng Trong Kỳ (+)</th>
+                    <th class="text-success" style="text-align: right; min-width: 110px; white-space: nowrap">Trả Trong Kỳ (−)</th>
                     <th class="text-danger" style="text-align: right; min-width: 120px; white-space: nowrap">Tổng Nợ Hiện Tại</th>
                     <th style="text-align: center; width: 90px">Lịch Sử</th>
                   </tr>
@@ -213,7 +214,7 @@
             <div class="app-pagination" id="cc-ung-summary"></div>
           </div>
           <div class="text-secondary mt-2" style="font-size: 11px">
-            💡 Bấm <strong>➕ Nhập Tiền Ứng</strong> ở thanh trên để ghi nhận thợ ứng tiền ngay (kể cả giữa tuần). Phần trừ nợ thực hiện ở cột <strong>Tổng Trừ Nợ/Ứng</strong> trong Sổ Chấm Công.
+            💡 Bấm <strong>💵 Tiền ứng CN</strong> ở thanh trên để ghi nhận <strong>ứng tiền</strong> hoặc <strong>trả nợ</strong> cho thợ (ngay cả giữa tuần). Sổ cái tự cập nhật công nợ realtime.
           </div>
         </div>
         <!-- ══ /SUBTAB Ứng Công Nhân ══ -->
@@ -393,12 +394,21 @@
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title">💵 Nhập Tiền Ứng Công Nhân</h5>
+                <h5 class="modal-title">💵 Tiền ứng Công Nhân</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
               </div>
               <div class="modal-body">
                 <div class="mb-3">
-                  <label class="form-label small fw-bold">Ngày ứng</label>
+                  <label class="form-label small fw-bold d-block">Loại giao dịch</label>
+                  <div class="btn-group w-100" role="group" id="cc-ung-m-kind-group">
+                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-ung" value="ung" checked />
+                    <label class="btn btn-outline-warning btn-sm fw-bold" for="cc-ung-m-kind-ung">➕ Ứng tiền</label>
+                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-tra" value="tra" />
+                    <label class="btn btn-outline-success btn-sm fw-bold" for="cc-ung-m-kind-tra">➖ Trả nợ</label>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">Ngày giao dịch</label>
                   <input type="date" id="cc-ung-m-date" class="form-control form-control-sm" />
                 </div>
                 <div class="mb-3">
@@ -420,7 +430,7 @@
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()">💾 Lưu tiền ứng</button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()">💾 Lưu giao dịch</button>
               </div>
             </div>
           </div>

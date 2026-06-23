@@ -181,7 +181,7 @@ function goPage(btn, id) {
   if (id==='doanhthu') initDoanhThu();
   if (id==='congno') initCongNo();
   if (id==='nhapung') { initUngTableIfEmpty(); buildUngFilters(); filterAndRenderUng(); }
-  if (id==='chamcong') { populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); renderCCTLTMini(); }
+  if (id==='chamcong') { populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); renderCCTLTMini(); if (typeof renderCCUngLedger==='function') renderCCUngLedger(); }
   if (id==='thietbi') { tbPopulateSels(); tbBuildRows(5); tbRenderList(); renderKhoTong(); }
   if (id==='congtrinh') renderProjectsPage();
   if (id==='thungrac') renderThungRac();
@@ -436,6 +436,7 @@ function renderActiveTab() {
       break;
     case 'chamcong':
       populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); renderCCTLTMini();
+      if (typeof renderCCUngLedger==='function') renderCCUngLedger();
       break;
     case 'thietbi':
       tbPopulateSels(); tbRenderList(); renderKhoTong();

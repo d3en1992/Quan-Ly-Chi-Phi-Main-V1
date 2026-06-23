@@ -55,7 +55,7 @@ const CC_DATE_OFFSETS = [0,1,2,3,4,5,6]; // offset from Sunday (week starts Sund
 
 function round1(n){ return Math.round(n * 10) / 10; }
 
-// ── Collapsible debt columns (Nợ Cũ / Vay Mới / Trừ Nợ) ─────────
+// ── Collapsible cột phụ trong Sổ Chấm Công (HĐ Mua Lẻ / Nội Dung) ─────────
 // Mặc định: ẩn. Bấm toggle để mở/đóng.
 let _ccDebtColsHidden = true;
 
@@ -75,84 +75,74 @@ function _applyCCDebtColsVisibility() {
   });
 }
 
-// Tính tổng nợ lũy kế của công nhân trước tuần fromDate
-// debt = sum(loanAmount - tru) cho mọi tuần đã lưu có fromDate < ngày truyền vào
-//
-// [SYNC-SAFE] NỢ CŨ là giá trị tính lũy kế từ toàn bộ lịch sử local. Nếu thiết bị
-// chưa tải đủ các năm trước (pull chỉ lấy các năm đã có ở local), số tính tại chỗ sẽ
-// thiếu → lệch giữa thiết bị. Khắc phục: khi lưu tuần, ta đóng băng (snapshot) giá trị
-// này vào từng công nhân (wk.debtBefore) — snapshot đi theo record cc_v2 lên cloud.
-// Khi hiển thị, ưu tiên snapshot đã đồng bộ; chỉ tính lũy kế tại chỗ khi:
-//   - forceLive = true (lúc lưu, cần tính lại số mới nhất để đóng băng), hoặc
-//   - record cũ chưa có snapshot (tương thích ngược).
-function _calcDebtBefore(workerName, fromDate, forceLive) {
-  if (!workerName || !fromDate) return 0;
+// ── Sổ cái công nợ công nhân ─────────────────────────────────────────
+// Tái dùng store ung_v1: loai='congnhan', tp=tên CN, cnKind='ung'(ứng tiền) | 'tra'(trả nợ).
+// Công nợ 1 thợ = Σ ỨNG − Σ TRẢ (sổ cái) + (loanAmount − tru) của dữ liệu chấm công CŨ.
+// Bản ghi cũ chưa có cnKind → coi như 'ung' (tương thích ngược).
 
-  // (a) Ưu tiên snapshot đã lưu & đồng bộ — giữ NỢ CŨ giống nhau trên mọi thiết bị
-  if (!forceLive) {
-    let snap = null, snapTs = -1;
-    const safeTs = (typeof _safeTs === 'function')
-      ? _safeTs
-      : (ts => (typeof ts === 'number' ? ts : parseInt(ts) || 0));
-    ccData.forEach(w => {
-      if (w.deletedAt) return;
-      if ((w.fromDate || '') !== fromDate) return;
-      (w.workers || []).forEach(wk => {
-        if (wk.name !== workerName) return;
-        if (typeof wk.debtBefore !== 'number') return;
-        const ts = safeTs(w.updatedAt || w.createdAt || 0);
-        if (ts >= snapTs) { snapTs = ts; snap = wk.debtBefore; }
-      });
-    });
-    if (snap !== null) return snap;
-  }
+function _ccUngRecs(workerName) {
+  const recs = (typeof ungRecords !== 'undefined') ? ungRecords : [];
+  return recs.filter(r => !r.deletedAt && r.loai === 'congnhan' && (r.tp || '') === workerName);
+}
+function _ccKind(r) { return r.cnKind === 'tra' ? 'tra' : 'ung'; }
 
-  // (b) Fallback: tính lũy kế từ dữ liệu local (lúc lưu, hoặc record cũ chưa có snapshot)
-  // Công nợ = ỨNG (sổ cái tiền ứng realtime + loanAmount lịch sử trong tuần) − TRỪ NỢ.
+// Net sổ cái (ứng = +, trả nợ = −) của 1 công nhân, lọc theo pred(record).
+function _ccLedgerNet(workerName, pred) {
+  let s = 0;
+  _ccUngRecs(workerName).forEach(r => {
+    if (pred && !pred(r)) return;
+    s += (_ccKind(r) === 'tra' ? -1 : 1) * (Number(r.tien) || 0);
+  });
+  return s;
+}
+
+// Tổng tiền ỨNG (kind='ung') trong khoảng ngày [start, end].
+function ccUngInRange(workerName, start, end) {
+  let s = 0;
+  _ccUngRecs(workerName).forEach(r => {
+    if (_ccKind(r) !== 'ung' || !r.ngay) return;
+    if (r.ngay < start || r.ngay > end) return;
+    s += Number(r.tien) || 0;
+  });
+  return s;
+}
+// Tổng tiền TRẢ NỢ (kind='tra') trong khoảng ngày [start, end].
+function ccTraInRange(workerName, start, end) {
+  let s = 0;
+  _ccUngRecs(workerName).forEach(r => {
+    if (_ccKind(r) !== 'tra' || !r.ngay) return;
+    if (r.ngay < start || r.ngay > end) return;
+    s += Number(r.tien) || 0;
+  });
+  return s;
+}
+
+// Phần nợ từ dữ liệu chấm công CŨ (loanAmount − tru) ở các tuần thỏa predWeek(week).
+function _ccLegacyDebt(workerName, predWeek) {
   let debt = 0;
   ccData.forEach(w => {
     if (w.deletedAt) return;
-    if (w.fromDate >= fromDate) return;
+    if (predWeek && !predWeek(w)) return;
     (w.workers || []).forEach(wk => {
       if (wk.name !== workerName) return;
-      // loanAmount: dữ liệu vay-trong-tuần CŨ (trước khi tách sổ cái) — giữ để tương thích ngược.
       debt += (wk.loanAmount || 0) - (wk.tru || 0);
     });
   });
-  // [MỚI] Cộng các phiếu ứng realtime (ung_v1, loai='congnhan') có ngày TRƯỚC tuần fromDate.
-  debt += _ccUngSum(workerName, r => r.ngay && r.ngay < fromDate);
   return debt;
 }
 
-// ── Sổ cái tiền ứng công nhân (tái dùng store ung_v1, loai='congnhan', field tp=tên CN) ──
-// Tổng tiền ứng của 1 công nhân thỏa điều kiện lọc pred(record).
-function _ccUngSum(workerName, pred) {
-  if (!workerName) return 0;
-  const recs = (typeof ungRecords !== 'undefined') ? ungRecords : [];
-  let sum = 0;
-  recs.forEach(r => {
-    if (r.deletedAt) return;
-    if (r.loai !== 'congnhan') return;
-    if ((r.tp || '') !== workerName) return;
-    if (pred && !pred(r)) return;
-    sum += Number(r.tien) || 0;
-  });
-  return sum;
+// Dư nợ TRƯỚC mốc dateISO (không tính ngày = dateISO) → "nợ cũ mang sang" đầu kỳ.
+function _calcDebtBefore(workerName, dateISO) {
+  if (!workerName || !dateISO) return 0;
+  return _ccLegacyDebt(workerName, w => (w.fromDate || '') < dateISO)
+       + _ccLedgerNet(workerName, r => r.ngay && r.ngay < dateISO);
 }
 
-// Tổng tiền ứng phát sinh TRONG tuần [fromDate, toDate] của 1 công nhân.
-function ccUngForWorkerInWeek(workerName, fromDate, toDate) {
-  if (!fromDate) return 0;
-  const to = toDate || ccSaturdayISO(fromDate);
-  return _ccUngSum(workerName, r => r.ngay >= fromDate && r.ngay <= to);
-}
-
-// Dư nợ hiện tại của công nhân tính đến hết tuần đang xét = nợ cũ mang sang + ứng trong tuần.
-// Dùng để auto-fill cột "Tổng Trừ Nợ/Ứng" (hybrid) và cho sổ cái Ứng Công Nhân.
-function ccWorkerDebtNow(workerName, fromDate, toDate) {
-  if (!workerName || !fromDate) return 0;
-  // forceLive=true: luôn tính realtime (không đọc snapshot) để phản ánh phiếu ứng vừa nhập.
-  return _calcDebtBefore(workerName, fromDate, true) + ccUngForWorkerInWeek(workerName, fromDate, toDate);
+// Dư nợ tính ĐẾN HẾT ngày dateISO (bao gồm ngày đó) → tổng nợ hiện tại cuối kỳ.
+function ccWorkerDebtUpTo(workerName, dateISO) {
+  if (!workerName || !dateISO) return 0;
+  return _ccLegacyDebt(workerName, w => (w.fromDate || '') <= dateISO)
+       + _ccLedgerNet(workerName, r => r.ngay && r.ngay <= dateISO);
 }
 
 // ─── date helpers ───────────────────────────────────────────────

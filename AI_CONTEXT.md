@@ -40,6 +40,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.14 Đưa Quản Lý Khách Hàng ra Tổng Quan + Chi tiết CT chỉ theo dõi chi phí (19/06/2026)](#914-đưa-quản-lý-khách-hàng-ra-tổng-quan--chi-tiết-ct-chỉ-theo-dõi-chi-phí-19062026)
    - [9.15 Lọc tuần + Sort DESC + Fix dropdown đổi tên + Số ngày thi công + Biểu đồ 52 tuần đa năm (22/06/2026)](#915-lọc-tuần--sort-desc--fix-dropdown-đổi-tên--số-ngày-thi-công--biểu-đồ-52-tuần-đa-năm-22062026)
    - [9.16 Fix bug đặt tên Công Trình & dọn dead code Danh Mục (23/06/2026)](#916-fix-bug-đặt-tên-công-trình--dọn-dead-code-danh-mục-23062026)
+   - [9.17 Tách Tạm Ứng/Công Nợ Công Nhân ra khỏi Sổ Chấm Công (23/06/2026)](#917-tách-tạm-ứngcông-nợ-công-nhân-ra-khỏi-sổ-chấm-công-23062026)
 
 **Phụ lục**
 
@@ -281,7 +282,7 @@ Mỗi **năm × hạng mục = 1 doc** + **5 doc meta dùng chung**, tên field 
 | `cc_v2` | `Array<Object>` | Chấm công tuần | `id:string`, `fromDate:YYYY-MM-DD`, `toDate:YYYY-MM-DD`, `ct:string`, `projectId:string\|null`, `ctPid:string?`, `workers:array`, `createdAt:number`, `updatedAt:number`, `deletedAt:number\|null`, `deviceId:string` |
 | `cc_v2.workers[]` | `Array<Object>` | Dòng công nhân | `name:string`, `d:number[7]`, `luong:number`, `phucap:number`, `hdmuale:number`, `tru:number`, `loanAmount:number`, `nd:string`, `role:string?` |
 | `tb_v1` | `Array<Object>` | Thiết bị | `id:string`, `ct:string`, `projectId:string\|null`, `ten:string`, `soluong:number`, `tinhtrang:string`, `nguoi:string`, `ghichu:string`, `ngay:string`, metadata |
-| `ung_v1` | `Array<Object>` | Tiền ứng | `id:string`, `ngay:string`, `loai:'thauphu'\|'nhacungcap'\|'congnhan'`, `tp:string`, `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nd:string`, metadata |
+| `ung_v1` | `Array<Object>` | Tiền ứng | `id:string`, `ngay:string`, `loai:'thauphu'\|'nhacungcap'\|'congnhan'`, `cnKind:'ung'\|'tra'` (chỉ khi loai='congnhan'; trống=ung), `tp:string` (TP/NCC hoặc tên CN), `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nd:string`, metadata |
 | `thu_v1` | `Array<Object>` | Thu tiền | `id:string`, `ngay:string`, `congtrinh:string`, `projectId:string\|null`, `tien:number`, `nguoi:string`, `nd:string`, metadata |
 | `projects_v1` | `Array<Object>` | Master công trình | `{ id, name, type, status, startDate, endDate, closedDate, note, chuDauTu, customerId, heSoTiTrong, createdYear, createdAt, updatedAt, deletedAt }` <br> - `customerId`: FK → `customers_v1[].id` (dual-write cùng `chuDauTu` = tên KH). <br> - `heSoTiTrong` (k): hệ số phân bổ chi phí chung, mặc định 1, `k=0` → không gánh. <br> - Special ID: `COMPANY` (CÔNG TY) for overhead costs. <br> - Statuses: `planning`, `active`, `completed`, `closed`. <br> - Types: `CT` (Công trình), `SC` (Sửa chữa), `OTHER`. |
 | `customers_v1` | `Array<Object>` | Master khách hàng (Chủ đầu tư / CRM) | `{ id, name, phone, email, address, taxCode, note, createdAt, updatedAt, deletedAt }` <br> - 1 khách hàng → nhiều công trình (qua `projects_v1[].customerId`). <br> - Sync piggyback trong doc `meta_cong_trinh`. |
@@ -1153,6 +1154,30 @@ Rà soát sâu cơ chế **tên** của Tab Danh Mục (id-based qua `cat_items_
 **Tham chiếu hiện hành cần cập nhật:** `js/app/auth.js` thêm `_backgroundUsersSync()`; `trySyncUsersBeforeAuth()` nay **không chặn** khi có tài khoản local.
 
 **File đã sửa:** `js/app/auth.js`, `js/app/main.js`.
+
+---
+
+## 9.17 Tách Tạm Ứng/Công Nợ Công Nhân ra khỏi Sổ Chấm Công (23/06/2026)
+
+**Bối cảnh:** Trước đây Sổ Chấm Công gánh luôn công nợ thợ qua các cột `Nợ Cũ / Vay Mới (+) / Trừ Nợ (-)` (lưu `worker.loanAmount`, `worker.tru` trong `cc_v2`). Thợ ứng tiền lắt nhắt giữa tuần nhưng phải đợi mở bảng lương tuần mới ghi được → bất tiện. Tách nghiệp vụ tạm ứng/trả nợ thành luồng realtime tập trung ở popup, giữ Sổ Chấm Công gọn (chỉ ngày công + lương).
+
+**Thay đổi chính:**
+
+1. **Sổ Chấm Công gọn lại:** xóa hẳn 3 cột nợ + cột "Tổng Trừ Nợ/Ứng". Công thức mới: `THỰC LÃNH = Tổng Lương + Phụ Cấp + HĐ Mua Lẻ` (không còn trừ nợ trong bảng). Giữ 2 cột thu gọn `HĐ Mua Lẻ` + `Nội Dung`. Khi lưu, `loanAmount` và `tru` của record mới luôn = 0 (dữ liệu cũ vẫn được cộng dồn để không mất nợ tồn).
+
+2. **Sub-tab mới `💵 ỨNG CÔNG NHÂN`** (`#cc-sub-ung`) giữa Sổ Chấm Công và Tổng Lương: sổ cái công nợ thợ, lọc gọn bằng dropdown **Tháng** + **Tuần** + ô tìm tên (bỏ nút Tuần trước/sau). Cột: Tên CN · T/P · Nợ Cũ Mang Sang · Ứng Trong Kỳ (+) · Trả Trong Kỳ (−) · Tổng Nợ Hiện Tại · Lịch Sử.
+
+3. **Nút global `💵 Tiền ứng CN`** (luôn hiển thị trên thanh sub-tab) mở **popup gộp Ứng tiền + Trả nợ**: radio chọn loại giao dịch (`Ứng tiền`/`Trả nợ`), ngày, tên CN (datalist `cats.congNhan`), số tiền, công trình (tùy chọn), ghi chú. Modal "Lịch sử" xem toàn bộ ứng/trả của 1 thợ.
+
+4. **Lưu trữ — tái dùng `ung_v1`:** không tạo key/collection mới (không đụng `sync.js`/`core.storage.js`). Phiếu công nhân có `loai='congnhan'`, `tp=tên CN`, `cnKind='ung'|'tra'`. Trang Tiền Ứng (nhapung) và Công Nợ chỉ lọc `loai` thauphu/nhacungcap (`doanhthu.congno.js` dòng 257 bỏ qua loại khác) nên phiếu công nhân không lẫn sang đó.
+
+**Tham chiếu hiện hành cần cập nhật:**
+- `js/modules/chamcong/chamcong.core.js`: bỏ logic snapshot `debtBefore`; helper công nợ mới: `_ccUngRecs`, `_ccKind`, `_ccLedgerNet`, `ccUngInRange`, `ccTraInRange`, `_ccLegacyDebt`, `_calcDebtBefore(name, dateISO)` (nợ trước mốc), `ccWorkerDebtUpTo(name, dateISO)` (nợ đến hết mốc). `ccGoSub` thêm nhánh `cc-sub-ung`.
+- File mới `js/modules/chamcong/chamcong.ung-ledger.js` (nạp sau `chamcong.history-reports.js`): `renderCCUngLedger`, `buildCCUngFilters`, `onCCUngMonthChange`, `openCCUngModal`, `saveCCUng`, `openCCUngHist`, `renderCCUngHistory`, `delCCUngRecord`, `_ccUngPeriod`, `_ccUngMonthRange`.
+- Schema `ung_v1` (mục 5) thêm trường tùy chọn `cnKind` cho bản ghi `loai='congnhan'`.
+- `main.js` `goPage`/`renderActiveTab` nhánh `chamcong` gọi thêm `renderCCUngLedger()`.
+
+**File đã sửa:** `pages/chamcong.html`, `index.html`, `assets/css/style.css`, `js/modules/chamcong/chamcong.core.js`, `js/modules/chamcong/chamcong.week-form.js`, `js/modules/chamcong/chamcong.history-reports.js` (CSV bỏ cột Vay Mới), `js/app/main.js`, **mới** `js/modules/chamcong/chamcong.ung-ledger.js`.
 
 ---
 
