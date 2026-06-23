@@ -39,6 +39,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.13 Tách meta_khach_hang + Quyết Toán Chi Phí + Subtab Lợi Nhuận (19/06/2026)](#913-tách-meta_khach_hang--quyết-toán-chi-phí--subtab-lợi-nhuận-19062026)
    - [9.14 Đưa Quản Lý Khách Hàng ra Tổng Quan + Chi tiết CT chỉ theo dõi chi phí (19/06/2026)](#914-đưa-quản-lý-khách-hàng-ra-tổng-quan--chi-tiết-ct-chỉ-theo-dõi-chi-phí-19062026)
    - [9.15 Lọc tuần + Sort DESC + Fix dropdown đổi tên + Số ngày thi công + Biểu đồ 52 tuần đa năm (22/06/2026)](#915-lọc-tuần--sort-desc--fix-dropdown-đổi-tên--số-ngày-thi-công--biểu-đồ-52-tuần-đa-năm-22062026)
+   - [9.16 Fix bug đặt tên Công Trình & dọn dead code Danh Mục (23/06/2026)](#916-fix-bug-đặt-tên-công-trình--dọn-dead-code-danh-mục-23062026)
 
 **Phụ lục**
 
@@ -1074,6 +1075,28 @@ Năm sửa đổi độc lập theo yêu cầu người dùng:
 **5. Biểu đồ chi phí đa năm: gộp theo SỐ TUẦN, 52 cột cố định.** `datatools.js`: chế độ Nhiều năm/Toàn bộ năm trước đây dùng `_dbBarChart` (theo tháng, trung bình cùng tháng giữa các năm — gây "cộng gộp sai"). Nay thay bằng hàm mới `_dbBarChartWeekly52(years, invoiceData, ungData)`: dựng 52 bucket, cộng dồn theo số tuần (1..52) xuyên TẤT CẢ năm chọn (cột T_N = Σ tuần N của từng năm; tuần 53 gộp vào T52); render SVG cột chồng giống `_dbBarChartWeekly` nhưng cố định T1..T52, không click-chọn tuần. Thêm state `_dbChartMode` ('single'|'multi') + cache `_dbLastWeeklyYears`; `renderDashboard` nhánh đa năm set mode='multi' và gọi hàm mới (đổi tiêu đề thành "Chi Phí Theo Tuần"); `_dbSetWeekFilter` re-render đúng theo mode. Bộ lọc range: `all`=52 cột, `12/8/4`=N tuần cuối. Hàm cũ `_dbBarChart` còn định nghĩa nhưng KHÔNG còn được gọi.
 
 **File đã sửa:** `index.html`, `js/modules/hoadon/hoadon.list-trash.js`, `js/modules/doanhthu/doanhthu.forms.js`, `js/modules/projects/projects.ui.js`, `js/legacy/datatools.js`.
+
+---
+
+## 9.16 Fix bug đặt tên Công Trình & dọn dead code Danh Mục (23/06/2026)
+
+Rà soát sâu cơ chế **tên** của Tab Danh Mục (id-based qua `cat_items_v1`) vs Tab Công Trình (`projects_v1`, `cats.congTrinh*` là derived) → sửa 6 bug:
+
+**1. Lan tên khi đổi tên CT — cứu record text-only mồ côi (BUG 1).** `projects.model.js`: thêm `_propagateProjectRename(id, oldName, newName)` — quét `invoices/ccData/ungRecords/tbData/thuRecords/thauPhuContracts`, với record có `projectId===id` HOẶC record text-only khớp `normalizeKey(oldName)` → set `projectId=id` + cập nhật text (`congtrinh`/`ct`) sang tên mới. Gọi trong `updateProject()` khi `name` đổi. Trước đây record chỉ có text `congtrinh` (import/legacy) bị kẹt tên cũ sau khi đổi tên vì `migrateProjectLinks` chỉ khớp theo tên hiện hành.
+
+**2. Chống trùng tên Công Trình (BUG 2).** Thêm `_normProjName` (bỏ dấu+lowercase+gộp space), `_isProjectNameTaken(name, exceptId)`, `_isReservedCatName(name)`, `_assertProjectNameOk(name, exceptId)` (throw). Gọi ở `createProject()` và `updateProject()` (chỉ khi tên thực sự đổi, loại trừ chính nó). `saveCTEdit()` bọc `try/catch` + `toast` lỗi (createProject vốn đã có try/catch ở `saveCTCreate`).
+
+**3. Chặn đặt tên CT trùng tên Danh Mục + nới `cleanupInvalidProjects` (BUG 3).** `_isReservedCatName` chặn từ lúc tạo/đổi tên. Đồng thời `cleanupInvalidProjects()` KHÔNG còn xóa cứng project trùng tên danh mục nếu project **đã có dữ liệu liên kết** (`!canDeleteProject(p.id)`) — tránh mất CT thật sau reload.
+
+**4. `congTrinhYears` không còn key mồ côi (BUG 4).** `rebuildCatCTFromProjects()` dựng map năm **mới hoàn toàn** từ `projects[]` (chỉ giữ key là tên project hợp lệ hiện hành; thiếu `startDate` thì giữ năm cũ cho đúng tên đó) — thay vì spread map cũ để lại key tên đã đổi/đã xóa.
+
+**5. Re-key HĐ Chính legacy khi đổi tên CT (BUG 6).** Thêm `_rekeyHopDongOnRename(id, oldName, newName)` — nếu `hopDongData[oldName]` (key legacy theo tên) tồn tại và chưa có `hopDongData[id]` → di chuyển sang key `projectId`, set `projectId`/`updatedAt`. Gọi trước `_syncChuDauTuToHopDong` trong `updateProject`.
+
+**6. Dọn dead code congTrinh trong Danh Mục (BUG 5).** `danhmuc.categories.js`: `addItem()`/`delItem()` đã `return` sớm cho `congTrinh` → xóa các nhánh `if(catId==='congTrinh')` phía sau (gán/xóa `congTrinhYears`, gọi `populateCCCtSel`/`tbPopulateSels`) vốn không bao giờ chạy. Thêm chú thích `[KHÔNG DÙNG]` cho `renderCTItem` (card congTrinh đã bị loại khỏi `renderSettings`).
+
+**Tham chiếu hiện hành cần cập nhật:** `projects.model.js` thêm globals/hàm `_normProjName`, `_isProjectNameTaken`, `_isReservedCatName`, `_assertProjectNameOk`, `_propagateProjectRename`, `_rekeyHopDongOnRename`.
+
+**File đã sửa:** `js/modules/projects/projects.model.js`, `js/modules/projects/projects.ui.js`, `js/modules/danhmuc/danhmuc.categories.js`.
 
 ---
 

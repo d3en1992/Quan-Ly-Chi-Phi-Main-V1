@@ -66,10 +66,16 @@ function _isValidProject(p) {
 function cleanupInvalidProjects(badNames) {
   const badSet = new Set((badNames || []).map(n => (n || '').trim()));
   const before = projects.length;
-  // Giữ lại: soft-deleted (không xóa hard) + valid project không nằm trong badNames
-  projects = projects.filter(p =>
-    p.deletedAt || (_isValidProject(p) && !badSet.has((p.name || '').trim()))
-  );
+  // Giữ lại:
+  //  - soft-deleted (không xóa hard)
+  //  - valid project KHÔNG trùng tên danh mục
+  //  - HOẶC project trùng tên danh mục NHƯNG đã có dữ liệu liên kết (tránh mất CT thật — BUG 3)
+  projects = projects.filter(p => {
+    if (p.deletedAt) return true;
+    if (!_isValidProject(p)) return false;
+    if (!badSet.has((p.name || '').trim())) return true;
+    return !canDeleteProject(p.id); // trùng tên danh mục: chỉ xóa khi rỗng (không có dữ liệu)
+  });
   if (projects.length < before) {
     _saveProjects();
     console.log(`[cleanupProjects] Đã xóa ${before - projects.length} project không hợp lệ khỏi projects_v1`);
@@ -120,16 +126,23 @@ function rebuildCatCTFromProjects() {
   if (typeof cats === 'undefined') return;
 
   // Chỉ build từ projects[] — single source of truth, không union từ invoices/cc/ung/thu
-  const projNames = projects.filter(_isValidProject).map(p => p.name);
+  const validProjects = projects.filter(_isValidProject);
+  const projNames = validProjects.map(p => p.name);
   const deduped = [...new Set(projNames)];
 
-  // Rebuild congTrinhYears — lấy year từ project.startDate (ưu tiên), giữ year cũ cho phần còn lại
-  const newYears = { ...(cats.congTrinhYears || {}) };
-  projects.filter(_isValidProject).forEach(p => {
+  // Rebuild congTrinhYears MỚI HOÀN TOÀN — chỉ giữ key là tên project hợp lệ hiện hành.
+  // (KHÔNG spread map cũ → tránh để lại key "mồ côi" khi đổi tên/xóa CT.)
+  // Năm lấy từ startDate; nếu project thiếu startDate thì giữ lại năm cũ cho ĐÚNG tên đó.
+  const oldYears = cats.congTrinhYears || {};
+  const newYears = {};
+  validProjects.forEach(p => {
+    let yr = null;
     if (p.startDate) {
-      const yr = parseInt(p.startDate.split('-')[0]);
-      if (yr > 2000 && yr < 2100) newYears[p.name] = yr;
+      const y = parseInt(p.startDate.split('-')[0]);
+      if (y > 2000 && y < 2100) yr = y;
     }
+    if (yr == null && oldYears[p.name] != null) yr = oldYears[p.name];
+    if (yr != null) newYears[p.name] = yr;
   });
 
   cats.congTrinh      = deduped;
@@ -204,6 +217,90 @@ function getProjectAutoStartDate(projectId) {
   return d.toISOString().slice(0, 10);
 }
 
+// ── Helpers chống trùng / chuẩn hóa tên công trình ─────────────────
+// Chuẩn hóa tên CT để so trùng: bỏ dấu tiếng Việt + lowercase + gộp khoảng trắng.
+// (đồng nhất với _norm trong findProjectIdByName & deduplicateProjects)
+function _normProjName(s) {
+  return (s || '').toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Tên CT đã tồn tại ở project khác chưa? (so accent-insensitive, bỏ qua chính nó khi edit)
+function _isProjectNameTaken(name, exceptId = null) {
+  const n = _normProjName(name);
+  if (!n) return false;
+  return projects.some(p => !p.deletedAt && p.id !== exceptId && _normProjName(p.name) === n);
+}
+
+// Tên CT có trùng với một mục trong Danh Mục không?
+// cleanupInvalidProjects() sẽ XÓA project trùng tên danh mục → phải chặn ngay từ lúc tạo/đổi tên.
+function _isReservedCatName(name) {
+  if (typeof cats === 'undefined') return false;
+  const n = _normProjName(name);
+  if (!n) return false;
+  const arrs = [cats.loaiChiPhi, cats.congNhan, cats.thauPhu, cats.nhaCungCap, cats.nguoiTH];
+  return arrs.some(arr => (arr || []).some(v => _normProjName(v) === n));
+}
+
+// Validate tên CT khi tạo/đổi tên — throw nếu trùng (để UI bắt và toast).
+function _assertProjectNameOk(name, exceptId = null) {
+  if (_isProjectNameTaken(name, exceptId))
+    throw new Error('Tên công trình đã tồn tại: ' + (name || '').trim());
+  if (_isReservedCatName(name))
+    throw new Error('Tên "' + (name || '').trim() + '" trùng với một mục trong Danh Mục — vui lòng đặt tên khác.');
+}
+
+// Lan tên mới của project xuống các record (text congtrinh/ct) + liên kết record text cũ mồ côi.
+// Match: record có projectId===id  HOẶC  record text-only khớp tên CŨ (normalized).
+// → set projectId=id + cập nhật text sang tên mới, cứu record import/legacy khỏi kẹt tên cũ.
+function _propagateProjectRename(id, oldName, newName) {
+  if (!newName || oldName === newName) return;
+  const normOld = _normProjName(oldName);
+  // field text chứa tên CT theo từng store
+  const apply = (arr, field) => {
+    if (typeof arr === 'undefined' || !Array.isArray(arr)) return false;
+    let changed = false;
+    arr.forEach(r => {
+      if (r.deletedAt) return;
+      const isLinked  = r.projectId === id;
+      const isOrphan  = !r.projectId && normOld && _normProjName(r[field] || '') === normOld;
+      if (!isLinked && !isOrphan) return;
+      if (!r.projectId) r.projectId = id;
+      if (r[field] !== newName) r[field] = newName;
+      changed = true;
+    });
+    return changed;
+  };
+  const inv = apply(typeof invoices         !== 'undefined' ? invoices         : undefined, 'congtrinh');
+  const cc  = apply(typeof ccData           !== 'undefined' ? ccData           : undefined, 'ct');
+  const ung = apply(typeof ungRecords       !== 'undefined' ? ungRecords       : undefined, 'congtrinh');
+  const tb  = apply(typeof tbData           !== 'undefined' ? tbData           : undefined, 'ct');
+  const thu = apply(typeof thuRecords       !== 'undefined' ? thuRecords       : undefined, 'congtrinh');
+  const tp  = apply(typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : undefined, 'congtrinh');
+  if (inv || cc) { if (typeof clearInvoiceCache === 'function') clearInvoiceCache(); }
+  if (inv) save('inv_v3',   invoices);
+  if (cc)  save('cc_v2',    ccData);
+  if (ung) save('ung_v1',   ungRecords);
+  if (tb)  save('tb_v1',    tbData);
+  if (thu) save('thu_v1',   thuRecords);
+  if (tp)  save('thauphu_v1', thauPhuContracts);
+}
+
+// Re-key hợp đồng chính legacy (key = tên CT) sang projectId khi đổi tên CT.
+// Chỉ di chuyển khi chưa có key projectId (tránh ghi đè/mất dữ liệu khi cả 2 key cùng tồn tại).
+function _rekeyHopDongOnRename(id, oldName, newName) {
+  if (typeof hopDongData === 'undefined' || !oldName) return;
+  if (hopDongData[oldName] && !hopDongData[id]) {
+    hopDongData[id] = hopDongData[oldName];
+    delete hopDongData[oldName];
+    hopDongData[id].projectId = id;
+    hopDongData[id].updatedAt = Date.now();
+    save('hopdong_v1', hopDongData);
+  }
+}
+
 /**
  * Tạo mới một công trình.
  * @param {Object} opts
@@ -218,6 +315,8 @@ function getProjectAutoStartDate(projectId) {
 function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '', chuDauTu = '', customerId = null, heSoTiTrong = 1 } = {}) {
   if (!name || !name.trim()) throw new Error('Tên công trình không được để trống');
   if (!PROJECT_STATUS[status]) throw new Error('Trạng thái không hợp lệ: ' + status);
+  // Chống trùng tên + trùng tên danh mục (tránh tạo CT ambiguous / bị xóa khi reload)
+  _assertProjectNameOk(name);
   const nowMs  = Date.now();
   const todayS = new Date().toISOString().slice(0, 10);
   const curYear = new Date().getFullYear();
@@ -266,9 +365,17 @@ function updateProject(id, changes = {}) {
   const idx = projects.findIndex(p => p.id === id);
   if (idx < 0) return null;
   const { createdAt } = projects[idx]; // bảo toàn thời điểm tạo gốc
+  const oldName = projects[idx].name;  // giữ tên cũ để lan tên xuống record sau khi đổi
   // Loại bỏ các trường không được phép ghi đè qua changes
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...safeChanges } = changes;
   if (typeof safeChanges.chuDauTu === 'string') safeChanges.chuDauTu = safeChanges.chuDauTu.trim();
+  // Nếu đổi tên: trim + chống trùng (bỏ qua chính nó) + chặn trùng tên danh mục
+  if (typeof safeChanges.name === 'string') {
+    safeChanges.name = safeChanges.name.trim();
+    if (safeChanges.name && _normProjName(safeChanges.name) !== _normProjName(oldName)) {
+      _assertProjectNameOk(safeChanges.name, id);
+    }
+  }
   // Ép kiểu hệ số tỉ trọng về số hợp lệ (>= 0); không hợp lệ → 1
   if ('heSoTiTrong' in safeChanges) {
     const _k = Number(safeChanges.heSoTiTrong);
@@ -282,6 +389,12 @@ function updateProject(id, changes = {}) {
     updatedAt: Date.now()
   };
   _saveProjects();
+  // Đổi tên CT → lan tên mới xuống record (cứu record text-only mồ côi) + re-key HĐ legacy
+  const newName = projects[idx].name;
+  if (newName !== oldName) {
+    _rekeyHopDongOnRename(id, oldName, newName);
+    _propagateProjectRename(id, oldName, newName);
+  }
   rebuildCatCTFromProjects();
   // Đồng bộ chuDauTu → hopdong_v1.khachHang (đảm bảo HĐ Chính hiển thị đúng tên CĐT mới)
   if ('chuDauTu' in safeChanges) _syncChuDauTuToHopDong(id);

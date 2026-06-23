@@ -389,6 +389,8 @@ function _dmFilterCard(catId) {
 }
 
 // ── Render item Công Trình với badge năm ──────────────────────────
+// [KHÔNG DÙNG] Card congTrinh đã bị loại khỏi renderSettings (filter cfg.id !== 'congTrinh').
+// Giữ lại để tham chiếu; công trình được quản lý hoàn toàn ở Tab Công Trình (projects_v1).
 function renderCTItem(item, idx) {
   const inUse = isItemInUse('congTrinh', item);
   const yr = cats.congTrinhYears && cats.congTrinhYears[item];
@@ -569,16 +571,9 @@ function addItem(catId) {
   const isDup = cats[catId].some(existing => normalizeKey(existing) === normVal);
   if(isDup){toast(`⚠️ "${val}" đã tồn tại trong danh mục!`,'error');return;}
   cats[catId].push(val);
-  // Gán năm cho công trình mới (để lọc theo năm)
-  if (catId === 'congTrinh') {
-    cats.congTrinhYears[val] = activeYear || new Date().getFullYear();
-  }
+  // (congTrinh không bao giờ tới đây — đã return sớm ở đầu hàm; quản lý qua Tab Công Trình)
   saveCats(catId); inp.value='';
   renderSettings(); rebuildEntrySelects(); rebuildUngSelects();
-  if (catId === 'congTrinh') {
-    try { populateCCCtSel(); } catch(e) {}
-    try { tbPopulateSels(); } catch(e) {}
-  }
   if (catId === 'tbTen') {
     try { tbRefreshNameDl(); tbPopulateSels(); } catch(e) {}
   }
@@ -649,17 +644,10 @@ function delItem(catId,idx) {
     ungRecords = ungRecords.filter(r => !(r.loai === 'congnhan' && r.tp === item));
   }
   cats[catId].splice(idx,1);
-  // Xóa year entry nếu có
-  if (catId === 'congTrinh' && cats.congTrinhYears) {
-    delete cats.congTrinhYears[item];
-  }
+  // (congTrinh không bao giờ tới đây — đã return sớm ở đầu hàm; quản lý qua Tab Công Trình)
   saveCats(catId);
   save('ung_v1', ungRecords);
   renderSettings(); rebuildEntrySelects(); rebuildUngSelects();
-  if (catId === 'congTrinh') {
-    try { populateCCCtSel(); } catch(e) {}
-    try { tbPopulateSels(); } catch(e) {}
-  }
   toast(`Đã xóa "${item}"`);
 }
 

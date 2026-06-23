@@ -1135,7 +1135,14 @@ function saveCTEdit(id) {
     ? true
     : (p?.startDateUserEdited || false);
 
-  updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId, heSoTiTrong });
+  try {
+    updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId, heSoTiTrong });
+  } catch (e) {
+    // updateProject throw khi tên trùng CT khác hoặc trùng tên Danh Mục
+    toast('❌ ' + e.message, 'error');
+    document.getElementById('ct-edit-name')?.focus();
+    return;
+  }
   closeModal();
   toast('✅ Đã cập nhật công trình', 'success');
   renderProjectsPage();
