@@ -71,7 +71,7 @@ function _applyCCDebtColsVisibility() {
   // Cập nhật icon trên toggle header
   document.querySelectorAll('.cc-debt-toggle-th').forEach(th => {
     th.textContent = _ccDebtColsHidden ? '▶' : '◀';
-    th.title = _ccDebtColsHidden ? 'Mở rộng: HĐ Mua Lẻ / Nội Dung / Nợ Cũ / Vay Mới / Trừ Nợ' : 'Thu gọn';
+    th.title = _ccDebtColsHidden ? 'Mở rộng: HĐ Mua Lẻ / Nội Dung' : 'Thu gọn';
   });
 }
 
@@ -108,16 +108,51 @@ function _calcDebtBefore(workerName, fromDate, forceLive) {
   }
 
   // (b) Fallback: tính lũy kế từ dữ liệu local (lúc lưu, hoặc record cũ chưa có snapshot)
+  // Công nợ = ỨNG (sổ cái tiền ứng realtime + loanAmount lịch sử trong tuần) − TRỪ NỢ.
   let debt = 0;
   ccData.forEach(w => {
     if (w.deletedAt) return;
     if (w.fromDate >= fromDate) return;
     (w.workers || []).forEach(wk => {
       if (wk.name !== workerName) return;
+      // loanAmount: dữ liệu vay-trong-tuần CŨ (trước khi tách sổ cái) — giữ để tương thích ngược.
       debt += (wk.loanAmount || 0) - (wk.tru || 0);
     });
   });
+  // [MỚI] Cộng các phiếu ứng realtime (ung_v1, loai='congnhan') có ngày TRƯỚC tuần fromDate.
+  debt += _ccUngSum(workerName, r => r.ngay && r.ngay < fromDate);
   return debt;
+}
+
+// ── Sổ cái tiền ứng công nhân (tái dùng store ung_v1, loai='congnhan', field tp=tên CN) ──
+// Tổng tiền ứng của 1 công nhân thỏa điều kiện lọc pred(record).
+function _ccUngSum(workerName, pred) {
+  if (!workerName) return 0;
+  const recs = (typeof ungRecords !== 'undefined') ? ungRecords : [];
+  let sum = 0;
+  recs.forEach(r => {
+    if (r.deletedAt) return;
+    if (r.loai !== 'congnhan') return;
+    if ((r.tp || '') !== workerName) return;
+    if (pred && !pred(r)) return;
+    sum += Number(r.tien) || 0;
+  });
+  return sum;
+}
+
+// Tổng tiền ứng phát sinh TRONG tuần [fromDate, toDate] của 1 công nhân.
+function ccUngForWorkerInWeek(workerName, fromDate, toDate) {
+  if (!fromDate) return 0;
+  const to = toDate || ccSaturdayISO(fromDate);
+  return _ccUngSum(workerName, r => r.ngay >= fromDate && r.ngay <= to);
+}
+
+// Dư nợ hiện tại của công nhân tính đến hết tuần đang xét = nợ cũ mang sang + ứng trong tuần.
+// Dùng để auto-fill cột "Tổng Trừ Nợ/Ứng" (hybrid) và cho sổ cái Ứng Công Nhân.
+function ccWorkerDebtNow(workerName, fromDate, toDate) {
+  if (!workerName || !fromDate) return 0;
+  // forceLive=true: luôn tính realtime (không đọc snapshot) để phản ánh phiếu ứng vừa nhập.
+  return _calcDebtBefore(workerName, fromDate, true) + ccUngForWorkerInWeek(workerName, fromDate, toDate);
 }
 
 // ─── date helpers ───────────────────────────────────────────────
@@ -292,6 +327,9 @@ function ccGoSub(btn, id) {
   } else if (id === 'cc-sub-socc') {
     // Refresh bảng tổng lương mini khi quay lại subtab 1 (dữ liệu có thể đã đổi)
     renderCCTLTMini();
+  } else if (id === 'cc-sub-ung') {
+    // Sub-tab Ứng Công Nhân: render sổ cái công nợ thợ (guard vì file nạp sau)
+    if (typeof renderCCUngLedger === 'function') renderCCUngLedger();
   }
 }
 

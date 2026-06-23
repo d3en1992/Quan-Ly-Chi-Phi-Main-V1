@@ -1,9 +1,14 @@
 <!-- Partial: page-chamcong (tách từ index.html — Phase 2) -->
 
-        <!-- Sub-tab navigation: Sổ Chấm Công / Tổng Lương & Lịch Sử -->
-        <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="cc-sub-nav">
+        <!-- Sub-tab navigation: Sổ Chấm Công / Ứng Công Nhân / Tổng Lương & Lịch Sử -->
+        <div class="nav nav-pills gap-2 mb-3 flex-wrap align-items-center" id="cc-sub-nav">
           <button class="nav-link active" id="cc-sub-socc-btn" onclick="ccGoSub(this,'cc-sub-socc')">📝 SỔ CHẤM CÔNG</button>
+          <button class="nav-link" id="cc-sub-ung-btn" onclick="ccGoSub(this,'cc-sub-ung')">💵 ỨNG CÔNG NHÂN</button>
           <button class="nav-link" id="cc-sub-baocao-btn" onclick="ccGoSub(this,'cc-sub-baocao')">📊 TỔNG LƯƠNG & LỊCH SỬ</button>
+          <!-- Nút Nhập Tiền Ứng nhanh — luôn hiển thị ở mọi sub-tab -->
+          <button class="btn btn-warning btn-sm fw-bold ms-auto" onclick="openCCUngModal()" title="Nhập tiền ứng cho công nhân (bấm được ở mọi tab)">
+            ➕ Nhập Tiền Ứng
+          </button>
         </div>
 
         <!-- ══ SUBTAB 1: Sổ Chấm Công + bảng Tổng Lương Tuần mini ══ -->
@@ -165,6 +170,53 @@
         </div>
         </div>
         <!-- ══ /SUBTAB 1 ══ -->
+
+        <!-- ══ SUBTAB: Ứng Công Nhân — Sổ cái công nợ thợ theo tuần ══ -->
+        <div class="sub-page" id="cc-sub-ung">
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Ứng Công Nhân — Sổ Cái Công Nợ</div>
+          </div>
+
+          <!-- Bộ chọn tuần riêng cho sổ cái -->
+          <div class="entry-date-bar" style="gap: 10px; flex-wrap: wrap; align-items: center">
+            <button class="btn btn-outline-secondary btn-sm" onclick="ccUngPrevWeek()">← Tuần trước</button>
+            <span id="cc-ung-week-label" style="font-size: 13px; font-weight: 700; min-width: 200px; text-align: center; color: var(--bs-warning)"></span>
+            <button class="btn btn-outline-secondary btn-sm" onclick="ccUngNextWeek()">Tuần sau →</button>
+            <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
+            <span class="bar-label">Từ ngày</span>
+            <input type="date" id="cc-ung-from" class="form-control form-control-sm w-auto" onchange="onCCUngFromChange()" />
+            <span class="bar-label">–</span>
+            <input type="date" id="cc-ung-to" class="form-control form-control-sm w-auto" readonly style="background: var(--bs-tertiary-bg); cursor: default" />
+            <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
+            <div class="search-box" style="min-width: 160px">
+              <span class="ico">🔍</span>
+              <input type="text" id="cc-ung-search" placeholder="Tìm tên CN..." oninput="renderCCUngLedger()" />
+            </div>
+          </div>
+
+          <div class="records-wrap card shadow-sm overflow-hidden">
+            <div style="overflow-x: auto">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Tên Công Nhân</th>
+                    <th style="text-align: center; width: 36px">T/P</th>
+                    <th style="text-align: right; min-width: 120px; white-space: nowrap">Nợ Cũ Mang Sang</th>
+                    <th style="text-align: right; min-width: 120px; white-space: nowrap">Ứng Trong Tuần</th>
+                    <th class="text-danger" style="text-align: right; min-width: 120px; white-space: nowrap">Tổng Nợ Hiện Tại</th>
+                    <th style="text-align: center; width: 90px">Lịch Sử</th>
+                  </tr>
+                </thead>
+                <tbody id="cc-ung-tbody"></tbody>
+              </table>
+            </div>
+            <div class="app-pagination" id="cc-ung-summary"></div>
+          </div>
+          <div class="text-secondary mt-2" style="font-size: 11px">
+            💡 Bấm <strong>➕ Nhập Tiền Ứng</strong> ở thanh trên để ghi nhận thợ ứng tiền ngay (kể cả giữa tuần). Phần trừ nợ thực hiện ở cột <strong>Tổng Trừ Nợ/Ứng</strong> trong Sổ Chấm Công.
+          </div>
+        </div>
+        <!-- ══ /SUBTAB Ứng Công Nhân ══ -->
 
         <!-- ══ SUBTAB 2: Tổng Lương Tuần đầy đủ + Lịch Sử Chấm Công ══ -->
         <div class="sub-page" id="cc-sub-baocao">
@@ -335,4 +387,73 @@
         </div>
         </div>
         <!-- ══ /SUBTAB 2 ══ -->
+
+        <!-- ══ MODAL: Nhập Tiền Ứng nhanh ══ -->
+        <div class="modal fade" id="cc-ung-modal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">💵 Nhập Tiền Ứng Công Nhân</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">Ngày ứng</label>
+                  <input type="date" id="cc-ung-m-date" class="form-control form-control-sm" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">Tên công nhân</label>
+                  <input type="text" id="cc-ung-m-name" class="form-control form-control-sm" list="cc-name-dl" placeholder="Chọn / gõ tên công nhân..." autocomplete="off" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">Số tiền</label>
+                  <input type="text" id="cc-ung-m-tien" class="form-control form-control-sm text-end" inputmode="decimal" placeholder="0" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold">Công trình <span class="text-secondary fw-normal">(tùy chọn)</span></label>
+                  <select id="cc-ung-m-ct" class="form-select form-select-sm"></select>
+                </div>
+                <div class="mb-1">
+                  <label class="form-label small fw-bold">Ghi chú / Lý do</label>
+                  <input type="text" id="cc-ung-m-nd" class="form-control form-control-sm" placeholder="VD: đổ xăng, cơm trưa..." />
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()">💾 Lưu tiền ứng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ MODAL: Lịch sử ứng/trừ của 1 công nhân ══ -->
+        <div class="modal fade" id="cc-ung-hist-modal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">📜 Lịch sử công nợ — <span id="cc-ung-hist-name"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+              </div>
+              <div class="modal-body">
+                <div style="overflow-x: auto">
+                  <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Ngày</th>
+                        <th>Loại</th>
+                        <th>Công Trình / Tuần</th>
+                        <th>Nội Dung</th>
+                        <th style="text-align: right">Ứng (+)</th>
+                        <th class="text-danger" style="text-align: right">Trừ (−)</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="cc-ung-hist-tbody"></tbody>
+                  </table>
+                </div>
+                <div class="app-pagination" id="cc-ung-hist-summary"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       

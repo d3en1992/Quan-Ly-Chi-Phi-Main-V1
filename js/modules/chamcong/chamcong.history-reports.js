@@ -476,7 +476,7 @@ function delCCWorker(wid,name){
 function exportCCWeekCSV(){
   const f=document.getElementById('cc-from').value;
   const ct=document.getElementById('cc-ct-sel').value||'?';
-  const rows=[['CT','Từ','Đến','Tên','CN','T2','T3','T4','T5','T6','T7','TC','Lương/N','Tổng Lương','Phụ Cấp','Vay Mới','HĐ Mua Lẻ','Trừ Nợ','Nội Dung','Thực Lãnh']];
+  const rows=[['CT','Từ','Đến','Tên','CN','T2','T3','T4','T5','T6','T7','TC','Lương/N','Tổng Lương','Phụ Cấp','HĐ Mua Lẻ','Tổng Trừ Nợ/Ứng','Nội Dung','Thực Lãnh']];
   document.querySelectorAll('#cc-tbody tr:not(.cc-sum-row)').forEach(tr=>{
     const name=tr.querySelector('[data-cc="name"]')?.value?.trim()||'';
     if(!name) return;
@@ -484,11 +484,10 @@ function exportCCWeekCSV(){
     const tc=round1(d.reduce((s,v)=>s+v,0));
     const l=parseInt(tr.querySelector('[data-cc="luong"]')?.dataset?.raw||0)||0;
     const pc=parseInt(tr.querySelector('[data-cc="phucap"]')?.dataset?.raw||0)||0;
-    const ln=parseInt(tr.querySelector('[data-cc="loan"]')?.dataset?.raw||0)||0;
     const hd=parseInt(tr.querySelector('[data-cc="hdml"]')?.dataset?.raw||0)||0;
     const tru=parseInt(tr.querySelector('[data-cc="tru"]')?.dataset?.raw||0)||0;
     const nd=tr.querySelector('[data-cc="nd"]')?.value?.trim()||'';
-    rows.push([ct,f,document.getElementById('cc-to').value,name,...d,tc,l,tc*l,pc,ln,hd,tru,nd,tc*l+pc+ln+hd-tru]);
+    rows.push([ct,f,document.getElementById('cc-to').value,name,...d,tc,l,tc*l,pc,hd,tru,nd,tc*l+pc+hd-tru]);
   });
   dlCSV(rows,'chamcong_'+f+'.csv');
 }

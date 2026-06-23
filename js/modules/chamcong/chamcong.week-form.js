@@ -104,6 +104,7 @@ function loadCCWeekForm() {
         nd: "",
         role: wk.role || "",
         tru: 0,
+        _isStub: true, // tuần mới copy từ tuần trước → cho phép auto-fill dư nợ
       }));
       buildCCTable(stub);
     } else {
@@ -142,14 +143,12 @@ function buildCCTable(workers) {
     <th class="col-phucap" style="text-align:right;${BG}">
       <span style="display:inline-flex;align-items:center;gap:4px;justify-content:flex-end">
         Phụ Cấp
-        <span class="cc-debt-toggle-th" onclick="toggleCCDebtCols()" title="Mở rộng: HĐ Mua Lẻ / Nội Dung / Nợ Cũ / Vay Mới / Trừ Nợ" style="cursor:pointer;font-size:10px;user-select:none;color:var(--ink2);padding:0 2px">▶</span>
+        <span class="cc-debt-toggle-th" onclick="toggleCCDebtCols()" title="Mở rộng: HĐ Mua Lẻ / Nội Dung" style="cursor:pointer;font-size:10px;user-select:none;color:var(--ink2);padding:0 2px">▶</span>
       </span>
     </th>
     <th class="cc-debt-col col-hdml" style="text-align:right;${BG}">HĐ Mua Lẻ</th>
     <th class="cc-debt-col col-nd" style="${BG}">Nội Dung</th>
-    <th class="cc-debt-col col-debtbefore" style="text-align:right;${BG_DEBT}" title="Nợ tồn đọng trước tuần này">Nợ Cũ</th>
-    <th class="cc-debt-col col-loan" style="text-align:right;${BG_DEBT}">Vay Mới (+)</th>
-    <th class="cc-debt-col col-tru" style="text-align:right;${BG_DEBT};color:var(--red)">Trừ Nợ (-)</th>
+    <th class="col-truno" style="text-align:right;${BG_DEBT};color:var(--red)" title="Tổng trừ nợ/ứng tuần này — tự điền = dư nợ hiện tại, có thể sửa">Tổng Trừ Nợ/Ứng</th>
     <th class="col-total" style="text-align:right;background:var(--gold);color:#fff;font-weight:700">Thực Lãnh</th>
     <th class="col-del" style="${BG}"></th>
   `;
@@ -186,7 +185,6 @@ function buildCCRow(w, num) {
   const luong = w ? w.luong || 0 : 0;
   const phucap = w ? w.phucap || 0 : 0;
   const hdml = w ? w.hdmuale || 0 : 0;
-  const loanAmount = w ? w.loanAmount || 0 : 0;
   const tru = w ? w.tru || 0 : 0;
   const role = w?.role || (w?.name ? cnRoles[w.name] || "" : "");
   const isKnown = w?.name
@@ -225,11 +223,12 @@ function buildCCRow(w, num) {
     <td class="cc-debt-col col-nd" style="padding:0"><input class="cc-name-input" data-cc="nd"
       value="${x(w ? w.nd || "" : "" || "")}" placeholder="Nội dung..."
       style="font-size:11px"></td>
-    <td class="cc-debt-col col-debtbefore" data-cc="debtbefore" style="text-align:right;font-size:11px;padding:4px 6px;white-space:nowrap">—</td>
-    <td class="cc-debt-col col-loan" style="padding:0"><input class="cc-wage-input" data-cc="loan" data-raw="${loanAmount || ""}" inputmode="decimal"
-      value="${loanAmount ? numFmt(loanAmount) : ""}" placeholder="0" style="color:var(--gold)"></td>
-    <td class="cc-debt-col col-tru" style="padding:0"><input class="cc-wage-input" data-cc="tru" data-raw="${tru || ""}" inputmode="decimal"
-      value="${tru ? numFmt(tru) : ""}" placeholder="0" style="color:var(--red)"></td>
+    <td class="col-truno" style="padding:0;text-align:right;white-space:nowrap">
+      <input class="cc-wage-input" data-cc="tru" data-raw="${tru || ""}" inputmode="decimal"
+        value="${tru ? numFmt(tru) : ""}" placeholder="0" style="color:var(--red)">
+      <div data-cc="debthint" class="cc-debt-hint" title="Bấm để điền lại = toàn bộ dư nợ hiện tại"
+        style="font-size:9px;color:var(--ink3);padding:0 6px 2px;cursor:pointer"></div>
+    </td>
     <td class="cc-total-cell col-total" data-cc="tongcong" style="color:var(--gold);font-size:13px">—</td>
     <td class="col-del"><button class="del-btn" onclick="delCCRow(this)">✕</button></td>
   `;
@@ -247,16 +246,20 @@ function buildCCRow(w, num) {
     onCCMoneyKey(this);
     updateCCSumRow();
   });
-  tr.querySelector('[data-cc="loan"]').addEventListener("input", function () {
-    onCCMoneyKey(this);
-    updateCCSumRow();
-  });
   tr.querySelector('[data-cc="hdml"]').addEventListener("input", function () {
     onCCMoneyKey(this);
     updateCCSumRow();
   });
-  tr.querySelector('[data-cc="tru"]').addEventListener("input", function () {
+  // Cột "Tổng Trừ Nợ/Ứng": khi người dùng tự gõ → đánh dấu touched để KHÔNG bị auto-fill đè.
+  const truInput = tr.querySelector('[data-cc="tru"]');
+  truInput.addEventListener("input", function () {
+    this.dataset.touched = "1";
     onCCMoneyKey(this);
+    updateCCSumRow();
+  });
+  // Bấm vào dòng gợi ý "Dư nợ" → điền lại = toàn bộ dư nợ hiện tại của thợ.
+  tr.querySelector('[data-cc="debthint"]').addEventListener("click", function () {
+    _ccFillDebt(tr);
     updateCCSumRow();
   });
   tr.querySelector('[data-cc="name"]').addEventListener("input", function () {
@@ -290,19 +293,29 @@ function buildCCRow(w, num) {
       toast('⚠️ "' + v + '" không có trong danh mục công nhân!', "error");
       this.value = "";
       this.style.boxShadow = "";
+      _ccOnNameDebt(this.closest("tr"));
       updateCCSumRow();
     } else {
       this.style.boxShadow = "";
       this.value = canonical; // điền đúng tên chuẩn từ danh mục
+      _ccOnNameDebt(this.closest("tr")); // tên chuẩn → tính lại dư nợ chính xác
+      calcCCRow(this.closest("tr"));
     }
   });
   tr.querySelector('[data-cc="nd"]').addEventListener("input", updateCCSumRow);
+  // Tôn trọng giá trị "Tổng Trừ Nợ/Ứng" đã lưu của tuần cũ (đánh dấu touched để không bị
+  // auto-fill đè). Dòng mới (w==null) hoặc dòng copy sang tuần mới (_isStub) → để auto-fill.
+  const _truInp = tr.querySelector('[data-cc="tru"]');
+  if (_truInp && w && !w._isStub) _truInp.dataset.touched = "1";
   calcCCRow(tr);
   return tr;
 }
 
 function onCCNameInput(inp) {
   const name = inp.value.trim();
+  // Đổi tên → tính lại dư nợ cho cột "Tổng Trừ Nợ/Ứng" (luôn chạy, kể cả khi xóa tên)
+  const trRow = inp.closest("tr");
+  if (trRow) _ccOnNameDebt(trRow);
   if (!name) {
     inp.style.boxShadow = "";
     inp.title = "";
@@ -359,7 +372,66 @@ function onCCMoneyKey(inp) {
   calcCCRow(inp.closest("tr"));
 }
 
+// ── Cột "Tổng Trừ Nợ/Ứng" (hybrid) ──────────────────────────────────
+// Tính dư nợ hiện tại của thợ ở dòng tr (nợ cũ mang sang + ứng trong tuần),
+// cập nhật dòng gợi ý "Dư nợ" và auto-fill ô Trừ khi ô CHƯA bị người dùng sửa.
+// forceFill=true: luôn điền (dùng khi bấm ↺) và coi như giá trị đã chốt.
+function _ccRefreshDebt(tr, forceFill) {
+  const truInput = tr.querySelector('[data-cc="tru"]');
+  const hint = tr.querySelector('[data-cc="debthint"]');
+  if (!truInput) return;
+  const name = (tr.querySelector('[data-cc="name"]')?.value || "").trim();
+  const fromDate = document.getElementById("cc-from")?.value || "";
+  const toDate = document.getElementById("cc-to")?.value || "";
+  if (!name || !fromDate) {
+    if (hint) { hint.textContent = ""; }
+    return;
+  }
+  const debt =
+    typeof ccWorkerDebtNow === "function"
+      ? ccWorkerDebtNow(name, fromDate, toDate)
+      : 0;
+  // Dòng gợi ý dưới ô nhập
+  if (hint) {
+    if (debt > 0) {
+      hint.textContent = "Dư nợ: " + numFmt(debt) + " ↺";
+      hint.style.color = "var(--red)";
+    } else if (debt < 0) {
+      hint.textContent = "Dư: " + numFmt(-debt) + " ↺";
+      hint.style.color = "var(--green)";
+    } else {
+      hint.textContent = "Hết nợ";
+      hint.style.color = "var(--ink3)";
+    }
+  }
+  // Auto-fill khi được yêu cầu hoặc ô chưa bị người dùng sửa
+  if (forceFill || truInput.dataset.touched !== "1") {
+    const fill = debt > 0 ? debt : 0;
+    truInput.dataset.raw = fill || "";
+    truInput.value = fill ? numFmt(fill) : "";
+    if (forceFill) truInput.dataset.touched = "1"; // bấm ↺ = giá trị đã chốt
+  }
+}
+
+// Bấm vào gợi ý "Dư nợ ↺": điền lại = toàn bộ dư nợ hiện tại.
+function _ccFillDebt(tr) {
+  const truInput = tr.querySelector('[data-cc="tru"]');
+  if (truInput) truInput.dataset.touched = "0";
+  _ccRefreshDebt(tr, true);
+  calcCCRow(tr);
+}
+
+// Khi tên CN thay đổi: coi như thợ mới → bỏ cờ touched rồi tính lại dư nợ (passive fill).
+function _ccOnNameDebt(tr) {
+  const truInput = tr.querySelector('[data-cc="tru"]');
+  if (truInput) truInput.dataset.touched = "0";
+  _ccRefreshDebt(tr, false);
+}
+
 function calcCCRow(tr) {
+  // Cập nhật gợi ý dư nợ + auto-fill cột "Tổng Trừ Nợ/Ứng" (nếu ô chưa bị người dùng sửa)
+  _ccRefreshDebt(tr, false);
+
   let tc = 0;
   for (let i = 0; i < 7; i++)
     tc += parseFloat(tr.querySelector(`[data-cc="d${i}"]`)?.value || 0) || 0;
@@ -372,8 +444,6 @@ function calcCCRow(tr) {
     parseInt(tr.querySelector('[data-cc="phucap"]')?.dataset?.raw || 0) || 0;
   const hdml =
     parseInt(tr.querySelector('[data-cc="hdml"]')?.dataset?.raw || 0) || 0;
-  const loan =
-    parseInt(tr.querySelector('[data-cc="loan"]')?.dataset?.raw || 0) || 0;
   const tru =
     parseInt(tr.querySelector('[data-cc="tru"]')?.dataset?.raw || 0) || 0;
 
@@ -381,26 +451,8 @@ function calcCCRow(tr) {
   totCell.textContent = total > 0 ? numFmt(total) : "—";
   totCell.style.color = total > 0 ? "var(--green)" : "var(--ink3)";
 
-  // Nợ cũ: tính lũy kế từ ccData đã lưu (các tuần trước fromDate hiện tại)
-  const workerName = (tr.querySelector('[data-cc="name"]')?.value || "").trim();
-  const fromDate = document.getElementById("cc-from")?.value || "";
-  const debtBefore = _calcDebtBefore(workerName, fromDate);
-  const debtCell = tr.querySelector('[data-cc="debtbefore"]');
-  if (debtCell) {
-    if (debtBefore === 0) {
-      debtCell.textContent = "—";
-      debtCell.style.color = "var(--ink3)";
-    } else if (debtBefore > 0) {
-      debtCell.textContent = numFmt(debtBefore) + " nợ";
-      debtCell.style.color = "var(--red)";
-    } else {
-      debtCell.textContent = numFmt(-debtBefore) + " dư";
-      debtCell.style.color = "var(--green)";
-    }
-  }
-
-  // Thực Lãnh = (Tổng Lương + Phụ Cấp) + Vay Mới + HĐ Mua Lẻ - Trừ Nợ
-  const thucLanh = total + phucap + loan + hdml - tru;
+  // Thực Lãnh = Tổng Lương + Phụ Cấp + HĐ Mua Lẻ − Tổng Trừ Nợ/Ứng
+  const thucLanh = total + phucap + hdml - tru;
   const tcCell = tr.querySelector('[data-cc="tongcong"]');
   if (thucLanh > 0) {
     tcCell.textContent = numFmt(thucLanh);
@@ -430,7 +482,6 @@ function updateCCSumRow() {
     totalLuong = 0,
     totalPC = 0,
     totalHD = 0,
-    totalLoan = 0,
     totalTru = 0,
     totalTC = 0;
   rows.forEach((tr) => {
@@ -446,16 +497,13 @@ function updateCCSumRow() {
       parseInt(tr.querySelector('[data-cc="phucap"]')?.dataset?.raw || 0) || 0;
     const hd =
       parseInt(tr.querySelector('[data-cc="hdml"]')?.dataset?.raw || 0) || 0;
-    const ln =
-      parseInt(tr.querySelector('[data-cc="loan"]')?.dataset?.raw || 0) || 0;
     const tru =
       parseInt(tr.querySelector('[data-cc="tru"]')?.dataset?.raw || 0) || 0;
     totalLuong += t * l;
     totalPC += pc;
     totalHD += hd;
-    totalLoan += ln;
     totalTru += tru;
-    totalTC += t * l + pc + ln + hd - tru; // Thực Lãnh
+    totalTC += t * l + pc + hd - tru; // Thực Lãnh = Lương + Phụ Cấp + HĐ Lẻ − Trừ Nợ/Ứng
   });
   let sumRow = document.querySelector("#cc-tbody .cc-sum-row");
   if (!sumRow) {
@@ -475,9 +523,7 @@ function updateCCSumRow() {
     <td class="col-phucap" style="text-align:right;${mono};font-size:12px;color:var(--blue);padding:6px 8px;white-space:nowrap">${totalPC > 0 ? numFmt(totalPC) : "—"}</td>
     <td class="cc-debt-col col-hdml" style="text-align:right;${mono};font-size:12px;color:var(--ink2);padding:6px 8px;white-space:nowrap">${totalHD > 0 ? numFmt(totalHD) : "—"}</td>
     <td class="cc-debt-col col-nd"></td>
-    <td class="cc-debt-col col-debtbefore"></td>
-    <td class="cc-debt-col col-loan" style="text-align:right;${mono};font-size:12px;color:var(--gold);padding:6px 8px;white-space:nowrap">${totalLoan > 0 ? numFmt(totalLoan) : "—"}</td>
-    <td class="cc-debt-col col-tru" style="text-align:right;${mono};font-size:12px;color:var(--red);padding:6px 8px;white-space:nowrap">${totalTru > 0 ? numFmt(totalTru) : "—"}</td>
+    <td class="col-truno" style="text-align:right;${mono};font-size:12px;color:var(--red);padding:6px 8px;white-space:nowrap">${totalTru > 0 ? numFmt(totalTru) : "—"}</td>
     <td class="col-total" style="text-align:right;${mono};font-size:14px;color:var(--gold);padding:6px 8px;white-space:nowrap;background:#fff8e8">${totalTC > 0 ? numFmt(totalTC) : totalTC < 0 ? "(" + numFmt(-totalTC) + ")" : "—"}</td>
     <td class="col-del"></td>
   `;
@@ -549,8 +595,9 @@ function saveCCWeek() {
       parseInt(tr.querySelector('[data-cc="phucap"]')?.dataset?.raw || 0) || 0;
     const hdmuale =
       parseInt(tr.querySelector('[data-cc="hdml"]')?.dataset?.raw || 0) || 0;
-    const loanAmount =
-      parseInt(tr.querySelector('[data-cc="loan"]')?.dataset?.raw || 0) || 0;
+    // loanAmount (vay-trong-tuần) đã được tách ra "Sổ cái Ứng Công Nhân" (ung_v1, loai=congnhan).
+    // Tuần mới luôn lưu 0; dữ liệu cũ vẫn được tính khi cộng dồn nợ ở _calcDebtBefore.
+    const loanAmount = 0;
     const tru =
       parseInt(tr.querySelector('[data-cc="tru"]')?.dataset?.raw || 0) || 0;
     const nd = tr.querySelector('[data-cc="nd"]')?.value?.trim() || "";
@@ -690,6 +737,7 @@ function copyCCWeek() {
         nd: "",
         role: roleCopy,
         tru: 0,
+        _isStub: true, // dán sang tuần mới → cho phép auto-fill dư nợ
       });
   });
   if (!workers.length) {
