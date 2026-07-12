@@ -1181,38 +1181,67 @@ Rà soát sâu cơ chế **tên** của Tab Danh Mục (id-based qua `cat_items_
 
 ---
 
-## 9.18 Fix bug: Dữ liệu năm cũ (2025...) không tự đồng bộ lên cloud (12/07/2026)
+## 9.18 Fix bug (A): Dữ liệu năm cũ (2025...) không tự đồng bộ lên cloud — auto-push (12/07/2026)
 
-**Vấn đề:** Khi user nhập liệu sổ chấm công (hoặc hóa đơn, tiền ứng, thiết bị, thu tiền) cho tuần thuộc **năm cũ** (vd 2025) trong khi app đang hiển thị "năm đang xem" là 2026 (mặc định, từ `activeYear`), dữ liệu vẫn lưu vào IndexedDB local (máy này thấy đầy đủ), nhưng **KHÔNG được đẩy lên Firestore** — máy khác / sau F5 sẽ không thấy dữ liệu vừa nhập.
+**Vấn đề A:** Khi user nhập liệu sổ chấm công (hoặc hóa đơn, tiền ứng, thiết bị, thu tiền) cho tuần thuộc **năm cũ** (vd 2025) trong khi app đang hiển thị "năm đang xem" là 2026 (mặc định, từ `activeYear`), dữ liệu vẫn lưu vào IndexedDB local (máy này thấy đầy đủ), nhưng **KHÔNG được đẩy lên Firestore** — máy khác / sau F5 sẽ không thấy dữ liệu vừa nhập.
 
-**Nguyên nhân:**
-- Hàm `save('cc_v2', ccData)` → `schedulePush()` → `pushChanges({silent:true})` (auto-sync ngầm).
+**Nguyên nhân A:**
+- Auto-sync ngầm: `save('cc_v2', ccData)` → `schedulePush()` → `pushChanges({silent:true})`.
 - Trong [sync.js:292-293](js/sync/sync.js#L292-L293), push ngầm chỉ đẩy đúng 1 năm = `activeYear` (năm đang chọn trên UI), không phải năm **thực tế của record vừa lưu**.
 - Vòng lặp push `for (const yr of years)` với `years = [activeYear]` = `['2026']` → filter loại hết record 2025 → `pushChanges` không đẩy 2025 lên cloud.
-- Duy nhất cách 2025 lên được: bấm nút thủ công **🔄 Sync** (`manualSync` → `pushChanges({silent:false})` → đẩy tất cả năm).
 
-**Fix:** Theo dõi "(các) năm vừa sửa thực sự" qua `_dirtyYears` (Set các năm có `updatedAt` mới trong vài giây gần đây — từ `mkRecord`/`mkUpdate` vừa sinh record). Push ngầm gộp thêm các năm này vào danh sách cần đẩy:
+**Fix A:** Theo dõi "(các) năm vừa sửa thực sự" qua `_dirtyYears` (Set các năm có `updatedAt` mới trong vài giây gần đây). Push ngầm gộp thêm các năm này vào danh sách cần đẩy:
 
 1. **[core.storage.js](js/core/core.storage.js):**
    - Thêm global `_dirtyYears = new Set()` + `_YEAR_DATE_FIELD` map (dòng 191–208).
-   - `_resetPending()` + `_dirtyYears.clear()` cạnh `_dirtyKeys.clear()`.
-   - `save(k, v, opts)`: sau `_dirtyKeys.add(k)`, quét nhanh v[] để ghi nhận năm của record có `updatedAt` mới ≤5s (vừa được `mkRecord`/`mkUpdate`).
+   - `_resetPending()` + `_dirtyYears.clear()`.
+   - `save(k, v, opts)`: quét nhanh v[] để ghi nhận năm của record có `updatedAt` mới ≤5s.
 
 2. **[sync.js](js/sync/sync.js):**
-   - `pushChanges()` dòng 292–293: thay đổi logic tính `years`:
-     ```js
-     const _extraYrs = (typeof _dirtyYears !== 'undefined') ? [..._dirtyYears] : [];
-     const years = (silent && !_allYears)
-       ? [...new Set([_curYr, ..._extraYrs])]
-       : _getAllLocalYears();
-     ```
-   - Kết quả: push ngầm = năm hiện tại + (các) năm vừa sửa (nhẹ, không tràn lan mọi năm).
+   - `pushChanges()` dòng 292–299: gộp `_extraYrs` từ `_dirtyYears` vào `years` khi push ngầm.
 
-**Phạm vi:** Fix này ảnh hưởng mọi loại dữ liệu theo năm: `inv_v3` (hóa đơn), `ung_v1` (tiền ứng), `cc_v2` (chấm công), `tb_v1` (thiết bị), `thu_v1` (thu tiền). Trước sửa, tất cả đều bỏ sót năm cũ nếu nhập với `activeYear` ≠ năm record.
+**Phạm vi A:** Tất cả loại dữ liệu theo năm: `inv_v3`, `ung_v1`, `cc_v2`, `tb_v1`, `thu_v1`.
 
-**Không ảnh hưởng:** Luồng import (allYears=true) và manual sync (silent=false) giữ nguyên. UI/Firestore không đổi. Backward compat đầy đủ.
+---
 
-**File đã sửa:** `js/core/core.storage.js`, `js/sync/sync.js`.
+## 9.19 Fix bug (B): Dữ liệu năm cũ không hiện trên máy khác — manual sync (12/07/2026)
+
+**Vấn đề B (báo lỗi thực tế):** User nhập chấm công 11 hóa đơn (SC Chùa Thầy Tánh DN) từ 08/11/2025 đến
+31/01/2026 trên máy bàn. Máy bàn hiện đủ dữ liệu. Nhưng máy điện thoại/laptop khác (đã chọn bộ lọc
+năm **"2025, 2026"**) chỉ thấy 2/11 (cả 2 từ 2026), **toàn bộ 2025 biến mất** — dù đã chọn rõ ràng
+"2025" trong dropdown năm.
+
+**Nguyên nhân B:**
+- Nút 🔄 **Sync** thủ công gọi `manualSync()` → bước B1 (Pull) [sync.js:756-760](js/sync/sync.js#L756-L760).
+- Code lấy 1 năm duy nhất từ `activeYear` (biến tương thích cũ) thay vì `activeYears` (Set gốc đầy đủ):
+  ```js
+  const _syncYr = (typeof activeYears !== 'undefined' && activeYears.size === 1)
+    ? [...activeYears][0]
+    : (typeof activeYear !== 'undefined' && activeYear ? activeYear : new Date().getFullYear());
+  ```
+- Khi người dùng chọn ≥2 năm, `activeYear` được set = **0** ([main.js:14](js/app/main.js#L14)
+  `_syncActiveYearCompat()`: `else activeYear = 0; // multi → "all" for legacy`).
+- Nhưng `0 ? ... : new Date().getFullYear()` coi `0` là falsy → rơi thẳng về năm hệ thống 2026,
+  **bỏ qua 2025 hoàn toàn** dù đã chọn rõ trong dropdown.
+
+**Fix B:** Thay vì 1 năm duy nhất, pull **tuần tự từng năm** trong `activeYears` (Set gốc):
+```js
+const _syncYrs = (typeof activeYears !== 'undefined' && activeYears.size > 0)
+  ? [...activeYears]
+  : [(typeof activeYear !== 'undefined' && activeYear) || new Date().getFullYear()];
+for (const _yr of _syncYrs) {
+  await new Promise(resolve => pullChanges(_yr, resolve));
+}
+```
+Pattern này đã được dùng đúng ở `onYearChange()` [main.js:354-373](js/app/main.js#L354-L373) →
+chỉ `manualSync()` sai.
+
+**Khôi phục dữ liệu 2025 kẹt:**
+- Dữ liệu 2025 nhập TRƯỚC Bug A fix (commit `7fa7419`) vẫn kẹt ở IndexedDB máy bàn, chưa từng lên cloud.
+- Sau deploy Bug B fix này, **bấm 🔄 Sync 1 lần trên máy bàn** (dữ liệu gốc) → B3 push tất cả năm local
+  (gồm 2025) lên Firestore → mọi máy khác chọn "2025, 2026" + Sync đã sửa sẽ pull được đầy đủ.
+
+**File đã sửa:** `js/sync/sync.js` (hàm `manualSync()`, bước B1).
 
 ---
 

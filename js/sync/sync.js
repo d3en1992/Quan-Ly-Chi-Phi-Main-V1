@@ -753,11 +753,15 @@ async function manualSync() {
       await pushChanges({ silent: true });
     }
 
-    // B1: Pull — chỉ pull năm đang xem (thay thế local bằng cloud)
-    const _syncYr = (typeof activeYears !== 'undefined' && activeYears.size === 1)
-      ? [...activeYears][0]
-      : (typeof activeYear !== 'undefined' && activeYear ? activeYear : new Date().getFullYear());
-    await new Promise(resolve => pullChanges(_syncYr, resolve));
+    // B1: Pull — pull TẤT CẢ các năm đang chọn trong bộ lọc (hỗ trợ multi-year)
+    // [FIX Bug B] Trước đây chỉ suy ra 1 năm từ activeYear; khi chọn ≥2 năm, activeYear=0
+    // bị coi là falsy nên rơi về năm hệ thống hiện tại → bỏ sót các năm khác đã chọn.
+    const _syncYrs = (typeof activeYears !== 'undefined' && activeYears.size > 0)
+      ? [...activeYears]
+      : [(typeof activeYear !== 'undefined' && activeYear) || new Date().getFullYear()];
+    for (const _yr of _syncYrs) {
+      await new Promise(resolve => pullChanges(_yr, resolve));
+    }
 
     // B2: Reload globals + clear cache
     if (typeof _reloadGlobals === 'function') _reloadGlobals();
