@@ -190,6 +190,19 @@ let _pendingChanges = 0;
 // doc bị ảnh hưởng (tiết kiệm read/write), thay vì đẩy lại toàn bộ.
 const _dirtyKeys = new Set();
 
+// Tập các năm thực sự bị sửa (dựa trên updatedAt của bản ghi vừa nhập).
+// Dùng để push ngầm gộp thêm năm cũ ngoài activeYear, tránh bỏ sót dữ liệu năm khác.
+const _dirtyYears = new Set();
+
+// Mapping key → field chứa ngày của từng loại dữ liệu (để trích năm)
+const _YEAR_DATE_FIELD = {
+  inv_v3: 'ngay',
+  ung_v1: 'ngay',
+  cc_v2: 'fromDate',
+  tb_v1: 'ngay',
+  thu_v1: 'ngay'
+};
+
 // Timestamp cho đến khi pull bị chặn (set sau reset để tránh cloud hồi dữ liệu)
 let _blockPullUntil = 0;
 
@@ -218,6 +231,7 @@ function _incPending() {
 function _resetPending() {
   _pendingChanges = 0;
   _dirtyKeys.clear();
+  _dirtyYears.clear();
   _updateSyncBtnBadge();
 }
 
@@ -279,6 +293,21 @@ function save(k, v, opts) {
   if (!opts?.skipSync && _SYNC_DATA_KEYS.has(k)) {
     _incPending();
     _dirtyKeys.add(k); // ghi nhớ key này đã đổi → push ngầm chỉ đẩy doc liên quan
+
+    // Ghi nhận các năm thực sự bị sửa (để push ngầm không bỏ sót dữ liệu năm cũ)
+    // Chỉ quét record có updatedAt mới trong vài giây gần đây (vừa từ mkRecord/mkUpdate)
+    const _yf = _YEAR_DATE_FIELD[k];
+    if (_yf && Array.isArray(v)) {
+      const now = Date.now();
+      v.forEach(r => {
+        const ts = (r && (r.updatedAt || r.createdAt)) || 0;
+        if (now - ts <= 5000) {
+          const d = r && r[_yf];
+          if (d && String(d).length >= 4) _dirtyYears.add(String(d).slice(0, 4));
+        }
+      });
+    }
+
     // Online 100%: cố đẩy cloud gần như tức thì. Nếu mất mạng → vẫn lưu local
     // nhưng nhắc user là chưa đẩy được (tránh ngộ nhận đã đồng bộ).
     if (!navigator.onLine) _warnOfflineSave();

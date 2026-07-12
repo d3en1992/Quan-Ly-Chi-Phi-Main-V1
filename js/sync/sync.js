@@ -290,7 +290,11 @@ async function pushChanges(opts = {}) {
   // năm hiện tại được đẩy lên cloud → thiết bị khác không thấy các năm còn lại.
   const _allYears = opts?.allYears ?? false;
   const _curYr = String(activeYear || new Date().getFullYear());
-  const years  = (silent && !_allYears) ? [_curYr] : _getAllLocalYears();
+  // Gộp năm hiện tại + (các) năm thực sự vừa sửa (từ _dirtyYears) để không bỏ sót năm cũ
+  const _extraYrs = (typeof _dirtyYears !== 'undefined') ? [..._dirtyYears] : [];
+  const years  = (silent && !_allYears)
+    ? [...new Set([_curYr, ..._extraYrs])]
+    : _getAllLocalYears();
 
   // ── Lọc theo key đã đổi (chỉ áp dụng cho push ngầm) ──
   // Push thủ công (silent=false) luôn đẩy đủ. Push ngầm: nếu biết key nào đổi

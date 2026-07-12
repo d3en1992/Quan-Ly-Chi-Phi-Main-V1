@@ -1181,6 +1181,41 @@ Rà soát sâu cơ chế **tên** của Tab Danh Mục (id-based qua `cat_items_
 
 ---
 
+## 9.18 Fix bug: Dữ liệu năm cũ (2025...) không tự đồng bộ lên cloud (12/07/2026)
+
+**Vấn đề:** Khi user nhập liệu sổ chấm công (hoặc hóa đơn, tiền ứng, thiết bị, thu tiền) cho tuần thuộc **năm cũ** (vd 2025) trong khi app đang hiển thị "năm đang xem" là 2026 (mặc định, từ `activeYear`), dữ liệu vẫn lưu vào IndexedDB local (máy này thấy đầy đủ), nhưng **KHÔNG được đẩy lên Firestore** — máy khác / sau F5 sẽ không thấy dữ liệu vừa nhập.
+
+**Nguyên nhân:**
+- Hàm `save('cc_v2', ccData)` → `schedulePush()` → `pushChanges({silent:true})` (auto-sync ngầm).
+- Trong [sync.js:292-293](js/sync/sync.js#L292-L293), push ngầm chỉ đẩy đúng 1 năm = `activeYear` (năm đang chọn trên UI), không phải năm **thực tế của record vừa lưu**.
+- Vòng lặp push `for (const yr of years)` với `years = [activeYear]` = `['2026']` → filter loại hết record 2025 → `pushChanges` không đẩy 2025 lên cloud.
+- Duy nhất cách 2025 lên được: bấm nút thủ công **🔄 Sync** (`manualSync` → `pushChanges({silent:false})` → đẩy tất cả năm).
+
+**Fix:** Theo dõi "(các) năm vừa sửa thực sự" qua `_dirtyYears` (Set các năm có `updatedAt` mới trong vài giây gần đây — từ `mkRecord`/`mkUpdate` vừa sinh record). Push ngầm gộp thêm các năm này vào danh sách cần đẩy:
+
+1. **[core.storage.js](js/core/core.storage.js):**
+   - Thêm global `_dirtyYears = new Set()` + `_YEAR_DATE_FIELD` map (dòng 191–208).
+   - `_resetPending()` + `_dirtyYears.clear()` cạnh `_dirtyKeys.clear()`.
+   - `save(k, v, opts)`: sau `_dirtyKeys.add(k)`, quét nhanh v[] để ghi nhận năm của record có `updatedAt` mới ≤5s (vừa được `mkRecord`/`mkUpdate`).
+
+2. **[sync.js](js/sync/sync.js):**
+   - `pushChanges()` dòng 292–293: thay đổi logic tính `years`:
+     ```js
+     const _extraYrs = (typeof _dirtyYears !== 'undefined') ? [..._dirtyYears] : [];
+     const years = (silent && !_allYears)
+       ? [...new Set([_curYr, ..._extraYrs])]
+       : _getAllLocalYears();
+     ```
+   - Kết quả: push ngầm = năm hiện tại + (các) năm vừa sửa (nhẹ, không tràn lan mọi năm).
+
+**Phạm vi:** Fix này ảnh hưởng mọi loại dữ liệu theo năm: `inv_v3` (hóa đơn), `ung_v1` (tiền ứng), `cc_v2` (chấm công), `tb_v1` (thiết bị), `thu_v1` (thu tiền). Trước sửa, tất cả đều bỏ sót năm cũ nếu nhập với `activeYear` ≠ năm record.
+
+**Không ảnh hưởng:** Luồng import (allYears=true) và manual sync (silent=false) giữ nguyên. UI/Firestore không đổi. Backward compat đầy đủ.
+
+**File đã sửa:** `js/core/core.storage.js`, `js/sync/sync.js`.
+
+---
+
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
 
 > Hai file `js/sync/sync.v2format.js` và `js/sync/sync.v2meta.js` **đã bị xóa** (xem [9.9](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)). Phần dưới lưu lại **toàn bộ inventory hàm/biến/localStorage key của engine V2** để khi quét code thấy dấu vết `_v2*` thì biết đó là code/dữ liệu cũ cần dọn. **KHÔNG dùng làm tham chiếu hiện hành.**
