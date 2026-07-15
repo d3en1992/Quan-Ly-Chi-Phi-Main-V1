@@ -546,6 +546,49 @@ function _ctRenderGrid() {
 // ══════════════════════════════════════════════════════════════════
 //  DETAIL VIEW (mở modal)
 // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  MODAL CHI TIẾT CÔNG TRÌNH — helper dùng riêng cho openCTDetail
+// ══════════════════════════════════════════════════════════════════
+
+// Badge trạng thái (màu RIÊNG cho modal — KHÔNG đụng _PT_STATUS_META global
+// để không đổi màu ở trang Tổng Quan). Theo yêu cầu: đang thi công = xanh dương,
+// hoàn thành = cam, đã quyết toán = xanh lá đậm.
+function _ctdStatusBadge(status) {
+  const M = {
+    planning:  { label: 'Chuẩn bị thi công', bg: '#6c757d' }, // xám
+    active:    { label: 'Đang thi công',      bg: '#0d6efd' }, // xanh dương
+    completed: { label: 'Hoàn thành',         bg: '#fd7e14' }, // cam
+    closed:    { label: 'Đã quyết toán',      bg: '#157347' }, // xanh lá đậm
+  };
+  const m = M[status] || { label: status || '—', bg: '#6c757d' };
+  return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:${m.bg};color:#fff;white-space:nowrap;vertical-align:middle">${m.label}</span>`;
+}
+
+// Thanh tiến độ % (dùng cho cột Doanh Thu & Chi Phí). over=true → tô đỏ cảnh báo vượt.
+function _ctdProgress(pct, opts) {
+  const o = opts || {};
+  const val = Math.max(0, Math.round(pct || 0));
+  const barW = Math.min(100, val);
+  const barColor = o.over ? 'var(--bs-danger)' : (o.color || 'var(--bs-success)');
+  return `<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+    <div style="flex:1;height:8px;background:var(--bs-tertiary-bg);border-radius:5px;overflow:hidden">
+      <div style="height:100%;width:${barW}%;background:${barColor};border-radius:5px;transition:width .3s"></div>
+    </div>
+    <span style="font-size:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:${barColor};min-width:38px;text-align:right">${val}%</span>
+  </div>`;
+}
+
+// Chuyển tab trong modal (tự chứa — bật panel được chọn, ẩn các panel còn lại)
+function _ctdSwitchTab(btn, name) {
+  const body = document.getElementById('modal-body');
+  if (!body) return;
+  body.querySelectorAll('.ctd-tab-btn').forEach(b => b.classList.remove('active'));
+  body.querySelectorAll('.ctd-panel').forEach(pnl => { pnl.style.display = 'none'; });
+  btn.classList.add('active');
+  const panel = body.querySelector('#ctd-panel-' + name);
+  if (panel) panel.style.display = 'block';
+}
+
 function openCTDetail(id) {
   const p = getProjectById(id);
   if (!p) return;
@@ -560,36 +603,9 @@ function openCTDetail(id) {
   const loaiRows = Object.entries(byLoai)
     .sort((a, b) => b[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0) - a[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0));
 
-  document.getElementById('modal-title').innerHTML = `🏗️ ${x(p.name)} ${_ptStatusBadge(p.status)}`;
+  document.getElementById('modal-title').innerHTML = `🏗️ ${x(p.name)} ${_ctdStatusBadge(p.status)}`;
 
-  let html = `
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <div style="flex:1;min-width:90px;background:var(--bs-tertiary-bg);border-radius:8px;padding:12px">
-        <div class="text-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng HĐ</div>
-        <div style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace">${c.count}</div>
-      </div>
-      <div style="flex:2;min-width:150px;background:rgba(var(--bs-success-rgb),.1);border-radius:8px;padding:12px">
-        <div class="text-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Chi Phí · ${x(yearLabel)}</div>
-        <div style="font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--bs-success)">${fmtM(c.total)}</div>
-      </div>
-    </div>`;
-
-  if (!isCompany) {
-    const sd = p.startDate || (p.year ? `${p.year}-01-01` : null);
-    const ed = p.endDate ? _fmtProjDate(p.endDate) : null;
-    const dur = _ptDuration(p);
-    html += `
-    <div class="text-secondary" style="background:var(--bs-tertiary-bg);border-radius:8px;padding:11px 14px;margin-bottom:12px;font-size:13px">
-      ${sd  ? `<div style="margin-bottom:4px"><span class="text-secondary">Bắt đầu: </span>${sd}${ed ? ` → <span class="text-secondary">Hoàn thành:</span> ${ed}` : ''}${dur ? `<span class="text-secondary" style="margin-left:8px;font-size:11px">(${dur})</span>` : ''}</div>` : ''}
-      ${p.closedDate ? `<div style="margin-bottom:4px"><span class="text-secondary">Ngày quyết toán: </span><strong>${_fmtProjDate(p.closedDate)}</strong></div>` : ''}
-      ${p.note ? `<div><span class="text-secondary">Ghi chú: </span>${x(p.note)}</div>` : ''}
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="btn btn-outline-secondary btn-sm" onclick="_goTabWithCT('hoadon','${x(p.name)}')">📋 Hóa Đơn</button>
-      ${!isKetoan() ? `<button class="btn btn-outline-secondary btn-sm" onclick="_goTabWithCT('doanhthu','${x(p.name)}')">💰 Doanh Thu</button>` : ''} <!-- [ROLE KETOAN HIDE] -->
-      <button class="btn btn-outline-secondary btn-sm" onclick="_goTabWithCT('thietbi','${x(p.name)}')">🔧 Thiết Bị</button>
-    </div>`;
-  }
+  let html = '';
 
   // ── Phân bổ chi phí theo nguồn ────────────────────────────────────
   const matCost  = c.invs.filter(i => i.source !== 'cc').reduce((s,i) => s+(i.thanhtien||i.tien||0), 0);
@@ -656,6 +672,28 @@ function openCTDetail(id) {
   const _allocEntry = (!isCompany && p.startDate) ? allocateCompanyCost().find(a => a.p.id === p.id) : null;
   const _chiPhiChungFixed = _allocEntry ? _allocEntry.allocated : 0;
 
+  // ══ TÍNH TOÁN TÀI CHÍNH CỐT LÕI — dùng CÙNG công thức bảng "Lợi Nhuận" ══
+  //   Chi phí   = A(hóa đơn/vật tư) + B(HĐ thầu phụ) + C(chi phí chung phân bổ)
+  //   Doanh thu = X(HĐ chính)       + Y(quyết toán, có dấu ±)
+  //   Lợi nhuận = Doanh thu − Chi phí  → khớp tuyệt đối với tab Doanh Thu → Lợi Nhuận
+  const _A = c.total;            // (A) hóa đơn/vật tư của CT
+  const _B = tongHDTP;           // (B) tổng giá trị HĐ thầu phụ
+  const _C = _chiPhiChungFixed;  // (C) chi phí chung CÔNG TY phân bổ cho CT
+  const _X = tongGiaTriHD;       // (X) HĐ chính (giaTri + giaTriphu + phatSinh)
+  const _Y = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])   // (Y) quyết toán
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) &&
+      (r.projectId ? r.projectId === p.id
+                   : (resolveProjectName(r) === p.name || r.congtrinh === p.name)))
+    .reduce((s, r) => s + (r.giaTri || 0), 0);
+
+  const doanhThu    = _X + _Y;                  // tổng doanh thu công trình
+  const chiPhiTong  = _A + _B + _C;             // tổng chi phí (dự toán/ước tính)
+  const loiNhuan    = doanhThu - chiPhiTong;    // lãi (≥0) / lỗ (<0)
+  const conPhaiThuCT = doanhThu - tongThu;      // còn phải thu từ chủ đầu tư
+  const pctThu = doanhThu   > 0 ? Math.round(tongThu / doanhThu * 100) : 0;          // % đã thu
+  const pctChi = chiPhiTong > 0 ? Math.round(tongChiCongTrinh / chiPhiTong * 100) : 0; // % đã chi / dự toán
+  const isActiveCT = (p.status === 'active' || p.status === 'planning'); // đang thi công
+
   // ── Semantic color palette ────────────────────────────────────────────
   const CG = 'var(--bs-success)', CR = 'var(--bs-danger)', CA = 'var(--bs-warning)', CB = 'var(--bs-primary)';
   const BG = 'rgba(var(--bs-success-rgb),.09)', BR = 'rgba(var(--bs-danger-rgb),.09)';
@@ -687,142 +725,220 @@ function openCTDetail(id) {
   const _tag = t =>
     `<span style="border:1.5px solid var(--bs-border-color);border-radius:6px;padding:4px 10px;font-size:11px;white-space:nowrap">${t}</span>`;
 
-  // ═══ XÂY DỰNG HTML ═══════════════════════════════════════════════════
-  // Fix 8: CSS mobile (scoped vào modal, không ảnh hưởng UI ngoài)
-  html = `<style>
-    @media(max-width:640px){
-      .ctd-grid{grid-template-columns:1fr!important}
-      .ctd-hdr{grid-template-columns:1fr!important}
-      .ctd-note-blk{display:none!important}
-      .ctd-note-inline{display:inline!important}
-      .ctd-btns .btn{flex:1;justify-content:center}
-    }
+  // ═══════════════════ DỰNG GIAO DIỆN MỚI ═══════════════════
+  // CSS scoped trong modal: responsive + style thanh Tab
+  html += `<style>
+    .ctd-tabbar{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1.5px solid var(--bs-border-color);margin:6px 0 12px}
+    .ctd-tab-btn{border:none;background:transparent;padding:8px 14px;font-size:13px;font-weight:600;color:var(--bs-secondary-color);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1.5px}
+    .ctd-tab-btn.active{color:var(--bs-primary);border-bottom-color:var(--bs-primary)}
+    @media(max-width:640px){.ctd-core{grid-template-columns:1fr!important}.ctd-btns .btn{flex:1;justify-content:center}}
   </style>`;
 
-  // ── Row 0: Header compact — Chủ đầu tư | Địa chỉ / Ghi chú ───────────
-  // Tên công trình đã có ở header modal → thay ô tên bằng ô CHỦ ĐẦU TƯ
+  // ── Dải phụ dưới tiêu đề: khởi công · số ngày · chủ đầu tư · địa chỉ ──
+  const _sdTxt = _sd ? (() => { const [y, m, d] = _sd.split('-'); return `${d}-${m}-${y}`; })() : '';
+  const _custName = (() => {
+    const _cust = (p.customerId && typeof getCustomerById === 'function') ? getCustomerById(p.customerId) : null;
+    return _cust ? _cust.name : (p.chuDauTu || '');
+  })();
   html += `
-  <div class="ctd-hdr" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    <div style="${_bx};padding:10px 14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div style="font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.6px">Chủ Đầu Tư</div>
-      </div>
-      ${(() => {
-        // Ưu tiên bản ghi khách hàng (CRM) nếu công trình đã liên kết customerId
-        const _cust = (p.customerId && typeof getCustomerById === 'function') ? getCustomerById(p.customerId) : null;
-        const _ten  = _cust ? _cust.name : (p.chuDauTu || '');
-        if (!_ten) return '<div style="font-size:14px;font-weight:700;line-height:1.4"><span class="text-secondary" style="font-weight:400;font-size:12px">— Chưa nhập —</span></div>';
-        return `<div style="font-size:14px;font-weight:700;color:var(--bs-body-color);line-height:1.4">${x(_ten)}</div>`;
-      })()}
-    </div>
-    <div class="ctd-note-blk" style="${_bx};padding:10px 14px">
-      ${_lb('Địa chỉ công trình / Ghi chú')}
-      <div class="text-secondary" style="font-size:12px;line-height:1.5">${p.note ? x(p.note) : ''}</div>
-    </div>
+  <div class="text-secondary" style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;margin-bottom:12px">
+    ${_sdTxt ? `<span>📅 Khởi công: <strong style="color:var(--bs-body-color)">${_sdTxt}</strong></span>` : ''}
+    ${_durLabel ? `<span>⏱ Đã thực hiện: <strong style="color:var(--bs-body-color)">${_durLabel}</strong></span>` : ''}
+    ${p.endDate ? `<span>✅ Hoàn thành: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.endDate)}</strong></span>` : ''}
+    ${p.closedDate ? `<span>📊 Quyết toán: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.closedDate)}</strong></span>` : ''}
+    ${_custName ? `<span>👤 CĐT: <strong style="color:var(--bs-body-color)">${x(_custName)}</strong></span>` : ''}
+    ${p.note ? `<span>📍 ${x(p.note)}</span>` : ''}
   </div>`;
 
-  // ── Row 1: Tổng chi CT (đỏ) + Tổng chi phí dự toán (xanh dương) ───────────
-  // Màn hình chi tiết chỉ tập trung theo dõi chi phí → đã thay ô Lãi/Lỗ bằng Tổng chi phí dự toán
-  html += `
-  <div class="ctd-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    ${_box(_bxR, 'Tổng Chi Công Trình', _chiPhiChungFixed > 0
-        ? fmtS(tongChiCongTrinh) + `<span class="text-secondary" style="font-size:12px;font-weight:400"> / ${fmtS(tongChiCongTrinh + _chiPhiChungFixed)}</span>`
-        : fmtS(tongChiCongTrinh), CR)}
-    ${!isCompany
-      ? _box(_bxB, 'Tổng Chi Phí Dự Toán',
-          tongChiPhiDuToan ? fmtS(tongChiPhiDuToan) : '—', CB)
-      : `<div style="${_bx}">${_lb('Tổng Hóa Đơn')}${_vl(c.count + ' HĐ')}</div>`}
-  </div>`;
-
-  // ── Row 2: Date tags + Action buttons (Fix 2: emoji icons) ──────────
-  if (!isCompany) {
-    html += `
-  <div class="ctd-btns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-    ${_sd       ? _tag('Ngày bắt đầu: <strong>' + (_sd ? (() => { const [y,m,d]=_sd.split('-'); return `${d}-${m}-${y}`; })() : '') + '</strong>') : ''}
-    ${_durLabel ? _tag('⏱ <strong>' + _durLabel + '</strong>') : ''}
-    <button class="btn btn-outline-secondary btn-sm" onclick="openCTEditModal('${p.id}')">✏️ Sửa</button>
-    ${p.status !== 'completed' && !isClosed
-      ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCompleteCT('${p.id}')">✅ Hoàn Thành</button>`
-      : ''}
-    ${!isClosed
-      ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCloseCT('${p.id}')">📊 Quyết Toán</button>`
-      : ''}
-    <button class="btn btn-danger btn-sm" style="margin-left:auto"
-      onclick="confirmDeleteCT('${p.id}')">🗑 Xóa</button>
-  </div>`;
-  }
-
-  // ── Row 3: HĐ chính (vàng) + Đã thu (xanh) ──────────────────────────
-  if (!isCompany && !isKetoan()) { // [ROLE KETOAN HIDE]
-    const thuLabel = 'Tổng Tiền Đã Thu' + (soDotThu ? ` (${soDotThu} Đợt)` : '');
-    html += `
-  <div class="ctd-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    ${_box(_bxA, 'Tổng Giá Trị Hợp Đồng Chính',
-        tongGiaTriHD ? fmtS(tongGiaTriHD) : '—', CA, _xct('doanhthu'))}
-    ${_box(_bxG, thuLabel,
-        tongThu ? fmtS(tongThu) : '—', CG, _xct('doanhthu'))}
-  </div>`;
-  }
-
-  // ── Row 4: HĐ thầu phụ (vàng) + Ứng thầu phụ (vàng) ────────────────
-  // Fix 5: Ứng thầu phụ → tab 'ung', KHÔNG phải 'doanhthu'
-  if (!isCompany) {
-    html += `
-  <div class="ctd-grid" style="display:grid;grid-template-columns:${isKetoan() ? '1fr' : '1fr 1fr'};gap:10px;margin-bottom:10px">
-    ${isKetoan() ? '' : _box(_bxA, 'Tổng Giá Trị Hợp Đồng Thầu Phụ',
-        tongHDTP   ? fmtS(tongHDTP)   : '—', CA, _xct('doanhthu'))} <!-- [ROLE KETOAN HIDE] -->
-    ${_box(_bxA, 'Tổng Giá Trị Thầu Phụ Ứng',
-        ungTpCost  ? fmtS(ungTpCost)  : '—', CA, _xct('ung'))}
-  </div>`;
-  }
-
-  // ── Row 5: Chi phí chung + Nhà cung cấp ứng ──────────────────────────
-  if (!isCompany) {
-    const cpChungHtml = (chiPhiCongTy > 0)
-      ? fmtS(chiPhiCongTy) + (_allocEntry ? `<span class="text-secondary" style="font-size:11px;font-weight:400"> / ${fmtS(_chiPhiChungFixed)}</span>` : '')
-      : '—';
-    html += `
-  <div class="ctd-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    ${_box(_bx,  `Chi Phí Chung / Chia Tỉ Trọng (k=${getProjectK(p)})`, cpChungHtml)}
-    ${_box(_bxA, 'Tổng Giá Trị Nhà Cung Cấp Ứng',
-        ungNccCost ? fmtS(ungNccCost) : '—', CA, _xct('ung'))}
-  </div>`;
-  }
-
-  // ── Row 6: Tổng chi phí (đỏ, full width) + breakdown ────────────────
-  html += `
-  <div style="${_bxR};margin-bottom:10px">
-    ${_lb('Tổng Chi Phí Công Trình')}
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px;margin-bottom:10px">
-      ${_vl(fmtS(c.total), CR)}
-      ${_xct('thongke')}
-    </div>`;
-
-  if (!c.invs.length) {
-    html += `<div class="text-secondary" style="font-size:12px;padding:2px 0">
-               Không có hóa đơn nào trong ${x(yearLabel.toLowerCase())}
-             </div>`;
-  } else {
-    loaiRows.forEach(([loai, invList]) => {
+  // Helper cục bộ: danh sách phân rã chi phí theo loại (dùng cho tab 1 & view CÔNG TY)
+  const _costBreakdownHtml = () => {
+    if (!c.invs.length)
+      return `<div class="text-secondary" style="font-size:12px;padding:6px 0">Không có hóa đơn nào trong ${x(yearLabel.toLowerCase())}</div>`;
+    return loaiRows.map(([loai, invList]) => {
       const lt = invList.reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
-      html += `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;
-                padding:5px 0;border-top:1px solid rgba(220,38,38,.15);font-size:12px">
-      <span class="text-secondary">${x(loai)}<span class="text-body-secondary"> (${invList.length} hóa đơn)</span></span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:${CR}">${fmtS(lt)}</span>
-    </div>`;
-    });
-  }
-  html += `</div>`; // end row 5
+      return `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:6px 0;border-top:1px solid var(--bs-border-color);font-size:12.5px">
+        <span>${x(loai)} <span class="text-secondary" style="font-size:11px">(${invList.length} hóa đơn)</span></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:${CR};white-space:nowrap">${fmtS(lt)}</span>
+      </div>`;
+    }).join('');
+  };
 
-  // ── Footer: Ngày hoàn thành + Ngày quyết toán (Fix 7: chỉ show nếu có)
-  if (!isCompany && (p.endDate || p.closedDate)) {
+  // ══ NHÁNH CÔNG TY: view đơn giản (chỉ tổng chi phí + phân rã) ══
+  if (isCompany) {
     html += `
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
-    ${p.endDate    ? _tag('📅 Ngày hoàn thành: <strong>' + _fmtProjDate(p.endDate)    + '</strong>') : ''}
-    ${p.closedDate ? _tag('📊 Ngày quyết toán: <strong>' + _fmtProjDate(p.closedDate) + '</strong>') : ''}
-  </div>`;
+    <div style="${_bxR};margin-bottom:12px">
+      ${_lb('Tổng Chi Phí Chung Công Ty · ' + x(yearLabel))}
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px">
+        ${_vl(fmtS(c.total), CR)}
+        <span class="text-secondary" style="font-size:12px">${c.count} hóa đơn</span>
+      </div>
+    </div>
+    <div style="${_bx}">
+      ${_lb('Phân Rã Chi Phí')}
+      ${_costBreakdownHtml()}
+    </div>`;
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('ct-modal').classList.add('open');
+    return;
   }
+
+  // ══ KHU TÀI CHÍNH CỐT LÕI (3 cột: Doanh thu · Chi phí · Lãi/Lỗ) ══
+  const _cols = isKetoan() ? 1 : 3; // kế toán chỉ xem Chi phí
+
+  // Cột 1 — DOANH THU (ẩn với kế toán)
+  const _colRevenue = `
+    <div style="${_bxG}">
+      ${_lb('💰 Doanh Thu (HĐ + Quyết toán)')}
+      ${_vl(doanhThu ? fmtS(doanhThu) : '—', CG)}
+      ${doanhThu > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
+      <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
+        Đã thu <strong style="color:${CG}">${fmtS(tongThu)}</strong> / ${fmtS(doanhThu)}${soDotThu ? ` · ${soDotThu} đợt` : ''}
+      </div>
+      <div style="font-size:11.5px;margin-top:2px">
+        Còn phải thu:
+        <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
+      </div>
+    </div>`;
+
+  // Cột 2 — CHI PHÍ (đang thi công → kèm dự toán + thanh cảnh báo vượt)
+  const _over = pctChi > 100;
+  const _colCost = `
+    <div style="${_bxR}">
+      ${_lb('🧱 Chi Phí Thực Tế Đã Chi')}
+      ${_vl(tongChiCongTrinh ? fmtS(tongChiCongTrinh) : '—', CR)}
+      ${isActiveCT ? `
+        ${_ctdProgress(pctChi, { color: CB, over: _over })}
+        <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
+          Dự toán: <strong style="color:var(--bs-body-color)">${fmtS(chiPhiTong)}</strong>${_over ? ` <span style="color:${CR};font-weight:700">· ⚠ Vượt dự toán</span>` : ''}
+        </div>` : `
+        <div class="text-secondary" style="font-size:11.5px;margin-top:6px">Tổng chi phí công trình (đã chốt)</div>`}
+    </div>`;
+
+  // Cột 3 — HIỆU QUẢ LÃI/LỖ (ẩn với kế toán) + câu giải thích theo trạng thái
+  const _lnPos = loiNhuan >= 0;
+  const _lnColor = _lnPos ? CG : CR;
+  const _lnBg = _lnPos ? BG : BR;
+  const _dongTien = tongThu - tongChiCongTrinh; // dòng tiền thực = đã thu − đã chi
+  let _lnDesc;
+  if (isActiveCT) {
+    _lnDesc = `Đang thi công — đây là lãi <strong>dự kiến</strong> khi hoàn thành. `
+      + (_dongTien >= 0
+          ? `Dòng tiền hiện <strong style="color:${CG}">dương ${fmtS(_dongTien)}</strong> (thu nhiều hơn chi).`
+          : `Dòng tiền hiện <strong style="color:${CR}">âm ${fmtS(-_dongTien)}</strong> (chi nhiều hơn thu).`);
+  } else {
+    const _tt = (p.status === 'closed') ? 'đã quyết toán' : 'đã hoàn thành';
+    _lnDesc = _lnPos
+      ? `Công trình ${_tt} — đạt lợi nhuận <strong style="color:${CG}">${fmtS(loiNhuan)}</strong>.`
+      : `Công trình ${_tt} — đang <strong style="color:${CR}">lỗ ${fmtS(-loiNhuan)}</strong>.`;
+  }
+  const _colProfit = `
+    <div style="border:1.5px solid ${_lnColor};border-radius:8px;padding:11px 14px;background:${_lnBg}">
+      ${_lb((_lnPos ? '📈' : '📉') + ' Hiệu Quả (Lãi / Lỗ)')}
+      <div style="font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${_lnColor};line-height:1.2">${_lnPos ? '' : '−'}${fmtS(Math.abs(loiNhuan))}</div>
+      <div class="text-secondary" style="font-size:11.5px;margin-top:6px;line-height:1.5">${_lnDesc}</div>
+    </div>`;
+
+  html += `<div class="ctd-core" style="display:grid;grid-template-columns:repeat(${_cols},minmax(0,1fr));gap:10px;margin-bottom:14px">
+    ${isKetoan() ? '' : _colRevenue}
+    ${_colCost}
+    ${isKetoan() ? '' : _colProfit}
+  </div>`;
+
+  // ── Hàng nút hành động ──
+  html += `
+  <div class="ctd-btns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <button class="btn btn-outline-secondary btn-sm" onclick="openCTEditModal('${p.id}')">✏️ Sửa</button>
+    ${p.status !== 'completed' && !isClosed ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCompleteCT('${p.id}')">✅ Hoàn Thành</button>` : ''}
+    ${!isClosed ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCloseCT('${p.id}')">📊 Quyết Toán</button>` : ''}
+    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="confirmDeleteCT('${p.id}')">🗑 Xóa</button>
+  </div>`;
+
+  // ══ 3 TAB CHI TIẾT ══
+  // Tab 1 — Phân rã chi phí
+  const _tab1 = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
+      <span style="font-weight:700;font-size:13px">Tổng chi phí trực tiếp: <span style="color:${CR};font-family:'IBM Plex Mono',monospace">${fmtS(c.total)}</span></span>
+      ${_xct('thongke')}
+    </div>
+    ${_costBreakdownHtml()}`;
+
+  // Tab 2 — Thầu phụ & Đối tác: HĐ thầu phụ + đã ứng (thầu phụ, nhà cung cấp)
+  const _tpContracts = (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
+    .filter(r => !r.deletedAt && (r.projectId ? r.projectId === p.id : r.congtrinh === p.name))
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
+  // Gom tiền đã ứng theo tên đối tác (thầu phụ & nhà cung cấp riêng)
+  const _ungByName = (loaiUng) => {
+    const map = {};
+    (typeof ungRecords !== 'undefined' ? ungRecords : []).forEach(r => {
+      if (r.deletedAt || r.loai !== loaiUng || !inActiveYear(r.ngay)) return;
+      if (!(r.projectId ? r.projectId === p.id : r.congtrinh === p.name)) return;
+      const nm = (recCatName(r, 'ung', 'tp') || r.tp || '—').trim() || '—';
+      map[nm] = (map[nm] || 0) + (r.tien || 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  };
+  const _tpUngRows = _ungByName('thauphu');
+  const _nccUngRows = _ungByName('nhacungcap');
+  const _ungBlock = (title, total, rows, color) => rows.length ? `
+    <div style="margin-top:12px;font-weight:700;font-size:12.5px;color:var(--bs-secondary-color)">${title}: <span style="color:${color};font-family:'IBM Plex Mono',monospace">${fmtS(total)}</span></div>
+    ${rows.map(([nm, tien]) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px dashed var(--bs-border-color);font-size:12.5px">
+      <span>${x(nm)}</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:${color}">${fmtS(tien)}</span>
+    </div>`).join('')}` : '';
+  let _tab2;
+  if (!_tpContracts.length && !_tpUngRows.length && !_nccUngRows.length) {
+    _tab2 = `<div class="text-secondary" style="font-size:12px;padding:6px 0">Chưa có hợp đồng / tạm ứng thầu phụ · nhà cung cấp cho công trình này.</div>`;
+  } else {
+    _tab2 = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
+        <span style="font-weight:700;font-size:13px">Hợp đồng thầu phụ: <span style="color:${CA};font-family:'IBM Plex Mono',monospace">${fmtS(tongHDTP)}</span></span>
+        ${_xct('ung')}
+      </div>
+      ${_tpContracts.length ? _tpContracts.map(r => {
+        const gt = (r.giaTri || 0) + (r.phatSinh || 0);
+        const nm = recCatName(r, 'thauphu', 'thauphu') || '—';
+        return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--bs-border-color);font-size:12.5px">
+          <span><strong>${x(nm)}</strong>${r.nd ? ` <span class="text-secondary">· ${x(r.nd)}</span>` : ''}${r.ngay ? ` <span class="text-secondary" style="font-size:11px">(${_fmtProjDate(r.ngay)})</span>` : ''}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:${CA};white-space:nowrap">${fmtS(gt)}</span>
+        </div>`;
+      }).join('') : '<div class="text-secondary" style="font-size:12px;padding:6px 0">Chưa có hợp đồng thầu phụ.</div>'}
+      ${_ungBlock('Đã ứng cho thầu phụ', ungTpCost, _tpUngRows, CR)}
+      ${_ungBlock('Nhà cung cấp đã ứng', ungNccCost, _nccUngRows, CR)}`;
+  }
+
+  // Tab 3 — Lịch sử thu tiền từ chủ đầu tư
+  const _LOAI_THU = { tamung: ['Tạm ứng', '#fd7e14'], giaidoan: ['Giai đoạn', '#0dcaf0'], quyettoan: ['Quyết toán', '#198754'] };
+  const _thuList = (typeof thuRecords !== 'undefined' ? thuRecords : [])
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay) && (r.projectId ? r.projectId === p.id : r.congtrinh === p.name))
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
+  let _tab3;
+  if (!_thuList.length) {
+    _tab3 = `<div class="text-secondary" style="font-size:12px;padding:6px 0">Chưa có đợt thu tiền nào từ chủ đầu tư.</div>`;
+  } else {
+    _tab3 = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
+        <span style="font-weight:700;font-size:13px">Tổng đã thu (${_thuList.length} đợt): <span style="color:${CG};font-family:'IBM Plex Mono',monospace">${fmtS(tongThu)}</span></span>
+        ${_xct('doanhthu')}
+      </div>
+      ${_thuList.map(r => {
+        const lb = _LOAI_THU[r.loaiThu];
+        const badge = lb ? `<span style="font-size:10px;font-weight:700;color:${lb[1]};border:1px solid ${lb[1]};border-radius:5px;padding:1px 6px;margin-left:6px">${lb[0]}</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--bs-border-color);font-size:12.5px">
+          <span>${r.ngay ? `<strong>${_fmtProjDate(r.ngay)}</strong>` : ''}${badge}${r.nd ? ` <span class="text-secondary">· ${x(r.nd)}</span>` : ''}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:${CG};white-space:nowrap">${fmtS(r.tien || 0)}</span>
+        </div>`;
+      }).join('')}`;
+  }
+
+  // Dựng thanh tab + panel (kế toán chỉ có tab Phân rã chi phí)
+  const _tabs = [{ id: 'chiphi', label: '🧱 Phân rã chi phí', body: _tab1 }];
+  if (!isKetoan()) {
+    _tabs.push({ id: 'thauphu', label: '🤝 Thầu phụ & Đối tác', body: _tab2 });
+    _tabs.push({ id: 'thutien', label: '💰 Lịch sử thu tiền', body: _tab3 });
+  }
+  html += `<div class="ctd-tabbar">`
+    + _tabs.map((t, i) => `<button class="ctd-tab-btn${i === 0 ? ' active' : ''}" onclick="_ctdSwitchTab(this,'${t.id}')">${t.label}</button>`).join('')
+    + `</div>`;
+  html += _tabs.map((t, i) => `<div class="ctd-panel" id="ctd-panel-${t.id}" style="display:${i === 0 ? 'block' : 'none'}">${t.body}</div>`).join('');
 
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('ct-modal').classList.add('open');

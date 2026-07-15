@@ -43,6 +43,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.17 Tách Tạm Ứng/Công Nợ Công Nhân ra khỏi Sổ Chấm Công (23/06/2026)](#917-tách-tạm-ứngcông-nợ-công-nhân-ra-khỏi-sổ-chấm-công-23062026)
    - [9.20 Sổ Chấm Công: đổi thứ tự tab + popup Tiền ứng CN tick vào Thực Lãnh + badge vai trò (15/07/2026)](#920-sổ-chấm-công-đổi-thứ-tự-tab--popup-tiền-ứng-cn-tick-vào-thực-lãnh-badge-vai-trò-15072026)
    - [9.21 Fix bug: Quyết Toán Chi Phí nhập vào không lưu (store quyettoan_v1 thiếu đăng ký) (16/07/2026)](#921-fix-bug-quyết-toán-chi-phí-nhập-vào-không-lưu-store-quyettoan_v1-thiếu-đăng-ký-16072026)
+   - [9.22 Tái cấu trúc UI/UX Modal Chi Tiết Công Trình (đưa lại Lãi/Lỗ + 3 tab) (16/07/2026)](#922-tái-cấu-trúc-uiux-modal-chi-tiết-công-trình-đưa-lại-lãilỗ--3-tab-16072026)
 
 **Phụ lục**
 
@@ -1315,6 +1316,30 @@ deploy phải bấm 🔄 Sync 1 lần** trên máy giữ dữ liệu để đẩ
 
 **File đã sửa:** `js/core/core.storage.js` (`DB_KEY_MAP` + `_SYNC_DATA_KEYS`),
 `js/core/core.state-backup.js` (`_reloadGlobals`).
+
+---
+
+## 9.22 Tái cấu trúc UI/UX Modal Chi Tiết Công Trình (đưa lại Lãi/Lỗ + 3 tab) (16/07/2026)
+
+**Yêu cầu:** modal cũ nhồi ~8 ô số liệu phẳng, khó đọc, đã bỏ Lãi/Lỗ. Thiết kế lại cho người dùng
+bình thường: header rõ trạng thái, **3 cột cốt lõi (Doanh thu / Chi phí / Lãi-Lỗ)** có thanh tiến độ +
+câu giải thích, và **3 tab** (Phân rã chi phí · Thầu phụ & Đối tác · Lịch sử thu tiền).
+
+**Cách làm:** viết lại thân hàm `openCTDetail()` trong `js/modules/projects/projects.ui.js`. **Tái dùng
+đúng công thức bảng "Lợi Nhuận"** (reports-export.js) để số liệu khớp tuyệt đối:
+- Chi phí = A(hóa đơn `c.total`) + B(HĐ thầu phụ `tongHDTP`) + C(chi phí chung phân bổ `allocateCompanyCost`).
+- Doanh thu = X(HĐ chính `tongGiaTriHD`) + Y(quyết toán `quyetToanRecords`, có dấu ±).
+- **Lợi nhuận = Doanh thu − Chi phí**. Cột Chi phí hiển thị "đã chi thực tế" (`_ctTongChi`) + thanh
+  `% đã chi / dự toán` (vượt 100% → đỏ "⚠ Vượt dự toán") khi CT đang thi công.
+
+**Helper mới (đều trong projects.ui.js):** `_ctdStatusBadge` (badge màu RIÊNG cho modal: đang thi công=
+xanh dương, hoàn thành=cam, đã quyết toán=xanh lá đậm — **không** đụng `_PT_STATUS_META` global),
+`_ctdProgress` (thanh tiến độ %), `_ctdSwitchTab` (đổi tab tự chứa). Tab công khai gồm 3 panel
+(`#ctd-panel-chiphi|thauphu|thutien`); **role kế toán** chỉ thấy cột + tab Chi phí (ẩn Doanh thu/Lãi-Lỗ/
+Thầu phụ/Thu tiền). **CÔNG TY** dùng view rút gọn (tổng chi + phân rã). Đã dọn khối `html` chết cũ (khởi
+tạo rồi bị `html =` ghi đè).
+
+**File đã sửa:** `js/modules/projects/projects.ui.js` (`openCTDetail` + 3 helper mới).
 
 ---
 
