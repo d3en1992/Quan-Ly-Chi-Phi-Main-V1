@@ -42,6 +42,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.16 Fix bug đặt tên Công Trình & dọn dead code Danh Mục (23/06/2026)](#916-fix-bug-đặt-tên-công-trình--dọn-dead-code-danh-mục-23062026)
    - [9.17 Tách Tạm Ứng/Công Nợ Công Nhân ra khỏi Sổ Chấm Công (23/06/2026)](#917-tách-tạm-ứngcông-nợ-công-nhân-ra-khỏi-sổ-chấm-công-23062026)
    - [9.20 Sổ Chấm Công: đổi thứ tự tab + popup Tiền ứng CN tick vào Thực Lãnh + badge vai trò (15/07/2026)](#920-sổ-chấm-công-đổi-thứ-tự-tab--popup-tiền-ứng-cn-tick-vào-thực-lãnh-badge-vai-trò-15072026)
+   - [9.21 Fix bug: Quyết Toán Chi Phí nhập vào không lưu (store quyettoan_v1 thiếu đăng ký) (16/07/2026)](#921-fix-bug-quyết-toán-chi-phí-nhập-vào-không-lưu-store-quyettoan_v1-thiếu-đăng-ký-16072026)
 
 **Phụ lục**
 
@@ -1280,6 +1281,40 @@ field mới trên phiếu `ung_v1`: `tinhVaoThucLanh` (boolean); ID HTML mới: 
 `js/modules/chamcong/chamcong.ung-ledger.js` (openCCUngModal, saveCCUng, 2 helper sync),
 `js/modules/chamcong/chamcong.history-reports.js` (renderCCTLT desktop+mobile, renderCCTLTMini,
 exportCCTLTCSV, updateTLTSelectedSum, xuatPhieuLuong).
+
+---
+
+## 9.21 Fix bug: Quyết Toán Chi Phí nhập vào không lưu (store `quyettoan_v1` thiếu đăng ký) (16/07/2026)
+
+**Vấn đề:** Nhập 1 bản Quyết Toán Chi Phí (VD SC KHO, 15/12/2025) → app báo "✅ Đã lưu",
+hiện ngay trong bảng, nhưng **reload/pull là mất trắng**. Xảy ra với mọi năm (không riêng năm cũ).
+
+**Nguyên nhân gốc:** Store `quyettoan_v1` bị **bỏ sót đăng ký ở 3 mắt xích** hạ tầng lưu trữ/sync,
+nên record chỉ tồn tại trong RAM (`_mem`) + biến global, phụ thuộc hoàn toàn vào 1 lần 🔄 Sync thủ công:
+1. **Thiếu trong `DB_KEY_MAP`** ([core.storage.js](js/core/core.storage.js)) → `_dbSave()` gặp `cfg=undefined`
+   → return, **không ghi IndexedDB**. `dbInit()` cũng không nạp lại được.
+2. **Thiếu trong `_SYNC_DATA_KEYS`** → `save('quyettoan_v1')` **không** `_incPending`/`_dirtyKeys`/`schedulePush()`
+   → **không tự đẩy cloud**.
+3. **Thiếu trong `_reloadGlobals()`** ([core.state-backup.js](js/core/core.state-backup.js)) → biến
+   `quyetToanRecords` không được refresh từ `_mem`/IDB sau startup; chỉ được gán lại bởi pull cloud
+   (sync.js:497/605) hoặc khi mở tab Doanh Thu (reports-export.js:539).
+
+Phần cloud vốn ĐÃ đúng: `fbMetaHDPayload()` ghi `quyetToan`, `_pullMeta`/`_mergeMetaForPush` đọc `d.quyetToan`,
+`quyettoan_v1` đã có trong `_META_TRIGGER_KEYS`. Đối chiếu toàn bộ key `save()/load()`: `quyettoan_v1` là
+store **duy nhất** thiếu đăng ký (mọi store khác đủ).
+
+**Fix (theo đúng tiền lệ `customers_v1` — mảng lưu blob trong bảng `settings`, sync qua meta doc):**
+- `DB_KEY_MAP`: thêm `'quyettoan_v1': { table:'settings', isArr:false, rowId:'quyettoan' }`.
+- `_SYNC_DATA_KEYS`: thêm `'quyettoan_v1'`.
+- `_reloadGlobals()`: thêm `if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load('quyettoan_v1', []);`.
+
+Không cần bump version Dexie (tái dùng bảng `settings`), không đụng logic cloud.
+
+**Lưu ý khôi phục:** bản quyết toán đang ở RAM mà chưa đẩy cloud sẽ mất khi reload nạp code mới → **trước khi
+deploy phải bấm 🔄 Sync 1 lần** trên máy giữ dữ liệu để đẩy `meta_hop_dong` lên cloud, rồi mới reload.
+
+**File đã sửa:** `js/core/core.storage.js` (`DB_KEY_MAP` + `_SYNC_DATA_KEYS`),
+`js/core/core.state-backup.js` (`_reloadGlobals`).
 
 ---
 

@@ -314,6 +314,7 @@ function _reloadGlobals() {
   if (typeof hopDongData      !== 'undefined') hopDongData      = load('hopdong_v1', {});
   if (typeof thuRecords       !== 'undefined') thuRecords       = load('thu_v1',     []);
   if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = load('thauphu_v1', []);
+  if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load('quyettoan_v1', []);
   // Migration hopdong_v1: chuyển key tên CT → projectId (chạy sau khi projects đã load)
   _migrateHopDongKeys();
   // Module chamcong.js — cnRoles
