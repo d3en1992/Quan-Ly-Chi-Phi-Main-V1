@@ -228,16 +228,6 @@ function cnApplyFilters() {
   cnRenderTable();
 }
 
-// ─── Đặt lại toàn bộ bộ lọc ───────────────────────────────────
-function cnResetFilters() {
-  _cnCt = ''; _cnGroup = ''; _cnMonth = ''; _cnSearch = '';
-  const ids = ['cn-filter-group','cn-filter-month','cn-filter-search'];
-  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  cnPopulateCtFilter();
-  cnPopulateMonthFilter();
-  cnRenderTable();
-}
-
 // ─── Populate dropdown Công Trình ─────────────────────────────
 function cnPopulateCtFilter() {
   const sel = document.getElementById('cn-filter-ct');
@@ -288,4 +278,3 @@ function initCongNo() {
 // Cấp ra global
 window.initCongNo    = initCongNo;
 window.cnApplyFilters = cnApplyFilters;
-window.cnResetFilters = cnResetFilters;
