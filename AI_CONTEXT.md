@@ -1325,12 +1325,21 @@ deploy phải bấm 🔄 Sync 1 lần** trên máy giữ dữ liệu để đẩ
 bình thường: header rõ trạng thái, **3 cột cốt lõi (Doanh thu / Chi phí / Lãi-Lỗ)** có thanh tiến độ +
 câu giải thích, và **3 tab** (Phân rã chi phí · Thầu phụ & Đối tác · Lịch sử thu tiền).
 
-**Cách làm:** viết lại thân hàm `openCTDetail()` trong `js/modules/projects/projects.ui.js`. **Tái dùng
-đúng công thức bảng "Lợi Nhuận"** (reports-export.js) để số liệu khớp tuyệt đối:
-- Chi phí = A(hóa đơn `c.total`) + B(HĐ thầu phụ `tongHDTP`) + C(chi phí chung phân bổ `allocateCompanyCost`).
+**Cách làm:** viết lại thân hàm `openCTDetail()` trong `js/modules/projects/projects.ui.js`. Các đại lượng
+nền (tái dùng công thức bảng "Lợi Nhuận" — reports-export.js):
+- Chi phí (dự toán) = A(hóa đơn `c.total`) + B(HĐ thầu phụ `tongHDTP`) + C(chi phí chung phân bổ
+  `allocateCompanyCost` → `_chiPhiChungFixed`).
 - Doanh thu = X(HĐ chính `tongGiaTriHD`) + Y(quyết toán `quyetToanRecords`, có dấu ±).
-- **Lợi nhuận = Doanh thu − Chi phí**. Cột Chi phí hiển thị "đã chi thực tế" (`_ctTongChi`) + thanh
-  `% đã chi / dự toán` (vượt 100% → đỏ "⚠ Vượt dự toán") khi CT đang thi công.
+- **Lãi dự kiến khi hoàn thành = Doanh thu − Chi phí** (khớp bảng Lợi Nhuận).
+
+**Bố cục 3 cột (theo hướng "dòng tiền thực tế" user chốt):**
+- **Cột 1 Doanh thu:** số CHÍNH = **Đã thu** (`tongThu`, tiền mặt đã vào) + số đợt; thanh `% đã thu = tongThu/doanhThu`;
+  dòng dưới "HĐ: {doanhThu} · Còn phải thu: {doanhThu−tongThu}".
+- **Cột 2 Chi phí:** số CHÍNH = chi trực tiếp (`tongChiCongTrinh` từ `_ctTongChi`) **+ dòng "chi phí chia tỉ trọng"**
+  (`_chiPhiChungFixed`) → giá vốn thật của CT; đang thi công thì kèm thanh `% đã chi / dự toán` (vượt 100% → đỏ "⚠ Vượt dự toán").
+- **Cột 3 Hiệu quả:** số CHÍNH = **lãi/lỗ TỚI HIỆN TẠI = Đã thu − (chi thực tế + chi phí chia tỉ trọng)** (dòng tiền
+  thực). Câu giải thích khi đang thi công nêu thêm **"Lãi dự kiến khi hoàn thành"** (= loiNhuan). CT đã hoàn thành/quyết
+  toán → dùng luôn lãi/lỗ cuối `loiNhuan`.
 
 **Helper mới (đều trong projects.ui.js):** `_ctdStatusBadge` (badge màu RIÊNG cho modal: đang thi công=
 xanh dương, hoàn thành=cam, đã quyết toán=xanh lá đậm — **không** đụng `_PT_STATUS_META` global),

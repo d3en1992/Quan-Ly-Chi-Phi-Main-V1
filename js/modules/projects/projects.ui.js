@@ -785,27 +785,26 @@ function openCTDetail(id) {
   // ══ KHU TÀI CHÍNH CỐT LÕI (3 cột: Doanh thu · Chi phí · Lãi/Lỗ) ══
   const _cols = isKetoan() ? 1 : 3; // kế toán chỉ xem Chi phí
 
-  // Cột 1 — DOANH THU (ẩn với kế toán)
+  // Cột 1 — DOANH THU: số CHÍNH là "Đã thu" (dòng tiền thực đã vào), kèm HĐ + còn phải thu
   const _colRevenue = `
     <div style="${_bxG}">
       ${_lb('💰 Doanh Thu (HĐ + Quyết toán)')}
-      ${_vl(doanhThu ? fmtS(doanhThu) : '—', CG)}
+      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-bottom:2px">Đã thu${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
+      ${_vl(tongThu ? fmtS(tongThu) : '—', CG)}
       ${doanhThu > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
       <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
-        Đã thu <strong style="color:${CG}">${fmtS(tongThu)}</strong> / ${fmtS(doanhThu)}${soDotThu ? ` · ${soDotThu} đợt` : ''}
-      </div>
-      <div style="font-size:11.5px;margin-top:2px">
-        Còn phải thu:
-        <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
+        HĐ: <strong style="color:var(--bs-body-color)">${fmtS(doanhThu)}</strong>
+        · Còn phải thu: <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
       </div>
     </div>`;
 
-  // Cột 2 — CHI PHÍ (đang thi công → kèm dự toán + thanh cảnh báo vượt)
+  // Cột 2 — CHI PHÍ THỰC TẾ ĐÃ CHI = chi trực tiếp + chi phí chia tỉ trọng (giá vốn thật của CT)
   const _over = pctChi > 100;
   const _colCost = `
     <div style="${_bxR}">
       ${_lb('🧱 Chi Phí Thực Tế Đã Chi')}
       ${_vl(tongChiCongTrinh ? fmtS(tongChiCongTrinh) : '—', CR)}
+      ${_chiPhiChungFixed > 0 ? `<div class="text-secondary" style="font-size:11px;margin-top:2px">+ <strong style="color:var(--bs-body-color)">${fmtS(_chiPhiChungFixed)}</strong> chi phí chia tỉ trọng</div>` : ''}
       ${isActiveCT ? `
         ${_ctdProgress(pctChi, { color: CB, over: _over })}
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
@@ -814,28 +813,32 @@ function openCTDetail(id) {
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">Tổng chi phí công trình (đã chốt)</div>`}
     </div>`;
 
-  // Cột 3 — HIỆU QUẢ LÃI/LỖ (ẩn với kế toán) + câu giải thích theo trạng thái
-  const _lnPos = loiNhuan >= 0;
-  const _lnColor = _lnPos ? CG : CR;
-  const _lnBg = _lnPos ? BG : BR;
-  const _dongTien = tongThu - tongChiCongTrinh; // dòng tiền thực = đã thu − đã chi
-  let _lnDesc;
+  // Cột 3 — HIỆU QUẢ: số CHÍNH = lãi/lỗ TỚI HIỆN TẠI = Đã thu − (chi thực tế + chi phí chia tỉ trọng).
+  //   Đang thi công: câu giải thích nêu thêm "lãi dự kiến khi hoàn thành" (= doanh thu − tổng chi phí).
+  //   Đã hoàn thành/quyết toán: dùng luôn lãi/lỗ cuối (loiNhuan).
+  const laiHienTai = tongThu - (tongChiCongTrinh + _chiPhiChungFixed); // lãi/lỗ dòng tiền tới hiện tại
+  const _hqNum   = isActiveCT ? laiHienTai : loiNhuan;
+  const _hqPos   = _hqNum >= 0;
+  const _hqColor = _hqPos ? CG : CR;
+  const _hqBg    = _hqPos ? BG : BR;
+  let _hqDesc;
   if (isActiveCT) {
-    _lnDesc = `Đang thi công — đây là lãi <strong>dự kiến</strong> khi hoàn thành. `
-      + (_dongTien >= 0
-          ? `Dòng tiền hiện <strong style="color:${CG}">dương ${fmtS(_dongTien)}</strong> (thu nhiều hơn chi).`
-          : `Dòng tiền hiện <strong style="color:${CR}">âm ${fmtS(-_dongTien)}</strong> (chi nhiều hơn thu).`);
+    const _duKien = loiNhuan >= 0
+      ? `Lãi <strong style="color:${CG}">dự kiến</strong> khi hoàn thành: <strong>${fmtS(loiNhuan)}</strong>.`
+      : `Dự kiến <strong style="color:${CR}">lỗ ${fmtS(-loiNhuan)}</strong> khi hoàn thành.`;
+    _hqDesc = `Đang thi công — đây là ${_hqPos ? 'lãi' : 'lỗ'} tính tới thời điểm hiện tại `
+      + `(${_hqPos ? 'thu nhiều hơn chi' : 'chi nhiều hơn thu'}). ${_duKien}`;
   } else {
     const _tt = (p.status === 'closed') ? 'đã quyết toán' : 'đã hoàn thành';
-    _lnDesc = _lnPos
+    _hqDesc = _hqPos
       ? `Công trình ${_tt} — đạt lợi nhuận <strong style="color:${CG}">${fmtS(loiNhuan)}</strong>.`
-      : `Công trình ${_tt} — đang <strong style="color:${CR}">lỗ ${fmtS(-loiNhuan)}</strong>.`;
+      : `Công trình ${_tt} — <strong style="color:${CR}">lỗ ${fmtS(-loiNhuan)}</strong>.`;
   }
   const _colProfit = `
-    <div style="border:1.5px solid ${_lnColor};border-radius:8px;padding:11px 14px;background:${_lnBg}">
-      ${_lb((_lnPos ? '📈' : '📉') + ' Hiệu Quả (Lãi / Lỗ)')}
-      <div style="font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${_lnColor};line-height:1.2">${_lnPos ? '' : '−'}${fmtS(Math.abs(loiNhuan))}</div>
-      <div class="text-secondary" style="font-size:11.5px;margin-top:6px;line-height:1.5">${_lnDesc}</div>
+    <div style="border:1.5px solid ${_hqColor};border-radius:8px;padding:11px 14px;background:${_hqBg}">
+      ${_lb((_hqPos ? '📈' : '📉') + ' Hiệu Quả (Lãi / Lỗ)')}
+      <div style="font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${_hqColor};line-height:1.2">${_hqPos ? '' : '−'}${fmtS(Math.abs(_hqNum))}</div>
+      <div class="text-secondary" style="font-size:11.5px;margin-top:6px;line-height:1.5">${_hqDesc}</div>
     </div>`;
 
   html += `<div class="ctd-core" style="display:grid;grid-template-columns:repeat(${_cols},minmax(0,1fr));gap:10px;margin-bottom:14px">
