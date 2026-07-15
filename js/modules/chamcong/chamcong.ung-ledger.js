@@ -193,11 +193,15 @@ function openCCUngModal(prefillName) {
   const ndEl = document.getElementById("cc-ung-m-nd");
   const kindUng = document.getElementById("cc-ung-m-kind-ung");
   if (kindUng) kindUng.checked = true; // mặc định: Ứng tiền
+  const tlChk = document.getElementById("cc-ung-m-tl");
+  if (tlChk) tlChk.checked = false; // mặc định: KHÔNG cộng/trừ vào Thực Lãnh
   if (dateEl) dateEl.value = today();
   if (nameEl) nameEl.value = prefillName || "";
   if (tienEl) tienEl.value = "";
   if (ndEl) ndEl.value = "";
   if (ctEl) ctEl.innerHTML = _buildProjOpts("", "-- Không gắn công trình --");
+  _ccUngSyncTLLabel();   // đồng bộ text checkbox theo loại giao dịch
+  _ccUngSyncRoleBadge(); // đồng bộ badge vai trò theo tên (nếu có prefill)
 
   if (tienEl)
     tienEl.oninput = function () {
@@ -209,6 +213,45 @@ function openCCUngModal(prefillName) {
   if (el && typeof bootstrap !== "undefined")
     bootstrap.Modal.getOrCreateInstance(el).show();
   setTimeout(() => nameEl && nameEl.focus(), 200);
+}
+
+// Đồng bộ text checkbox "Thực Lãnh" theo Loại giao dịch đang chọn.
+//   Ứng tiền → "+ Cộng vào Thực lãnh tuần giao dịch"
+//   Trả nợ   → "− Trừ vào Thực lãnh tuần giao dịch"
+function _ccUngSyncTLLabel() {
+  const kind =
+    document.querySelector('input[name="cc-ung-m-kind"]:checked')?.value ||
+    "ung";
+  const lbl = document.getElementById("cc-ung-m-tl-label");
+  if (lbl)
+    lbl.textContent =
+      kind === "tra"
+        ? "− Trừ vào Thực lãnh tuần giao dịch"
+        : "+ Cộng vào Thực lãnh tuần giao dịch";
+}
+
+// Cập nhật badge Vai trò (T/P/C) theo công nhân đang chọn trong popup.
+// Lấy tên chuẩn từ danh mục rồi tra cnRoles; không có vai trò → ẩn badge.
+function _ccUngSyncRoleBadge() {
+  const badge = document.getElementById("cc-ung-m-role");
+  if (!badge) return;
+  const nameRaw = (
+    document.getElementById("cc-ung-m-name")?.value || ""
+  ).trim();
+  const canonical = nameRaw
+    ? (cats.congNhan || []).find(
+        (n) => normalizeKey(n) === normalizeKey(nameRaw),
+      )
+    : "";
+  const role = canonical ? cnRoles[canonical] || "" : "";
+  if (role) {
+    badge.textContent = role;
+    badge.title = "Vai trò: " + role;
+    badge.style.display = "";
+  } else {
+    badge.textContent = "";
+    badge.style.display = "none";
+  }
 }
 
 function saveCCUng() {
@@ -229,6 +272,9 @@ function saveCCUng() {
   const ct = (ctSel?.value || "").trim();
   const ctPid = _readPidFromSel(ctSel);
   const nd = (document.getElementById("cc-ung-m-nd")?.value || "").trim();
+  // Tick: có cộng/trừ số tiền này vào cột Thực Lãnh của tuần chứa Ngày giao dịch không
+  const tinhVaoTL =
+    document.getElementById("cc-ung-m-tl")?.checked || false;
 
   if (!date) return toast("Chọn ngày giao dịch!", "error");
   if (!nameRaw) return toast("Chọn tên công nhân!", "error");
@@ -252,6 +298,7 @@ function saveCCUng() {
       projectId: ctPid || null,
       tien,
       nd,
+      tinhVaoThucLanh: tinhVaoTL, // cờ đồng bộ vào cột Thực Lãnh
     }),
   );
   save("ung_v1", ungRecords);
@@ -262,9 +309,20 @@ function saveCCUng() {
 
   if (typeof rebuildCCNameList === "function") rebuildCCNameList();
   renderCCUngLedger();
+  // Nếu có tick "tính vào Thực Lãnh" → refresh các bảng Tổng Lương Tuần để cột
+  // Thực Lãnh cập nhật ngay (guard vì các hàm nằm ở file nạp sau).
+  if (tinhVaoTL) {
+    if (typeof renderCCTLTMini === "function") renderCCTLTMini();
+    if (typeof renderCCTLT === "function") renderCCTLT();
+  }
 
+  const tlNote = tinhVaoTL
+    ? kind === "tra"
+      ? " · đã trừ vào Thực Lãnh tuần"
+      : " · đã cộng vào Thực Lãnh tuần"
+    : "";
   toast(
-    `✅ Đã ghi ${kind === "tra" ? "trả nợ" : "ứng"} ${numFmt(tien)} cho ${canonical}`,
+    `✅ Đã ghi ${kind === "tra" ? "trả nợ" : "ứng"} ${numFmt(tien)} cho ${canonical}${tlNote}`,
     "success",
   );
 }

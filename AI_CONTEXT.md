@@ -41,6 +41,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.15 Lọc tuần + Sort DESC + Fix dropdown đổi tên + Số ngày thi công + Biểu đồ 52 tuần đa năm (22/06/2026)](#915-lọc-tuần--sort-desc--fix-dropdown-đổi-tên--số-ngày-thi-công--biểu-đồ-52-tuần-đa-năm-22062026)
    - [9.16 Fix bug đặt tên Công Trình & dọn dead code Danh Mục (23/06/2026)](#916-fix-bug-đặt-tên-công-trình--dọn-dead-code-danh-mục-23062026)
    - [9.17 Tách Tạm Ứng/Công Nợ Công Nhân ra khỏi Sổ Chấm Công (23/06/2026)](#917-tách-tạm-ứngcông-nợ-công-nhân-ra-khỏi-sổ-chấm-công-23062026)
+   - [9.20 Sổ Chấm Công: đổi thứ tự tab + popup Tiền ứng CN tick vào Thực Lãnh + badge vai trò (15/07/2026)](#920-sổ-chấm-công-đổi-thứ-tự-tab--popup-tiền-ứng-cn-tick-vào-thực-lãnh-badge-vai-trò-15072026)
 
 **Phụ lục**
 
@@ -1242,6 +1243,43 @@ chỉ `manualSync()` sai.
   (gồm 2025) lên Firestore → mọi máy khác chọn "2025, 2026" + Sync đã sửa sẽ pull được đầy đủ.
 
 **File đã sửa:** `js/sync/sync.js` (hàm `manualSync()`, bước B1).
+
+---
+
+## 9.20 Sổ Chấm Công: đổi thứ tự tab + popup Tiền ứng CN (tick vào Thực Lãnh, badge vai trò) (15/07/2026)
+
+**Yêu cầu:**
+1. Đổi thứ tự nút sub-tab: **TỔNG LƯƠNG & LỊCH SỬ** đứng trước **ỨNG CÔNG NHÂN**.
+2. Popup "Tiền ứng công nhân": thêm 1 checkbox ngay dưới "Loại giao dịch", text đổi động theo loại
+   ("+ Cộng vào Thực lãnh tuần giao dịch" / "− Trừ vào Thực lãnh tuần giao dịch"). Khi tick → số tiền giao
+   dịch được cộng/trừ vào cột **Thực Lãnh** của đúng công nhân trong **tuần chứa Ngày giao dịch**.
+3. Thêm badge Vai trò (T/P/C) tối giản kế bên ô chọn Tên công nhân, cập nhật động khi chọn CN.
+
+**Cách làm (quan trọng — tránh đếm nợ 2 lần):**
+- Popup vẫn ghi 1 phiếu `ung_v1` (loai=`congnhan`) như cũ → công nợ vẫn do **một nguồn duy nhất** này tính.
+  Checkbox chỉ set thêm cờ `tinhVaoThucLanh` trên phiếu, **không** đụng `loanAmount`/`tru` và **không** tạo
+  bản ghi trùng. Nhờ vậy **xóa phiếu là tự động hoàn tác** cả điều chỉnh Thực Lãnh.
+- Cột Thực Lãnh được điều chỉnh **động lúc render** (không lưu vào `cc_v2`) qua helper mới
+  `ccThucLanhLedgerAdj(name, start, end)`: cộng Σ các phiếu có `tinhVaoThucLanh=true` với `ngay` nằm trong
+  khoảng tuần (Ứng = +tien, Trả = −tien). Vì không lưu vào tuần nên **không bị reset** khi lưu lại Sổ Chấm Công.
+- Công thức Thực Lãnh ở mọi bảng Tổng Lương Tuần đổi thành `tl+pc+loan+hdml-tru + ccThucLanhLedgerAdj(...)`.
+- Phiếu lương PNG: phần dương gộp vào "VAY MỚI", phần âm gộp vào "TRỪ" để breakdown vẫn khớp dòng THỰC LÃNH.
+- Badge vai trò & text checkbox: 2 helper `_ccUngSyncRoleBadge()`, `_ccUngSyncTLLabel()` (gọi khi mở popup,
+  đổi radio loại giao dịch, và gõ/chọn tên).
+
+**Lưu ý hành vi:** cột Thực Lãnh chỉ hiện khi lọc **một tuần cụ thể** (bảng TLT đầy đủ) hoặc ở bảng mini theo
+tuần đang mở ở Sổ. Cột "Ứng/Trả trong kỳ" của sổ cái Ứng Công Nhân **không đổi** (vẫn đếm phiếu như cũ) — cờ
+tick chỉ ảnh hưởng hiển thị Thực Lãnh, không ảnh hưởng công nợ.
+
+**Hàm/biến mới:** `ccThucLanhLedgerAdj()` (core), `_ccUngSyncTLLabel()`, `_ccUngSyncRoleBadge()` (ung-ledger);
+field mới trên phiếu `ung_v1`: `tinhVaoThucLanh` (boolean); ID HTML mới: `cc-ung-m-tl`, `cc-ung-m-tl-label`,
+`cc-ung-m-role`.
+
+**File đã sửa:** `pages/chamcong.html` (đổi thứ tự tab, thêm checkbox + badge trong modal),
+`js/modules/chamcong/chamcong.core.js` (helper `ccThucLanhLedgerAdj`),
+`js/modules/chamcong/chamcong.ung-ledger.js` (openCCUngModal, saveCCUng, 2 helper sync),
+`js/modules/chamcong/chamcong.history-reports.js` (renderCCTLT desktop+mobile, renderCCTLTMini,
+exportCCTLTCSV, updateTLTSelectedSum, xuatPhieuLuong).
 
 ---
 

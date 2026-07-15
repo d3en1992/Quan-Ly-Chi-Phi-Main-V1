@@ -216,10 +216,11 @@ function renderCCTLT(){
       const ctsHtml=r.cts.length?`<div class="tlt-card-cts">${r.cts.map(c=>x(c)).join(' · ')}</div>`:'';
       const periodHtml=fWk?`${viShort(r.fromDate)} – ${viShort(r.toDate)}`:'Tổng nhiều tuần';
       const noCon_=_calcDebtBefore(r.name, r.fromDate);
+      const tlAdj_=ccThucLanhLedgerAdj(r.name, r.fromDate, r.toDate);
       return `<div class="tlt-card card shadow-sm"
         data-name="${x(r.name)}" data-from="${r.fromDate}" data-to="${r.toDate}"
         data-tc="${r.tc}" data-tl="${r.tl}" data-pc="${r.pc}" data-hdml="${r.hdml}"
-        data-loan="${r.loan}" data-tru="${r.tru}" data-no-con="${noCon_}"
+        data-loan="${r.loan}" data-tru="${r.tru}" data-tladj="${tlAdj_}" data-no-con="${noCon_}"
         data-cts="${r.cts.join('|')}">
         <div class="tlt-card-header">
           <label class="tlt-card-label">
@@ -239,7 +240,9 @@ function renderCCTLT(){
     cardsEl.style.display='none';
     tbody.innerHTML=paged.map(r=>{
       const tcLuong=r.tl+r.pc;
-      const thucLanh_=r.tl+r.pc+r.loan+r.hdml-r.tru;
+      // Điều chỉnh từ phiếu ứng/trả có tick "tính vào Thực Lãnh" trong khoảng tuần
+      const tlAdj_=ccThucLanhLedgerAdj(r.name, r.fromDate, r.toDate);
+      const thucLanh_=r.tl+r.pc+r.loan+r.hdml-r.tru+tlAdj_;
       const luongTB=r.tc>0?Math.round(tcLuong/r.tc):0; // TB/ngày = TC Lương ÷ TC
       const noCon_=_calcDebtBefore(r.name, r.fromDate);
       const ctDisplay_=r.cts.length<=1
@@ -248,7 +251,7 @@ function renderCCTLT(){
       return `<tr
         data-name="${x(r.name)}" data-from="${r.fromDate}" data-to="${r.toDate}"
         data-tc="${r.tc}" data-tl="${r.tl}" data-pc="${r.pc}" data-hdml="${r.hdml}"
-        data-loan="${r.loan}" data-tru="${r.tru}" data-no-con="${noCon_}"
+        data-loan="${r.loan}" data-tru="${r.tru}" data-tladj="${tlAdj_}" data-no-con="${noCon_}"
         data-cts="${r.cts.join('|')}">
         <td style="text-align:center;padding:4px"><input type="checkbox" class="cc-tlt-chk" style="width:15px;height:15px;cursor:pointer"></td>
         <td class="text-secondary" style="${mono};font-size:10px;white-space:nowrap">${fWk?viShort(r.fromDate):'Tổng'}<br><span class="text-body-secondary">${fWk?viShort(r.toDate):r.tc+' công'}</span></td>
@@ -329,9 +332,12 @@ function renderCCTLTMini(){
 
   const mono="font-family:'IBM Plex Mono',monospace";
   let sumTCLuong=0, sumThucLanh=0;
+  const _fWkSat=ccSaturdayISO(fWk); // T7 của tuần đang xem (mini bám 1 tuần cụ thể)
   tbody.innerHTML=rows.map(r=>{
     const tcLuong=r.tl+r.pc;
-    const thucLanh_=r.tl+r.pc+r.loan+r.hdml-r.tru;
+    // Điều chỉnh từ phiếu ứng/trả có tick "tính vào Thực Lãnh" trong tuần này
+    const tlAdj_=ccThucLanhLedgerAdj(r.name, fWk, _fWkSat);
+    const thucLanh_=r.tl+r.pc+r.loan+r.hdml-r.tru+tlAdj_;
     const luongTB=r.tc>0?Math.round(tcLuong/r.tc):0;
     sumTCLuong+=tcLuong; sumThucLanh+=thucLanh_;
     const ctDisplay_=r.cts.length<=1
@@ -371,7 +377,8 @@ function updateTLTSelectedSum(){
     const hdml=+(container.dataset.hdml||0);
     const loan=+(container.dataset.loan||0);
     const tru=+(container.dataset.tru||0);
-    total+=tl+pc+loan+hdml-tru;
+    const tladj=+(container.dataset.tladj||0);
+    total+=tl+pc+loan+hdml-tru+tladj;
   });
   sumEl.textContent=chks.length+'cn: '+fmtK(total);
 }
@@ -410,7 +417,7 @@ function exportCCTLTCSV(){
   Object.values(map).sort((a,b)=>fWk?b.fromDate.localeCompare(a.fromDate)||a.name.localeCompare(b.name,'vi'):a.name.localeCompare(b.name,'vi')).forEach(r=>{
     const tcL=r.tl+r.pc+r.hdml;  // TC Lương = lương + phụ cấp + HĐ mua lẻ
     const ltb=r.tc>0?Math.round(tcL/r.tc):0;
-    const thucLanh_csv=r.tl+r.pc+r.loan+r.hdml-r.tru;
+    const thucLanh_csv=r.tl+r.pc+r.loan+r.hdml-r.tru+ccThucLanhLedgerAdj(r.name, r.fromDate, r.toDate);
     const periodStr=fWk?viShort(r.fromDate)+'–'+viShort(r.toDate):'Tổng';
     rows.push([periodStr,r.name,...r.d,r.tc,tcL,ltb,r.loan,r.tru,thucLanh_csv,r.cts.join(', ')]);
   });
@@ -568,11 +575,12 @@ function xuatPhieuLuong() {
     const hdml     = parseInt(container.dataset.hdml)   || 0; // HĐ mua lẻ
     const loan     = parseInt(container.dataset.loan)   || 0; // vay mới
     const tru      = parseInt(container.dataset.tru)    || 0; // trừ nợ ứng
+    const tladj    = parseInt(container.dataset.tladj)  || 0; // điều chỉnh từ phiếu ứng/trả có tick (±)
     const noCon    = parseInt(container.dataset.noCon)  || 0; // nợ còn
     const cts      = (container.dataset.cts || '').split('|').filter(Boolean);
     const tongCong = tl + pc;
     const luongTB  = tc > 0 ? Math.round(tl / tc) : 0;
-    rows.push({ name, fromDate, toDate, tc, tl, pc, hdml, loan, cts, tongCong, luongTB, tru, noCon });
+    rows.push({ name, fromDate, toDate, tc, tl, pc, hdml, loan, cts, tongCong, luongTB, tru, tladj, noCon });
   });
 
   if (!rows.length) {
@@ -591,8 +599,13 @@ function xuatPhieuLuong() {
   const ctLabel    = allCts.join(', ') || '(Nhiều công trình)';
   const today_     = new Date().toLocaleDateString('vi-VN');
   const tongThanhToan  = rows.reduce((s, r) => s + r.tongCong, 0); // sum(tl+pc)
-  const tongTru_       = rows.reduce((s, r) => s + r.tru,      0);
-  const tongLoan_      = rows.reduce((s, r) => s + r.loan,     0);
+  // Điều chỉnh từ phiếu ứng/trả có tick "tính vào Thực Lãnh":
+  //   phần dương (Ứng) gộp vào VAY MỚI, phần âm (Trả) gộp vào TRỪ — để phần
+  //   breakdown trên phiếu vẫn khớp với dòng THỰC LÃNH và Nợ hiện tại.
+  const tongTLAdjPos_  = rows.reduce((s, r) => s + Math.max(0,  r.tladj), 0);
+  const tongTLAdjNeg_  = rows.reduce((s, r) => s + Math.max(0, -r.tladj), 0);
+  const tongTru_       = rows.reduce((s, r) => s + r.tru,      0) + tongTLAdjNeg_;
+  const tongLoan_      = rows.reduce((s, r) => s + r.loan,     0) + tongTLAdjPos_;
   const tongHDML_      = rows.reduce((s, r) => s + r.hdml,     0);
   const tongThucLanh_  = tongThanhToan + tongHDML_ + tongLoan_ - tongTru_;
   const _seenCNNames = new Set();

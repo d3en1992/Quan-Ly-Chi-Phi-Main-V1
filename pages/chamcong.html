@@ -3,8 +3,8 @@
         <!-- Sub-tab navigation: Sổ Chấm Công / Ứng Công Nhân / Tổng Lương & Lịch Sử -->
         <div class="nav nav-pills gap-2 mb-3 flex-wrap align-items-center" id="cc-sub-nav">
           <button class="nav-link active" id="cc-sub-socc-btn" onclick="ccGoSub(this,'cc-sub-socc')">📝 SỔ CHẤM CÔNG</button>
-          <button class="nav-link" id="cc-sub-ung-btn" onclick="ccGoSub(this,'cc-sub-ung')">💵 ỨNG CÔNG NHÂN</button>
           <button class="nav-link" id="cc-sub-baocao-btn" onclick="ccGoSub(this,'cc-sub-baocao')">📊 TỔNG LƯƠNG & LỊCH SỬ</button>
+          <button class="nav-link" id="cc-sub-ung-btn" onclick="ccGoSub(this,'cc-sub-ung')">💵 ỨNG CÔNG NHÂN</button>
           <!-- Nút Tiền ứng CN — luôn hiển thị ở mọi sub-tab; gộp Ứng tiền + Trả nợ -->
           <button class="btn btn-warning btn-sm fw-bold ms-auto" onclick="openCCUngModal()" title="Ghi nhận ứng tiền / trả nợ cho công nhân (bấm được ở mọi tab)">
             💵 Tiền ứng CN
@@ -401,11 +401,17 @@
                 <div class="mb-3">
                   <label class="form-label small fw-bold d-block">Loại giao dịch</label>
                   <div class="btn-group w-100" role="group" id="cc-ung-m-kind-group">
-                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-ung" value="ung" checked />
+                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-ung" value="ung" checked onchange="_ccUngSyncTLLabel()" />
                     <label class="btn btn-outline-warning btn-sm fw-bold" for="cc-ung-m-kind-ung">➕ Ứng tiền</label>
-                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-tra" value="tra" />
+                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-tra" value="tra" onchange="_ccUngSyncTLLabel()" />
                     <label class="btn btn-outline-success btn-sm fw-bold" for="cc-ung-m-kind-tra">➖ Trả nợ</label>
                   </div>
+                </div>
+                <!-- Tick: đồng bộ giao dịch vào cột "Thực Lãnh" của tuần chứa Ngày giao dịch.
+                     Text đổi động theo Loại giao dịch (xem _ccUngSyncTLLabel). -->
+                <div class="mb-3 form-check">
+                  <input type="checkbox" class="form-check-input" id="cc-ung-m-tl" />
+                  <label class="form-check-label small fw-bold" for="cc-ung-m-tl" id="cc-ung-m-tl-label">+ Cộng vào Thực lãnh tuần giao dịch</label>
                 </div>
                 <div class="mb-3">
                   <label class="form-label small fw-bold">Ngày giao dịch</label>
@@ -413,7 +419,12 @@
                 </div>
                 <div class="mb-3">
                   <label class="form-label small fw-bold">Tên công nhân</label>
-                  <input type="text" id="cc-ung-m-name" class="form-control form-control-sm" list="cc-name-dl" placeholder="Chọn / gõ tên công nhân..." autocomplete="off" />
+                  <!-- Ô chọn tên + badge Vai trò (T/P/C) tối giản, cập nhật động khi chọn CN -->
+                  <div class="d-flex align-items-center gap-2">
+                    <input type="text" id="cc-ung-m-name" class="form-control form-control-sm" list="cc-name-dl" placeholder="Chọn / gõ tên công nhân..." autocomplete="off" oninput="_ccUngSyncRoleBadge()" onchange="_ccUngSyncRoleBadge()" />
+                    <span id="cc-ung-m-role" title="Vai trò công nhân"
+                      style="display:none;flex:0 0 auto;min-width:28px;text-align:center;font-size:12px;font-weight:700;line-height:1;padding:6px 10px;border-radius:6px;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);background:var(--bs-tertiary-bg)"></span>
+                  </div>
                 </div>
                 <div class="mb-3">
                   <label class="form-label small fw-bold">Số tiền</label>

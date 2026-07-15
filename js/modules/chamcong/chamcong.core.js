@@ -117,6 +117,23 @@ function ccTraInRange(workerName, start, end) {
   return s;
 }
 
+// Điều chỉnh Thực Lãnh từ các phiếu ứng/trả CÓ TICK "tính vào Thực Lãnh"
+// (tinhVaoThucLanh=true) có Ngày giao dịch nằm trong khoảng tuần [start, end].
+//   Ứng tiền → +tien (cộng vào Thực Lãnh) ; Trả nợ → −tien (trừ vào Thực Lãnh).
+// LƯU Ý: đây là điều chỉnh HIỂN THỊ cho cột Thực Lãnh, KHÔNG đụng tới công nợ.
+//   Công nợ vẫn do chính phiếu ung_v1 tính (một nguồn duy nhất) → không đếm nợ 2 lần,
+//   và xóa phiếu là tự động hoàn tác điều chỉnh này.
+function ccThucLanhLedgerAdj(workerName, start, end) {
+  if (!workerName || !start || !end) return 0;
+  let s = 0;
+  _ccUngRecs(workerName).forEach(r => {
+    if (!r.tinhVaoThucLanh || !r.ngay) return;
+    if (r.ngay < start || r.ngay > end) return;
+    s += (_ccKind(r) === 'tra' ? -1 : 1) * (Number(r.tien) || 0);
+  });
+  return s;
+}
+
 // Phần nợ từ dữ liệu chấm công CŨ (loanAmount − tru) ở các tuần thỏa predWeek(week).
 function _ccLegacyDebt(workerName, predWeek) {
   let debt = 0;
