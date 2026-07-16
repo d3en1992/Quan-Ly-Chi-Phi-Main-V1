@@ -406,7 +406,7 @@ function renderCTItem(item, idx) {
       onkeydown="if(event.key==='Enter')finishEdit('congTrinh',${idx});if(event.key==='Escape')cancelEdit('congTrinh',${idx})">
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congTrinh',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congTrinh',${idx})"
-      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
+      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 
@@ -420,7 +420,7 @@ function renderItem(catId,item,idx) {
       onkeydown="if(event.key==='Enter')finishEdit('${catId}',${idx});if(event.key==='Escape')cancelEdit('${catId}',${idx})">
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('${catId}',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('${catId}',${idx})"
-      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
+      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 
@@ -445,7 +445,7 @@ function renderCNItem(name, idx) {
     </select>
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congNhan',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congNhan',${idx})"
-      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
+      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 
@@ -470,7 +470,7 @@ function renderTbTenItem(item, idx) {
       onkeydown="if(event.key==='Enter')finishEdit('tbTen',${idx});if(event.key==='Escape')cancelEdit('tbTen',${idx})">
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('tbTen',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('tbTen',${idx})"
-      title="${inUse?'Thiết bị đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
+      title="${inUse?'Thiết bị đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 

@@ -219,7 +219,7 @@ function renderBinModal() {
 
   const statusColor = yearKb < 200 ? 'var(--bs-success)' : yearKb < 500 ? '#e67e00' : 'var(--bs-danger)';
   const statusBg    = yearKb < 200 ? '#d4edda'  : yearKb < 500 ? '#fff3cd' : '#f8d7da';
-  const statusLabel = yearKb < 200 ? '✅ OK'    : yearKb < 500 ? '⚠️ Khá lớn' : '🔴 Lớn';
+  const statusLabel = yearKb < 200 ? '<span class="material-symbols-outlined msi-gap">check_circle</span>OK'    : yearKb < 500 ? '<span class="material-symbols-outlined msi-gap">warning</span>Khá lớn' : '<span class="material-symbols-outlined msi-gap">circle</span>Lớn';
 
   ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:460px;width:95vw;background:#fff;border-radius:16px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 12px 48px rgba(0,0,0,.18)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -261,7 +261,7 @@ function renderBinModal() {
         style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none">
     </div>
     <button onclick="fbSaveConfig()" style="width:100%;padding:12px;border-radius:8px;border:none;background:#1a1814;color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">
-      💾 ${isConnected ? 'Cập Nhật Kết Nối' : 'Kết Nối Firebase'}
+      <span class="material-symbols-outlined msi-gap">save</span>${isConnected ? 'Cập Nhật Kết Nối' : 'Kết Nối Firebase'}
     </button>
     <div style="font-size:11px;color:#aaa;text-align:center;line-height:1.6">
       Firebase free tier: 1GB · Không giới hạn size/file · Google hỗ trợ lâu dài

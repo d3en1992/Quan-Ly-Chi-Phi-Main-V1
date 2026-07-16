@@ -86,7 +86,7 @@ function toolResetAll() {
     toast('⚠️ Đang đồng bộ dữ liệu, vui lòng chờ', 'error'); return;
   }
   _showDeleteConfirm(
-    '⚠️ Reset toàn bộ dữ liệu',
+    '<span class="material-symbols-outlined msi-gap">warning</span>Reset toàn bộ dữ liệu',
     `Thao tác sẽ <b>xóa TOÀN BỘ</b> dữ liệu:<br>
      hóa đơn, chấm công, tiền ứng, thu tiền, hợp đồng, danh mục, thiết bị...<br><br>
      • App tự động backup trước khi reset.<br>
@@ -862,7 +862,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
         <div style="background:var(--bs-tertiary-bg);padding:8px 14px;display:flex;align-items:center;
                     justify-content:space-between;border-bottom:1px solid var(--bs-border-color)">
           <span style="font-size:12px;font-weight:700;color:var(--bs-body-color)">
-            📅 Chi tiết Tuần ${wkNum}
+            <span class="material-symbols-outlined msi-gap">calendar_month</span>Chi tiết Tuần ${wkNum}
             <span style="font-size:10px;font-weight:400;color:var(--bs-secondary-color);margin-left:8px">
               CN ${viShort(sun)} – T7 ${viShort(sat)}
             </span>
@@ -873,7 +873,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
                          transition:background .15s"
                   onmouseover="this.style.background='var(--bs-border-color)'"
                   onmouseout="this.style.background='none'"
-                  title="Đóng chi tiết">✕</button>
+                  title="Đóng chi tiết"><span class="material-symbols-outlined">close</span></button>
         </div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;min-width:440px">
@@ -922,7 +922,7 @@ function _dbBarChartWeekly(yr, invoiceData, ungData) {
 
   const selNote = selectedDashboardWeekKey
     ? `<span style="color:#c2895a;font-weight:700;font-size:10px;margin-left:auto">
-         📌 T${allWeeks.findIndex(w=>w.key===selectedDashboardWeekKey)+1}
+         <span class="material-symbols-outlined msi-gap">push_pin</span>T${allWeeks.findIndex(w=>w.key===selectedDashboardWeekKey)+1}
          (${weekLabel(selectedDashboardWeekKey)}) — click lại để bỏ
        </span>`
     : '';

@@ -34,7 +34,7 @@ function openExportModal() {
     <div style="background:#f0f9f4;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12.5px;color:#1a3c2a;line-height:2">
       <strong>Dữ liệu sẽ xuất (tất cả năm):</strong><br>
       <span class="material-symbols-outlined msi-gap">receipt_long</span>${invCount} hóa đơn &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">paid</span>${ungCount} tiền ứng &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">engineering</span>${cnCount} CN (${ccWks} tuần)<br>
-      🔧 ${tbCount} thiết bị &nbsp;·&nbsp; 💰 ${thuCount} lần thu &nbsp;·&nbsp; 🤝 ${tpCount} HĐ thầu phụ &nbsp;·&nbsp; 📋 ${hdCount} HĐ chính
+      <span class="material-symbols-outlined msi-gap">build</span>${tbCount} thiết bị &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">payments</span>${thuCount} lần thu &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">handshake</span>${tpCount} HĐ thầu phụ &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">list_alt</span>${hdCount} HĐ chính
     </div>
     <div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#444;line-height:1.8">
       <strong>10 sheets:</strong>

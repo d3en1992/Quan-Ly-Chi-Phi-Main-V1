@@ -130,9 +130,9 @@ function _khRender() {
                 <td style="font-size:12px">${esc(c.address || '—')}</td>
                 <td style="text-align:right;white-space:nowrap">
                   <button class="btn btn-outline-secondary btn-sm me-1" title="Sửa"
-                    onclick="_khOpenEdit('${esc(c.id)}')">✏️</button>
+                    onclick="_khOpenEdit('${esc(c.id)}')"><span class="material-symbols-outlined">edit</span></button>
                   <button class="btn btn-outline-danger btn-sm" title="Xóa"
-                    onclick="_khDelete('${esc(c.id)}')">🗑</button>
+                    onclick="_khDelete('${esc(c.id)}')"><span class="material-symbols-outlined">delete</span></button>
                 </td>
               </tr>`).join('')}
           </tbody>

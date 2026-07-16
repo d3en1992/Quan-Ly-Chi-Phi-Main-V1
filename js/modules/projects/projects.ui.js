@@ -603,7 +603,7 @@ function openCTDetail(id) {
   const loaiRows = Object.entries(byLoai)
     .sort((a, b) => b[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0) - a[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0));
 
-  document.getElementById('modal-title').innerHTML = `🏗️ ${x(p.name)} ${_ctdStatusBadge(p.status)}`;
+  document.getElementById('modal-title').innerHTML = `<span class="material-symbols-outlined msi-gap">construction</span>${x(p.name)} ${_ctdStatusBadge(p.status)}`;
 
   let html = '';
 
@@ -933,10 +933,10 @@ function openCTDetail(id) {
   }
 
   // Dựng thanh tab + panel (kế toán chỉ có tab Phân rã chi phí)
-  const _tabs = [{ id: 'chiphi', label: '🧱 Phân rã chi phí', body: _tab1 }];
+  const _tabs = [{ id: 'chiphi', label: '<span class="material-symbols-outlined msi-gap">foundation</span>Phân rã chi phí', body: _tab1 }];
   if (!isKetoan()) {
-    _tabs.push({ id: 'thauphu', label: '🤝 Thầu phụ & Đối tác', body: _tab2 });
-    _tabs.push({ id: 'thutien', label: '💰 Lịch sử thu tiền', body: _tab3 });
+    _tabs.push({ id: 'thauphu', label: '<span class="material-symbols-outlined msi-gap">handshake</span>Thầu phụ & Đối tác', body: _tab2 });
+    _tabs.push({ id: 'thutien', label: '<span class="material-symbols-outlined msi-gap">payments</span>Lịch sử thu tiền', body: _tab3 });
   }
   html += `<div class="ctd-tabbar">`
     + _tabs.map((t, i) => `<button class="ctd-tab-btn${i === 0 ? ' active' : ''}" onclick="_ctdSwitchTab(this,'${t.id}')">${t.label}</button>`).join('')
@@ -1288,7 +1288,7 @@ function quickCloseCT(id) {
           style="${inpStyle};font-family:'IBM Plex Mono',monospace">
       </div>
       <div class="text-secondary" style="font-size:12px;background:var(--bs-tertiary-bg);border-radius:6px;padding:8px 10px">
-        ⚠️ Sau khi quyết toán, không thể thêm mới dữ liệu vào công trình này.
+        <span class="material-symbols-outlined msi-gap">warning</span>Sau khi quyết toán, không thể thêm mới dữ liệu vào công trình này.
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-primary" style="flex:1" onclick="confirmQuickClose('${p.id}')"><span class="material-symbols-outlined msi-gap">lock</span>Xác Nhận</button>

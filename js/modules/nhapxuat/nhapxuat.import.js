@@ -266,9 +266,9 @@ function _showImportPreviewNew(session) {
     const canImport    = validCount > 0;
 
     let icon, iconColor;
-    if (validCount === 0 && errCount > 0 && dupCount === 0) { icon = '❌'; iconColor = '#c0392b'; }
-    else if (errCount > 0 || dupCount > 0)                  { icon = '⚠️'; iconColor = '#e67e22'; }
-    else                                                    { icon = '✔';  iconColor = '#1a7a45'; }
+    if (validCount === 0 && errCount > 0 && dupCount === 0) { icon = '<span class="material-symbols-outlined msi-gap">cancel</span>'; iconColor = '#c0392b'; }
+    else if (errCount > 0 || dupCount > 0)                  { icon = '<span class="material-symbols-outlined msi-gap">warning</span>'; iconColor = '#e67e22'; }
+    else                                                    { icon = '<span class="material-symbols-outlined msi-gap">check</span>';  iconColor = '#1a7a45'; }
 
     let countTxt;
     if (isCats) {
@@ -285,12 +285,12 @@ function _showImportPreviewNew(session) {
     } else if (key === 'cc') {
       const cnN = s.records.reduce((n, w) => n + (w.workers||[]).length, 0);
       countTxt  = `${s.records.length} tuần · ${cnN} CN`;
-      if (dbDupCount)    countTxt += ` · ⚠️ ${dbDupCount} tuần trùng DB`;
-      if (batchDupCount) countTxt += ` · ⛔ ${batchDupCount} tuần trùng file`;
+      if (dbDupCount)    countTxt += ` · <span class="material-symbols-outlined msi-gap">warning</span>${dbDupCount} tuần trùng DB`;
+      if (batchDupCount) countTxt += ` · <span class="material-symbols-outlined msi-gap">block</span>${batchDupCount} tuần trùng file`;
     } else {
       countTxt = `${validCount} bản ghi`;
-      if (dbDupCount)    countTxt += ` · ⚠️ ${dbDupCount} trùng DB`;
-      if (batchDupCount) countTxt += ` · ⛔ ${batchDupCount} trùng file`;
+      if (dbDupCount)    countTxt += ` · <span class="material-symbols-outlined msi-gap">warning</span>${dbDupCount} trùng DB`;
+      if (batchDupCount) countTxt += ` · <span class="material-symbols-outlined msi-gap">block</span>${batchDupCount} trùng file`;
     }
 
     const errSample = s.errors.slice(0, 4);
@@ -330,7 +330,7 @@ function _showImportPreviewNew(session) {
       ${sheetsHtml}
     </div>
     <div style="background:#f0f9f4;border-radius:8px;padding:9px 14px;margin-bottom:14px;font-size:11.5px;color:#1a3c2a;line-height:1.7">
-      ✔ Chỉ insert bản ghi MỚI · Bản trùng tự bỏ qua · Lỗi validate bị loại trước import
+      <span class="material-symbols-outlined msi-gap">check</span>Chỉ insert bản ghi MỚI · Bản trùng tự bỏ qua · Lỗi validate bị loại trước import
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('import-modal-overlay').style.display='none'" style="flex:1;padding:11px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-family:inherit;font-size:13px;cursor:pointer">Huỷ</button>

@@ -29,7 +29,7 @@ function renderThungRac() {
           <span class="text-secondary" style="font-size:12px;margin-left:8px">${totalCount ? totalCount + ' bản ghi' : 'Trống'}</span>
         </div>
         <button class="btn btn-outline-danger btn-sm" onclick="_trashEmptyAll()" ${!totalCount ? 'disabled' : ''}>
-          🧹 Làm sạch thùng rác
+          <span class="material-symbols-outlined msi-gap">cleaning_services</span>Làm sạch thùng rác
         </button>
       </div>
 
@@ -108,7 +108,7 @@ function _trashRenderTable(type) {
   wrap.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button class="btn btn-outline-danger btn-sm" onclick="_trashEmptyCurrentTab()">
-        🗑 Xóa tất cả trong tab này (${recs.length})
+        <span class="material-symbols-outlined msi-gap">delete</span>Xóa tất cả trong tab này (${recs.length})
       </button>
     </div>
     <div style="overflow-x:auto">
@@ -211,7 +211,7 @@ function _trashActionBtns(type, r) {
     <button class="btn btn-outline-secondary btn-sm" style="font-size:11px"
       onclick="_trashRestore('${restoreId}')">↩ Khôi phục</button>
     <button class="btn btn-danger btn-sm" style="font-size:11px"
-      onclick="_trashHardDelete('${deleteId}')">✕</button>
+      onclick="_trashHardDelete('${deleteId}')"><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 

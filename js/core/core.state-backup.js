@@ -547,7 +547,7 @@ function _showImportJSONConfirm({ data, c, ts }) {
     <h3 style="font-size:16px;font-weight:800;margin:0 0 12px;text-align:center;color:var(--bs-danger)">KHÔI PHỤC TOÀN BỘ DỮ LIỆU</h3>
     <div style="background:#fff3cd;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.8;margin-bottom:16px">
       <span class="material-symbols-outlined msi-gap">calendar_month</span>Snapshot lúc: <b>${ts}</b><br>
-      📊 Nội dung: ${c.inv} HĐ · ${c.ung} tiền ứng · ${c.cc} tuần CC · ${c.tb} thiết bị
+      <span class="material-symbols-outlined msi-gap">bar_chart</span>Nội dung: ${c.inv} HĐ · ${c.ung} tiền ứng · ${c.cc} tuần CC · ${c.tb} thiết bị
     </div>
     <div style="background:#f8d7da;border-radius:8px;padding:12px 14px;font-size:13px;color:#721c24;line-height:1.8;margin-bottom:20px">
       • Xóa toàn bộ dữ liệu hiện tại<br>

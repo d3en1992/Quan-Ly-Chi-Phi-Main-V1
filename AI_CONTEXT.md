@@ -1367,6 +1367,12 @@ tạo rồi bị `html =` ghi đè).
 
 **File đã đụng:** `index.html`, toàn bộ `pages/*.html` (trừ nội dung không có emoji), và ~26 file JS (nổi bật: `js/app/main.js`, `js/core/core.storage.js`, `core.cloud-cats-ui.js`, `core.state-backup.js`, `js/modules/projects/projects.ui.js`, `js/modules/danhmuc/*`, `js/modules/doanhthu/*`, `js/modules/hoadon/*`, `js/modules/chamcong/*`, `js/modules/khachhang/khachhang.ui.js`, `js/modules/nhapxuat/*`, `js/modules/tienung/*`, `js/modules/thungrac/thungrac.js`, `js/legacy/thietbi.js`, `datatools.js`). Xem bảng "Icon UI" ở [mục 8.1](#81-thay-đổi-cấu-trúcmodule-đã-xác-nhận) cho quy ước thường trực.
 
+**Bổ sung (đợt 2 — quét sót):** phát hiện & xử lý 2 nhóm bị bỏ sót ở lần đầu:
+1. **Emoji mã hóa HTML entity** (`&#x1F4CB;`, `&#x1F4B0;`, `&#x1F91D;`, `&#x1F9FE;`, `&#x2715;`…) — cả các modal trong `pages/doanhthu.html` (Khai Báo HĐ Chính/Thầu Phụ, Ghi Nhận Thu Tiền, Quyết Toán Chi Phí) dùng entity nên regex ký tự Unicode không bắt được. Lưu ý `&#x2014;` là gạch ngang "—", KHÔNG phải emoji → giữ nguyên.
+2. **Dòng continuation trong template `innerHTML` nhiều dòng** (không có thẻ `<` ngay trên dòng): header popup chi tiết CT + 3 tab (`projects.ui.js`), modal snapshot (`core.state-backup.js`), modal Firebase (`core.cloud-cats-ui.js`), modal xóa theo CT/thùng rác, thẻ tóm tắt import/export… — đã convert bổ sung.
+
+Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

@@ -174,11 +174,11 @@ function openProjectClearModal() {
         <!-- Tiêu đề -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
           <h3 style="font-size:15px;font-weight:800;margin:0;color:var(--bs-danger)">
-            🗑 Xóa dữ liệu theo công trình
+            <span class="material-symbols-outlined msi-gap">delete</span>Xóa dữ liệu theo công trình
           </h3>
           <button onclick="closeProjectClearModal()"
                   style="background:none;border:none;font-size:22px;cursor:pointer;
-                         color:var(--bs-secondary-color);line-height:1">✕</button>
+                         color:var(--bs-secondary-color);line-height:1"><span class="material-symbols-outlined">close</span></button>
         </div>
 
         <!-- Bước 1: Chọn công trình -->
@@ -211,7 +211,7 @@ function openProjectClearModal() {
         <div style="background:#fff3cd;border-radius:8px;padding:10px 14px;
                     font-size:12px;color:#664d03;line-height:1.7;margin-bottom:14px">
           <span class="material-symbols-outlined msi-gap">save</span>Hệ thống sẽ tạo bản sao lưu tự động trước khi xóa.<br>
-          ☁️ Sau khi xóa sẽ đẩy lên cloud — mọi thiết bị đều bị ảnh hưởng.
+          <span class="material-symbols-outlined msi-gap">cloud</span>Sau khi xóa sẽ đẩy lên cloud — mọi thiết bị đều bị ảnh hưởng.
         </div>
 
         <!-- Bước 3: Xác nhận bằng cách gõ tên công trình -->
@@ -235,7 +235,7 @@ function openProjectClearModal() {
           </button>
           <button id="prc-delete-btn" onclick="doProjectClear()"
                   class="btn btn-danger" style="flex:2;font-weight:700;font-size:13px" disabled>
-            🗑 Xóa dữ liệu đã chọn
+            <span class="material-symbols-outlined msi-gap">delete</span>Xóa dữ liệu đã chọn
           </button>
         </div>
       </div>
