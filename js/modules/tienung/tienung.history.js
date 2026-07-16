@@ -170,8 +170,8 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
         <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
         <td style="white-space:nowrap">
           <div style="display:flex;gap:4px;justify-content:flex-end">
-            <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')">✕</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')"><span class="material-symbols-outlined">edit</span></button>
+            <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
           </div>
         </td>
       </tr>`).join('')}</tbody>
@@ -247,8 +247,8 @@ function renderUngMini() {
       <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
       <td style="white-space:nowrap">
         <div style="display:flex;gap:4px;justify-content:flex-end">
-          <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')">✕</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')"><span class="material-symbols-outlined">edit</span></button>
+          <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
         </div>
       </td>
     </tr>`;

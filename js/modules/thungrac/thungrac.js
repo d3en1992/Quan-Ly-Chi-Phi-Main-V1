@@ -25,7 +25,7 @@ function renderThungRac() {
     <div style="padding:12px 16px 0">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         <div>
-          <span style="font-size:16px;font-weight:700">🗑️ Thùng Rác</span>
+          <span style="font-size:16px;font-weight:700"><span class="material-symbols-outlined msi-gap">delete</span>Thùng Rác</span>
           <span class="text-secondary" style="font-size:12px;margin-left:8px">${totalCount ? totalCount + ' bản ghi' : 'Trống'}</span>
         </div>
         <button class="btn btn-outline-danger btn-sm" onclick="_trashEmptyAll()" ${!totalCount ? 'disabled' : ''}>
@@ -96,7 +96,7 @@ function _trashRenderTable(type) {
 
   if (!recs.length) {
     wrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 16px;font-size:13px">
-      <div style="font-size:32px;margin-bottom:8px">🗑️</div>
+      <div style="font-size:32px;margin-bottom:8px"><span class="material-symbols-outlined">delete</span></div>
       Thùng rác trống cho mục này
     </div>`;
     return;

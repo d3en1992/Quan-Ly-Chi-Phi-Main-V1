@@ -152,7 +152,7 @@ function addRow(d={}) {
     <td><input class="cell-input" data-f="nd" value="${x(d.nd||'')}" placeholder="Nội dung..."></td>
     <td><input class="cell-input" data-f="nguoi" autocomplete="off" placeholder="Người TH..." value="${x(d.nguoi||'')}"></td>
     <td><input class="cell-input" data-f="ncc" autocomplete="off" placeholder="NCC..." value="${x(d.ncc||'')}"></td>
-    <td><button class="del-btn" onclick="delRow(this)">✕</button></td>
+    <td><button class="del-btn" onclick="delRow(this)"><span class="material-symbols-outlined">close</span></button></td>
   `;
 
   // Thousand-separator logic for tien input
@@ -396,7 +396,7 @@ function _doSaveRows(rows) {
   else if(saved > 0 && updated === 0) toast(`✅ Đã lưu ${saved} hóa đơn!`, 'success');
   else toast(`✅ Đã lưu ${saved} mới, cập nhật ${updated} hóa đơn!`, 'success');
   const _eBtn = document.getElementById('entry-save-btn');
-  if (_eBtn) _eBtn.textContent = '💾 Lưu Hóa Đơn';
+  if (_eBtn) _eBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
 
   // Tự động refresh sub-tab "HĐ/CP nhập trong ngày"
   renderTodayInvoices();

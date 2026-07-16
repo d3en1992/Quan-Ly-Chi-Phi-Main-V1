@@ -400,11 +400,11 @@ function renderCTItem(item, idx) {
   return `<div class="settings-item" id="si-congTrinh-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-congTrinh-${idx}" ondblclick="startEdit('congTrinh',${idx})">${x(item)}</span>
     ${yrBadge}
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-congTrinh-${idx}" value="${x(item)}"
       onblur="finishEdit('congTrinh',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congTrinh',${idx});if(event.key==='Escape')cancelEdit('congTrinh',${idx})">
-    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congTrinh',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congTrinh',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congTrinh',${idx})"
       title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
@@ -414,11 +414,11 @@ function renderItem(catId,item,idx) {
   const inUse = isItemInUse(catId, item);
   return `<div class="settings-item" id="si-${catId}-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-${catId}-${idx}" ondblclick="startEdit('${catId}',${idx})">${x(item)}</span>
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-${catId}-${idx}" value="${x(item)}"
       onblur="finishEdit('${catId}',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('${catId}',${idx});if(event.key==='Escape')cancelEdit('${catId}',${idx})">
-    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('${catId}',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('${catId}',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('${catId}',${idx})"
       title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
@@ -431,7 +431,7 @@ function renderCNItem(name, idx) {
   const inUse = ccData.some(w => !w.deletedAt && w.workers && w.workers.some(wk => wk.name === name));
   return `<div class="settings-item" id="si-congNhan-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-congNhan-${idx}" ondblclick="startEdit('congNhan',${idx})">${x(name)}</span>
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-congNhan-${idx}" value="${x(name)}"
       onblur="finishEdit('congNhan',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congNhan',${idx});if(event.key==='Escape')cancelEdit('congNhan',${idx})">
@@ -443,7 +443,7 @@ function renderCNItem(name, idx) {
       <option value="T" ${role==='T'?'selected':''}>T</option>
       <option value="P" ${role==='P'?'selected':''}>P</option>
     </select>
-    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congNhan',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congNhan',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congNhan',${idx})"
       title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;
@@ -464,11 +464,11 @@ function renderTbTenItem(item, idx) {
   const inUse = typeof tbData !== 'undefined' && tbData.some(t => t.ten === item);
   return `<div class="settings-item" id="si-tbTen-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-tbTen-${idx}" ondblclick="startEdit('tbTen',${idx})">${x(item)}</span>
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">✓ đang dùng</span>`:''}
+    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-tbTen-${idx}" value="${x(item)}"
       onblur="finishEdit('tbTen',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('tbTen',${idx});if(event.key==='Escape')cancelEdit('tbTen',${idx})">
-    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('tbTen',${idx})" title="Sửa tên">✏️</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('tbTen',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
     <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('tbTen',${idx})"
       title="${inUse?'Thiết bị đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}>✕</button>
   </div>`;

@@ -294,7 +294,7 @@ function renderCTOverview() {
     <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px">
       <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Tổng Quan Công Trình</div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-secondary btn-sm" onclick="openKhachHangModal()">👥 Quản Lý Khách Hàng</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="openKhachHangModal()"><span class="material-symbols-outlined msi-gap">group</span>Quản Lý Khách Hàng</button>
         <button class="btn btn-primary btn-sm" onclick="openCTCreateModal()">+ Thêm Công Trình</button>
       </div>
     </div>
@@ -507,7 +507,7 @@ function _ctRenderGrid() {
   const companyCard = `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('COMPANY')" style="cursor:pointer;border:2px solid var(--bs-border-color)">
     <div class="ct-card-head" style="align-items:flex-start">
       <div style="flex:1;min-width:0">
-        <div class="ct-card-name" style="margin-bottom:5px">🏢 ${x(PROJECT_COMPANY.name)}</div>
+        <div class="ct-card-name" style="margin-bottom:5px"><span class="material-symbols-outlined msi-gap">apartment</span>${x(PROJECT_COMPANY.name)}</div>
         <div style="margin-bottom:4px"><span class="text-primary fw-bold" style="font-size:10px;padding:2px 9px;border-radius:10px;background:rgba(var(--bs-primary-rgb),.1);white-space:nowrap">Chi phí chung</span></div>
         <div class="ct-card-count">${companyCosts.count} hóa đơn</div>
       </div>
@@ -742,12 +742,12 @@ function openCTDetail(id) {
   })();
   html += `
   <div class="text-secondary" style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;margin-bottom:12px">
-    ${_sdTxt ? `<span>📅 Khởi công: <strong style="color:var(--bs-body-color)">${_sdTxt}</strong></span>` : ''}
-    ${_durLabel ? `<span>⏱ Đã thực hiện: <strong style="color:var(--bs-body-color)">${_durLabel}</strong></span>` : ''}
-    ${p.endDate ? `<span>✅ Hoàn thành: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.endDate)}</strong></span>` : ''}
-    ${p.closedDate ? `<span>📊 Quyết toán: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.closedDate)}</strong></span>` : ''}
-    ${_custName ? `<span>👤 CĐT: <strong style="color:var(--bs-body-color)">${x(_custName)}</strong></span>` : ''}
-    ${p.note ? `<span>📍 ${x(p.note)}</span>` : ''}
+    ${_sdTxt ? `<span><span class="material-symbols-outlined msi-gap">calendar_month</span>Khởi công: <strong style="color:var(--bs-body-color)">${_sdTxt}</strong></span>` : ''}
+    ${_durLabel ? `<span><span class="material-symbols-outlined msi-gap">timer</span>Đã thực hiện: <strong style="color:var(--bs-body-color)">${_durLabel}</strong></span>` : ''}
+    ${p.endDate ? `<span><span class="material-symbols-outlined msi-gap">check_circle</span>Hoàn thành: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.endDate)}</strong></span>` : ''}
+    ${p.closedDate ? `<span><span class="material-symbols-outlined msi-gap">bar_chart</span>Quyết toán: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.closedDate)}</strong></span>` : ''}
+    ${_custName ? `<span><span class="material-symbols-outlined msi-gap">person</span>CĐT: <strong style="color:var(--bs-body-color)">${x(_custName)}</strong></span>` : ''}
+    ${p.note ? `<span><span class="material-symbols-outlined msi-gap">location_on</span>${x(p.note)}</span>` : ''}
   </div>`;
 
   // Helper cục bộ: danh sách phân rã chi phí theo loại (dùng cho tab 1 & view CÔNG TY)
@@ -788,7 +788,7 @@ function openCTDetail(id) {
   // Cột 1 — DOANH THU: số CHÍNH là "Đã thu" (dòng tiền thực đã vào), kèm HĐ + còn phải thu
   const _colRevenue = `
     <div style="${_bxG}">
-      ${_lb('💰 Doanh Thu (HĐ + Quyết toán)')}
+      ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Doanh Thu (HĐ + Quyết toán)')}
       <div class="text-secondary" style="font-size:11px;font-weight:600;margin-bottom:2px">Đã thu${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
       ${_vl(tongThu ? fmtS(tongThu) : '—', CG)}
       ${doanhThu > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
@@ -802,13 +802,13 @@ function openCTDetail(id) {
   const _over = pctChi > 100;
   const _colCost = `
     <div style="${_bxR}">
-      ${_lb('🧱 Chi Phí Thực Tế Đã Chi')}
+      ${_lb('<span class="material-symbols-outlined msi-gap">foundation</span>Chi Phí Thực Tế Đã Chi')}
       ${_vl(tongChiCongTrinh ? fmtS(tongChiCongTrinh) : '—', CR)}
       ${_chiPhiChungFixed > 0 ? `<div class="text-secondary" style="font-size:11px;margin-top:2px">+ <strong style="color:var(--bs-body-color)">${fmtS(_chiPhiChungFixed)}</strong> chi phí chia tỉ trọng</div>` : ''}
       ${isActiveCT ? `
         ${_ctdProgress(pctChi, { color: CB, over: _over })}
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
-          Dự toán: <strong style="color:var(--bs-body-color)">${fmtS(chiPhiTong)}</strong>${_over ? ` <span style="color:${CR};font-weight:700">· ⚠ Vượt dự toán</span>` : ''}
+          Dự toán: <strong style="color:var(--bs-body-color)">${fmtS(chiPhiTong)}</strong>${_over ? ` <span style="color:${CR};font-weight:700">· <span class="material-symbols-outlined msi-gap">warning</span>Vượt dự toán</span>` : ''}
         </div>` : `
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">Tổng chi phí công trình (đã chốt)</div>`}
     </div>`;
@@ -836,7 +836,7 @@ function openCTDetail(id) {
   }
   const _colProfit = `
     <div style="border:1.5px solid ${_hqColor};border-radius:8px;padding:11px 14px;background:${_hqBg}">
-      ${_lb((_hqPos ? '📈' : '📉') + ' Hiệu Quả (Lãi / Lỗ)')}
+      ${_lb((_hqPos ? '<span class="material-symbols-outlined msi-gap">trending_up</span>' : '<span class="material-symbols-outlined msi-gap">trending_down</span>') + 'Hiệu Quả (Lãi / Lỗ)')}
       <div style="font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${_hqColor};line-height:1.2">${_hqPos ? '' : '−'}${fmtS(Math.abs(_hqNum))}</div>
       <div class="text-secondary" style="font-size:11.5px;margin-top:6px;line-height:1.5">${_hqDesc}</div>
     </div>`;
@@ -850,10 +850,10 @@ function openCTDetail(id) {
   // ── Hàng nút hành động ──
   html += `
   <div class="ctd-btns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-    <button class="btn btn-outline-secondary btn-sm" onclick="openCTEditModal('${p.id}')">✏️ Sửa</button>
-    ${p.status !== 'completed' && !isClosed ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCompleteCT('${p.id}')">✅ Hoàn Thành</button>` : ''}
-    ${!isClosed ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCloseCT('${p.id}')">📊 Quyết Toán</button>` : ''}
-    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="confirmDeleteCT('${p.id}')">🗑 Xóa</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="openCTEditModal('${p.id}')"><span class="material-symbols-outlined msi-gap">edit</span>Sửa</button>
+    ${p.status !== 'completed' && !isClosed ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCompleteCT('${p.id}')"><span class="material-symbols-outlined msi-gap">check_circle</span>Hoàn Thành</button>` : ''}
+    ${!isClosed ? `<button class="btn btn-outline-secondary btn-sm" onclick="quickCloseCT('${p.id}')"><span class="material-symbols-outlined msi-gap">bar_chart</span>Quyết Toán</button>` : ''}
+    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="confirmDeleteCT('${p.id}')"><span class="material-symbols-outlined msi-gap">delete</span>Xóa</button>
   </div>`;
 
   // ══ 3 TAB CHI TIẾT ══
@@ -1104,7 +1104,7 @@ function openCTCreateModal() {
           style="${inpStyle}">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-primary" style="flex:1" onclick="saveCTCreate()">💾 Lưu Công Trình</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveCTCreate()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Công Trình</button>
         <button class="btn btn-outline-secondary" onclick="closeModal()">Hủy</button>
       </div>
     </div>
@@ -1156,7 +1156,7 @@ function openCTEditModal(id) {
   const cld = p.closedDate || '';
   const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
   const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
-  document.getElementById('modal-title').textContent = '✏️ Sửa Công Trình';
+  document.getElementById('modal-title').innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Sửa Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
       <!-- Hàng 1: Tên công trình -->
@@ -1209,7 +1209,7 @@ function openCTEditModal(id) {
           style="${inpStyle}">
       </div>
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-primary" style="flex:1" onclick="saveCTEdit('${p.id}')">💾 Lưu Thay Đổi</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveCTEdit('${p.id}')"><span class="material-symbols-outlined msi-gap">save</span>Lưu Thay Đổi</button>
         <button class="btn btn-outline-secondary" onclick="openCTDetail('${p.id}')">Hủy</button>
       </div>
     </div>
@@ -1278,7 +1278,7 @@ function quickCloseCT(id) {
   const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
   const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   const todayStr = new Date().toISOString().slice(0, 10);
-  document.getElementById('modal-title').textContent = '🔒 Quyết Toán Công Trình';
+  document.getElementById('modal-title').innerHTML = '<span class="material-symbols-outlined msi-gap">lock</span>Quyết Toán Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="text-secondary" style="font-size:13px">Đánh dấu <strong>${x(p.name)}</strong> là <strong>Đã Quyết Toán</strong>?</div>
@@ -1291,7 +1291,7 @@ function quickCloseCT(id) {
         ⚠️ Sau khi quyết toán, không thể thêm mới dữ liệu vào công trình này.
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" style="flex:1" onclick="confirmQuickClose('${p.id}')">🔒 Xác Nhận</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmQuickClose('${p.id}')"><span class="material-symbols-outlined msi-gap">lock</span>Xác Nhận</button>
         <button class="btn btn-outline-secondary" onclick="openCTDetail('${p.id}')">Hủy</button>
       </div>
     </div>
@@ -1315,7 +1315,7 @@ function quickCompleteCT(id) {
   const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
   const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   const todayStr = new Date().toISOString().slice(0, 10);
-  document.getElementById('modal-title').textContent = '✅ Hoàn Thành Công Trình';
+  document.getElementById('modal-title').innerHTML = '<span class="material-symbols-outlined msi-gap">check_circle</span>Hoàn Thành Công Trình';
   document.getElementById('modal-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="text-secondary" style="font-size:13px">Đánh dấu <strong>${x(p.name)}</strong> là <strong>Đã Hoàn Thành</strong>?</div>
@@ -1325,7 +1325,7 @@ function quickCompleteCT(id) {
           style="${inpStyle};font-family:'IBM Plex Mono',monospace">
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" style="flex:1" onclick="confirmQuickComplete('${p.id}')">✅ Xác Nhận</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmQuickComplete('${p.id}')"><span class="material-symbols-outlined msi-gap">check_circle</span>Xác Nhận</button>
         <button class="btn btn-outline-secondary" onclick="openCTDetail('${p.id}')">Hủy</button>
       </div>
     </div>

@@ -50,7 +50,7 @@ function _khRender() {
   // ── Form thêm mới ──
   const addForm = (_khMode === 'add') ? `
     <div style="padding:14px 16px;border-bottom:1px solid var(--bs-border-color);background:var(--bs-body-bg)">
-      <div style="font-weight:700;font-size:13px;margin-bottom:10px">➕ Thêm Khách Hàng Mới</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px"><span class="material-symbols-outlined msi-gap">add_circle</span>Thêm Khách Hàng Mới</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
           <label style="${lbSt}">Tên *</label>
@@ -70,7 +70,7 @@ function _khRender() {
         </div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="_khSaveAdd()">💾 Lưu</button>
+        <button class="btn btn-primary btn-sm" onclick="_khSaveAdd()"><span class="material-symbols-outlined msi-gap">save</span>Lưu</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="_khCancelForm()">Hủy</button>
       </div>
     </div>` : '';
@@ -79,7 +79,7 @@ function _khRender() {
   const editCust = _khEditId ? (typeof getCustomerById === 'function' ? getCustomerById(_khEditId) : null) : null;
   const editForm = (_khMode === 'edit' && editCust) ? `
     <div style="padding:14px 16px;border-bottom:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg)">
-      <div style="font-weight:700;font-size:13px;margin-bottom:10px">✏️ Sửa Thông Tin Khách Hàng</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px"><span class="material-symbols-outlined msi-gap">edit</span>Sửa Thông Tin Khách Hàng</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
           <label style="${lbSt}">Tên *</label>
@@ -99,7 +99,7 @@ function _khRender() {
         </div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="_khSaveEdit()">💾 Lưu thay đổi</button>
+        <button class="btn btn-primary btn-sm" onclick="_khSaveEdit()"><span class="material-symbols-outlined msi-gap">save</span>Lưu thay đổi</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="_khCancelForm()">Hủy</button>
       </div>
     </div>` : '';
@@ -108,7 +108,7 @@ function _khRender() {
   const custs = (typeof getAllCustomers === 'function') ? getAllCustomers() : [];
   const listHtml = custs.length === 0
     ? `<div class="text-secondary text-center p-4" style="font-size:13px">
-        Chưa có khách hàng nào. Nhấn <strong>➕ Thêm Khách Hàng</strong> bên dưới.
+        Chưa có khách hàng nào. Nhấn <strong><span class="material-symbols-outlined msi-gap">add_circle</span>Thêm Khách Hàng</strong> bên dưới.
        </div>`
     : `<div style="overflow-x:auto">
         <table class="table table-sm table-hover align-middle mb-0">

@@ -313,11 +313,11 @@ function _showImportPreviewNew(session) {
 
   ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:540px;width:95vw;background:#fff;border-radius:16px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 12px 48px rgba(0,0,0,.18);max-height:92vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <h3 style="font-size:16px;font-weight:800;margin:0">📥 Xem Trước Import</h3>
-      <button onclick="document.getElementById('import-modal-overlay').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888">✕</button>
+      <h3 style="font-size:16px;font-weight:800;margin:0"><span class="material-symbols-outlined msi-gap">download</span>Xem Trước Import</h3>
+      <button onclick="document.getElementById('import-modal-overlay').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888"><span class="material-symbols-outlined">close</span></button>
     </div>
     <div style="background:#f0f4ff;border-radius:8px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:#333">
-      📄 <strong>${session.filename}</strong>
+      <span class="material-symbols-outlined msi-gap">description</span><strong>${session.filename}</strong>
     </div>
     ${hasAnything ? `<div style="margin-bottom:8px">
       <label style="display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:12.5px;font-weight:700;cursor:pointer;color:#1a1814">
@@ -335,7 +335,7 @@ function _showImportPreviewNew(session) {
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('import-modal-overlay').style.display='none'" style="flex:1;padding:11px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-family:inherit;font-size:13px;cursor:pointer">Huỷ</button>
       ${hasAnything
-        ? `<button onclick="_applyImport()" style="flex:2;padding:11px;border-radius:8px;border:none;background:#1a1814;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">✅ Import Các Sheet Đã Chọn</button>`
+        ? `<button onclick="_applyImport()" style="flex:2;padding:11px;border-radius:8px;border:none;background:#1a1814;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer"><span class="material-symbols-outlined msi-gap">check_circle</span>Import Các Sheet Đã Chọn</button>`
         : `<button disabled style="flex:2;padding:11px;border-radius:8px;border:none;background:#ccc;color:#666;font-family:inherit;font-size:13px;font-weight:700;cursor:not-allowed">Không có dữ liệu hợp lệ</button>`
       }
     </div>

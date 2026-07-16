@@ -480,7 +480,7 @@ function _showOfflineBlock() {
     + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
     + 'text-align:center;font-family:system-ui,sans-serif;padding:24px;gap:14px';
   el.innerHTML =
-    '<div style="font-size:52px">📡</div>'
+    '<div style="font-size:52px"><span class="material-symbols-outlined">cell_tower</span></div>'
     + '<div style="font-size:20px;font-weight:700">Mất kết nối internet</div>'
     + '<div style="font-size:15px;opacity:.8;max-width:320px;line-height:1.5">'
     + 'App cần có mạng để làm việc với dữ liệu trên cloud. '

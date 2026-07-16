@@ -28,12 +28,12 @@ function openExportModal() {
 
   ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:460px;width:95vw;background:#fff;border-radius:16px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 12px 48px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="font-size:16px;font-weight:800;margin:0">📤 Xuất Toàn Bộ Dữ Liệu Ra Excel</h3>
-      <button onclick="document.getElementById('export-modal-overlay').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888">✕</button>
+      <h3 style="font-size:16px;font-weight:800;margin:0"><span class="material-symbols-outlined msi-gap">upload</span>Xuất Toàn Bộ Dữ Liệu Ra Excel</h3>
+      <button onclick="document.getElementById('export-modal-overlay').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888"><span class="material-symbols-outlined">close</span></button>
     </div>
     <div style="background:#f0f9f4;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12.5px;color:#1a3c2a;line-height:2">
       <strong>Dữ liệu sẽ xuất (tất cả năm):</strong><br>
-      🧾 ${invCount} hóa đơn &nbsp;·&nbsp; 💸 ${ungCount} tiền ứng &nbsp;·&nbsp; 👷 ${cnCount} CN (${ccWks} tuần)<br>
+      <span class="material-symbols-outlined msi-gap">receipt_long</span>${invCount} hóa đơn &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">paid</span>${ungCount} tiền ứng &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">engineering</span>${cnCount} CN (${ccWks} tuần)<br>
       🔧 ${tbCount} thiết bị &nbsp;·&nbsp; 💰 ${thuCount} lần thu &nbsp;·&nbsp; 🤝 ${tpCount} HĐ thầu phụ &nbsp;·&nbsp; 📋 ${hdCount} HĐ chính
     </div>
     <div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#444;line-height:1.8">
@@ -44,7 +44,7 @@ function openExportModal() {
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('export-modal-overlay').style.display='none'" style="flex:1;padding:11px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-family:inherit;font-size:13px;cursor:pointer">Huỷ</button>
-      <button onclick="exportExcel()" style="flex:2;padding:11px;border-radius:8px;border:none;background:#1a7a45;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">📥 Tải export_full_data.xlsx</button>
+      <button onclick="exportExcel()" style="flex:2;padding:11px;border-radius:8px;border:none;background:#1a7a45;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer"><span class="material-symbols-outlined msi-gap">download</span>Tải export_full_data.xlsx</button>
     </div>
   </div>`;
   ov.style.display = 'flex';

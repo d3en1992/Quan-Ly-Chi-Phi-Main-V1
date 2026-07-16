@@ -39,7 +39,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'inv_quick',
     key: 'inv_v3',
-    group: '📄 Hóa đơn',
+    group: '<span class="material-symbols-outlined msi-gap">description</span>Hóa đơn',
     label: 'HĐ Nhập nhanh',
     // Khớp: thuộc CT này VÀ source là quick (không phải detail, không phải CC)
     filter: (r, pid, pname) =>
@@ -48,7 +48,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'inv_detail',
     key: 'inv_v3',
-    group: '📄 Hóa đơn',
+    group: '<span class="material-symbols-outlined msi-gap">description</span>Hóa đơn',
     label: 'HĐ Chi tiết',
     filter: (r, pid, pname) =>
       _prcBelongs(r, pid, pname) && _prcInvSource(r) === 'detail',
@@ -56,7 +56,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'inv_cc',
     key: 'inv_v3',
-    group: '📄 Hóa đơn',
+    group: '<span class="material-symbols-outlined msi-gap">description</span>Hóa đơn',
     label: 'HĐ từ Chấm công',
     // Hóa đơn tự sinh từ module Chấm Công — xóa riêng, không ảnh hưởng bảng CC gốc
     filter: (r, pid, pname) =>
@@ -67,7 +67,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'ung_tp',
     key: 'ung_v1',
-    group: '💰 Tiền ứng',
+    group: '<span class="material-symbols-outlined msi-gap">payments</span>Tiền ứng',
     label: 'Ứng Thầu phụ',
     // loai='thauphu' hoặc không có loai (data cũ mặc định là thầu phụ)
     filter: (r, pid, pname) =>
@@ -76,7 +76,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'ung_ncc',
     key: 'ung_v1',
-    group: '💰 Tiền ứng',
+    group: '<span class="material-symbols-outlined msi-gap">payments</span>Tiền ứng',
     label: 'Ứng Nhà cung cấp',
     filter: (r, pid, pname) =>
       _prcBelongs(r, pid, pname) && r.loai === 'nhacungcap',
@@ -86,7 +86,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'tb',
     key: 'tb_v1',
-    group: '🛠 Thiết bị',
+    group: '<span class="material-symbols-outlined msi-gap">handyman</span>Thiết bị',
     label: 'Theo dõi thiết bị',
     filter: (r, pid, pname) => _prcBelongs(r, pid, pname),
   },
@@ -95,7 +95,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'cc',
     key: 'cc_v2',
-    group: '📅 Chấm công',
+    group: '<span class="material-symbols-outlined msi-gap">calendar_month</span>Chấm công',
     label: 'Bảng chấm công',
     filter: (r, pid, pname) => _prcBelongs(r, pid, pname),
   },
@@ -104,7 +104,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'hopdong',
     key: 'hopdong_v1',
-    group: '📑 Hợp đồng',
+    group: '<span class="material-symbols-outlined msi-gap">article</span>Hợp đồng',
     label: 'Hợp đồng chính',
     // hopdong_v1 là object { [projectId]: {...} } — cần xử lý đặc biệt
     isObject: true,
@@ -112,7 +112,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'thauphu',
     key: 'thauphu_v1',
-    group: '📑 Hợp đồng',
+    group: '<span class="material-symbols-outlined msi-gap">article</span>Hợp đồng',
     label: 'HĐ Thầu phụ',
     filter: (r, pid, pname) => _prcBelongs(r, pid, pname),
   },
@@ -121,7 +121,7 @@ const PROJECT_CLEAR_DEFS = [
   {
     id: 'thu',
     key: 'thu_v1',
-    group: '💵 Thu tiền',
+    group: '<span class="material-symbols-outlined msi-gap">attach_money</span>Thu tiền',
     label: 'Phiếu thu tiền',
     filter: (r, pid, pname) => _prcBelongs(r, pid, pname),
   },
@@ -210,7 +210,7 @@ function openProjectClearModal() {
         <!-- Cảnh báo luôn hiện -->
         <div style="background:#fff3cd;border-radius:8px;padding:10px 14px;
                     font-size:12px;color:#664d03;line-height:1.7;margin-bottom:14px">
-          💾 Hệ thống sẽ tạo bản sao lưu tự động trước khi xóa.<br>
+          <span class="material-symbols-outlined msi-gap">save</span>Hệ thống sẽ tạo bản sao lưu tự động trước khi xóa.<br>
           ☁️ Sau khi xóa sẽ đẩy lên cloud — mọi thiết bị đều bị ảnh hưởng.
         </div>
 
@@ -441,7 +441,7 @@ async function doProjectClear() {
 
   // Vô hiệu hóa nút khi đang xử lý
   const btn = document.getElementById('prc-delete-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang xóa...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined msi-gap">hourglass_top</span>Đang xóa...'; }
 
   try {
     // Bước 1: Tạo backup trước khi xóa (để khôi phục nếu nhỡ tay)
@@ -501,6 +501,6 @@ async function doProjectClear() {
     console.error('[ProjectClear] Lỗi:', e);
     toast('❌ Lỗi khi xóa: ' + (e.message || String(e)), 'error');
     // Phục hồi nút nếu lỗi
-    if (btn) { btn.disabled = false; btn.textContent = '🗑 Xóa dữ liệu đã chọn'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined msi-gap">delete</span>Xóa dữ liệu đã chọn'; }
   }
 }

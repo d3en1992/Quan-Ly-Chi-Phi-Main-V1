@@ -141,7 +141,7 @@ function buildCCTable(workers) {
     <th class="col-phucap" style="text-align:right;${BG}">
       <span style="display:inline-flex;align-items:center;gap:4px;justify-content:flex-end">
         Phụ Cấp
-        <span class="cc-debt-toggle-th" onclick="toggleCCDebtCols()" title="Mở rộng: HĐ Mua Lẻ / Nội Dung" style="cursor:pointer;font-size:10px;user-select:none;color:var(--ink2);padding:0 2px">▶</span>
+        <span class="cc-debt-toggle-th" onclick="toggleCCDebtCols()" title="Mở rộng: HĐ Mua Lẻ / Nội Dung" style="cursor:pointer;font-size:10px;user-select:none;color:var(--ink2);padding:0 2px"><span class="material-symbols-outlined">chevron_right</span></span>
       </span>
     </th>
     <th class="cc-debt-col col-hdml" style="text-align:right;${BG}">HĐ Mua Lẻ</th>
@@ -220,7 +220,7 @@ function buildCCRow(w, num) {
       value="${x(w ? w.nd || "" : "" || "")}" placeholder="Nội dung..."
       style="font-size:11px"></td>
     <td class="cc-total-cell col-total" data-cc="tongcong" style="color:var(--gold);font-size:13px">—</td>
-    <td class="col-del"><button class="del-btn" onclick="delCCRow(this)">✕</button></td>
+    <td class="col-del"><button class="del-btn" onclick="delCCRow(this)"><span class="material-symbols-outlined">close</span></button></td>
   `;
   tr.querySelectorAll('[data-cc^="d"]').forEach((el) =>
     el.addEventListener("input", () => {

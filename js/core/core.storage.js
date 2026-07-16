@@ -17,13 +17,13 @@ const DEFAULTS = {
 };
 
 const CATS = [
-  { id:'congTrinh',  title:'🏗️ Công Trình',           sk:'cat_ct',     refField:'congtrinh' },
-  { id:'loaiChiPhi', title:'📂 Loại Chi Phí',          sk:'cat_loai',   refField:'loai' },
-  { id:'nhaCungCap', title:'🏪 Nhà Cung Cấp',          sk:'cat_ncc',    refField:'ncc' },
-  { id:'nguoiTH',    title:'👷 Người Thực Hiện',       sk:'cat_nguoi',  refField:'nguoi' },
-  { id:'thauPhu',    title:'🤝 Thầu Phụ / TP',         sk:'cat_tp',     refField:'tp' },
-  { id:'congNhan',   title:'🪖 Công Nhân',              sk:'cat_cn',     refField:null },
-  { id:'tbTen',      title:'🛠 Máy / Thiết Bị Thi Công', sk:'cat_tbteb', refField:null }
+  { id:'congTrinh',  title:'<span class="material-symbols-outlined msi-gap">construction</span>Công Trình',           sk:'cat_ct',     refField:'congtrinh' },
+  { id:'loaiChiPhi', title:'<span class="material-symbols-outlined msi-gap">folder_open</span>Loại Chi Phí',          sk:'cat_loai',   refField:'loai' },
+  { id:'nhaCungCap', title:'<span class="material-symbols-outlined msi-gap">storefront</span>Nhà Cung Cấp',          sk:'cat_ncc',    refField:'ncc' },
+  { id:'nguoiTH',    title:'<span class="material-symbols-outlined msi-gap">engineering</span>Người Thực Hiện',       sk:'cat_nguoi',  refField:'nguoi' },
+  { id:'thauPhu',    title:'<span class="material-symbols-outlined msi-gap">handshake</span>Thầu Phụ / TP',         sk:'cat_tp',     refField:'tp' },
+  { id:'congNhan',   title:'<span class="material-symbols-outlined msi-gap">engineering</span>Công Nhân',              sk:'cat_cn',     refField:null },
+  { id:'tbTen',      title:'<span class="material-symbols-outlined msi-gap">handyman</span>Máy / Thiết Bị Thi Công', sk:'cat_tbteb', refField:null }
 ];
 
 
@@ -251,7 +251,7 @@ function _updateSyncBtnBadge() {
       btn.title = `Đã đồng bộ lúc ${hhmm} — nhấn để sync ngay`;
       btn.dataset.state = 'synced';
     } else {
-      btn.textContent = '☁️';
+      btn.innerHTML = '<span class="material-symbols-outlined msi-gap">cloud</span>';
       btn.title = 'Đồng bộ dữ liệu';
       btn.dataset.state = '';
     }

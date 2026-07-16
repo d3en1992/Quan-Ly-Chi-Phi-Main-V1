@@ -110,7 +110,7 @@ function _hdcResetForm() {
   const editEl = document.getElementById('hdc-edit-id');
   if (editEl) editEl.value = '';
   const btn = document.getElementById('hdc-save-btn');
-  if (btn) btn.textContent = '💾 Lưu';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu';
   const tong = document.getElementById('hdc-tong-label');
   if (tong) tong.textContent = '';
 }
@@ -159,7 +159,7 @@ function editHopDongChinh(keyId) {
   const editEl = document.getElementById('hdc-edit-id');
   if (editEl) editEl.value = keyId;
   const btn = document.getElementById('hdc-save-btn');
-  if (btn) btn.textContent = '✏️ Cập nhật';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
 
   hdcUpdateTotal();
   openDtModal('hdc');
@@ -287,7 +287,7 @@ function editThuRecord(id) {
   const editEl = document.getElementById('thu-edit-id');
   if (editEl) editEl.value = id;
   const saveBtn = document.getElementById('thu-save-btn');
-  if (saveBtn) saveBtn.textContent = '✏️ Cập nhật';
+  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
   const cancelBtn = document.getElementById('thu-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = '';
 
@@ -322,7 +322,7 @@ function _thuResetForm() {
   const editEl = document.getElementById('thu-edit-id');
   if (editEl) editEl.value = '';
   const saveBtn = document.getElementById('thu-save-btn');
-  if (saveBtn) saveBtn.textContent = '💾 Ghi nhận Thu';
+  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Ghi nhận Thu';
   const cancelBtn = document.getElementById('thu-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = 'none';
 }
@@ -421,7 +421,7 @@ function _hdtpResetForm() {
   const editEl = document.getElementById('hdtp-edit-id');
   if (editEl) editEl.value = '';
   const btn = document.getElementById('hdtp-save-btn');
-  if (btn) btn.textContent = '💾 Lưu';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu';
   const tong = document.getElementById('hdtp-tong-label');
   if (tong) tong.textContent = '';
 }
@@ -461,7 +461,7 @@ function editHopDongThauPhu(id) {
   const editEl = document.getElementById('hdtp-edit-id');
   if (editEl) editEl.value = id;
   const btn = document.getElementById('hdtp-save-btn');
-  if (btn) btn.textContent = '✏️ Cập nhật';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
 
   hdtpUpdateTotal();
   openDtModal('hdtp');
@@ -522,7 +522,7 @@ function renderKhaiBaoTable(page) {
         nd: hd.nd || '—',
         tien: tong,
         tienCls: 'text-warning',
-        loaiBadge: '<span class="badge bg-primary" style="font-size:10px">📋 HĐ Chính</span>',
+        loaiBadge: '<span class="badge bg-primary" style="font-size:10px"><span class="material-symbols-outlined msi-gap">list_alt</span>HĐ Chính</span>',
         actions: `
           <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>`,
@@ -543,7 +543,7 @@ function renderKhaiBaoTable(page) {
         nd: r.nd || '—',
         tien: tong,
         tienCls: 'text-warning',
-        loaiBadge: '<span class="badge bg-warning text-dark" style="font-size:10px">🤝 HĐ Thầu Phụ</span>',
+        loaiBadge: '<span class="badge bg-warning text-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">handshake</span>HĐ Thầu Phụ</span>',
         actions: `
           <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongThauPhu('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongThauPhu('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
@@ -565,7 +565,7 @@ function renderKhaiBaoTable(page) {
         nd: r.nd || '—',
         tien: r.tien || 0,
         tienCls: 'text-success',
-        loaiBadge: '<span class="badge bg-success" style="font-size:10px">💰 Thu Tiền</span>' + loaiExtra,
+        loaiBadge: '<span class="badge bg-success" style="font-size:10px"><span class="material-symbols-outlined msi-gap">payments</span>Thu Tiền</span>' + loaiExtra,
         actions: `
           <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editThuRecord('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delThuRecord('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
@@ -588,7 +588,7 @@ function renderKhaiBaoTable(page) {
         // Phát sinh giảm (âm) tô đỏ, tăng tô xanh
         tienCls: v < 0 ? 'text-danger' : 'text-success',
         tienTxt: v ? (v > 0 ? '+' : '') + fmtM(v) : '—',
-        loaiBadge: '<span class="badge bg-dark" style="font-size:10px">🧾 Quyết Toán</span>',
+        loaiBadge: '<span class="badge bg-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán</span>',
         actions: `
           <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editQuyetToan('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delQuyetToan('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
@@ -883,7 +883,7 @@ function _qtResetForm() {
   const editEl = document.getElementById('qt-edit-id');
   if (editEl) editEl.value = '';
   const saveBtn = document.getElementById('qt-save-btn');
-  if (saveBtn) saveBtn.textContent = '💾 Lưu';
+  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu';
   const cancelBtn = document.getElementById('qt-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = 'none';
 }
@@ -919,7 +919,7 @@ function editQuyetToan(id) {
   const editEl = document.getElementById('qt-edit-id');
   if (editEl) editEl.value = id;
   const saveBtn = document.getElementById('qt-save-btn');
-  if (saveBtn) saveBtn.textContent = '✏️ Cập nhật';
+  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
   const cancelBtn = document.getElementById('qt-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = '';
 

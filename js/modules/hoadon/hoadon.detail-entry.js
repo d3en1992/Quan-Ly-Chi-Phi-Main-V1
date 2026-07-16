@@ -105,7 +105,7 @@ function renderDetailRowHTML(d, num) {
       value="${d.dongia?numFmt(d.dongia):''}" placeholder="0" inputmode="decimal"></td>
     <td><input class="cell-input" data-f="ck" value="${x(ckFmt)}" placeholder="vd: 5% hoặc 50000"></td>
     <td class="tt-cell" data-f="thtien"></td>
-    <td><button class="del-btn" onclick="delDetailRow(this)">✕</button></td>
+    <td><button class="del-btn" onclick="delDetailRow(this)"><span class="material-symbols-outlined">close</span></button></td>
   `;
 }
 
@@ -298,7 +298,7 @@ function saveDetailInvoice() {
     toast('✅ Đã lưu hóa đơn chi tiết!','success');
   }
   const saveBtn = document.getElementById('detail-save-btn');
-  if(saveBtn) saveBtn.textContent = '💾 Lưu Hóa Đơn';
+  if(saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
 
   clearInvoiceCache(); save('inv_v3', invoices);
   buildYearSelect(); updateTop();
@@ -322,7 +322,7 @@ function clearDetailForm() {
   const container = document.getElementById('inr-hd-chitiet');
   if(container) container.dataset.editId = '';
   const saveBtn = document.getElementById('detail-save-btn');
-  if(saveBtn) saveBtn.textContent = '💾 Lưu Hóa Đơn';
+  if(saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
   calcDetailTotals();
 }
 
@@ -423,7 +423,7 @@ function openDetailEdit(inv) {
     calcDetailTotals();
     document.getElementById('inr-hd-chitiet').dataset.editId = String(inv.id);
     const saveBtn2 = document.getElementById('detail-save-btn');
-    if(saveBtn2) saveBtn2.textContent = '💾 Cập Nhật';
+    if(saveBtn2) saveBtn2.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Cập Nhật';
     toast('✏️ Chỉnh sửa hóa đơn chi tiết rồi nhấn 💾 Cập Nhật','success');
   }, 120);
 }

@@ -396,12 +396,12 @@ function _lnBuildDashboard(rowsData, tChi, tDt, tLN) {
 
   const barLai = `
     <div class="card shadow-sm border-0 h-100"><div class="card-body py-3">
-      <div class="text-secondary mb-3" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">📈 Top 5 Lãi Cao Nhất</div>
+      <div class="text-secondary mb-3" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px"><span class="material-symbols-outlined msi-gap">trending_up</span>Top 5 Lãi Cao Nhất</div>
       ${_bars(topLai, 'var(--bs-success)')}
     </div></div>`;
   const barLo = `
     <div class="card shadow-sm border-0 h-100"><div class="card-body py-3">
-      <div class="text-secondary mb-3" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">📉 Top 5 Đang Lỗ</div>
+      <div class="text-secondary mb-3" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px"><span class="material-symbols-outlined msi-gap">trending_down</span>Top 5 Đang Lỗ</div>
       ${_bars(topLo, 'var(--bs-danger)')}
     </div></div>`;
 

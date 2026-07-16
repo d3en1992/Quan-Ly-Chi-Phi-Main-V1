@@ -5,7 +5,7 @@
             <span class="dot"></span>Quản Lý Danh Mục
           </div>
           <span class="text-secondary" style="font-size: 12px"
-            >Nhấn ✏️ hoặc nhấp đúp để sửa tên • Thay đổi sẽ tự cập nhật vào hóa
+            >Nhấn <span class="material-symbols-outlined msi-gap">edit</span>hoặc nhấp đúp để sửa tên • Thay đổi sẽ tự cập nhật vào hóa
             đơn đã lưu</span
           >
         </div>
@@ -14,7 +14,7 @@
         <!-- ── Panel Tools ── -->
         <div id="dm-tools-section" style="margin-top: 28px">
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>🔧 Tools</div>
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span><span class="material-symbols-outlined msi-gap">build</span>Tools</div>
             <span
               class="text-secondary" style="font-size: 12px"
               id="backup-status-label"
@@ -42,14 +42,14 @@
                   onclick="toolExportJSON()"
                   title="Xuất snapshot toàn bộ hệ thống ra file .json"
                 >
-                  📦 Xuất snapshot hệ thống
+                  <span class="material-symbols-outlined msi-gap">inventory_2</span>Xuất snapshot hệ thống
                 </button>
                 <button
                   class="btn btn-outline-secondary"
                   onclick="toolImportJSON()"
                   title="Khôi phục toàn bộ hệ thống từ file snapshot .json — xóa và ghi đè toàn bộ dữ liệu"
                 >
-                  📥 Import JSON
+                  <span class="material-symbols-outlined msi-gap">download</span>Import JSON
                 </button>
               </div>
             </div>
@@ -74,14 +74,14 @@
                   onclick="toolImportExcel()"
                   title="Import dữ liệu từ file Excel (.xlsx/.xls)"
                 >
-                  📥 Import Excel
+                  <span class="material-symbols-outlined msi-gap">download</span>Import Excel
                 </button>
                 <button
                   class="btn btn-outline-secondary"
                   onclick="toolExportExcel()"
                   title="Xuất toàn bộ dữ liệu ra file Excel (.xlsx)"
                 >
-                  📤 Export Excel
+                  <span class="material-symbols-outlined msi-gap">upload</span>Export Excel
                 </button>
               </div>
             </div>
@@ -98,7 +98,7 @@
                   letter-spacing: 0.8px;
                 "
               >
-                ⚠ Quản Lý Dữ Liệu
+                <span class="material-symbols-outlined msi-gap">warning</span>Quản Lý Dữ Liệu
               </div>
               <div style="display: flex; flex-wrap: wrap; gap: 8px">
                 <button
@@ -112,7 +112,7 @@
                   onclick="toolResetAll()"
                   title="Xóa TOÀN BỘ dữ liệu — không thể hoàn tác"
                 >
-                  ⚠️ Reset toàn bộ dữ liệu
+                  <span class="material-symbols-outlined msi-gap">warning</span>Reset toàn bộ dữ liệu
                 </button>
                 <button
                   class="btn"
@@ -125,7 +125,7 @@
                   onclick="openProjectClearModal()"
                   title="Xóa dữ liệu theo từng hạng mục của một công trình cụ thể"
                 >
-                  🗑 Xóa theo công trình
+                  <span class="material-symbols-outlined msi-gap">delete</span>Xóa theo công trình
                 </button>
               </div>
             </div>

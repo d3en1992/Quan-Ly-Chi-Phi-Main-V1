@@ -397,6 +397,7 @@ Lưu ý đặc biệt: `buildInvoices()` không chỉ đọc `inv_v3`; nó tạo
 | Hạng mục | Trạng thái mới |
 |---|---|
 | Bootstrap | `index.html` nạp Bootstrap 5.3.3 CSS trước `assets/css/style.css`, nạp Bootstrap Icons 1.11.3, và nạp Bootstrap bundle ở cuối body. |
+| Icon UI | Icon giao diện dùng **Google Material Symbols (Outlined)** qua CDN `fonts.googleapis.com/css2?family=Material+Symbols+Outlined` (nạp trong `<head>` index.html, các page partial dùng chung). Cú pháp: `<span class="material-symbols-outlined">ten_icon</span>` (chuẩn tên mới, KHÔNG dùng đuôi `_outline`). Thêm class `msi-gap` khi icon đứng trước chữ để giãn cách đều. CSS base ở cuối `assets/css/style.css`. **Lưu ý:** icon là font ligature → KHÔNG dùng trong `<option>`, thuộc tính `placeholder`/`title`, `element.textContent`, toast/alert/confirm, log tải về, và template chụp ảnh html2canvas (giữ emoji ở các chỗ này). |
 | Tiền Ứng | Không còn `js/modules/danhmuc/danhmuc.ung.js`. Module Tiền Ứng hiện nằm ở `js/modules/tienung/` gồm `tienung.core.js`, `tienung.entry.js`, `tienung.history.js`. |
 | Hóa đơn quick entry | Có thêm `js/modules/hoadon/hoadon.sheet-grid.js` cho lưới nhập liệu dạng Excel: selection, keyboard navigation, copy/paste, autocomplete. |
 | Auth | Có `js/app/auth.js` riêng, nạp sau `sync.js` và trước `main.js`. File này phụ trách đăng nhập, đăng xuất, đổi tài khoản, phân quyền và session. |
@@ -1349,6 +1350,22 @@ Thầu phụ/Thu tiền). **CÔNG TY** dùng view rút gọn (tổng chi + phân
 tạo rồi bị `html =` ghi đè).
 
 **File đã sửa:** `js/modules/projects/projects.ui.js` (`openCTDetail` + 3 helper mới).
+
+---
+
+## 9.23 Thay emoji icon UI bằng Google Material Symbols (Outlined) (16/07/2026)
+
+**Mục tiêu:** thay toàn bộ emoji dùng làm **icon giao diện** (sidebar, tiêu đề, nút, tab, modal, popup chi tiết công trình, badge…) bằng thẻ `<span class="material-symbols-outlined">ten_icon</span>` của Google Material Symbols, phong cách tối giản, tên icon chuẩn mới (KHÔNG có `_outline`).
+
+**Nền tảng:**
+- `index.html` `<head>`: thêm link CDN `Material+Symbols+Outlined` (đủ trục opsz/wght/FILL/GRAD). Các page partial `pages/*.html` nạp vào index nên dùng chung, không cần thêm link riêng.
+- `assets/css/style.css` (cuối file): thêm base `.material-symbols-outlined` (căn `vertical-align:-0.18em`, `font-size:1.15em`, `FILL 0`), class phụ `.msi-gap` (giãn cách icon↔chữ), và canh giữa cho icon đứng một mình trong nút.
+
+**Phạm vi thay (render dạng HTML):** ~116 chỗ trong file HTML tĩnh + ~130 chỗ trong JS sinh UI (template `innerHTML`, nhãn map render qua `innerHTML`, nút đổi trạng thái `textContent`→`innerHTML`).
+
+**Cố ý GIỮ nguyên emoji (không thể render span):** `<option>`, thuộc tính `placeholder`/`title`; `element.textContent` động (nối biến/`${}`); `toast()`/`alert()`/`confirm()`/`showSyncBanner()`; `console.*`; comment; file log tải về (`_log`/`txt` trong `nhapxuat.import.js`); và template chụp ảnh **html2canvas** (`hdchinh-template`/`hdthauphu-template` trong index.html, phiếu lương/HĐ trong `doanhthu.reports-export.js`, `chamcong.history-reports.js`) — vì font ligature không render đáng tin trong canvas. Mũi tên `→`/`←` trong comment JS cũng giữ nguyên (không phải icon). Object `_PT_GROUP_LABELS` (dead code) giữ nguyên.
+
+**File đã đụng:** `index.html`, toàn bộ `pages/*.html` (trừ nội dung không có emoji), và ~26 file JS (nổi bật: `js/app/main.js`, `js/core/core.storage.js`, `core.cloud-cats-ui.js`, `core.state-backup.js`, `js/modules/projects/projects.ui.js`, `js/modules/danhmuc/*`, `js/modules/doanhthu/*`, `js/modules/hoadon/*`, `js/modules/chamcong/*`, `js/modules/khachhang/khachhang.ui.js`, `js/modules/nhapxuat/*`, `js/modules/tienung/*`, `js/modules/thungrac/thungrac.js`, `js/legacy/thietbi.js`, `datatools.js`). Xem bảng "Icon UI" ở [mục 8.1](#81-thay-đổi-cấu-trúcmodule-đã-xác-nhận) cho quy ước thường trực.
 
 ---
 

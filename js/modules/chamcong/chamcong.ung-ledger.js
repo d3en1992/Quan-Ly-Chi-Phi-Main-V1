@@ -172,7 +172,7 @@ function renderCCUngLedger() {
         <td style="text-align:right;${mono}">${r.traKy > 0 ? `<span style="color:var(--green);font-weight:700">${numFmt(r.traKy)}</span>` : '<span style="color:var(--ink3)">—</span>'}</td>
         <td style="text-align:right;${mono};font-weight:700">${_debtCell(r.tongNo)}</td>
         <td style="text-align:center">
-          <button class="btn btn-outline-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="openCCUngHist('${nmeSafe}')">📜 Xem</button>
+          <button class="btn btn-outline-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="openCCUngHist('${nmeSafe}')"><span class="material-symbols-outlined msi-gap">history</span>Xem</button>
         </td>
       </tr>`;
     })
@@ -403,7 +403,7 @@ function renderCCUngHistory(name) {
       totUng += it.ung;
       totTru += it.tru;
       const delBtn = it.id
-        ? `<button class="del-btn" title="Xóa giao dịch" onclick="delCCUngRecord('${String(it.id).replace(/'/g, "\\'")}')">✕</button>`
+        ? `<button class="del-btn" title="Xóa giao dịch" onclick="delCCUngRecord('${String(it.id).replace(/'/g, "\\'")}')"><span class="material-symbols-outlined">close</span></button>`
         : "";
       const typeLabel =
         it.type === "tra"

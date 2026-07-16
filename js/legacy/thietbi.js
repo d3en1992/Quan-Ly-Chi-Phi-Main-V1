@@ -236,7 +236,7 @@ function tbAddRow(data, num) {
         style="width:100%;border:none;background:transparent;padding:7px 8px;font-size:12px;font-family:'IBM Plex Sans',sans-serif;outline:none;color:var(--ink)">
     </td>
     <td style="padding:3px 4px;text-align:center">
-      <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();tbRenum()" title="Xóa dòng">✕</button>
+      <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();tbRenum()" title="Xóa dòng"><span class="material-symbols-outlined">close</span></button>
     </td>`;
   tbody.appendChild(tr);
 }
@@ -252,18 +252,18 @@ function tbClearRows() {
 function tbSave() {
   const saveBtn = document.getElementById('tb-save-btn');
   if (saveBtn && saveBtn.disabled) return;
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Đang lưu...'; }
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">hourglass_top</span>Đang lưu...'; }
 
   const tbCtSel = document.getElementById('tb-ct-sel');
   const ct    = tbCtSel.value.trim();
   const ctPid = _readPidFromSel(tbCtSel);
   if (!ct) {
     toast('Vui lòng chọn công trình!', 'error');
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Lưu thiết bị'; }
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu thiết bị'; }
     return;
   }
   if (_checkProjectClosed(ctPid, ct)) {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Lưu thiết bị'; }
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu thiết bị'; }
     return;
   }
 
@@ -279,7 +279,7 @@ function tbSave() {
 
   if (!rows.length) {
     toast('Không có dữ liệu để lưu!', 'error');
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Lưu thiết bị'; }
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu thiết bị'; }
     return;
   }
 
@@ -317,7 +317,7 @@ function tbSave() {
   tbBuildRows();
   toast(`✅ Đã lưu ${rows.length} thiết bị vào ${ct}`, 'success');
   setTimeout(() => {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Lưu thiết bị'; }
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu thiết bị'; }
   }, 1500);
 }
 
@@ -462,7 +462,7 @@ function tbLuanChuyen(id) {
   <div style="background:#fff;border-radius:14px;padding:24px;width:min(480px,96vw);box-shadow:0 8px 32px rgba(0,0,0,.2);font-family:'IBM Plex Sans',sans-serif" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 style="font-size:16px;font-weight:700">↩ Luân Chuyển Thiết Bị</h3>
-      <button onclick="document.getElementById('tb-edit-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+      <button onclick="document.getElementById('tb-edit-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888"><span class="material-symbols-outlined">close</span></button>
     </div>
     <div style="display:grid;gap:10px">
       <div style="background:#f8f8f5;border-radius:8px;padding:10px;font-size:12px">

@@ -7,21 +7,21 @@
             id="dt-sub-khaibao-btn"
             onclick="dtGoSub(this, 'dt-sub-khaibao')"
           >
-            📝 KHAI BÁO
+            <span class="material-symbols-outlined msi-gap">edit_note</span>KHAI BÁO
           </button>
           <button
             class="nav-link"
             id="dt-sub-thongke-btn"
             onclick="dtGoSub(this, 'dt-sub-thongke')"
           >
-            📊 THỐNG KÊ
+            <span class="material-symbols-outlined msi-gap">bar_chart</span>THỐNG KÊ
           </button>
           <button
             class="nav-link"
             id="dt-sub-loinhuan-btn"
             onclick="dtGoSub(this, 'dt-sub-loinhuan')"
           >
-            💰 LỢI NHUẬN
+            <span class="material-symbols-outlined msi-gap">payments</span>LỢI NHUẬN
           </button>
         </div>
 
@@ -82,7 +82,7 @@
           <!-- Bảng GỘP CHUNG: mọi khai báo 30 ngày gần nhất (HĐ Chính + HĐ Thầu Phụ + Thu Tiền) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>📑 Khai Báo Gần Đây
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">article</span>Khai Báo Gần Đây
               <span class="text-secondary" style="font-size:11px;font-weight:400">(30 ngày gần nhất)</span>
               <span id="kb-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
             </div>
@@ -125,9 +125,9 @@
           <!-- TK BẢNG 1: Hợp đồng chính (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>📋 Hợp Đồng Chính Công Ty
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">list_alt</span>Hợp Đồng Chính Công Ty
             </div>
-            <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG">📤 Xuất phiếu HĐ Chính</button>
+            <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ Chính</button>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
@@ -154,9 +154,9 @@
           <!-- TK BẢNG 2: Hợp đồng thầu phụ (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>🤝 Hợp Đồng Thầu Phụ
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">handshake</span>Hợp Đồng Thầu Phụ
             </div>
-            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG">📤 Xuất phiếu HĐ TP</button>
+            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ TP</button>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
@@ -182,10 +182,10 @@
           <!-- TK BẢNG 3: Lịch sử thu tiền (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>💰 Lịch Sử Thu Tiền
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">payments</span>Lịch Sử Thu Tiền
               <span id="thutk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
             </div>
-            <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG">📤 Xuất phiếu thu</button>
+            <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu thu</button>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
@@ -212,7 +212,7 @@
           <!-- TK BẢNG 4: Quyết toán chi phí (toàn bộ) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>🧾 Quyết Toán Chi Phí
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán Chi Phí
               <span id="qttk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
               <span class="text-secondary" style="font-size:11px;font-weight:400">(số âm = giảm trừ)</span>
             </div>
@@ -243,7 +243,7 @@
         <div class="sub-page" id="dt-sub-loinhuan">
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>💰 Tổng Quan Lợi Nhuận
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">payments</span>Tổng Quan Lợi Nhuận
               <span class="text-secondary" style="font-size:11px;font-weight:400">(theo năm đang lọc — chọn "Tất cả năm" để xem toàn vòng đời)</span>
             </div>
             <button class="btn btn-outline-secondary btn-sm" id="dt-ln-toggle-btn" onclick="toggleLoiNhuanDetail()">

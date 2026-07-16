@@ -122,7 +122,7 @@ function renderCCHistory(){
     <td style="white-space:nowrap">
       <div class="d-flex gap-1 flex-nowrap justify-content-center align-items-center">
         <button class="btn btn-outline-secondary btn-sm" onclick="loadCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Tải tuần này">↩ Tải</button>
-        <button class="btn btn-danger btn-sm" onclick="delCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Xóa tuần">✕ Xóa</button>
+        <button class="btn btn-danger btn-sm" onclick="delCCWeekById('${r.id}','${r.fromDate}','${x(r.ct)}')" title="Xóa tuần"><span class="material-symbols-outlined msi-gap">close</span>Xóa</button>
       </div>
     </td>
   </tr>`).join('');

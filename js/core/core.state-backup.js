@@ -433,10 +433,10 @@ async function renderBackupList() {
     const store  = b.store || _legacySnapToStore(b);
     const c      = _countStore(store);
     const time   = b._time ? new Date(b._time).toLocaleString('vi-VN') : '(không rõ)';
-    const label  = b._label === 'auto' ? '🔄 Tự động' : b._label === 'manual' ? '📸 Thủ công' :
-                   b._label === 'manual-export' ? '📤 Trước khi xuất' :
-                   b._label === 'before-json-import' ? '🛡 Trước khi nhập JSON' :
-                   b._label === 'before-restore' ? '🛡 Trước khi khôi phục' : b._label;
+    const label  = b._label === 'auto' ? '<span class="material-symbols-outlined msi-gap">sync</span>Tự động' : b._label === 'manual' ? '<span class="material-symbols-outlined msi-gap">photo_camera</span>Thủ công' :
+                   b._label === 'manual-export' ? '<span class="material-symbols-outlined msi-gap">upload</span>Trước khi xuất' :
+                   b._label === 'before-json-import' ? '<span class="material-symbols-outlined msi-gap">shield</span>Trước khi nhập JSON' :
+                   b._label === 'before-restore' ? '<span class="material-symbols-outlined msi-gap">shield</span>Trước khi khôi phục' : b._label;
     const counts = c.inv + ' HĐ · ' + c.ung + ' tiền ứng · ' + c.cc + ' tuần CC · ' + c.tb + ' TB';
     const isNewest = i === 0;
     return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
@@ -543,10 +543,10 @@ function _showImportJSONConfirm({ data, c, ts }) {
     document.body.appendChild(ov);
   }
   ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:420px;width:94vw;background:#fff;border-radius:14px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 16px 56px rgba(0,0,0,.25)">
-    <div style="font-size:28px;text-align:center;margin-bottom:10px">⚠️</div>
+    <div style="font-size:28px;text-align:center;margin-bottom:10px"><span class="material-symbols-outlined">warning</span></div>
     <h3 style="font-size:16px;font-weight:800;margin:0 0 12px;text-align:center;color:var(--bs-danger)">KHÔI PHỤC TOÀN BỘ DỮ LIỆU</h3>
     <div style="background:#fff3cd;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.8;margin-bottom:16px">
-      📅 Snapshot lúc: <b>${ts}</b><br>
+      <span class="material-symbols-outlined msi-gap">calendar_month</span>Snapshot lúc: <b>${ts}</b><br>
       📊 Nội dung: ${c.inv} HĐ · ${c.ung} tiền ứng · ${c.cc} tuần CC · ${c.tb} thiết bị
     </div>
     <div style="background:#f8d7da;border-radius:8px;padding:12px 14px;font-size:13px;color:#721c24;line-height:1.8;margin-bottom:20px">

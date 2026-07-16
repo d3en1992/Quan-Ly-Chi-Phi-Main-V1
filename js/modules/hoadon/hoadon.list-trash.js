@@ -218,7 +218,7 @@ function openEntryEdit(inv) {
     }
     calcSummary();
     const _eBtn = document.getElementById('entry-save-btn');
-    if (_eBtn) _eBtn.textContent = '💾 Cập nhật';
+    if (_eBtn) _eBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Cập nhật';
     toast('✏️ Chỉnh sửa rồi nhấn 💾 Cập nhật', 'success');
   }, 100);
 }

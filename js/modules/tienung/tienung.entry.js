@@ -28,7 +28,7 @@ function resetUngForm() {
   initUngTable(4);
   document.getElementById('ung-date').value = today();
   const btn = document.getElementById('ung-save-btn');
-  if (btn) btn.textContent = '💾 Lưu tất cả';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu tất cả';
   calcUngSummary();
   document.querySelectorAll('.editing-row').forEach(tr => tr.classList.remove('editing-row'));
 }
@@ -74,7 +74,7 @@ function addUngRow(d={}) {
     <td><select class="cell-input" data-f="ct">${ctOpts}</select></td>
     <td><input class="cell-input right tien-input" data-f="tien" data-raw="${d.tien||''}" placeholder="0" value="${d.tien?numFmt(d.tien):''}" inputmode="decimal"></td>
     <td><input class="cell-input" data-f="nd" value="${x(d.nd||'')}" placeholder="Nội dung..."></td>
-    <td><button class="del-btn" onclick="delUngRow(this)">✕</button></td>
+    <td><button class="del-btn" onclick="delUngRow(this)"><span class="material-symbols-outlined">close</span></button></td>
   `;
 
   const tienInput = tr.querySelector('[data-f="tien"]');
@@ -220,7 +220,7 @@ function editUngRecord(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const btn = document.getElementById('ung-save-btn');
-  if (btn) btn.textContent = '💾 Cập Nhật';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Cập Nhật';
 
   document.querySelectorAll('.editing-row').forEach(tr => tr.classList.remove('editing-row'));
   const row = document.querySelector(`[data-ung-id="${id}"]`);

@@ -167,12 +167,12 @@ function updateJbBtn() {
   const btn = document.getElementById('jb-btn');
   if (btn) {
     if (fbReady()) {
-      btn.textContent = '✅ Cloud';
+      btn.innerHTML = '<span class="material-symbols-outlined msi-gap">check_circle</span>Cloud';
       btn.style.background = 'rgba(26,122,69,0.4)';
       btn.style.borderColor = 'rgba(26,200,100,0.5)';
       _ensureSyncDot();
     } else {
-      btn.textContent = '☁️ Cloud';
+      btn.innerHTML = '<span class="material-symbols-outlined msi-gap">cloud</span>Cloud';
       btn.style.background = 'rgba(255,255,255,0.12)';
       btn.style.borderColor = 'rgba(255,255,255,0.25)';
       const dot = document.getElementById('sync-dot');
@@ -223,24 +223,24 @@ function renderBinModal() {
 
   ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:460px;width:95vw;background:#fff;border-radius:16px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 12px 48px rgba(0,0,0,.18)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="font-size:17px;font-weight:800;margin:0">🔥 Kết Nối Firebase</h3>
-      <button onclick="closeBinModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1">✕</button>
+      <h3 style="font-size:17px;font-weight:800;margin:0"><span class="material-symbols-outlined msi-gap">local_fire_department</span>Kết Nối Firebase</h3>
+      <button onclick="closeBinModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1"><span class="material-symbols-outlined">close</span></button>
     </div>
 
     ${isConnected ? `
     <div style="background:#f0fff4;border:1px solid #b2dfdb;border-radius:8px;padding:10px 14px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--bs-success);margin-bottom:4px">✅ ĐÃ KẾT NỐI</div>
+      <div style="font-size:11px;font-weight:700;color:var(--bs-success);margin-bottom:4px"><span class="material-symbols-outlined msi-gap">check_circle</span>ĐÃ KẾT NỐI</div>
       <div style="font-size:11px;color:#555">Project: <strong>${FB_CONFIG.projectId}</strong></div>
       <div style="font-size:11px;color:#888;margin-top:2px">API Key: ${FB_CONFIG.apiKey.substring(0,8)}••••••••</div>
     </div>
     <div style="background:var(--bs-tertiary-bg);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px">
-      📊 Dữ liệu năm ${yr}: <strong style="color:${statusColor}">${yearKb}kb</strong>
+      <span class="material-symbols-outlined msi-gap">bar_chart</span>Dữ liệu năm ${yr}: <strong style="color:${statusColor}">${yearKb}kb</strong>
       <span style="margin-left:6px;background:${statusBg};color:${statusColor};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">${statusLabel}</span>
       <div style="font-size:10px;color:#aaa;margin-top:2px">Firebase free: 1GB storage · 50K reads/ngày · 20K writes/ngày</div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button onclick="manualSync();closeBinModal();" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #1565c0;background:transparent;color:#1565c0;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">🔄 Sync</button>
-      <button onclick="fbDisconnect()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--bs-danger);background:transparent;color:var(--bs-danger);font-family:inherit;font-size:13px;cursor:pointer">⛔ Ngắt</button>
+      <button onclick="manualSync();closeBinModal();" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #1565c0;background:transparent;color:#1565c0;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer"><span class="material-symbols-outlined msi-gap">sync</span>Sync</button>
+      <button onclick="fbDisconnect()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--bs-danger);background:transparent;color:var(--bs-danger);font-family:inherit;font-size:13px;cursor:pointer"><span class="material-symbols-outlined msi-gap">block</span>Ngắt</button>
     </div>
     ` : `
     <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#856404">
@@ -768,13 +768,13 @@ function _setSyncState(state) {
   const jbBtn = document.getElementById('jb-btn');
   if (jbBtn) {
     if (state === 'syncing') {
-      jbBtn.textContent = '⏳ Đang sync...';
+      jbBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">hourglass_top</span>Đang sync...';
     } else if (state === 'success') {
       const hhmm = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
       jbBtn.textContent = `✅ Đã sync ${hhmm}`;
       setTimeout(() => { if (jbBtn.textContent.includes('Đã sync')) updateJbBtn(); }, 10000);
     } else if (state === 'error') {
-      jbBtn.textContent = '⚠️ Sync lỗi';
+      jbBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">warning</span>Sync lỗi';
       setTimeout(() => updateJbBtn(), 8000);
     }
   }
@@ -782,14 +782,14 @@ function _setSyncState(state) {
   const syncBtn = document.getElementById('sync-btn');
   if (syncBtn) {
     if (state === 'syncing') {
-      syncBtn.textContent = '⏳';
+      syncBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">hourglass_top</span>';
       syncBtn.title = 'Đang đồng bộ...';
       syncBtn.dataset.state = 'syncing';
     } else if (state === 'success') {
       // Badge sẽ tự cập nhật qua _resetPending() → _updateSyncBtnBadge()
       _updateSyncBtnBadge();
     } else if (state === 'error') {
-      syncBtn.textContent = '⚠️';
+      syncBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">warning</span>';
       syncBtn.title = 'Sync lỗi — nhấn để thử lại';
       syncBtn.dataset.state = 'error';
       setTimeout(() => _updateSyncBtnBadge(), 8000);

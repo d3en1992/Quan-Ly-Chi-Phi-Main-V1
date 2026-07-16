@@ -1951,3 +1951,40 @@ td.action-col > div {
 #db-bar-chart table tfoot td {
   white-space: nowrap !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   MATERIAL SYMBOLS (Outlined) — icon thay thế emoji trong toàn UI
+   ─────────────────────────────────────────────────────────────
+   Dùng thẻ: <span class="material-symbols-outlined">ten_icon</span>
+   - Căn giữa theo dòng chữ (vertical-align), cỡ hơi lớn hơn chữ 1 chút.
+   - Không tự thêm khoảng cách; khoảng cách với chữ do 1 dấu cách hoặc
+     class .msi-gap (dùng khi cần đều nhau, tối giản) đảm nhiệm. */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 1.15em;          /* nhỉnh hơn chữ để cân thị giác */
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  vertical-align: -0.18em;    /* hạ nhẹ để canh giữa theo baseline chữ */
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings:
+    'FILL' 0,   /* nét rỗng (Outlined) */
+    'wght' 400, /* độ đậm vừa, hợp phong cách tối giản */
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+/* Khoảng cách đều, tối giản giữa icon và chữ đứng ngay sau nó.
+   Áp vào thẻ icon khi muốn giãn cách chuẩn (thay cho dấu cách thủ công). */
+.material-symbols-outlined.msi-gap { margin-inline-end: 0.4em; }
+
+/* Icon đứng một mình trong nút tròn/nút đóng (✕) — canh giữa tuyệt đối, bỏ lệch baseline */
+.btn > .material-symbols-outlined:only-child,
+.close-btn > .material-symbols-outlined:only-child { vertical-align: middle; }

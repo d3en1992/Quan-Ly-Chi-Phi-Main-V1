@@ -8,13 +8,13 @@
               class="nav-link key-action-btn active"
               onclick="goInnerSub(this, 'inr-nhap-nhanh')"
             >
-              ⚡ Nhập nhanh
+              <span class="material-symbols-outlined msi-gap">bolt</span>Nhập nhanh
             </button>
             <button
               class="nav-link key-action-btn"
               onclick="goInnerSub(this, 'inr-hd-chitiet')"
             >
-              📋 Hóa đơn chi tiết
+              <span class="material-symbols-outlined msi-gap">receipt_long</span>Hóa đơn chi tiết
             </button>
           </div>
 
@@ -26,7 +26,7 @@
               </div>
               <div class="d-flex gap-2 flex-wrap align-items-center">
                 <button class="btn btn-outline-secondary" onclick="clearTable()">
-                  🗑 Xóa bảng
+                  <span class="material-symbols-outlined msi-gap">delete</span>Xóa bảng
                 </button>
               </div>
             </div>
@@ -89,7 +89,7 @@
                 class="btn btn-success"
                 onclick="saveAllRows()"
               >
-                💾 Lưu Hóa Đơn
+                <span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn
               </button>
             </div>
           </div>
@@ -101,7 +101,7 @@
                 <span class="dot"></span>Hóa Đơn Chi Tiết
               </div>
               <button class="btn btn-outline-secondary" onclick="clearDetailForm()">
-                🗑 Xóa form
+                <span class="material-symbols-outlined msi-gap">delete</span>Xóa form
               </button>
             </div>
 
@@ -226,7 +226,7 @@
                 id="detail-save-btn"
                 onclick="saveDetailInvoice()"
               >
-                💾 Lưu Hóa Đơn
+                <span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn
               </button>
             </div>
           </div>
@@ -245,7 +245,7 @@
                 class="btn btn-outline-secondary btn-sm"
                 onclick="renderTodayInvoices()"
               >
-                ↻ Làm mới
+                <span class="material-symbols-outlined msi-gap">refresh</span>Làm mới
               </button>
             </div>
             <div class="records-wrap card shadow-sm overflow-hidden">

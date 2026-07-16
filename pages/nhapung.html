@@ -2,8 +2,8 @@
 
         <!-- Sub-tab navigation: Nhập Tiền Ứng / Báo Cáo -->
         <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="ung-sub-nav">
-          <button class="nav-link active" id="ung-sub-nhap-btn" onclick="ungGoSub(this,'ung-sub-nhap')">📝 NHẬP TIỀN ỨNG</button>
-          <button class="nav-link" id="ung-sub-baocao-btn" onclick="ungGoSub(this,'ung-sub-baocao')">📊 THỐNG KÊ ỨNG</button>
+          <button class="nav-link active" id="ung-sub-nhap-btn" onclick="ungGoSub(this,'ung-sub-nhap')"><span class="material-symbols-outlined msi-gap">edit_note</span>NHẬP TIỀN ỨNG</button>
+          <button class="nav-link" id="ung-sub-baocao-btn" onclick="ungGoSub(this,'ung-sub-baocao')"><span class="material-symbols-outlined msi-gap">bar_chart</span>THỐNG KÊ ỨNG</button>
         </div>
 
         <!-- ══ SUBTAB 1: Nhập Tiền Ứng + Phiếu Ứng Gần Đây ══ -->
@@ -15,14 +15,14 @@
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <button class="btn btn-outline-secondary" onclick="clearUngTable()">
-              🗑 Xóa bảng
+              <span class="material-symbols-outlined msi-gap">delete</span>Xóa bảng
             </button>
             <button
               class="btn btn-success"
               id="ung-save-btn"
               onclick="saveAllUngRows()"
             >
-              💾 Lưu tất cả
+              <span class="material-symbols-outlined msi-gap">save</span>Lưu tất cả
             </button>
           </div>
         </div>
@@ -82,7 +82,7 @@
         <div style="margin-top: 20px">
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 14px">
-              <span class="dot"></span>🕓 Phiếu Ứng Gần Đây
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">schedule</span>Phiếu Ứng Gần Đây
               <span class="text-secondary" style="font-size: 12px; font-weight: 400">(10 phiếu mới nhất)</span>
             </div>
           </div>
@@ -99,17 +99,17 @@
         <div style="margin-top: 24px">
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>🤝 Thầu Phụ
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">handshake</span>Thầu Phụ
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngTpCSV()">⬇ CSV</button>
-              <button class="btn btn-sm" onclick="exportUngTpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Thầu Phụ rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng TP</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngTpCSV()"><span class="material-symbols-outlined msi-gap">download</span>CSV</button>
+              <button class="btn btn-sm" onclick="exportUngTpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Thầu Phụ rồi bấm để xuất phiếu tạm ứng PNG"><span class="material-symbols-outlined msi-gap">photo_camera</span>Xuất Phiếu Ứng TP</button>
             </div>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
               <div class="search-box">
-                <span class="ico">🔍</span>
+                <span class="ico"><span class="material-symbols-outlined">search</span></span>
                 <input type="text" id="ung-tp-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngTp()" />
               </div>
               <select class="form-select form-select-sm w-auto" id="uf-tp-tp" onchange="filterAndRenderUngTp()">
@@ -129,17 +129,17 @@
           <!-- Bảng 2b: Nhà Cung Cấp -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span>🏪 Nhà Cung Cấp
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">storefront</span>Nhà Cung Cấp
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngNccCSV()">⬇ CSV</button>
-              <button class="btn btn-sm" onclick="exportUngNccToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Nhà Cung Cấp rồi bấm để xuất phiếu tạm ứng PNG">📸 Xuất Phiếu Ứng NCC</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngNccCSV()"><span class="material-symbols-outlined msi-gap">download</span>CSV</button>
+              <button class="btn btn-sm" onclick="exportUngNccToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Nhà Cung Cấp rồi bấm để xuất phiếu tạm ứng PNG"><span class="material-symbols-outlined msi-gap">photo_camera</span>Xuất Phiếu Ứng NCC</button>
             </div>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden">
             <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
               <div class="search-box">
-                <span class="ico">🔍</span>
+                <span class="ico"><span class="material-symbols-outlined">search</span></span>
                 <input type="text" id="ung-ncc-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngNcc()" />
               </div>
               <select class="form-select form-select-sm w-auto" id="uf-ncc-ncc" onchange="filterAndRenderUngNcc()">

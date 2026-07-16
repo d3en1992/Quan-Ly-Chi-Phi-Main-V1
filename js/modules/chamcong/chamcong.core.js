@@ -70,7 +70,7 @@ function _applyCCDebtColsVisibility() {
   table.classList.toggle('debt-cols-hidden', _ccDebtColsHidden);
   // Cập nhật icon trên toggle header
   document.querySelectorAll('.cc-debt-toggle-th').forEach(th => {
-    th.textContent = _ccDebtColsHidden ? '▶' : '◀';
+    th.innerHTML = _ccDebtColsHidden ? '<span class="material-symbols-outlined msi-gap">chevron_right</span>' : '<span class="material-symbols-outlined msi-gap">chevron_left</span>';
     th.title = _ccDebtColsHidden ? 'Mở rộng: HĐ Mua Lẻ / Nội Dung' : 'Thu gọn';
   });
 }
@@ -312,7 +312,7 @@ function updateCCSaveBtn() {
   const ct        = (ccCtSel?.value||'').trim();
   const ctPid     = _readPidFromSel(ccCtSel);
   const isEdit    = !!(fromDate && ct && ccData.some(r => !r.deletedAt && r.fromDate === fromDate && (r.ctPid === ctPid || r.ct === ct)));
-  btn.textContent = isEdit ? '💾 Cập nhật tuần này' : '💾 Lưu tuần này';
+  btn.innerHTML = isEdit ? '<span class="material-symbols-outlined msi-gap">save</span>Cập nhật tuần này' : '<span class="material-symbols-outlined msi-gap">save</span>Lưu tuần này';
 }
 
 function onCCCtSelChange(){

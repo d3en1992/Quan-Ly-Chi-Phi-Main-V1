@@ -2,12 +2,12 @@
 
         <!-- Sub-tab navigation: Sổ Chấm Công / Ứng Công Nhân / Tổng Lương & Lịch Sử -->
         <div class="nav nav-pills gap-2 mb-3 flex-wrap align-items-center" id="cc-sub-nav">
-          <button class="nav-link active" id="cc-sub-socc-btn" onclick="ccGoSub(this,'cc-sub-socc')">📝 SỔ CHẤM CÔNG</button>
-          <button class="nav-link" id="cc-sub-baocao-btn" onclick="ccGoSub(this,'cc-sub-baocao')">📊 TỔNG LƯƠNG & LỊCH SỬ</button>
-          <button class="nav-link" id="cc-sub-ung-btn" onclick="ccGoSub(this,'cc-sub-ung')">💵 ỨNG CÔNG NHÂN</button>
+          <button class="nav-link active" id="cc-sub-socc-btn" onclick="ccGoSub(this,'cc-sub-socc')"><span class="material-symbols-outlined msi-gap">edit_note</span>SỔ CHẤM CÔNG</button>
+          <button class="nav-link" id="cc-sub-baocao-btn" onclick="ccGoSub(this,'cc-sub-baocao')"><span class="material-symbols-outlined msi-gap">bar_chart</span>TỔNG LƯƠNG & LỊCH SỬ</button>
+          <button class="nav-link" id="cc-sub-ung-btn" onclick="ccGoSub(this,'cc-sub-ung')"><span class="material-symbols-outlined msi-gap">attach_money</span>ỨNG CÔNG NHÂN</button>
           <!-- Nút Tiền ứng CN — luôn hiển thị ở mọi sub-tab; gộp Ứng tiền + Trả nợ -->
           <button class="btn btn-warning btn-sm fw-bold ms-auto" onclick="openCCUngModal()" title="Ghi nhận ứng tiền / trả nợ cho công nhân (bấm được ở mọi tab)">
-            💵 Tiền ứng CN
+            <span class="material-symbols-outlined msi-gap">attach_money</span>Tiền ứng CN
           </button>
         </div>
 
@@ -17,7 +17,7 @@
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2"><span class="dot"></span>Sổ Chấm Công</div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <button class="btn btn-outline-secondary btn-sm" onclick="clearCCWeek()">
-              🗑 Xóa bảng
+              <span class="material-symbols-outlined msi-gap">delete</span>Xóa bảng
             </button>
             <button
               class="btn btn-outline-secondary btn-sm"
@@ -25,7 +25,7 @@
               onclick="copyCCWeek()"
               title="Copy toàn bộ CN + ngày công + lương tuần này"
             >
-              📋 Copy tuần
+              <span class="material-symbols-outlined msi-gap">content_copy</span>Copy tuần
             </button>
             <button
               class="btn btn-outline-secondary btn-sm"
@@ -34,14 +34,14 @@
               title="Dán toàn bộ CN + ngày công đã copy"
               style="display: none"
             >
-              📌 Dán
+              <span class="material-symbols-outlined msi-gap">content_paste</span>Dán
             </button>
             <button
               id="cc-save-btn"
               class="btn btn-success btn-sm"
               onclick="saveCCWeek()"
             >
-              💾 Lưu tuần này
+              <span class="material-symbols-outlined msi-gap">save</span>Lưu tuần này
             </button>
           </div>
         </div>
@@ -52,7 +52,7 @@
           style="gap: 10px; flex-wrap: wrap; align-items: center"
         >
           <button class="btn btn-outline-secondary btn-sm" onclick="ccPrevWeek()">
-            ← Tuần trước
+            <span class="material-symbols-outlined msi-gap">chevron_left</span>Tuần trước
           </button>
           <span
             id="cc-week-label"
@@ -65,7 +65,7 @@
             "
           ></span>
           <button class="btn btn-outline-secondary btn-sm" onclick="ccNextWeek()">
-            Tuần sau →
+            Tuần sau <span class="material-symbols-outlined msi-gap">chevron_right</span>
           </button>
           <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
           <span class="bar-label">Từ ngày</span>
@@ -189,7 +189,7 @@
             </select>
             <div style="width: 1px; height: 24px; background: var(--bs-border-color)"></div>
             <div class="search-box" style="min-width: 160px">
-              <span class="ico">🔍</span>
+              <span class="ico"><span class="material-symbols-outlined">search</span></span>
               <input type="text" id="cc-ung-search" placeholder="Tìm tên CN..." oninput="renderCCUngLedger()" />
             </div>
           </div>
@@ -214,7 +214,7 @@
             <div class="app-pagination" id="cc-ung-summary"></div>
           </div>
           <div class="text-secondary mt-2" style="font-size: 11px">
-            💡 Bấm <strong>💵 Tiền ứng CN</strong> ở thanh trên để ghi nhận <strong>ứng tiền</strong> hoặc <strong>trả nợ</strong> cho thợ (ngay cả giữa tuần). Sổ cái tự cập nhật công nợ realtime.
+            <span class="material-symbols-outlined msi-gap">lightbulb</span>Bấm <strong><span class="material-symbols-outlined msi-gap">attach_money</span>Tiền ứng CN</strong> ở thanh trên để ghi nhận <strong>ứng tiền</strong> hoặc <strong>trả nợ</strong> cho thợ (ngay cả giữa tuần). Sổ cái tự cập nhật công nợ realtime.
           </div>
         </div>
         <!-- ══ /SUBTAB Ứng Công Nhân ══ -->
@@ -229,7 +229,7 @@
             </div>
             <div class="d-flex gap-2 flex-wrap align-items-center">
               <div class="search-box" style="min-width: 140px">
-                <span class="ico">🔍</span>
+                <span class="ico"><span class="material-symbols-outlined">search</span></span>
                 <input
                   type="text"
                   id="cc-tlt-search"
@@ -261,7 +261,7 @@
                 <option value="">Tất cả tuần</option>
               </select>
               <button class="btn btn-outline-secondary btn-sm" onclick="exportCCTLTCSV()">
-                ⬇ Xuất CSV
+                <span class="material-symbols-outlined msi-gap">download</span>Xuất CSV
               </button>
               <button
                 class="btn btn-sm"
@@ -274,7 +274,7 @@
                 "
                 title="Tick chọn công nhân trong bảng rồi bấm để xuất phiếu lương PNG"
               >
-                📸 Xuất Phiếu Lương
+                <span class="material-symbols-outlined msi-gap">photo_camera</span>Xuất Phiếu Lương
               </button>
             </div>
           </div>
@@ -352,7 +352,7 @@
                 class="btn btn-outline-secondary btn-sm"
                 onclick="exportCCHistCSV()"
               >
-                ⬇ Xuất CSV
+                <span class="material-symbols-outlined msi-gap">download</span>Xuất CSV
               </button>
             </div>
           </div>
@@ -394,7 +394,7 @@
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title">💵 Tiền ứng Công Nhân</h5>
+                <h5 class="modal-title"><span class="material-symbols-outlined msi-gap">attach_money</span>Tiền ứng Công Nhân</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
               </div>
               <div class="modal-body">
@@ -402,9 +402,9 @@
                   <label class="form-label small fw-bold d-block">Loại giao dịch</label>
                   <div class="btn-group w-100" role="group" id="cc-ung-m-kind-group">
                     <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-ung" value="ung" checked onchange="_ccUngSyncTLLabel()" />
-                    <label class="btn btn-outline-warning btn-sm fw-bold" for="cc-ung-m-kind-ung">➕ Ứng tiền</label>
+                    <label class="btn btn-outline-warning btn-sm fw-bold" for="cc-ung-m-kind-ung"><span class="material-symbols-outlined msi-gap">add_circle</span>Ứng tiền</label>
                     <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-tra" value="tra" onchange="_ccUngSyncTLLabel()" />
-                    <label class="btn btn-outline-success btn-sm fw-bold" for="cc-ung-m-kind-tra">➖ Trả nợ</label>
+                    <label class="btn btn-outline-success btn-sm fw-bold" for="cc-ung-m-kind-tra"><span class="material-symbols-outlined msi-gap">remove_circle</span>Trả nợ</label>
                   </div>
                 </div>
                 <!-- Tick: đồng bộ giao dịch vào cột "Thực Lãnh" của tuần chứa Ngày giao dịch.
@@ -441,7 +441,7 @@
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()">💾 Lưu giao dịch</button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()"><span class="material-symbols-outlined msi-gap">save</span>Lưu giao dịch</button>
               </div>
             </div>
           </div>
@@ -452,7 +452,7 @@
           <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title">📜 Lịch sử công nợ — <span id="cc-ung-hist-name"></span></h5>
+                <h5 class="modal-title"><span class="material-symbols-outlined msi-gap">history</span>Lịch sử công nợ — <span id="cc-ung-hist-name"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
               </div>
               <div class="modal-body">

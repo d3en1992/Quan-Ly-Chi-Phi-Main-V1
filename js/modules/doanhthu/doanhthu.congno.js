@@ -98,11 +98,11 @@ function _cnBuildRows() {
 function _cnStatusBadge(row) {
   const { value, daUng, conPhaiTT } = row;
   if (conPhaiTT < 0) return '<span class="badge bg-info text-dark" style="font-size:11px">↑ Ứng dư</span>';
-  if (conPhaiTT === 0) return '<span class="badge bg-success" style="font-size:11px">✅ Đã xong</span>';
+  if (conPhaiTT === 0) return '<span class="badge bg-success" style="font-size:11px"><span class="material-symbols-outlined msi-gap">check_circle</span>Đã xong</span>';
   // Còn nợ: đánh giá theo tỉ lệ đã thanh toán
   const paidPct = value > 0 ? daUng / value : 0;
-  if (paidPct >= 0.5) return '<span class="badge bg-warning text-dark" style="font-size:11px">● Đang nợ</span>';
-  return '<span class="badge bg-danger" style="font-size:11px">⚠ Nợ lớn</span>';
+  if (paidPct >= 0.5) return '<span class="badge bg-warning text-dark" style="font-size:11px"><span class="material-symbols-outlined msi-gap">circle</span>Đang nợ</span>';
+  return '<span class="badge bg-danger" style="font-size:11px"><span class="material-symbols-outlined msi-gap">warning</span>Nợ lớn</span>';
 }
 
 // ─── Thanh tiến độ % đã ứng ───────────────────────────────────

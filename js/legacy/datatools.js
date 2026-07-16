@@ -1222,7 +1222,7 @@ function _dbTop5(data) {
     const amt = inv.thanhtien || inv.tien || 0;
     const pct = Math.round(amt / max * 100);
     return `<div class="db-rank-row">
-      <div class="db-rank-num ${i===0?'top1':''}">${i===0?'🥇':i+1}</div>
+      <div class="db-rank-num ${i===0?'top1':''}">${i===0?'<span class="material-symbols-outlined msi-gap">workspace_premium</span>':i+1}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;color:var(--bs-body-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${inv.nd || inv.loai || '—'}
@@ -1357,7 +1357,7 @@ function _dbTBByCT() {
 
     const khoRow = khoTotal > 0
       ? `<div style="padding:10px 0;border-bottom:2px solid var(--bs-warning);margin-bottom:4px">
-          <div style="font-weight:800;color:var(--bs-warning);margin-bottom:6px;font-size:13px">🏪 KHO TỔNG</div>
+          <div style="font-weight:800;color:var(--bs-warning);margin-bottom:6px;font-size:13px"><span class="material-symbols-outlined msi-gap">storefront</span>KHO TỔNG</div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
             <span style="color:var(--bs-secondary-color)">Tổng: <b style="color:var(--bs-body-color);font-size:14px">${khoTotal}</b></span>
             <span style="color:var(--bs-success)">Đang hoạt động: <b>${khoHd}</b></span>
