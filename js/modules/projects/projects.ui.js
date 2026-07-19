@@ -655,7 +655,8 @@ function openCTDetail(id) {
 
   // Nhóm hóa đơn theo loại, sắp xếp theo tổng giảm dần
   const byLoai = {};
-  c.invs.forEach(inv => { (byLoai[inv.loai] = byLoai[inv.loai] || []).push(inv); });
+  // Group theo tên loại chi phí resolve từ id (recCatName) — đổi tên trong Danh Mục lan tức thì tới đây
+  c.invs.forEach(inv => { const _l = recCatName(inv,'inv','loai') || inv.loai; (byLoai[_l] = byLoai[_l] || []).push(inv); });
   const loaiRows = Object.entries(byLoai)
     .sort((a, b) => b[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0) - a[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0));
 

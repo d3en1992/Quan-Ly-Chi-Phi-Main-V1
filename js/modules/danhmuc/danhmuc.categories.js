@@ -12,7 +12,9 @@ function renderCtPage() {
     const ctKey = resolveProjectName(inv) || '(Không rõ)';
     if(!map[ctKey]) map[ctKey]={total:0,count:0,byLoai:{}};
     map[ctKey].total+=(inv.thanhtien||inv.tien||0); map[ctKey].count++;
-    map[ctKey].byLoai[inv.loai]=(map[ctKey].byLoai[inv.loai]||0)+(inv.thanhtien||inv.tien||0);
+    // Lấy tên loại chi phí qua recCatName (theo id) để phản ánh đúng tên đã đổi trong Danh Mục
+    const _loaiTen = recCatName(inv,'inv','loai') || inv.loai;
+    map[ctKey].byLoai[_loaiTen]=(map[ctKey].byLoai[_loaiTen]||0)+(inv.thanhtien||inv.tien||0);
   });
   const sortBy=(document.getElementById('ct-sort')?.value)||'value';
   const entries=Object.entries(map).sort((a,b)=>
@@ -38,7 +40,8 @@ function showCtModal(ctName) {
   const invs=getInvoicesCached().filter(i=>resolveProjectName(i)===ctName && inActiveYear(i.ngay));
   document.getElementById('modal-title').textContent='🏗️ '+ctName;
   const byLoai={};
-  invs.forEach(inv=>{ if(!byLoai[inv.loai])byLoai[inv.loai]=[]; byLoai[inv.loai].push(inv); });
+  // Group theo tên loại chi phí resolve từ id (recCatName) — hiển thị đúng tên mới sau khi đổi tên Danh Mục
+  invs.forEach(inv=>{ const _l=recCatName(inv,'inv','loai')||inv.loai; if(!byLoai[_l])byLoai[_l]=[]; byLoai[_l].push(inv); });
   const total=invs.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
   let html=`<div style="display:flex;gap:12px;margin-bottom:18px">
     <div style="flex:1;background:var(--bs-tertiary-bg);border-radius:8px;padding:12px"><div class="text-body-secondary" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng HĐ</div><div style="font-size:22px;font-weight:700">${invs.length}</div></div>
@@ -55,7 +58,7 @@ function showCtModal(ctName) {
         <thead><tr>${['Ngày','Người TH','Nội Dung','Thành Tiền'].map((h,i)=>`<th class="text-secondary" style="padding:5px 8px;background:var(--bs-tertiary-bg);font-size:10px;font-weight:700;text-transform:uppercase;text-align:${i===3?'right':'left'}">${h}</th>`).join('')}</tr></thead>
         <tbody>${invList.map(i=>`<tr style="border-bottom:1px solid var(--bs-border-color)">
           <td class="text-secondary font-monospace" style="padding:6px 8px">${i.ngay}</td>
-          <td class="text-secondary" style="padding:6px 8px">${x(i.nguoi||'—')}</td>
+          <td class="text-secondary" style="padding:6px 8px">${x(recCatName(i,'inv','nguoi')||i.nguoi||'—')}</td>
           <td class="text-secondary" style="padding:6px 8px">${x(i.nd||'—')}</td>
           <td class="text-success text-end font-monospace fw-semibold" style="padding:6px 8px">${numFmt(i.thanhtien||i.tien||0)}</td>
         </tr>`).join('')}</tbody>
@@ -497,6 +500,83 @@ function cancelEdit(catId,idx) {
   document.getElementById(`se-${catId}-${idx}`).classList.remove('on');
   document.getElementById(`sn-${catId}-${idx}`).classList.remove('off');
 }
+// ── Quét & cập nhật TÊN đã lưu trong mọi record khi đổi tên danh mục ─────────────
+// Vì phần lớn dữ liệu cũ CHƯA có *Id (loaiId/nccId/...), cơ chế id-based (recCatName)
+// sẽ fallback về text cũ → đổi tên không lan tới hóa đơn/record đã lưu. Hàm này quét
+// trực tiếp và thay text cũ → tên mới, khớp theo normalizeKey(tên cũ) nên bắt được cả
+// bản ghi sai hoa/thường/dấu. Sau khi save(), stampCatIds() sẽ tự gắn *Id cho record.
+// Lưu ý: chấm công (cc_v2) + cnRoles cho congNhan đã được finishEdit() xử lý riêng.
+function propagateCatRename(catId, normOld, newVal) {
+  const nk = normalizeKey;
+  const hit = v => v && nk(v) === normOld; // record đang mang tên cũ?
+
+  if (catId === 'loaiChiPhi') {
+    let ch = false;
+    invoices.forEach(r => { if (hit(r.loai)) { r.loai = newVal; ch = true; } });
+    if (ch) { clearInvoiceCache(); save('inv_v3', invoices); }
+    return;
+  }
+  if (catId === 'nhaCungCap') {
+    let ci = false;
+    invoices.forEach(r => { if (hit(r.ncc)) { r.ncc = newVal; ci = true; } });
+    if (ci) { clearInvoiceCache(); save('inv_v3', invoices); }
+    // Tiền ứng NCC: r.loai === 'nhacungcap', tên nằm ở field tp
+    let cu = false;
+    if (typeof ungRecords !== 'undefined') ungRecords.forEach(r => {
+      if (r.loai === 'nhacungcap' && hit(r.tp)) { r.tp = newVal; cu = true; }
+    });
+    if (cu) save('ung_v1', ungRecords);
+    return;
+  }
+  if (catId === 'nguoiTH') {
+    let ci = false;
+    invoices.forEach(r => { if (hit(r.nguoi)) { r.nguoi = newVal; ci = true; } });
+    if (ci) { clearInvoiceCache(); save('inv_v3', invoices); }
+    let ct = false;
+    if (typeof thuRecords !== 'undefined') thuRecords.forEach(r => {
+      if (hit(r.nguoi)) { r.nguoi = newVal; ct = true; }
+    });
+    if (ct) save('thu_v1', thuRecords);
+    let ch = false;
+    if (typeof hopDongData !== 'undefined') Object.values(hopDongData).forEach(r => {
+      if (hit(r.nguoi)) { r.nguoi = newVal; ch = true; }
+    });
+    if (ch) save('hopdong_v1', hopDongData);
+    return;
+  }
+  if (catId === 'thauPhu') {
+    // Tiền ứng thầu phụ (loai mặc định 'thauphu') + Hợp đồng thầu phụ
+    let cu = false;
+    if (typeof ungRecords !== 'undefined') ungRecords.forEach(r => {
+      if ((r.loai || 'thauphu') === 'thauphu' && hit(r.tp)) { r.tp = newVal; cu = true; }
+    });
+    if (cu) save('ung_v1', ungRecords);
+    let cc = false;
+    if (typeof thauPhuContracts !== 'undefined') thauPhuContracts.forEach(r => {
+      if (hit(r.thauphu)) { r.thauphu = newVal; cc = true; }
+    });
+    if (cc) save('thauphu_v1', thauPhuContracts);
+    return;
+  }
+  if (catId === 'congNhan') {
+    // cc_v2 + cnRoles đã xử lý ở finishEdit; ở đây chỉ còn tiền ứng công nhân
+    let cu = false;
+    if (typeof ungRecords !== 'undefined') ungRecords.forEach(r => {
+      if (r.loai === 'congnhan' && hit(r.tp)) { r.tp = newVal; cu = true; }
+    });
+    if (cu) save('ung_v1', ungRecords);
+    return;
+  }
+  if (catId === 'tbTen') {
+    let ct = false;
+    if (typeof tbData !== 'undefined') tbData.forEach(r => {
+      if (hit(r.ten)) { r.ten = newVal; ct = true; }
+    });
+    if (ct) save('tb_v1', tbData);
+    return;
+  }
+}
+
 function finishEdit(catId,idx) {
   // congTrinh không được đổi tên qua danh mục — dùng Tab Công Trình để đổi tên project
   if (catId === 'congTrinh') {
@@ -519,11 +599,14 @@ function finishEdit(catId,idx) {
   const normOld = normalizeKey(old);
 
   // ── Đổi tên item master TẠI CHỖ (giữ nguyên id) ──────────────────────
-  // Toàn bộ record trỏ tới id này tự cập nhật tên qua recCatName()/catName():
-  // hóa đơn (loai/ncc/nguoi), tiền ứng (tp — gồm cả thầu phụ/NCC/công nhân),
-  // thiết bị (ten), HĐ thầu phụ (thauphu), thu tiền (nguoi), HĐ chính (nguoi).
-  // KHÔNG còn quét/sửa text từng record → không phụ thuộc trùng tên.
+  // Record CÓ *Id (loaiId/nccId/...) sẽ tự hiển thị tên mới qua recCatName()/catName().
   if (typeof renameCatItemInPlace === 'function') renameCatItemInPlace(catId, old, newVal);
+
+  // ── Quét & cập nhật TÊN đã lưu trong mọi record ──────────────────────
+  // Dữ liệu cũ phần lớn CHƯA có *Id → phải sửa thẳng text để tên mới lan tới
+  // hóa đơn/tiền ứng/thiết bị/HĐ đã lưu (đúng như mô tả "tự cập nhật vào hóa đơn đã lưu").
+  // Sau save(), stampCatIds() sẽ gắn *Id cho các record vừa sửa.
+  if (typeof propagateCatRename === 'function') propagateCatRename(catId, normOld, newVal);
 
   // ── Chấm công: vẫn đọc theo TÊN công nhân (chưa chuyển sang cnId) ─────
   // → propagate tên vào cc_v2 workers + đổi key cnRoles.

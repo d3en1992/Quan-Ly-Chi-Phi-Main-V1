@@ -1397,6 +1397,27 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 
 ---
 
+## 9.25 Fix bug: Đổi tên Danh Mục không cập nhật vào hóa đơn/record đã lưu (19/07/2026)
+
+**Triệu chứng:** Màn hình Danh Mục ghi "Thay đổi sẽ tự cập nhật vào hóa đơn đã lưu", nhưng khi đổi tên một danh mục (VD "Đào Đất" → "Đào Đất - San Lấp") thì các hóa đơn cũ ở màn hình Thống Kê / Chi Tiết Công Trình vẫn hiển thị tên cũ.
+
+**Nguyên nhân gốc:** Kiến trúc id-based (mỗi record lưu `*Id` như `loaiId/nccId/nguoiId/tpId/tenId` trỏ tới master `cat_items_v1`, hiển thị qua `recCatName()`/`catName()`) chỉ hoạt động khi record CÓ `*Id`. Kiểm tra dữ liệu thực tế (`cpct_snapshot`) cho thấy **0/784 hóa đơn có `loaiId`** — `stampCatIds()` chỉ chạy khi `save()`, không có migration stamp toàn bộ dữ liệu cũ. Vì thiếu id, `recCatName()` fallback về text cũ → `renameCatItemInPlace()` (chỉ đổi tên master, không quét record) không lan tới dữ liệu đã lưu.
+
+**Cách sửa (`js/modules/danhmuc/danhmuc.categories.js`):**
+- Thêm hàm `propagateCatRename(catId, normOld, newVal)` — quét thẳng các mảng record, khớp theo `normalizeKey(tên cũ)` và thay text → tên mới, rồi `save()` (sau save `stampCatIds()` tự gắn `*Id`). Bao phủ đầy đủ:
+  - `loaiChiPhi` → `invoices.loai`
+  - `nhaCungCap` → `invoices.ncc` + `ungRecords`(loai='nhacungcap').`tp`
+  - `nguoiTH` → `invoices.nguoi` + `thuRecords.nguoi` + `hopDongData[].nguoi`
+  - `thauPhu` → `ungRecords`(loai='thauphu').`tp` + `thauPhuContracts.thauphu`
+  - `congNhan` → `ungRecords`(loai='congnhan').`tp` (cc_v2 + cnRoles vẫn do `finishEdit` xử lý riêng như trước)
+  - `tbTen` → `tbData.ten`
+- Gọi `propagateCatRename(catId, normOld, newVal)` trong `finishEdit()` ngay sau `renameCatItemInPlace()`.
+- Đồng thời chỉnh các màn hình còn đọc text thô sang dùng `recCatName()` (belt-and-suspenders, nhất quán với danh sách hóa đơn): `renderCtPage()` + `showCtModal()` (`danhmuc.categories.js`), `openCTDetail()` group `byLoai` (`projects.ui.js`), `openEntryEdit()` nạp form sửa HĐ (`hoadon.list-trash.js`).
+
+**File đã đụng:** `js/modules/danhmuc/danhmuc.categories.js` (chính), `js/modules/projects/projects.ui.js`, `js/modules/hoadon/hoadon.list-trash.js`.
+
+---
+
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
 
 > Hai file `js/sync/sync.v2format.js` và `js/sync/sync.v2meta.js` **đã bị xóa** (xem [9.9](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)). Phần dưới lưu lại **toàn bộ inventory hàm/biến/localStorage key của engine V2** để khi quét code thấy dấu vết `_v2*` thì biết đó là code/dữ liệu cũ cần dọn. **KHÔNG dùng làm tham chiếu hiện hành.**

@@ -205,16 +205,20 @@ function openEntryEdit(inv) {
     // 4. Nạp dữ liệu vào form
     document.getElementById('entry-date').value = inv.ngay || today();
     document.getElementById('entry-tbody').innerHTML = '';
-    addRow({ loai: inv.loai, congtrinh: inv.congtrinh,
-             nguoi: inv.nguoi || '', ncc: inv.ncc || '', nd: inv.nd || '', tien: inv.tien || 0 });
+    // Resolve tên loại/NCC/người qua recCatName (theo id) — nạp đúng tên mới nếu danh mục đã đổi tên
+    const _eLoai  = recCatName(inv,'inv','loai')  || inv.loai;
+    const _eNcc   = recCatName(inv,'inv','ncc')   || inv.ncc   || '';
+    const _eNguoi = recCatName(inv,'inv','nguoi') || inv.nguoi || '';
+    addRow({ loai: _eLoai, congtrinh: inv.congtrinh,
+             nguoi: _eNguoi, ncc: _eNcc, nd: inv.nd || '', tien: inv.tien || 0 });
     const row = document.querySelector('#entry-tbody tr');
     if (row) {
       row.dataset.editId = String(inv.id);
       // FIX: gán NCC/Người TH linh hoạt (phòng trường hợp giá trị trong HĐ
       // có whitespace/case khác với danh mục → option không được selected)
-      _setSelectFlexible(row.querySelector('[data-f="ncc"]'),   inv.ncc);
-      _setSelectFlexible(row.querySelector('[data-f="nguoi"]'), inv.nguoi);
-      _setSelectFlexible(row.querySelector('[data-f="loai"]'),  inv.loai);
+      _setSelectFlexible(row.querySelector('[data-f="ncc"]'),   _eNcc);
+      _setSelectFlexible(row.querySelector('[data-f="nguoi"]'), _eNguoi);
+      _setSelectFlexible(row.querySelector('[data-f="loai"]'),  _eLoai);
     }
     calcSummary();
     const _eBtn = document.getElementById('entry-save-btn');
