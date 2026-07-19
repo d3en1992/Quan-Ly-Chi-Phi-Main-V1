@@ -443,7 +443,12 @@ function renderLoiNhuan() {
     const Y = quyetToanRecords                                   // (Y) quyết toán (có dấu)
       .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _matchProj(r, p))
       .reduce((s, r) => s + (r.giaTri || 0), 0);
-    const chi = A + B + C, dt = X + Y;
+    const Thu = thuRecords                                       // (Đã thu) — dùng cho công thức max(X, Thu)
+      .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _matchProj(r, p))
+      .reduce((s, r) => s + (r.tien || 0), 0);
+    const chi = A + B + C;
+    // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán — xem _dtCalcRevenue() (doanhthu.core.js)
+    const dt = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, Thu, Y) : X + Y;
     return { name: p.name, A, B, C, X, Y, chi, dt, ln: dt - chi };
   }).filter(r => r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
 

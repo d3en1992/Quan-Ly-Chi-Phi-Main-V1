@@ -707,12 +707,12 @@ function renderHdtpTableTk(page) {
 
   // Sắp xếp: ngày mới nhất lên đầu (DESC), tie-break theo thời điểm tạo
   let filtered = thauPhuContracts
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTkProjFilter(r))
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTpProjFilter(r))
     .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '')
       || ((b.createdAt || 0) - (a.createdAt || 0)));
 
-  if (_dtTkSearch) {
-    const q = _dtTkSearch;
+  if (_dtTpSearch) {
+    const q = _dtTpSearch;
     filtered = filtered.filter(r =>
       (_resolveCtName(r) || '').toLowerCase().includes(q) ||
       (recCatName(r,'thauphu','thauphu') || '').toLowerCase().includes(q) ||
@@ -856,6 +856,14 @@ function saveQuyetToan() {
   }
 
   save('quyettoan_v1', quyetToanRecords);
+
+  // Lưu Quyết Toán Chi Phí → tự động đóng công trình: chuyển trạng thái sang
+  // "Đã quyết toán" (closed) + cập nhật ngày quyết toán theo ngày vừa nhập.
+  if (typeof updateProject === 'function') {
+    updateProject(_qtPid, { status: 'closed', closedDate: ngay });
+    if (typeof renderProjectsPage === 'function') renderProjectsPage();
+  }
+
   _qtResetForm();
   closeDtModal('qt');
   renderKhaiBaoTable(0);

@@ -751,7 +751,8 @@ function openCTDetail(id) {
                    : (resolveProjectName(r) === p.name || r.congtrinh === p.name)))
     .reduce((s, r) => s + (r.giaTri || 0), 0);
 
-  const doanhThu    = _X + _Y;                  // tổng doanh thu công trình
+  // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán — xem _dtCalcRevenue() (doanhthu.core.js)
+  const doanhThu    = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(_X, tongThu, _Y) : _X + _Y;
   const chiPhiTong  = _A + _B + _C;             // tổng chi phí (dự toán/ước tính)
   const loiNhuan    = doanhThu - chiPhiTong;    // lãi (≥0) / lỗ (<0)
   const conPhaiThuCT = doanhThu - tongThu;      // còn phải thu từ chủ đầu tư

@@ -191,6 +191,8 @@ const DT_RECENT_DAYS = 30;
 let _dtCtFilter = '';
 // CT filter riêng cho sub-tab THỐNG KÊ — cô lập với Khai Báo
 let _dtTkCtFilter = '';
+// CT filter riêng cho sub-tab THẦU PHỤ — cô lập với Thống Kê
+let _dtTpCtFilter = '';
 // (Giữ lại cho tương thích — sub-tab CÔNG NỢ cũ đã tách sang page riêng)
 let _dtCnCtFilter = '';
 
@@ -266,11 +268,27 @@ function _dtMatchTkHDCFilter(keyId, hd) {
   return false;
 }
 
+// ── Match record với CT filter THẦU PHỤ ───────────────────────────────────
+function _dtMatchTpProjFilter(record) {
+  if (!_dtTpCtFilter) return true;
+  if (record.projectId) {
+    const proj = getAllProjects().find(p => p.name === _dtTpCtFilter);
+    if (proj) return record.projectId === proj.id;
+  }
+  return (record.congtrinh || '') === _dtTpCtFilter;
+}
+
 // ── Populate CT filter select cho sub-tab THỐNG KÊ ───────────────────────
 // (KHAI BÁO không còn bộ lọc CT — đã gộp thành 1 bảng tổng hợp.)
 function dtPopulateCtFilter() {
   const tkSel = document.getElementById('dt-tk-ct-filter-sel');
   if (tkSel) tkSel.innerHTML = _buildProjFilterOpts(_dtTkCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
+}
+
+// ── Populate CT filter select cho sub-tab THẦU PHỤ ───────────────────────
+function dtPopulateTpCtFilter() {
+  const tpSel = document.getElementById('dt-tp-ct-filter-sel');
+  if (tpSel) tpSel.innerHTML = _buildProjFilterOpts(_dtTpCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
 }
 
 // ── Áp dụng CT filter → CHỈ re-render bảng KHAI BÁO (30 ngày) ─────────────
@@ -285,10 +303,16 @@ function dtSetCtFilter(val) {
 // ── Áp dụng CT filter → CHỈ re-render bảng THỐNG KÊ (toàn bộ) ─────────────
 function dtSetTkCtFilter(val) {
   _dtTkCtFilter = val || '';
-  _hdcTkPage = 0; _hdtpTkPage = 0; _thuTkPage = 0;
+  _hdcTkPage = 0; _thuTkPage = 0;
   renderHdcTableTk(0);
-  renderHdtpTableTk(0);
   renderThuTableTk(0);
+}
+
+// ── Áp dụng CT filter → CHỈ re-render bảng THẦU PHỤ ───────────────────────
+function dtSetTpCtFilter(val) {
+  _dtTpCtFilter = val || '';
+  _hdtpTkPage = 0;
+  renderHdtpTableTk(0);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -333,6 +357,15 @@ function _dtInYear(ngay) {
   return inActiveYear(ngay);
 }
 
+// ── Công thức Doanh Thu Thực Tế của công trình ─────────────────
+// Doanh thu = max(Giá trị HĐ chính, Tổng đã thu) + Quyết toán chi phí (±)
+// Lấy max thay vì luôn dùng giá trị HĐ chính: nếu khách đã trả nhiều hơn HĐ gốc
+// (phát sinh thêm ngoài hợp đồng), doanh thu phải phản ánh đúng số tiền thực nhận.
+function _dtCalcRevenue(giaTriHDChinh, tongThuTien, chiPhiQuyetToan) {
+  const base = (giaTriHDChinh || 0) > (tongThuTien || 0) ? (giaTriHDChinh || 0) : (tongThuTien || 0);
+  return base + (chiPhiQuyetToan || 0);
+}
+
 // ── Helper: render HTML phân trang ────────────────────────────
 function _dtPaginationHtml(total, curPage, onClickFn) {
   const pages = Math.ceil(total / DT_PG);
@@ -364,10 +397,18 @@ let _dtTkSearch = '';
 
 function dtSetTkSearch(val) {
   _dtTkSearch = (val || '').trim().toLowerCase();
-  _hdcTkPage = 0; _hdtpTkPage = 0; _thuTkPage = 0;
+  _hdcTkPage = 0; _thuTkPage = 0;
   renderHdcTableTk(0);
-  renderHdtpTableTk(0);
   renderThuTableTk(0);
+}
+
+// ── Text search state (THẦU PHỤ) ─────────────────────────────
+let _dtTpSearch = '';
+
+function dtSetTpSearch(val) {
+  _dtTpSearch = (val || '').trim().toLowerCase();
+  _hdtpTkPage = 0;
+  renderHdtpTableTk(0);
 }
 
 // ── Dashboard mini: 3 stat cards trên sub-tab TỔNG QUAN ──────
@@ -537,10 +578,12 @@ function dtGoSub(btn, id) {
   if (id === 'dt-sub-khaibao') {
     _dtRenderDashboardMini();
     renderKhaiBaoTable(_kbPage);
+  } else if (id === 'dt-sub-thauphu') {
+    dtPopulateTpCtFilter();
+    renderHdtpTableTk(_hdtpTkPage);
   } else if (id === 'dt-sub-thongke') {
     dtPopulateCtFilter();
     renderHdcTableTk(_hdcTkPage);
-    renderHdtpTableTk(_hdtpTkPage);
     renderThuTableTk(_thuTkPage);
     if (typeof renderQtTableTk === 'function') renderQtTableTk(_qtTkPage);
   } else if (id === 'dt-sub-loinhuan') {
@@ -551,20 +594,17 @@ function dtGoSub(btn, id) {
 // ── Populate selects trong tab Doanh Thu ─────────────────────
 function dtPopulateSels() {
   // CT select: lấy từ projects lọc theo năm — không dùng cats.congTrinh, không có COMPANY
-  // 3 tab nhập liệu (HĐ Chính, Ghi nhận thu, HĐ Thầu phụ) → ẩn CT đã quyết toán,
-  // nhưng vẫn giữ giá trị đang chọn (cur) để edit dữ liệu cũ không mất.
+  // Cả 4 form khai báo (HĐ Chính, Ghi nhận thu, HĐ Thầu phụ, Quyết toán) đều CHO PHÉP
+  // chọn công trình đã "Đã quyết toán" — vì sau khi quyết toán vẫn có thể phát sinh thêm
+  // chi phí chậm trễ, thu nốt tiền nợ, hoặc cập nhật lại HĐ chính.
   const projForYear = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => activeYear === 0 || _ctInActiveYear(p.name));
   ['hdc-ct-input','thu-ct-input','hdtp-ct-input','qt-ct-input'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel || sel.tagName !== 'SELECT') return;
     const cur = sel.value;
-    // Quyết toán thường làm sau khi đóng công trình → vẫn cho chọn CT đã đóng
-    const visible = id === 'qt-ct-input'
-      ? projForYear
-      : projForYear.filter(p => p.status !== 'closed' || p.name === cur);
     sel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
-      visible.map(p => `<option value="${x(p.name)}">${x(p.name)}</option>`).join('');
+      projForYear.map(p => `<option value="${x(p.name)}">${x(p.name)}</option>`).join('');
     if (cur) sel.value = cur;
   });
 
