@@ -1375,6 +1375,28 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 
 ---
 
+## 9.24 Badge phân loại đồng bộ + Nhận biết công trình "vắt năm" (19/07/2026)
+
+**Mục tiêu:** (1) mọi công trình đều có **badge phân loại** thống nhất (CT, SC, SN, NB…) trích từ mã in hoa ở đầu tên; (2) đánh dấu công trình **vắt năm** (thi công > 365 ngày hoặc qua 2 năm dương lịch) ở cả card danh sách lẫn popup chi tiết.
+
+**Helper mới (đều trong `js/modules/projects/projects.ui.js`):**
+- `_ctResolveStartISO(p, invList)` — ngày bắt đầu: ưu tiên `p.startDate` → hóa đơn Nhân Công (`source==='cc'`) sớm nhất → `null`.
+- `_ctCategoryInfo(name)` → `{ code, display }` — tách mã in hoa đầu tên (regex `^([A-ZĐ]{2,4})(?![a-zà-ỹ])[\s\-–:.]*`) + cắt bỏ khỏi tên hiển thị để không lặp chữ. Không có mã in hoa rõ ràng (VD "Nhà anh Tài") → badge = 2 ký tự đầu in hoa, GIỮ nguyên tên.
+- `_ctCategoryBadge(name)` — badge tối giản: nền `rgba(secondary-rgb,.14)`, chữ xám đậm.
+- `_ctCrossYearInfo(p, invList)` → `{ cross, startY, endY, days }` — vắt năm = `days > 365 || startY !== endY`; endY = năm `endDate` (khi `closed`) hoặc năm hiện tại.
+- `_ctCrossYearBadge(p, invList)` — badge nhỏ cam/đỏ nhạt "Vắt năm" (dùng ở card danh sách).
+
+**Card danh sách (2 chỗ: block no_cost + block withData):** thay `typeTag` cũ (`[CT]`/`[SC]` text-secondary) bằng cụm badge phân loại + badge "Vắt năm", tên hiển thị dùng `_ctCategoryInfo(p.name).display`.
+
+**Popup chi tiết (`openCTDetail`):**
+- Header: `modal-title` = tên (đã cắt mã) + badge phân loại + badge trạng thái + badge "Vắt năm YY-YY" (2 số cuối năm khởi công–kết thúc). Guard `isCompany` → không gắn badge phân loại/vắt năm.
+- Dòng thời gian: "Đã thực hiện: X ngày" đổi màu cam `#d9480f` + thêm "(qua 2 năm)" khi vắt năm.
+- Thẻ **CHI PHÍ THỰC TẾ ĐÃ CHI**: thêm dòng chú thích nhỏ, in nghiêng, xám (`#9ca3af`): `*(Dữ liệu chi phí trải dài từ năm [startY] - [endY])` khi vắt năm.
+
+**File đã đụng:** `js/modules/projects/projects.ui.js`.
+
+---
+
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
 
 > Hai file `js/sync/sync.v2format.js` và `js/sync/sync.v2meta.js` **đã bị xóa** (xem [9.9](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)). Phần dưới lưu lại **toàn bộ inventory hàm/biến/localStorage key của engine V2** để khi quét code thấy dấu vết `_v2*` thì biết đó là code/dữ liệu cũ cần dọn. **KHÔNG dùng làm tham chiếu hiện hành.**

@@ -223,6 +223,62 @@ function _ptDurationDays(p, invList) {
   return _daysInclusiveLocal(sd, endISO);
 }
 
+// ── Ngày bắt đầu công trình (ưu tiên startDate → hóa đơn Nhân Công sớm nhất) ──
+function _ctResolveStartISO(p, invList) {
+  return p.startDate || (() => {
+    const first = (invList || [])
+      .filter(i => i.source === 'cc' && i.ngay)
+      .sort((a, b) => a.ngay.localeCompare(b.ngay))[0];
+    return first ? first.ngay : null;
+  })();
+}
+
+// ── Trích xuất mã phân loại + tên hiển thị từ tên công trình ────────
+// Quy ước: mã = cụm 2–4 CHỮ IN HOA ở đầu tên (CT, SC, SN, NB…), theo sau là
+// dấu phân cách (khoảng trắng, "-", ":", "."). Nếu có mã rõ ràng → cắt bỏ khỏi
+// tên để badge + tên không bị lặp chữ. Nếu không có mã in hoa (VD "Nhà anh Tài")
+// → vẫn lấy 2 ký tự đầu in hoa làm badge nhưng GIỮ NGUYÊN tên.
+function _ctCategoryInfo(name) {
+  const raw = (name || '').trim();
+  if (!raw) return { code: '', display: '' };
+  // Mã in hoa ở đầu + dấu phân cách (lookahead chặn trường hợp là chữ Hoa-thường như "Nhà")
+  const m = raw.match(/^([A-ZĐ]{2,4})(?![a-zà-ỹ])[\s\-–:.]*/);
+  if (m) {
+    const display = raw.slice(m[0].length).trim();
+    return { code: m[1], display: display || raw };
+  }
+  // Không có mã in hoa rõ ràng → badge = 2 ký tự đầu in hoa, giữ nguyên tên
+  return { code: raw.slice(0, 2).toUpperCase(), display: raw };
+}
+
+// ── Badge phân loại (UI tối giản: nền nhạt, chữ xám đậm) ─────────────
+function _ctCategoryBadge(name) {
+  const { code } = _ctCategoryInfo(name);
+  if (!code) return '';
+  return `<span style="font-size:10px;font-weight:700;color:var(--bs-secondary-color);background:rgba(var(--bs-secondary-rgb),.14);border-radius:5px;padding:1px 6px;letter-spacing:.3px;white-space:nowrap">${code}</span>`;
+}
+
+// ── Nhận biết công trình "vắt năm" ──────────────────────────────────
+// Vắt năm = thi công > 365 ngày HOẶC năm khởi công khác năm kết thúc
+// (endISO: dùng endDate nếu đã đóng/hoàn thành, ngược lại lấy năm hiện tại).
+function _ctCrossYearInfo(p, invList) {
+  const startISO = _ctResolveStartISO(p, invList);
+  if (!startISO) return { cross: false, startY: null, endY: null, days: 0 };
+  const endISO = (p.endDate && p.status === 'closed') ? p.endDate : null;
+  const days   = _daysInclusiveLocal(startISO, endISO);
+  const yearOf = iso => Number(String(iso).slice(0, 4));
+  const startY = yearOf(startISO);
+  const endY   = endISO ? yearOf(endISO) : new Date().getFullYear();
+  return { cross: days > 365 || startY !== endY, startY, endY, days };
+}
+
+// ── Badge "Vắt năm" nhỏ (cam/đỏ nhạt) — dùng ngoài card danh sách ───
+function _ctCrossYearBadge(p, invList) {
+  const info = _ctCrossYearInfo(p, invList);
+  if (!info.cross) return '';
+  return `<span style="font-size:10px;font-weight:700;color:#d9480f;background:rgba(253,126,20,.14);border-radius:5px;padding:1px 6px;white-space:nowrap">Vắt năm</span>`;
+}
+
 // ── State filter của grid công trình (giữ giữa các lần render) ─────
 let _ctSearch  = '';
 let _ctFStatus = '';
@@ -417,12 +473,12 @@ function _ctRenderGrid() {
     gridWrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
       ${noCostList.map(p => {
         const dim     = p.status === 'closed' ? 'opacity:.72;' : '';
-        const _pt     = _projTypeByName(p.name);
-        const typeTag = (_pt !== 'OTHER') ? `<span class="text-secondary" style="font-size:10px;margin-left:4px">[${_pt}]</span>` : '';
+        const _cat    = _ctCategoryInfo(p.name);
+        const _badges = `<span style="display:inline-flex;gap:4px;margin-left:5px;vertical-align:middle">${_ctCategoryBadge(p.name)}${_ctCrossYearBadge(p, [])}</span>`;
         return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
           <div class="ct-card-head" style="align-items:flex-start">
             <div style="flex:1;min-width:0">
-              <div class="ct-card-name" style="margin-bottom:5px">${x(p.name)}${typeTag}</div>
+              <div class="ct-card-name" style="margin-bottom:5px">${x(_cat.display)}${_badges}</div>
               <div style="margin-bottom:4px">${_ptStatusBadge(p.status)}</div>
               <div class="ct-card-count">
                 <span class="ghost">Chưa phát sinh</span>
@@ -520,8 +576,8 @@ function _ctRenderGrid() {
     ${withData.map(({ p, c, tongChi, days }) => {
       const dim      = p.status === 'closed' ? 'opacity:.72;' : '';
       const durLabel = days > 0 ? `${days} ngày` : '';
-      const _pt = _projTypeByName(p.name);
-      const typeTag  = (_pt !== 'OTHER') ? `<span class="text-secondary" style="font-size:10px;margin-left:4px">[${_pt}]</span>` : '';
+      const _cat = _ctCategoryInfo(p.name);
+      const _badges = `<span style="display:inline-flex;gap:4px;margin-left:5px;vertical-align:middle">${_ctCategoryBadge(p.name)}${_ctCrossYearBadge(p, c.invs)}</span>`;
       // [MODIFIED] Hiển thị placeholder nếu count = 0 để card không bị lệch
       const countLine = c.count > 0
         ? `<span>${c.count} hóa đơn</span>${durLabel ? `<span class="text-secondary">·</span><span>${durLabel}</span>` : ''}`
@@ -530,7 +586,7 @@ function _ctRenderGrid() {
       return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
         <div class="ct-card-head" style="align-items:flex-start">
           <div style="flex:1;min-width:0">
-            <div class="ct-card-name" style="margin-bottom:5px">${x(p.name)}${typeTag}</div>
+            <div class="ct-card-name" style="margin-bottom:5px">${x(_cat.display)}${_badges}</div>
             <div style="margin-bottom:4px">${_ptStatusBadge(p.status)}</div>
             <div class="ct-card-count" style="display:flex;gap:6px;flex-wrap:wrap">
               ${countLine}
@@ -603,7 +659,15 @@ function openCTDetail(id) {
   const loaiRows = Object.entries(byLoai)
     .sort((a, b) => b[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0) - a[1].reduce((s,i)=>s+(i.thanhtien||i.tien||0),0));
 
-  document.getElementById('modal-title').innerHTML = `<span class="material-symbols-outlined msi-gap">construction</span>${x(p.name)} ${_ctdStatusBadge(p.status)}`;
+  // ── Tiêu đề modal: mã phân loại + tên + trạng thái + badge vắt năm ──
+  const _mCat  = isCompany ? { code: '', display: p.name } : _ctCategoryInfo(p.name);
+  const _mCatBadge = isCompany ? '' : _ctCategoryBadge(p.name);
+  const _mCross = isCompany ? { cross: false } : _ctCrossYearInfo(p, c.invs);
+  const _mCrossBadge = _mCross.cross
+    ? `<span style="font-size:10px;font-weight:700;color:#d9480f;background:rgba(253,126,20,.14);border-radius:6px;padding:2px 8px;white-space:nowrap">Vắt năm ${String(_mCross.startY).slice(-2)}-${String(_mCross.endY).slice(-2)}</span>`
+    : '';
+  document.getElementById('modal-title').innerHTML =
+    `<span class="material-symbols-outlined msi-gap">construction</span>${x(_mCat.display)} ${_mCatBadge} ${_ctdStatusBadge(p.status)} ${_mCrossBadge}`;
 
   let html = '';
 
@@ -743,7 +807,7 @@ function openCTDetail(id) {
   html += `
   <div class="text-secondary" style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;margin-bottom:12px">
     ${_sdTxt ? `<span><span class="material-symbols-outlined msi-gap">calendar_month</span>Khởi công: <strong style="color:var(--bs-body-color)">${_sdTxt}</strong></span>` : ''}
-    ${_durLabel ? `<span><span class="material-symbols-outlined msi-gap">timer</span>Đã thực hiện: <strong style="color:var(--bs-body-color)">${_durLabel}</strong></span>` : ''}
+    ${_durLabel ? `<span><span class="material-symbols-outlined msi-gap">timer</span>Đã thực hiện: <strong style="color:${_mCross.cross ? '#d9480f' : 'var(--bs-body-color)'}">${_durLabel}${_mCross.cross ? ' (qua 2 năm)' : ''}</strong></span>` : ''}
     ${p.endDate ? `<span><span class="material-symbols-outlined msi-gap">check_circle</span>Hoàn thành: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.endDate)}</strong></span>` : ''}
     ${p.closedDate ? `<span><span class="material-symbols-outlined msi-gap">bar_chart</span>Quyết toán: <strong style="color:var(--bs-body-color)">${_fmtProjDate(p.closedDate)}</strong></span>` : ''}
     ${_custName ? `<span><span class="material-symbols-outlined msi-gap">person</span>CĐT: <strong style="color:var(--bs-body-color)">${x(_custName)}</strong></span>` : ''}
@@ -813,6 +877,7 @@ function openCTDetail(id) {
           Dự toán: <strong style="color:var(--bs-body-color)">${fmtS(chiPhiTong)}</strong>${_over ? ` <span style="color:${CR};font-weight:700">· <span class="material-symbols-outlined msi-gap">warning</span>Vượt dự toán</span>` : ''}
         </div>` : `
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">Tổng chi phí công trình (đã chốt)</div>`}
+      ${_mCross.cross ? `<div style="font-size:10px;font-style:italic;color:#9ca3af;margin-top:6px">*(Dữ liệu chi phí trải dài từ năm ${_mCross.startY} - ${_mCross.endY})</div>` : ''}
     </div>`;
 
   // Cột 3 — HIỆU QUẢ: số CHÍNH = lãi/lỗ TỚI HIỆN TẠI = Đã thu − (chi thực tế + chi phí chia tỉ trọng).
