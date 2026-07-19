@@ -1416,6 +1416,12 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 
 **File đã đụng:** `js/modules/danhmuc/danhmuc.categories.js` (chính), `js/modules/projects/projects.ui.js`, `js/modules/hoadon/hoadon.list-trash.js`.
 
+### 9.25.1 Fix bổ sung: đảm bảo đổi tên đồng bộ ĐÚNG lên cloud (mọi năm bị ảnh hưởng)
+
+**Lỗ hổng phát hiện thêm:** Bản `propagateCatRename()` ban đầu chỉ mutate field text (`r.loai/r.ncc/...`) rồi `save()` mà **KHÔNG cập nhật `r.updatedAt`**. Push ngầm (`pushChanges({silent:true})`) chỉ đẩy các năm trong `years = [năm đang xem, ..._dirtyYears]`; mà `_dirtyYears` (xem [9.24 Fix A](#924)) chỉ ghi năm của record có `updatedAt` mới trong ≤5s (`core.storage.js:298-310`). Hệ quả: hóa đơn/tiền ứng/thu/thiết bị thuộc **năm khác năm đang xem** không được đánh dấu dirty → push ngầm bỏ sót năm đó → **cloud giữ tên cũ** → thiết bị khác pull về thấy dữ liệu KHÔNG đồng nhất (chỉ khắc phục khi bấm 🔄 Sync thủ công vì nút này đẩy `_getAllLocalYears()`). Phạm vi: 4 mảng year-partition (`inv_v3/ung_v1/thu_v1/tb_v1`); `thauphu_v1`/`hopdong_v1` đẩy qua meta doc wholesale nên không bị.
+
+**Cách sửa:** trong `propagateCatRename()` thêm `stamp(r)` = `{ r.updatedAt = Date.now(); r.deviceId = DEVICE_ID; }`, gọi ngay khi bất kỳ field text nào bị đổi (tất cả nhánh). Nhờ đó `save()` đưa đúng năm bị ảnh hưởng vào `_dirtyYears` → push ngầm 800ms sau tự đẩy đủ mọi năm lên cloud, không cần Sync thủ công. Đã kiểm chứng bằng script mô phỏng (`_dirtyYears` bắt đúng cả năm cũ lẫn năm hiện tại).
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

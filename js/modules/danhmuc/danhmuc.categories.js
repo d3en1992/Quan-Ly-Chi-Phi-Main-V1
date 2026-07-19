@@ -509,37 +509,43 @@ function cancelEdit(catId,idx) {
 function propagateCatRename(catId, normOld, newVal) {
   const nk = normalizeKey;
   const hit = v => v && nk(v) === normOld; // record đang mang tên cũ?
+  // Đóng dấu thời gian + thiết bị lên record vừa sửa text — BẮT BUỘC để cơ chế
+  // đồng bộ ngầm nhận diện đúng NĂM bị ảnh hưởng (_dirtyYears) và đẩy lên cloud.
+  // Nếu thiếu bước này, hóa đơn/tiền ứng thuộc năm KHÁC năm đang xem sẽ không được
+  // push ngầm → cloud giữ tên cũ → thiết bị khác pull về thấy dữ liệu KHÔNG đồng nhất.
+  const devId = (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : '';
+  const stamp = r => { r.updatedAt = Date.now(); r.deviceId = devId; };
 
   if (catId === 'loaiChiPhi') {
     let ch = false;
-    invoices.forEach(r => { if (hit(r.loai)) { r.loai = newVal; ch = true; } });
+    invoices.forEach(r => { if (hit(r.loai)) { r.loai = newVal; stamp(r); ch = true; } });
     if (ch) { clearInvoiceCache(); save('inv_v3', invoices); }
     return;
   }
   if (catId === 'nhaCungCap') {
     let ci = false;
-    invoices.forEach(r => { if (hit(r.ncc)) { r.ncc = newVal; ci = true; } });
+    invoices.forEach(r => { if (hit(r.ncc)) { r.ncc = newVal; stamp(r); ci = true; } });
     if (ci) { clearInvoiceCache(); save('inv_v3', invoices); }
     // Tiền ứng NCC: r.loai === 'nhacungcap', tên nằm ở field tp
     let cu = false;
     if (typeof ungRecords !== 'undefined') ungRecords.forEach(r => {
-      if (r.loai === 'nhacungcap' && hit(r.tp)) { r.tp = newVal; cu = true; }
+      if (r.loai === 'nhacungcap' && hit(r.tp)) { r.tp = newVal; stamp(r); cu = true; }
     });
     if (cu) save('ung_v1', ungRecords);
     return;
   }
   if (catId === 'nguoiTH') {
     let ci = false;
-    invoices.forEach(r => { if (hit(r.nguoi)) { r.nguoi = newVal; ci = true; } });
+    invoices.forEach(r => { if (hit(r.nguoi)) { r.nguoi = newVal; stamp(r); ci = true; } });
     if (ci) { clearInvoiceCache(); save('inv_v3', invoices); }
     let ct = false;
     if (typeof thuRecords !== 'undefined') thuRecords.forEach(r => {
-      if (hit(r.nguoi)) { r.nguoi = newVal; ct = true; }
+      if (hit(r.nguoi)) { r.nguoi = newVal; stamp(r); ct = true; }
     });
     if (ct) save('thu_v1', thuRecords);
     let ch = false;
     if (typeof hopDongData !== 'undefined') Object.values(hopDongData).forEach(r => {
-      if (hit(r.nguoi)) { r.nguoi = newVal; ch = true; }
+      if (hit(r.nguoi)) { r.nguoi = newVal; stamp(r); ch = true; }
     });
     if (ch) save('hopdong_v1', hopDongData);
     return;
@@ -548,12 +554,12 @@ function propagateCatRename(catId, normOld, newVal) {
     // Tiền ứng thầu phụ (loai mặc định 'thauphu') + Hợp đồng thầu phụ
     let cu = false;
     if (typeof ungRecords !== 'undefined') ungRecords.forEach(r => {
-      if ((r.loai || 'thauphu') === 'thauphu' && hit(r.tp)) { r.tp = newVal; cu = true; }
+      if ((r.loai || 'thauphu') === 'thauphu' && hit(r.tp)) { r.tp = newVal; stamp(r); cu = true; }
     });
     if (cu) save('ung_v1', ungRecords);
     let cc = false;
     if (typeof thauPhuContracts !== 'undefined') thauPhuContracts.forEach(r => {
-      if (hit(r.thauphu)) { r.thauphu = newVal; cc = true; }
+      if (hit(r.thauphu)) { r.thauphu = newVal; stamp(r); cc = true; }
     });
     if (cc) save('thauphu_v1', thauPhuContracts);
     return;
@@ -562,7 +568,7 @@ function propagateCatRename(catId, normOld, newVal) {
     // cc_v2 + cnRoles đã xử lý ở finishEdit; ở đây chỉ còn tiền ứng công nhân
     let cu = false;
     if (typeof ungRecords !== 'undefined') ungRecords.forEach(r => {
-      if (r.loai === 'congnhan' && hit(r.tp)) { r.tp = newVal; cu = true; }
+      if (r.loai === 'congnhan' && hit(r.tp)) { r.tp = newVal; stamp(r); cu = true; }
     });
     if (cu) save('ung_v1', ungRecords);
     return;
@@ -570,7 +576,7 @@ function propagateCatRename(catId, normOld, newVal) {
   if (catId === 'tbTen') {
     let ct = false;
     if (typeof tbData !== 'undefined') tbData.forEach(r => {
-      if (hit(r.ten)) { r.ten = newVal; ct = true; }
+      if (hit(r.ten)) { r.ten = newVal; stamp(r); ct = true; }
     });
     if (ct) save('tb_v1', tbData);
     return;
