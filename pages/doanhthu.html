@@ -11,13 +11,6 @@
           </button>
           <button
             class="nav-link"
-            id="dt-sub-thauphu-btn"
-            onclick="dtGoSub(this, 'dt-sub-thauphu')"
-          >
-            <span class="material-symbols-outlined msi-gap">handshake</span>THẦU PHỤ
-          </button>
-          <button
-            class="nav-link"
             id="dt-sub-thongke-btn"
             onclick="dtGoSub(this, 'dt-sub-thongke')"
           >
@@ -112,54 +105,6 @@
 
         </div>
         <!-- /dt-sub-khaibao -->
-
-        <!-- ── SUB TAB THẦU PHỤ: khai báo + đối soát HĐ Thầu Phụ ───────── -->
-        <div class="sub-page" id="dt-sub-thauphu">
-          <!-- Bộ lọc: Công trình + tìm kiếm (độc lập với THỐNG KÊ) -->
-          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
-            <select id="dt-tp-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetTpCtFilter(this.value)">
-              <option value="">-- Tất cả công trình --</option>
-            </select>
-            <input type="text" id="dt-tp-search-input" class="form-control form-control-sm" style="max-width:220px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetTpSearch(this.value)">
-          </div>
-
-          <div class="row g-2 mb-4">
-            <div class="col-12">
-              <button class="btn btn-warning w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdtpResetForm();openDtModal('hdtp')">
-                <i class="bi bi-people me-1"></i>+ HĐ Thầu Phụ
-              </button>
-            </div>
-          </div>
-
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">handshake</span>Hợp Đồng Thầu Phụ
-            </div>
-            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ TP</button>
-          </div>
-          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
-            <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
-                <thead class="table-light">
-                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdtp-row-chk').forEach(c=>c.checked=this.checked)"/></th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
-                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700">Thầu Phụ</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700">Giá Trị HĐ</th>
-                    <th class="action-col"></th>
-                  </tr>
-                </thead>
-                <tbody id="hdtptk-tbody"></tbody>
-              </table>
-            </div>
-            <div id="hdtptk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng thầu phụ</div>
-            <div id="hdtptk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
-          </div>
-        </div>
-        <!-- /dt-sub-thauphu -->
 
         <!-- ── SUB TAB 2: THỐNG KÊ (đối soát tổng hợp — bảng đầy đủ) ───── -->
         <div class="sub-page" id="dt-sub-thongke">
@@ -380,63 +325,8 @@
           </div>
         </div>
 
-        <!-- Modal: Khai Bao HD Thau Phu -->
-        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
-        <div id="dt-modal-hdtp-ov" class="overlay">
-          <div class="app-modal" style="max-width:660px">
-            <div class="app-modal-head">
-              <h3><span class="material-symbols-outlined msi-gap">handshake</span>Khai B&#225;o H&#7907;p &#272;&#7891;ng Th&#7847;u Ph&#7909;</h3>
-              <button class="close-btn" onclick="closeDtModal('hdtp')"><span class="material-symbols-outlined">close</span></button>
-            </div>
-            <div class="app-modal-body">
-              <div class="dt-form-grid">
-                <div class="dt-field"><label>Ng&#224;y *</label><input type="date" id="hdtp-ngay" /></div>
-                <div class="dt-field">
-                  <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
-                  <select id="hdtp-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="_hdtpOnCtChange(this.value)">
-                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
-                  </select>
-                </div>
-                <div class="dt-field">
-                  <label>T&#234;n Th&#7847;u Ph&#7909; *</label>
-                  <select id="hdtp-thauphu" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
-                    <option value="">-- Ch&#7885;n th&#7847;u ph&#7909; --</option>
-                  </select>
-                </div>
-                <div class="dt-field">
-                  <label>Gi&#225; Tr&#7883; H&#272; Th&#7847;u Ph&#7909; (&#273;)</label>
-                  <input type="text" id="hdtp-giatri" placeholder="0" oninput="fmtInputMoney(this);hdtpUpdateTotal()" />
-                </div>
-                <div class="dt-field"><label>N&#7897;i Dung</label><input type="text" id="hdtp-nd" placeholder="VD: &#201;p c&#7885;c, M&#243;ng, Th&#244;..." /></div>
-              </div>
-              <div style="margin-top:10px">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="hdtp-btn-chitiet" onclick="window.togglehdtpChiTiet&&window.togglehdtpChiTiet()"><span class="material-symbols-outlined msi-gap">bar_chart</span>Kh&#7889;i l&#432;&#7907;ng chi ti&#7871;t</button>
-                <div id="hdtp-chitiet-wrap" style="display:none;margin-top:10px;border:1px solid var(--bs-border-color);padding:10px;border-radius:6px;background:var(--bs-tertiary-bg)">
-                  <div style="overflow-x:auto"><table class="entry-table" style="width:100%;min-width:400px"><thead><tr>
-                    <th style="text-align:left">T&#234;n h&#7841;ng m&#7909;c</th>
-                    <th style="width:50px;text-align:center">&#272;&#417;n v&#7883;</th>
-                    <th style="width:56px;text-align:center">Kh&#7889;i l&#432;&#7907;ng</th>
-                    <th style="width:98px;text-align:right">&#272;&#417;n gi&#225; (&#273;)</th>
-                    <th style="width:150px;text-align:right">Th&#224;nh ti&#7873;n (&#273;)</th>
-                    <th style="width:40px"></th>
-                  </tr></thead><tbody id="hdtp-chitiet-tbody"></tbody></table></div>
-                  <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.addhdtpChiTietRow&&window.addhdtpChiTietRow()">+ Th&#234;m d&#242;ng</button>
-                    <div style="font-weight:bold;font-size:13px"><span class="text-body-secondary">T&#7893;ng chi ti&#7871;t: </span><span id="hdtp-chitiet-tong" class="text-warning">0</span></div>
-                  </div>
-                </div>
-              </div>
-              <input type="hidden" id="hdtp-edit-id" />
-            </div>
-            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:space-between;align-items:center;gap:8px">
-              <span id="hdtp-tong-label" class="text-secondary" style="font-size:12px"></span>
-              <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary" onclick="closeDtModal('hdtp')">H&#7911;y</button>
-                <button class="btn btn-warning" id="hdtp-save-btn" onclick="saveHopDongThauPhu()"><span class="material-symbols-outlined msi-gap">save</span>L&#432;u</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Modal: Khai Bao HD Thau Phu — ĐÃ DỜI sang khu modal global trong index.html
+             (để dùng được từ cả tab Doanh Thu lẫn tab Công Nợ; modal nằm trong .page ẩn sẽ không hiện). -->
 
         <!-- Modal: Quyet Toan Chi Phi (ke thua layout HD Chinh) -->
         <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->

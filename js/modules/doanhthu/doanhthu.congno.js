@@ -263,6 +263,24 @@ function cnPopulateMonthFilter() {
     sorted.map(ym => `<option value="${ym}" ${ym === _cnMonth ? 'selected' : ''}>${_label(ym)}</option>`).join('');
 }
 
+// ─── Sub-tab navigation trong page-congno (CÔNG NỢ · THẦU PHỤ) ──
+// THẦU PHỤ dời từ tab Doanh Thu sang đây: nút + HĐ Thầu Phụ và bảng đối soát.
+// Bảng dùng lại renderHdtpTableTk() + bộ lọc dtSetTpCtFilter/dtSetTpSearch (doanhthu.core.js).
+function cnGoSub(btn, id) {
+  document.querySelectorAll('#page-congno .sub-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#page-congno .nav-link').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'cn-sub-congno') {
+    cnPopulateCtFilter();
+    cnPopulateMonthFilter();
+    cnRenderTable();
+  } else if (id === 'cn-sub-thauphu') {
+    if (typeof dtPopulateTpCtFilter === 'function') dtPopulateTpCtFilter();
+    if (typeof renderHdtpTableTk === 'function') renderHdtpTableTk(_hdtpTkPage);
+  }
+}
+
 // ─── Init page Công Nợ (gọi từ goPage / renderActiveTab) ──────
 function initCongNo() {
   // goPage()/renderActiveTab() đã gọi _reloadGlobals() (refresh invoices, ungRecords,
@@ -273,8 +291,15 @@ function initCongNo() {
   cnPopulateCtFilter();
   cnPopulateMonthFilter();
   cnRenderTable();
+  // Chuẩn bị sẵn dữ liệu sub-tab THẦU PHỤ (bảng ẩn — sẽ hiện khi bấm sub-tab)
+  // dtPopulateSels(): nạp dropdown CT + Thầu Phụ cho modal HĐ Thầu Phụ (global) —
+  // cần gọi ở đây vì modal có thể mở từ tab Công Nợ mà chưa hề vào tab Doanh Thu.
+  if (typeof dtPopulateSels === 'function') dtPopulateSels();
+  if (typeof dtPopulateTpCtFilter === 'function') dtPopulateTpCtFilter();
+  if (typeof renderHdtpTableTk === 'function') renderHdtpTableTk(0);
 }
 
 // Cấp ra global
 window.initCongNo    = initCongNo;
 window.cnApplyFilters = cnApplyFilters;
+window.cnGoSub        = cnGoSub;

@@ -851,16 +851,16 @@ function openCTDetail(id) {
   // ══ KHU TÀI CHÍNH CỐT LÕI (3 cột: Doanh thu · Chi phí · Lãi/Lỗ) ══
   const _cols = isKetoan() ? 1 : 3; // kế toán chỉ xem Chi phí
 
-  // Cột 1 — DOANH THU: số CHÍNH là "Đã thu" (dòng tiền thực đã vào), kèm HĐ + còn phải thu
+  // Cột 1 — DOANH THU: số CHÍNH là Doanh Thu (= max(HĐ, đã thu) + quyết toán),
+  // dòng phụ kèm "đã thu" (dòng tiền thực đã vào) + còn phải thu.
   const _colRevenue = `
     <div style="${_bxG}">
       ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Doanh Thu (HĐ + Quyết toán)')}
-      ${_vl(tongThu ? fmtS(tongThu) : '—', CG)}
-      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-top:2px">Đã thu${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
+      ${_vl(doanhThu ? fmtS(doanhThu) : '—', CG)}
+      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-top:2px">Đã thu: <span style="color:var(--bs-body-color)">${fmtS(tongThu)}</span>${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
       ${doanhThu > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
       <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
-        HĐ: <strong style="color:var(--bs-body-color)">${fmtS(doanhThu)}</strong>
-        · Còn phải thu: <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
+        Còn phải thu: <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
       </div>
     </div>`;
 

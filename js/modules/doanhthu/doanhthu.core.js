@@ -578,9 +578,6 @@ function dtGoSub(btn, id) {
   if (id === 'dt-sub-khaibao') {
     _dtRenderDashboardMini();
     renderKhaiBaoTable(_kbPage);
-  } else if (id === 'dt-sub-thauphu') {
-    dtPopulateTpCtFilter();
-    renderHdtpTableTk(_hdtpTkPage);
   } else if (id === 'dt-sub-thongke') {
     dtPopulateCtFilter();
     renderHdcTableTk(_hdcTkPage);

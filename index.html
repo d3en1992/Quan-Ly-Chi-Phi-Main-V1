@@ -1192,6 +1192,64 @@
       </div>
     </div>
 
+    <!-- Modal: Khai Bao HD Thau Phu (GLOBAL — dùng từ cả tab Doanh Thu lẫn Công Nợ) -->
+    <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
+    <div id="dt-modal-hdtp-ov" class="overlay">
+      <div class="app-modal" style="max-width:660px">
+        <div class="app-modal-head">
+          <h3><span class="material-symbols-outlined msi-gap">handshake</span>Khai B&#225;o H&#7907;p &#272;&#7891;ng Th&#7847;u Ph&#7909;</h3>
+          <button class="close-btn" onclick="closeDtModal('hdtp')"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="app-modal-body">
+          <div class="dt-form-grid">
+            <div class="dt-field"><label>Ng&#224;y *</label><input type="date" id="hdtp-ngay" /></div>
+            <div class="dt-field">
+              <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
+              <select id="hdtp-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="_hdtpOnCtChange(this.value)">
+                <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
+              </select>
+            </div>
+            <div class="dt-field">
+              <label>T&#234;n Th&#7847;u Ph&#7909; *</label>
+              <select id="hdtp-thauphu" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
+                <option value="">-- Ch&#7885;n th&#7847;u ph&#7909; --</option>
+              </select>
+            </div>
+            <div class="dt-field">
+              <label>Gi&#225; Tr&#7883; H&#272; Th&#7847;u Ph&#7909; (&#273;)</label>
+              <input type="text" id="hdtp-giatri" placeholder="0" oninput="fmtInputMoney(this);hdtpUpdateTotal()" />
+            </div>
+            <div class="dt-field"><label>N&#7897;i Dung</label><input type="text" id="hdtp-nd" placeholder="VD: &#201;p c&#7885;c, M&#243;ng, Th&#244;..." /></div>
+          </div>
+          <div style="margin-top:10px">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="hdtp-btn-chitiet" onclick="window.togglehdtpChiTiet&&window.togglehdtpChiTiet()"><span class="material-symbols-outlined msi-gap">bar_chart</span>Kh&#7889;i l&#432;&#7907;ng chi ti&#7871;t</button>
+            <div id="hdtp-chitiet-wrap" style="display:none;margin-top:10px;border:1px solid var(--bs-border-color);padding:10px;border-radius:6px;background:var(--bs-tertiary-bg)">
+              <div style="overflow-x:auto"><table class="entry-table" style="width:100%;min-width:400px"><thead><tr>
+                <th style="text-align:left">T&#234;n h&#7841;ng m&#7909;c</th>
+                <th style="width:50px;text-align:center">&#272;&#417;n v&#7883;</th>
+                <th style="width:56px;text-align:center">Kh&#7889;i l&#432;&#7907;ng</th>
+                <th style="width:98px;text-align:right">&#272;&#417;n gi&#225; (&#273;)</th>
+                <th style="width:150px;text-align:right">Th&#224;nh ti&#7873;n (&#273;)</th>
+                <th style="width:40px"></th>
+              </tr></thead><tbody id="hdtp-chitiet-tbody"></tbody></table></div>
+              <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.addhdtpChiTietRow&&window.addhdtpChiTietRow()">+ Th&#234;m d&#242;ng</button>
+                <div style="font-weight:bold;font-size:13px"><span class="text-body-secondary">T&#7893;ng chi ti&#7871;t: </span><span id="hdtp-chitiet-tong" class="text-warning">0</span></div>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="hdtp-edit-id" />
+        </div>
+        <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span id="hdtp-tong-label" class="text-secondary" style="font-size:12px"></span>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" onclick="closeDtModal('hdtp')">H&#7911;y</button>
+            <button class="btn btn-warning" id="hdtp-save-btn" onclick="saveHopDongThauPhu()"><span class="material-symbols-outlined msi-gap">save</span>L&#432;u</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="app-toast" id="toast"></div>
 
     <script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
