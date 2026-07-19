@@ -789,8 +789,8 @@ function openCTDetail(id) {
   const _colRevenue = `
     <div style="${_bxG}">
       ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Doanh Thu (HĐ + Quyết toán)')}
-      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-bottom:2px">Đã thu${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
       ${_vl(tongThu ? fmtS(tongThu) : '—', CG)}
+      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-top:2px">Đã thu${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
       ${doanhThu > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
       <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
         HĐ: <strong style="color:var(--bs-body-color)">${fmtS(doanhThu)}</strong>
@@ -800,11 +800,13 @@ function openCTDetail(id) {
 
   // Cột 2 — CHI PHÍ THỰC TẾ ĐÃ CHI = chi trực tiếp + chi phí chia tỉ trọng (giá vốn thật của CT)
   const _over = pctChi > 100;
+  // Tổng chi phí thực tế hiển thị = chi trực tiếp (tongChiCongTrinh) + chi phí chia tỉ trọng
+  const _tongChiHienThi = tongChiCongTrinh + _chiPhiChungFixed;
   const _colCost = `
     <div style="${_bxR}">
       ${_lb('<span class="material-symbols-outlined msi-gap">foundation</span>Chi Phí Thực Tế Đã Chi')}
-      ${_vl(tongChiCongTrinh ? fmtS(tongChiCongTrinh) : '—', CR)}
-      ${_chiPhiChungFixed > 0 ? `<div class="text-secondary" style="font-size:11px;margin-top:2px">+ <strong style="color:var(--bs-body-color)">${fmtS(_chiPhiChungFixed)}</strong> chi phí chia tỉ trọng</div>` : ''}
+      ${_vl(_tongChiHienThi ? fmtS(_tongChiHienThi) : '—', CR)}
+      ${_chiPhiChungFixed > 0 ? `<div class="text-secondary" style="font-size:11px;margin-top:2px">(${fmtS(_chiPhiChungFixed)} chi phí chia tỉ trọng)</div>` : ''}
       ${isActiveCT ? `
         ${_ctdProgress(pctChi, { color: CB, over: _over })}
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
