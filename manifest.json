@@ -1,0 +1,16 @@
+{
+  "name": "Quản Lý Chi Phí Công Trình",
+  "short_name": "QLCP",
+  "description": "Quản lý chi phí, chấm công, doanh thu và công nợ công trình",
+  "lang": "vi",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F3F5",
+  "theme_color": "#2563EB",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

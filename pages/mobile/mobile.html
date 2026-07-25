@@ -1,0 +1,17 @@
+<!--
+  pages/mobile/mobile.html — Khung (shell) giao diện điện thoại
+  Được nạp bởi loadMobilePartials() trong js/app/main.js, đổ vào #mb-shell của index.html.
+
+  Ở đây CHỈ có khung tĩnh. Toàn bộ nội dung động do js/mobile/*.js render:
+    #mb-header   → mbRenderHeader()   (tiêu đề, chọn năm, nút đồng bộ)
+    #mb-years    → dải chọn năm (ẩn/hiện khi bấm nút năm)
+    #mb-subtabs  → thanh tab con của từng màn hình
+    #mb-body     → nội dung màn hình đang mở
+    #mb-nav      → bottom nav 5 mục
+-->
+
+<div class="mb-header" id="mb-header"></div>
+<div class="mb-years"   id="mb-years" style="display:none"></div>
+<div class="mb-subtabs" id="mb-subtabs" style="display:none"></div>
+<div class="mb-body"    id="mb-body"></div>
+<div class="mb-nav"     id="mb-nav"></div>

@@ -213,6 +213,10 @@ function _pageIdFromHash() {
 // Mở đúng tab theo hash hiện tại — gọi lúc khởi động và mỗi khi hash thay đổi
 function _routeFromHash() {
   if (!getCurrentUser()) return;              // chưa đăng nhập → bỏ qua (sẽ route lại sau khi login)
+  // Đang ở giao diện điện thoại: hash dùng namespace riêng (#/m/...) và do
+  // mbRouteFromHash() xử lý. Router desktop phải đứng ngoài, nếu không nó sẽ
+  // thấy hash "lạ" rồi nhảy về tab mặc định và render thừa.
+  if (typeof MB !== 'undefined' && MB.on) return;
   let id  = _pageIdFromHash() || 'congtrinh'; // hash trống/sai → tab mặc định
   let btn = document.querySelector('.nav-btn[data-page="' + id + '"]');
   // Vai trò hiện tại không được phép xem tab này (nút nav bị ẩn) → quay về mặc định
@@ -417,6 +421,14 @@ function renderActiveTab() {
   if (typeof _reloadGlobals === 'function') _reloadGlobals();
   updateTop();
 
+  // Giao diện điện thoại: chỉ vẽ lại mobile shell. Không render các tab desktop
+  // đang bị ẩn — vừa thừa vừa tốn thời gian trên máy yếu.
+  if (typeof MB !== 'undefined' && MB.on) {
+    MB.ccWorkers = null;              // dữ liệu vừa đổi → nạp lại bản nháp chấm công
+    if (typeof mbRender === 'function') mbRender();
+    return;
+  }
+
   const tab = getCurrentTab();
   if (!getCurrentUser()) {
     toggleUserDropdown(true);
@@ -567,7 +579,18 @@ window._dataReady = false;
 
   init();
 
+  // ── Giao diện điện thoại ─────────────────────────────────────────────
+  // Màn hình ≤768px → bật mobile shell (js/mobile/*.js). DOM desktop vẫn được
+  // nạp và init() vẫn chạy y như cũ; CSS `body.mb-on` chỉ ẩn nó đi. Nhờ vậy mọi
+  // logic/render cũ vẫn hoạt động, mobile chỉ là một tầng hiển thị khác.
+  // Bật TRƯỚC initHashRouter() để router desktop không giành quyền xử lý hash.
+  const _useMobile = (typeof mbIsMobile === 'function') && mbIsMobile();
+  if (_useMobile && typeof initMobile === 'function') {
+    await initMobile();
+  }
+
   // Khởi tạo hash router → mở đúng tab theo URL (#/...) và theo dõi Back/Forward
+  // (ở chế độ mobile, _routeFromHash() tự thoát sớm — xem chú thích trong hàm)
   initHashRouter();
 
   // Reset pending counter sau init (tránh migration/startup saves làm badge sai)

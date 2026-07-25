@@ -44,6 +44,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.20 Sổ Chấm Công: đổi thứ tự tab + popup Tiền ứng CN tick vào Thực Lãnh + badge vai trò (15/07/2026)](#920-sổ-chấm-công-đổi-thứ-tự-tab--popup-tiền-ứng-cn-tick-vào-thực-lãnh-badge-vai-trò-15072026)
    - [9.21 Fix bug: Quyết Toán Chi Phí nhập vào không lưu (store quyettoan_v1 thiếu đăng ký) (16/07/2026)](#921-fix-bug-quyết-toán-chi-phí-nhập-vào-không-lưu-store-quyettoan_v1-thiếu-đăng-ký-16072026)
    - [9.22 Tái cấu trúc UI/UX Modal Chi Tiết Công Trình (đưa lại Lãi/Lỗ + 3 tab) (16/07/2026)](#922-tái-cấu-trúc-uiux-modal-chi-tiết-công-trình-đưa-lại-lãilỗ--3-tab-16072026)
+   - [9.26 Giao diện điện thoại (mobile shell) + PWA cài được (25/07/2026)](#926-giao-diện-điện-thoại-mobile-shell--pwa-cài-được-25072026)
 
 **Phụ lục**
 
@@ -122,7 +123,11 @@ Thứ tự chính xác trong `index.html`:
 | 31b | `js/modules/doanhthu/doanhthu.congno.js` | Page **CÔNG NỢ** (tab chính độc lập): `initCongNo`, `cnRenderTable`, `cnApplyFilters`, `cnResetFilters`, `cnPopulateCtFilter`, `cnPopulateMonthFilter`, `_cnBuildRows` (chỉ đối tác có `daUng>0`), `_cnRenderKpis`, `_cnProgressBar`, `_cnStatusBadge`, `_cnGroupBadge`, `_cnMatchCt`, `_cnInMonth`; state lọc `_cnCt`/`_cnGroup`/`_cnMonth`/`_cnSearch`. Nạp sau `doanhthu.reports-export.js`. |
 | 32 | `js/sync/sync.js` | Sync engine Firestore (cấu trúc B, online-only, cloud-authoritative): `DEVICE_ID`, `pushChanges` (ghi mỗi năm × hạng mục + 5 meta doc: thêm `meta_khach_hang`), `pullChanges` (REPLACE local bằng cloud), `_pullMeta` (customers đọc `meta_khach_hang`, fallback `meta_cong_trinh.customers`; quyetToan trong `meta_hop_dong`), `_mergeMetaForPush`, `_replaceYearData`, `manualSync`, `schedulePush` (debounce 800ms), conflict merge (`resolveConflict`/`mergeDatasets`/`normalizeCC`) chỉ dùng ở pre-push merge |
 | 33 | `js/app/auth.js` | Auth/session/role UI: đăng nhập, đăng xuất, đổi thông tin tài khoản, quản lý `users_v1`, phân quyền `admin`/`giamdoc`/`ketoan` |
-| 34 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`) |
+| 34 | `js/app/main.js` | Bootstrap khởi động cuối cùng: init, year filter, tab rendering, role UI, auto-sync, chặn dùng app khi offline (`_showOfflineBlock`), **bật mobile shell khi màn hình ≤768px** (`mbIsMobile()` → `initMobile()`) |
+| 34b | `js/mobile/mobile.core.js` | **Giao diện điện thoại — lõi.** State `MB`, `mbIsMobile()`, `loadMobilePartials()`, `initMobile()`, render shell (`mbRender`/`mbRenderHeader`/`mbRenderYears`/`mbRenderSubtabs`/`mbRenderBody`/`mbRenderNav`), router riêng `#/m/<tab>` (`mbRouteFromHash`), event delegation (`data-act` / `data-in`), bảng hành động `MB_ACTS`, helper hiển thị (`mbFmt`/`mbFull`/`mbDate`/`mbCanSee`/`mbProjStats`…) |
+| 34c | `js/mobile/mobile.screens.js` | **Giao diện điện thoại — màn hình.** `mbScreen(tab)` + 13 hàm render (Tổng quan, Công trình, Chi tiết CT, Nhập HĐ, Chấm công, Tiền ứng, Doanh thu, Công nợ, Thiết bị, Danh mục, Thống kê CPHĐ, Thùng rác, Thêm). Chỉ ĐỌC dữ liệu, dùng lại helper desktop |
+| 34d | `js/mobile/mobile.actions.js` | **Giao diện điện thoại — ghi dữ liệu.** Bổ sung vào `MB_ACTS`: lưu HĐ nhanh/chi tiết, phiếu ứng, tuần chấm công, khai báo doanh thu; danh mục và thùng rác gọi lại `addItem`/`delItem`/`_trashRestore`/`_trashHardDelete` của desktop |
+| 34e | *(inline trong `index.html`)* | Đăng ký service worker `sw.js` (PWA — "Thêm vào màn hình chính") |
 | 35 | `https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js` | Bootstrap bundle (nạp ở cuối body, sau toàn bộ JS app) |
 
 Thứ tự này quan trọng vì code không dùng module system. Nhóm `core.*.js` **bắt buộc nạp trước tất cả module nghiệp vụ**. Các file dùng chung biến/hàm global như `load`, `save`, `cats`, `projects`, `invoices`, `ccData`, `hopDongData`, `buildInvoices`, `pullChanges`, `manualSync`. Nếu đổi thứ tự, module có thể đọc biến chưa khai báo hoặc render trước khi `dbInit()` populate `_mem`.
@@ -136,9 +141,22 @@ Thứ tự này quan trọng vì code không dùng module system. Nhóm `core.*.
 ```text
 index.html                    ← Entry point SPA
 AI_CONTEXT.md
+manifest.json                 ← PWA manifest ("Thêm vào màn hình chính")
+sw.js                         ← Service worker network-first (chỉ để cài được app)
 assets/
   css/
-    style.css                 ← Stylesheet duy nhất
+    style.css                 ← Stylesheet chính (desktop)
+    mobile.css                ← Giao diện điện thoại (chỉ áp dụng khi body.mb-on)
+  img/
+    logo-cty.png
+    icon-192.png              ← Icon PWA (sinh từ logo)
+    icon-512.png
+
+pages/                        ← HTML partial của từng tab (nạp bằng fetch)
+  dashboard.html · nhap.html · chamcong.html · nhapung.html
+  doanhthu.html · congno.html · danhmuc.html · thietbi.html · thongkecphd.html
+  mobile/
+    mobile.html               ← Khung shell của giao diện điện thoại
 
 js/
   core/                       ← Nạp đầu tiên, nền tảng toàn app
@@ -189,6 +207,11 @@ js/
   app/
     auth.js
     main.js                   ← Bootstrap cuối cùng
+
+  mobile/                     ← Tầng hiển thị cho điện thoại (nạp SAU main.js)
+    mobile.core.js            ← State MB, shell, router #/m/*, event delegation
+    mobile.screens.js         ← 13 màn hình (chỉ đọc dữ liệu)
+    mobile.actions.js         ← Các hành động ghi dữ liệu
 ```
 
 **Lưu ý tổ chức thư mục:**
@@ -1421,6 +1444,40 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 **Lỗ hổng phát hiện thêm:** Bản `propagateCatRename()` ban đầu chỉ mutate field text (`r.loai/r.ncc/...`) rồi `save()` mà **KHÔNG cập nhật `r.updatedAt`**. Push ngầm (`pushChanges({silent:true})`) chỉ đẩy các năm trong `years = [năm đang xem, ..._dirtyYears]`; mà `_dirtyYears` (xem [9.24 Fix A](#924)) chỉ ghi năm của record có `updatedAt` mới trong ≤5s (`core.storage.js:298-310`). Hệ quả: hóa đơn/tiền ứng/thu/thiết bị thuộc **năm khác năm đang xem** không được đánh dấu dirty → push ngầm bỏ sót năm đó → **cloud giữ tên cũ** → thiết bị khác pull về thấy dữ liệu KHÔNG đồng nhất (chỉ khắc phục khi bấm 🔄 Sync thủ công vì nút này đẩy `_getAllLocalYears()`). Phạm vi: 4 mảng year-partition (`inv_v3/ung_v1/thu_v1/tb_v1`); `thauphu_v1`/`hopdong_v1` đẩy qua meta doc wholesale nên không bị.
 
 **Cách sửa:** trong `propagateCatRename()` thêm `stamp(r)` = `{ r.updatedAt = Date.now(); r.deviceId = DEVICE_ID; }`, gọi ngay khi bất kỳ field text nào bị đổi (tất cả nhánh). Nhờ đó `save()` đưa đúng năm bị ảnh hưởng vào `_dirtyYears` → push ngầm 800ms sau tự đẩy đủ mọi năm lên cloud, không cần Sync thủ công. Đã kiểm chứng bằng script mô phỏng (`_dirtyYears` bắt đúng cả năm cũ lẫn năm hiện tại).
+
+---
+
+## 9.26 Giao diện điện thoại (mobile shell) + PWA cài được (25/07/2026)
+
+**Bối cảnh:** App vốn chỉ có giao diện desktop (bảng nhiều cột, topbar + nav ngang). Mở trên điện thoại phải phóng to/kéo ngang, gần như không nhập liệu được ngoài công trường. Bản thiết kế trên Claude Design (`QLCP Mobile App.dc.html` + `QLCP Screens.dc.html`) đã vẽ trọn giao diện mobile cho cả 11 tab; đợt này hiện thực hóa bản thiết kế đó.
+
+**Nguyên tắc kiến trúc (quan trọng — đọc trước khi sửa):**
+
+- Mobile chỉ là **tầng hiển thị**. Không đẻ ra logic nghiệp vụ mới, không đẻ ra store mới, không đụng `sync.js`.
+- **DOM desktop vẫn được nạp và `init()` vẫn chạy y như cũ.** Mobile shell là một lớp phủ `position:fixed` (`#mb-shell`), CSS `body.mb-on` ẩn `.topbar`/`.page`/`.container-fluid` đi. Nhờ vậy mọi hàm render/sync cũ vẫn hoạt động, không phải sửa module nghiệp vụ nào.
+- Số liệu phải **trùng khít bản desktop** → mobile gọi lại chính các helper cũ: `getInvoicesCached()`, `inActiveYear()`, `_buildInvoiceMap()`, `_ctGetCostsFromMap()`, `_ctTongChi()`, `_hdLookup()`, `_cnBuildRows()`, `allocateCompanyCost()`, `getCompanyCost()`, `ccSundayISO()`/`ccSaturdayISO()`/`weekLabel()`, `ccWorkerDebtUpTo()`, `ccThucLanhLedgerAdj()`.
+- Ghi dữ liệu đi **đúng đường cũ**: `mkRecord()`/`mkUpdate()` + `save()` → `save()` tự lo `_mem` → IndexedDB → `schedulePush()`. Riêng Danh Mục và Thùng Rác **gọi thẳng** `addItem()`/`delItem()`/`_trashRestore()`/`_trashHardDelete()` của desktop để không lệch luật chống trùng / kiểm tra "đang sử dụng" / dọn `ung_v1`.
+
+**Thông tin kiến trúc (IA) của bản mobile:** bottom nav 5 mục — Tổng quan · Công trình · Nhập · Chấm công · Thêm. 7 module còn lại (Tiền ứng, Doanh thu, Công nợ, Thiết bị, Thống kê CPHĐ, Danh mục, Thùng rác) nằm trong tab **Thêm** và có nút Back về Thêm. Màn "Chi tiết công trình" Back về Công trình.
+
+**Cơ chế:**
+
+- **Bật/tắt:** `main.js` sau `init()` gọi `mbIsMobile()` (`matchMedia('(max-width: 768px)')`); nếu đúng → `await initMobile()`. Người dùng có thể ép về bản desktop qua mục "Mở bản máy tính" trong tab Thêm (đặt cờ `localStorage._mbForceDesktop='1'`, `mbEnableMobile()` để quay lại).
+- **Router:** mobile dùng namespace hash riêng `#/m/<tab>` (`mbRouteFromHash`). `_routeFromHash()` của desktop được thêm một dòng thoát sớm `if (MB.on) return;` để hai router không giành nhau.
+- **Render:** `mbRender()` vẽ lại toàn bộ shell mỗi lần state đổi, có **khôi phục focus + vị trí con trỏ** theo `id` của ô đang gõ nên không bị mất focus khi nhập liệu.
+- **Sự kiện:** ủy quyền (event delegation) trên `#mb-shell`. Mọi phần tử bấm được chỉ cần `data-act="tên" data-arg="tham số"` → tra `MB_ACTS`; mọi ô nhập chỉ cần `data-in="đường.dẫn.trong.MB"`. Không dùng `onclick` inline → không lo escape chuỗi tên công trình có dấu nháy.
+- **`renderActiveTab()`** (main.js) được thêm nhánh: ở chế độ mobile chỉ `_reloadGlobals()` + `mbRender()` rồi `return`, không render 11 tab desktop đang bị ẩn (thừa và chậm trên máy yếu).
+- **Phân quyền:** `mbCanSee(tab)` lặp lại đúng luật `applyRoleUI()` — vai trò `ketoan` không thấy Tổng quan / Doanh thu / Công nợ (ẩn ở cả bottom nav lẫn danh sách tab Thêm).
+- **Chấm công:** giữ một bản nháp `MB.ccWorkers` theo khóa `tuần|công trình` (`MB.ccLoadedKey`); đổi tuần / đổi CT / sau khi sync → đặt `null` để nạp lại từ `cc_v2`. Bấm ô ngày xoay vòng `0 → 1 công → 0.5 công → 0`. Lưu tuần = upsert vào `cc_v2` theo `fromDate + ct` rồi `rebuildCCCategories()`.
+- **PWA:** thêm `manifest.json` + `sw.js` + thẻ meta apple/theme-color trong `<head>`, `<meta viewport>` thêm `viewport-fit=cover` để dùng `env(safe-area-inset-*)`. `sw.js` cố ý dùng **network-first** (app chạy online 100%, cache-first sẽ khiến người dùng dính bản JS cũ sau khi deploy). Icon PWA `assets/img/icon-192.png` / `icon-512.png` sinh từ `logo-cty.png`. Muốn ra file APK thì đóng gói PWA này bằng PWABuilder/Capacitor.
+
+**File mới:** `assets/css/mobile.css`, `pages/mobile/mobile.html`, `js/mobile/mobile.core.js`, `js/mobile/mobile.screens.js`, `js/mobile/mobile.actions.js`, `manifest.json`, `sw.js`, `assets/img/icon-192.png`, `assets/img/icon-512.png`.
+
+**File đã sửa:**
+- `index.html` — thẻ meta PWA + `viewport-fit=cover`, link `mobile.css`, `<div id="mb-shell">`, 3 `<script>` mobile sau `main.js`, script đăng ký service worker.
+- `js/app/main.js` — gọi `initMobile()` sau `init()`; thoát sớm trong `_routeFromHash()` và nhánh mobile trong `renderActiveTab()`.
+
+**Giới hạn đã biết (chưa làm trong đợt này):** bản mobile là giao diện **nhập nhanh + tra cứu**, chưa có sửa/xóa từng bản ghi (hóa đơn, phiếu ứng, khai báo doanh thu), chưa có tạo/sửa công trình, chưa có Quyết toán CP, chưa có nhập/xuất Excel và sao lưu. Những việc đó vẫn làm ở bản desktop (mục "Mở bản máy tính" trong tab Thêm).
 
 ---
 

@@ -86,7 +86,14 @@
       "Bash(npm update *)",
       "Bash(node --check js/modules/tienung/tienung.core.js)",
       "Bash(node --check js/modules/tienung/tienung.entry.js)",
-      "Bash(node --check \"d:/NGUYEN HUU/APP QUAN LY CONG TRINH/Claude \\(Old ver\\)/js/modules/thungrac/thungrac.js\")"
+      "Bash(node --check \"d:/NGUYEN HUU/APP QUAN LY CONG TRINH/Claude \\(Old ver\\)/js/modules/thungrac/thungrac.js\")",
+      "Bash(python -)",
+      "Bash(node test-screens.js)",
+      "mcp__claude-in-chrome__list_connected_browsers",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__resize_window",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__javascript_tool"
     ]
   }
 }

@@ -2,10 +2,21 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: cho phép giao diện mobile dùng env(safe-area-inset-*)
+         để né tai thỏ iPhone và thanh cử chỉ Android -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>CTY NGUYỄN HỮU - CPCT</title>
     <!-- Favicon hiển thị trên tab trình duyệt — dùng logo công ty -->
     <link rel="icon" type="image/png" href="assets/img/logo-cty.png" />
+
+    <!-- ── PWA: cho phép "Thêm vào màn hình chính" trên điện thoại ── -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#2563EB" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="QLCP" />
+    <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
     <link
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
@@ -20,6 +31,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/style.css" />
+    <!-- Giao diện điện thoại — chỉ có hiệu lực khi body có class .mb-on (do JS bật) -->
+    <link rel="stylesheet" href="assets/css/mobile.css" />
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1250,6 +1263,12 @@
       </div>
     </div>
 
+    <!-- ══ KHUNG GIAO DIỆN ĐIỆN THOẠI ══
+         Rỗng lúc đầu; loadMobilePartials() (mobile.core.js) sẽ đổ
+         pages/mobile/mobile.html vào đây khi màn hình ≤ 768px.
+         Ẩn hoàn toàn trên desktop (xem assets/css/mobile.css). -->
+    <div id="mb-shell"></div>
+
     <div class="app-toast" id="toast"></div>
 
     <script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
@@ -1290,6 +1309,24 @@
     <script src="js/sync/sync.js"></script>
     <script src="js/app/auth.js"></script>
     <script src="js/app/main.js"></script>
+
+    <!-- ── Giao diện điện thoại (nạp sau main.js) ──
+         3 file này chỉ định nghĩa hàm; main.js gọi initMobile() khi màn hình nhỏ. -->
+    <script src="js/mobile/mobile.core.js"></script>
+    <script src="js/mobile/mobile.screens.js"></script>
+    <script src="js/mobile/mobile.actions.js"></script>
+
+    <!-- ── Đăng ký service worker để cài app vào màn hình chính ──
+         sw.js dùng chiến lược network-first nên KHÔNG gây kẹt bản cũ. -->
+    <script>
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(err =>
+            console.warn('[PWA] Không đăng ký được service worker:', err)
+          );
+        });
+      }
+    </script>
 
     <!-- Bootstrap 5 JS Bundle (đã gộp Popper.js — cần thiết cho Offcanvas) -->
     <!-- Đặt cuối body để không chặn render nội dung trang -->
