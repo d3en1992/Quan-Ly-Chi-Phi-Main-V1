@@ -426,6 +426,15 @@ function syncAuthUI() {
   if (guestBox) guestBox.style.display = user ? 'none' : 'block';
   if (authBox)  authBox.style.display  = user ? 'block' : 'none';
 
+  // Chỉ hiện nút "Chuyển sang giao diện điện thoại" khi người dùng đã lỡ bấm
+  // "Mở bản máy tính" (cờ _mbForceDesktop) — đây là lối thoát duy nhất để quay
+  // lại mobile mà không cần biết cách xóa localStorage thủ công.
+  const mobileSwitchBtn = document.getElementById('ud-mobile-switch-btn');
+  if (mobileSwitchBtn) {
+    mobileSwitchBtn.style.display =
+      (localStorage.getItem('_mbForceDesktop') === '1') ? 'flex' : 'none';
+  }
+
   if (user) {
     const accountName = document.getElementById('account-current-username');
     const accountRole = document.getElementById('account-current-role');

@@ -1076,6 +1076,12 @@
                 <span><span class="material-symbols-outlined">cloud</span></span> Kết nối Cloud
                 <span id="ud-cloud-status-auth" class="ud-cloud-status ms-auto">—</span>
               </button>
+              <!-- Chỉ hiện khi người dùng đã lỡ bấm "Mở bản máy tính" trên điện thoại
+                   (cờ localStorage._mbForceDesktop='1') — xem syncAuthUI() trong auth.js.
+                   Mặc định ẩn nên KHÔNG xuất hiện với người dùng máy tính bình thường. -->
+              <button class="ud-action-btn" id="ud-mobile-switch-btn" style="display:none" onclick="mbEnableMobile()">
+                <span><span class="material-symbols-outlined">smartphone</span></span> Chuyển sang giao diện điện thoại
+              </button>
               <button class="ud-action-btn ud-logout" onclick="logout()">
                 <span><span class="material-symbols-outlined">logout</span></span> Đăng xuất
               </button>
