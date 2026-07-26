@@ -93,7 +93,9 @@
       "mcp__claude-in-chrome__navigate",
       "mcp__claude-in-chrome__resize_window",
       "mcp__claude-in-chrome__read_console_messages",
-      "mcp__claude-in-chrome__javascript_tool"
+      "mcp__claude-in-chrome__javascript_tool",
+      "Bash(git check-ignore *)",
+      "Bash(git ls-tree *)"
     ]
   }
 }

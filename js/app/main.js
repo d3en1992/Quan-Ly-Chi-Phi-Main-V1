@@ -588,6 +588,9 @@ window._dataReady = false;
   if (_useMobile && typeof initMobile === 'function') {
     await initMobile();
   }
+  // Kéo hẹp/rộng cửa sổ trình duyệt → tự chuyển qua lại giữa hai giao diện,
+  // không cần F5. Trên điện thoại thật gần như không bao giờ kích hoạt.
+  if (typeof mbWatchViewport === 'function') mbWatchViewport();
 
   // Khởi tạo hash router → mở đúng tab theo URL (#/...) và theo dõi Back/Forward
   // (ở chế độ mobile, _routeFromHash() tự thoát sớm — xem chú thích trong hàm)

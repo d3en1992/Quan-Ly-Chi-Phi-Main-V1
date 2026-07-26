@@ -1463,6 +1463,8 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 **Cơ chế:**
 
 - **Bật/tắt:** `main.js` sau `init()` gọi `mbIsMobile()` (`matchMedia('(max-width: 768px)')`); nếu đúng → `await initMobile()`. Người dùng có thể ép về bản desktop qua mục "Mở bản máy tính" trong tab Thêm (đặt cờ `localStorage._mbForceDesktop='1'`, `mbEnableMobile()` để quay lại).
+- **Tự chuyển theo bề rộng cửa sổ (2 chiều, KHÔNG reload):** `mbWatchViewport()` (gọi một lần từ `main.js`) lắng nghe `change` của media query. Kéo hẹp → `initMobile()`; kéo rộng → `mbExitMobile()`. `mbExitMobile()` bỏ class `mb-on`, tra `MB_TO_DESKTOP` để mở đúng tab desktop tương ứng (vd `tienung` → `nhapung`, `thongke` → `thongkecphd`) rồi đặt lại hash `#/<tab>`; nếu vai trò hiện tại không xem được tab đó thì lùi về `congtrinh`. Chuyển mềm được là nhờ **DOM desktop luôn tồn tại song song** — chỉ bị CSS ẩn. State `MB` giữ nguyên nên kéo hẹp lại là quay về đúng chỗ đang xem. Nếu người dùng đã bấm "Mở bản máy tính" thì listener tôn trọng lựa chọn đó và không tự ép lại.
+  - `initMobile()` gọi lại được nhiều lần: cờ `_mbHashWired` chặn gắn trùng listener `hashchange`, và ngày mặc định của các form chỉ đặt khi còn trống (không đè lên thứ người dùng đang nhập dở).
 - **Router:** mobile dùng namespace hash riêng `#/m/<tab>` (`mbRouteFromHash`). `_routeFromHash()` của desktop được thêm một dòng thoát sớm `if (MB.on) return;` để hai router không giành nhau.
 - **Render:** `mbRender()` vẽ lại toàn bộ shell mỗi lần state đổi, có **khôi phục focus + vị trí con trỏ** theo `id` của ô đang gõ nên không bị mất focus khi nhập liệu.
 - **Sự kiện:** ủy quyền (event delegation) trên `#mb-shell`. Mọi phần tử bấm được chỉ cần `data-act="tên" data-arg="tham số"` → tra `MB_ACTS`; mọi ô nhập chỉ cần `data-in="đường.dẫn.trong.MB"`. Không dùng `onclick` inline → không lo escape chuỗi tên công trình có dấu nháy.
@@ -1478,6 +1480,16 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 - `js/app/main.js` — gọi `initMobile()` sau `init()`; thoát sớm trong `_routeFromHash()` và nhánh mobile trong `renderActiveTab()`.
 
 **Giới hạn đã biết (chưa làm trong đợt này):** bản mobile là giao diện **nhập nhanh + tra cứu**, chưa có sửa/xóa từng bản ghi (hóa đơn, phiếu ứng, khai báo doanh thu), chưa có tạo/sửa công trình, chưa có Quyết toán CP, chưa có nhập/xuất Excel và sao lưu. Những việc đó vẫn làm ở bản desktop (mục "Mở bản máy tính" trong tab Thêm).
+
+### 9.26.1 Fix: màn Danh Mục trên mobile mở lên trống trơn
+
+**Triệu chứng:** Vào tab Thêm → Danh Mục, danh sách rỗng ("Danh mục trống") và không chip phân loại nào sáng, dù dữ liệu danh mục vẫn đầy đủ ở bản desktop.
+
+**Nguyên nhân:** `MB.dmType` khởi tạo bằng `'loai'`, nhưng `mbScrDanhMuc()` đọc thẳng `cats[MB.dmType]` — mà khóa thật trong `cats` là `loaiChiPhi` (xem `CATS` trong `core.cloud-cats-ui.js`). `cats['loai']` là `undefined` → `|| []` → rỗng, và không chip nào khớp để tô sáng. Việc gọi `addItem('loai')`/`delItem('loai')` cũng sẽ hỏng theo vì `CATS.find(c => c.id === 'loai')` không ra gì.
+
+**Cách sửa:** đổi mặc định thành `'loaiChiPhi'` và ghi rõ ràng buộc "phải là khóa có thật trong `cats`" ngay tại chỗ khai báo (`mobile.core.js`). Đồng thời xóa hằng `MB_DM_KEYS` trong `mobile.screens.js` — dead code, lại còn ghi sai tên store (`cat_tbteb`), để lại chỉ tổ dẫn người đọc sau đi nhầm đường; việc lưu danh mục đã do `saveCats()` của desktop lo qua `addItem()`/`delItem()`.
+
+**File đã đụng:** `js/mobile/mobile.core.js`, `js/mobile/mobile.screens.js`.
 
 ---
 

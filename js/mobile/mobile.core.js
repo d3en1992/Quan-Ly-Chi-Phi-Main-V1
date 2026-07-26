@@ -57,9 +57,12 @@ const MB = {
   statusFilter: 'all',    // trạng thái công trình
   cnGroup:      'all',    // nhóm đối tác công nợ
   tbView:       'ct',     // thiết bị: ct | kho
-  dmType:       'loai',   // danh mục đang xem
+  // Danh mục đang xem — PHẢI là một khóa có thật trong `cats`
+  // (loaiChiPhi | nhaCungCap | nguoiTH | thauPhu | congNhan | tbTen),
+  // vì mbScrDanhMuc() đọc thẳng cats[MB.dmType].
+  dmType:       'loaiChiPhi',
   trashType:    'hoadon', // loại bản ghi trong thùng rác
-  dtKind:       'hdc',    // khai báo doanh thu: hdc | hdtp | thu | qt
+  dtKind:       'hdc',    // khai báo doanh thu: hdc | hdtp | thu
   ungKind:      'thauphu',// loại phiếu ứng
 
   dmNew: '',              // ô nhập thêm danh mục
@@ -491,9 +494,14 @@ async function loadMobilePartials() {
   }
 }
 
+// Các listener chỉ được gắn MỘT lần cho cả vòng đời trang, kể cả khi
+// người dùng chuyển qua lại giữa hai giao diện nhiều lần.
+let _mbHashWired = false;
+
 /**
  * Bật giao diện điện thoại. Gọi từ main.js SAU init() để chắc chắn
  * dữ liệu, migration và phân quyền đã sẵn sàng.
+ * Gọi lại được nhiều lần (khi người dùng thu nhỏ cửa sổ trở lại).
  */
 async function initMobile() {
   if (MB.on) return;
@@ -503,26 +511,75 @@ async function initMobile() {
   MB.ready = true;
   document.body.classList.add('mb-on');
 
-  // Giá trị mặc định cho các form
+  // Giá trị mặc định cho các form (chỉ đặt lần đầu — lần bật lại giữ nguyên
+  // những gì người dùng đang nhập dở)
   const today = mbToday();
-  MB.form.ngay    = today;
-  MB.ungForm.ngay = today;
-  MB.dtForm.ngay  = today;
-  MB.detailForm.ngay = today;
+  if (!MB.form.ngay)       MB.form.ngay       = today;
+  if (!MB.ungForm.ngay)    MB.ungForm.ngay    = today;
+  if (!MB.dtForm.ngay)     MB.dtForm.ngay     = today;
+  if (!MB.detailForm.ngay) MB.detailForm.ngay = today;
 
   // Kế toán không vào được Tổng quan → mở thẳng Công trình
   if (!mbCanSee(MB.tab)) MB.tab = 'congtrinh';
 
   mbBindEvents();
-  window.addEventListener('hashchange', mbRouteFromHash);
+  if (!_mbHashWired) {
+    _mbHashWired = true;
+    window.addEventListener('hashchange', mbRouteFromHash);
+  }
   mbRouteFromHash();
   mbSyncHash();
   mbRender();
+}
 
-  // Xoay ngang / đổi kích thước sang khổ lớn → gợi ý quay lại desktop
-  window.matchMedia(MB_BREAKPOINT).addEventListener('change', e => {
-    if (!e.matches && MB.on) location.reload();
-  });
+// Màn hình mobile ↔ tab desktop tương ứng (dùng khi rời giao diện điện thoại)
+const MB_TO_DESKTOP = {
+  dashboard: 'dashboard', congtrinh: 'congtrinh', detail: 'congtrinh',
+  nhap: 'nhap', chamcong: 'chamcong', tienung: 'nhapung',
+  doanhthu: 'doanhthu', congno: 'congno', thietbi: 'thietbi',
+  danhmuc: 'danhmuc', thongke: 'thongkecphd', thungrac: 'thungrac',
+  more: 'congtrinh',
+};
+
+/**
+ * Tắt lớp phủ mobile, trả quyền hiển thị cho giao diện desktop — KHÔNG reload.
+ * Làm được vì DOM desktop luôn tồn tại song song, chỉ bị CSS `body.mb-on` ẩn đi.
+ * Giữ nguyên state MB nên thu nhỏ cửa sổ lại là quay về đúng chỗ đang xem.
+ */
+function mbExitMobile() {
+  if (!MB.on) return;
+  MB.on = false;
+  MB.yearOpen = false;
+  document.body.classList.remove('mb-on');
+
+  // Mở tab desktop tương ứng. Nếu vai trò hiện tại không được xem tab đó
+  // (nút nav bị applyRoleUI ẩn) thì lùi về Công Trình.
+  let id  = MB_TO_DESKTOP[MB.tab] || 'congtrinh';
+  const btn = document.querySelector('.nav-btn[data-page="' + id + '"]');
+  if (!btn || btn.style.display === 'none') id = 'congtrinh';
+
+  if (typeof goPage === 'function') goPage(null, id);
+  location.hash = '#/' + id;     // đổi hash SAU khi đã mở tab → _routeFromHash() không làm lại
+}
+
+/**
+ * Theo dõi bề rộng màn hình để tự chuyển giữa hai giao diện.
+ * - Điện thoại thật: gần như không bao giờ kích hoạt (viewport cố định).
+ * - Trên máy tính: kéo hẹp/rộng cửa sổ Chrome là đổi ngay, không cần F5.
+ * Gọi một lần từ main.js sau init().
+ */
+function mbWatchViewport() {
+  const mq = window.matchMedia(MB_BREAKPOINT);
+  const onChange = () => {
+    // Người dùng đã chủ động chọn "Mở bản máy tính" → tôn trọng, không tự ép lại
+    if (localStorage.getItem(MB_FORCE_KEY) === '1') return;
+    if (typeof getCurrentUser === 'function' && !getCurrentUser()) return;
+    if (mq.matches && !MB.on)      initMobile();
+    else if (!mq.matches && MB.on) mbExitMobile();
+  };
+  // addListener: bản Safari/iOS cũ chưa hỗ trợ addEventListener trên MediaQueryList
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else if (mq.addListener) mq.addListener(onChange);
 }
 
 /** Cho phép quay lại giao diện mobile sau khi đã ép desktop */

@@ -71,8 +71,10 @@ const MB_STATUS = {
 };
 
 const MB_UNG_LABEL   = { thauphu: 'Thầu phụ', nhacungcap: 'Nhà cung cấp', congnhan: 'Công nhân' };
+// Các danh mục sửa được trên mobile. Khóa PHẢI trùng `catId` của bản desktop
+// (xem CATS trong core.cloud-cats-ui.js) vì mobile gọi thẳng addItem()/delItem().
+// `congTrinh` cố ý không có ở đây — công trình chỉ tạo/sửa ở tab Công Trình.
 const MB_DM_LABELS   = { loaiChiPhi: 'Loại chi phí', nhaCungCap: 'Nhà cung cấp', nguoiTH: 'Người chi', thauPhu: 'Thầu phụ', congNhan: 'Công nhân', tbTen: 'Tên thiết bị' };
-const MB_DM_KEYS     = { loaiChiPhi: 'cat_loai', nhaCungCap: 'cat_ncc', nguoiTH: 'cat_nguoi', thauPhu: 'cat_tp', congNhan: 'cat_cn', tbTen: 'cat_tbteb' };
 
 // ══════════════════════════════
 //  BỘ ĐỊNH TUYẾN MÀN HÌNH
