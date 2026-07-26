@@ -1491,6 +1491,25 @@ Tổng cộng ~305 thẻ `.material-symbols-outlined` sau 2 đợt.
 
 **File đã đụng:** `js/mobile/mobile.core.js`, `js/mobile/mobile.screens.js`.
 
+### 9.26.2 Chỉnh IA giao diện điện thoại theo góp ý (m0016–m0029) (26/07/2026)
+
+Sáu thay đổi về thông tin kiến trúc và bộ lọc năm của bản mobile. Không đụng logic nghiệp vụ, chỉ đổi cách bày và cách gọi lại helper desktop.
+
+**1 · Bottom nav bỏ Tổng quan, thêm Tiền ứng** — `MB_NAV` giờ là Công trình · Chấm công · **Nhập** (đặt giữa cho dễ bấm) · Tiền ứng · Thêm. Kéo theo: `tienung` rời `MB_MORE_TABS` (không còn nút Back về Thêm), `MB.tab` mặc định đổi `dashboard` → `congtrinh`. **Tổng quan không bị xóa** mà chuyển xuống tab Thêm — vẫn xem được, vẫn bị `mbCanSee()` chặn với vai trò kế toán.
+
+**2 · Chi tiết công trình → tab Chấm công: liệt kê theo TUẦN** thay vì gộp theo công nhân. Mỗi dòng là một tuần (nhãn tuần, số công nhân, tổng công, tổng lương); bấm vào mở thẳng tab Chấm công đúng tuần + công trình đó để sửa. Vì hành động này nay gọi được từ **hai** nơi (Chấm công → "Tổng lương", và Chi tiết CT → "Chấm công"), `ccOpenWeek` phải đổi từ `mbSeg()` (chỉ đổi tab con) sang `MB.seg.chamcong='so'` + `mbGo('chamcong')` (chuyển hẳn tab) — trước đó gọi từ màn chi tiết sẽ không nhảy tab.
+
+**3 · Chi tiết công trình → tab Tiền ứng: bỏ phiếu công nhân**, chỉ còn thầu phụ + NCC.
+
+**4 · Tab Tiền ứng chỉ còn Thầu phụ · Nhà cung cấp.** Thống kê ứng rút còn 2 KPI + dòng đếm số phiếu (bỏ KPI "Ứng công nhân" và "Tổng đã ứng"). Việc này **đưa mobile về khớp với desktop**: `chamcong.ung-ledger.js` ghi rõ trang Tiền Ứng và Công Nợ vốn đã lọc bỏ phiếu `loai='congnhan'`.
+  - **Hệ quả phải xử lý:** bỏ công nhân khỏi tab Tiền ứng thì mất chỗ nhập ứng công nhân. Nên subtab **Chấm công → "Ứng CN"** được bổ sung form ghi phiếu ứng/trả (state mới `MB.ccUngForm`, hành động `ccUngKind` + `saveUngCN`), ghi đúng schema sổ nợ công nhân: `loai='congnhan'`, `cnKind='ung'|'tra'`, `tinhVaoThucLanh=true`. Đặt ở đây cũng đúng với desktop (xem [9.17](#917-tách-tạm-ứngcông-nợ-công-nhân-ra-khỏi-sổ-chấm-công-23062026)). Hành động cũ `goUngCN` đã bỏ.
+
+**5 · Tab Thêm bỏ mục Tiền Ứng** (đã lên bottom nav), thêm mục Tổng Quan.
+
+**6 · Chọn năm: single-select → multi-select.** `pickYear` trước đây gọi `setActiveYear(y)` (thay cả Set → chỉ 1 năm). Nay gọi lại đúng hàm multi-select sẵn có của desktop: `onYearToggle(y)` (thêm/bớt khỏi `activeYears`) và `yearQuickAll()` cho chip "Tất cả". Dải chọn năm **cố ý không tự đóng** sau mỗi lần bấm để chọn tiếp năm khác. Thêm helper `mbYearLabel()` — `activeYears` rỗng → `"Tất cả"`, ngược lại liệt kê tăng dần `"2024, 2025, 2026"` (giống `_updateYearBtn()` của desktop); dùng chung cho nút năm trên header, phụ đề màn Tổng quan và mục Tổng Quan trong tab Thêm. Dữ liệu nhiều năm tự gộp vì mọi màn hình đều lọc qua `inActiveYear()`.
+
+**File đã đụng:** `js/mobile/mobile.core.js`, `js/mobile/mobile.screens.js`, `js/mobile/mobile.actions.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

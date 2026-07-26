@@ -38,7 +38,7 @@ const MB = {
   on: false,              // shell đã bật chưa
   ready: false,           // đã nạp partial + gắn sự kiện chưa
 
-  tab: 'dashboard',       // màn hình đang mở
+  tab: 'congtrinh',       // màn hình đang mở (Công trình là mục đầu bottom nav)
   projectId: null,        // công trình đang xem chi tiết (tab 'detail')
   yearOpen: false,        // dải chọn năm đang mở?
 
@@ -63,7 +63,11 @@ const MB = {
   dmType:       'loaiChiPhi',
   trashType:    'hoadon', // loại bản ghi trong thùng rác
   dtKind:       'hdc',    // khai báo doanh thu: hdc | hdtp | thu
-  ungKind:      'thauphu',// loại phiếu ứng
+  // Loại phiếu ứng — CHỈ thầu phụ / nhà cung cấp.
+  // Ứng công nhân cố ý không nằm ở đây: nó là sổ nợ riêng (ung_v1 với
+  // loai='congnhan' + cnKind), nhập tại tab Chấm công → "Ứng CN", đúng như
+  // bản desktop (trang Tiền Ứng và Công Nợ đều lọc bỏ phiếu công nhân).
+  ungKind:      'thauphu',
 
   dmNew: '',              // ô nhập thêm danh mục
 
@@ -72,6 +76,8 @@ const MB = {
   ccCt:      '',          // tên công trình đang chấm
   ccWorkers: null,        // bản nháp danh sách công nhân trong tuần (null = chưa nạp)
   ccLoadedKey: '',        // khóa "tuần|công trình" của bản nháp đang giữ
+  // Form ứng/trả cho công nhân (subtab "Ứng CN")
+  ccUngForm: { tp: '', ct: '', ngay: '', tien: '', nd: '', kind: 'ung' },
 
   // Nhập hóa đơn nhanh — các dòng chờ lưu
   drafts: [],
@@ -159,6 +165,17 @@ function mbOptions(arr, selected) {
   ).join('');
 }
 
+/**
+ * Nhãn bộ lọc năm. `activeYears` là một Set:
+ *   rỗng   → "Tất cả" (không lọc năm)
+ *   n phần tử → liệt kê tăng dần, vd "2024, 2025, 2026"
+ * Dùng chung cho nút năm trên header và phụ đề màn Tổng quan.
+ */
+function mbYearLabel() {
+  if (typeof activeYears === 'undefined' || activeYears.size === 0) return 'Tất cả';
+  return [...activeYears].sort((a, b) => a - b).join(', ');
+}
+
 /** Số thay đổi đang chờ đẩy lên cloud */
 function mbPending() {
   return (typeof _pendingChanges !== 'undefined') ? _pendingChanges : 0;
@@ -186,8 +203,7 @@ function mbTitles() {
   const P    = mbProjects();
   const act  = P.filter(p => p.status === 'active').length;
   const sel  = MB.projectId ? mbProject(MB.projectId) : null;
-  const year = (typeof activeYears !== 'undefined' && activeYears.size === 1)
-    ? [...activeYears][0] : 'Tất cả';
+  const year = mbYearLabel();
   return {
     dashboard: ['Tổng Quan',      'Dashboard chi phí ' + year],
     congtrinh: ['Công Trình',     P.length + ' công trình · ' + act + ' đang thi công'],
@@ -205,15 +221,17 @@ function mbTitles() {
   };
 }
 
-// Các màn hình nằm trong tab "Thêm" (có nút Back về 'more')
-const MB_MORE_TABS = ['tienung', 'doanhthu', 'congno', 'thietbi', 'danhmuc', 'thongke', 'thungrac'];
+// Các màn hình nằm trong tab "Thêm" (có nút Back về 'more').
+// Tiền ứng đã lên bottom nav nên KHÔNG còn ở đây; đổi lại Tổng quan rời nav
+// xuống đây để vẫn xem được.
+const MB_MORE_TABS = ['dashboard', 'doanhthu', 'congno', 'thietbi', 'danhmuc', 'thongke', 'thungrac'];
 
-// Bottom nav: [id, nhãn, ký tự icon]
+// Bottom nav: [id, nhãn, ký tự icon] — 5 mục, "Nhập" đặt giữa cho dễ bấm
 const MB_NAV = [
-  ['dashboard', 'Tổng quan', 'T'],
   ['congtrinh', 'Công trình', 'C'],
-  ['nhap',      'Nhập',      '+'],
   ['chamcong',  'Chấm công', 'K'],
+  ['nhap',      'Nhập',      '+'],
+  ['tienung',   'Tiền ứng',  'U'],
   ['more',      'Thêm',      '≡'],
 ];
 
@@ -307,9 +325,8 @@ function mbRenderHeader() {
   const t        = mbTitles()[MB.tab] || ['', ''];
   const showBack = MB.tab === 'detail' || MB_MORE_TABS.includes(MB.tab);
   const pending  = mbPending();
-  const yearLbl  = (typeof activeYears !== 'undefined' && activeYears.size === 1)
-    ? [...activeYears][0]
-    : (typeof activeYears !== 'undefined' && activeYears.size === 0 ? 'Tất cả' : 'Nhiều năm');
+  // Chọn nhiều năm → liệt kê hết ("2024, 2025, 2026"), giống nút năm của desktop
+  const yearLbl  = mbYearLabel();
 
   el.innerHTML =
     (showBack
@@ -346,6 +363,8 @@ function mbRenderYears() {
   if (typeof thuRecords !== 'undefined') addY(thuRecords, 'ngay');
   const list = [...years].filter(y => y > 1990).sort((a, b) => b - a);
 
+  // Chọn NHIỀU năm: mỗi chip là một công tắc bật/tắt độc lập, dữ liệu các năm
+  // đang bật được gộp lại. Chip "Tất cả" = bỏ lọc năm (activeYears rỗng).
   const isAll = (typeof activeYears !== 'undefined') && activeYears.size === 0;
   el.innerHTML =
     `<div class="mb-year-chip${isAll ? ' on' : ''}" data-act="pickYear" data-arg="0">Tất cả</div>` +
@@ -446,14 +465,21 @@ const MB_ACTS = {
     else mbGo('more');
   },
   toggleYear: () => { MB.yearOpen = !MB.yearOpen; mbRender(); },
+  // Bật/tắt một năm. Dùng lại đúng hàm multi-select của desktop:
+  //   onYearToggle(y) — thêm/bớt y khỏi activeYears rồi gọi onYearChange()
+  //   yearQuickAll()  — xóa hết bộ lọc ("Tất cả")
+  // onYearChange() tự lo kéo dữ liệu năm còn thiếu từ Firebase rồi
+  // renderActiveTab() → ở mobile nhánh này chỉ gọi mbRender().
+  // Dải chọn năm CỐ Ý không đóng lại, để bấm chọn tiếp năm khác.
   pickYear: (arg) => {
     const y = parseInt(arg, 10);
-    if (typeof setActiveYear === 'function') setActiveYear(y);
-    MB.yearOpen = false;
     MB.ccWorkers = null;                       // đổi năm → bỏ nháp chấm công
+    if (y === 0) {
+      if (typeof yearQuickAll === 'function') yearQuickAll();
+    } else if (typeof onYearToggle === 'function') {
+      onYearToggle(y);
+    }
     if (typeof buildYearSelect === 'function') buildYearSelect();
-    // onYearChange() lo việc kéo dữ liệu năm còn thiếu từ Firebase
-    if (typeof onYearChange === 'function') onYearChange();
     mbRender();
   },
   sync: async () => {
@@ -518,6 +544,7 @@ async function initMobile() {
   if (!MB.ungForm.ngay)    MB.ungForm.ngay    = today;
   if (!MB.dtForm.ngay)     MB.dtForm.ngay     = today;
   if (!MB.detailForm.ngay) MB.detailForm.ngay = today;
+  if (!MB.ccUngForm.ngay)  MB.ccUngForm.ngay  = today;
 
   // Kế toán không vào được Tổng quan → mở thẳng Công trình
   if (!mbCanSee(MB.tab)) MB.tab = 'congtrinh';

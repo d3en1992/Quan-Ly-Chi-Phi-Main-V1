@@ -314,32 +314,40 @@ function mbPdChiPhi(p, st) {
   </div>`;
 }
 
+/**
+ * Chấm công của một công trình — liệt kê THEO TUẦN (không gộp theo công nhân).
+ * Bấm vào một tuần sẽ mở tab Chấm công đúng tuần + công trình đó để sửa.
+ */
 function mbPdChamCong(p) {
   const weeks = (typeof ccData !== 'undefined' ? ccData : [])
-    .filter(w => !w.deletedAt && inActiveYear(w.fromDate) && (w.projectId ? w.projectId === p.id : w.ct === p.name));
+    .filter(w => !w.deletedAt && inActiveYear(w.fromDate) && (w.projectId ? w.projectId === p.id : w.ct === p.name))
+    .sort((a, b) => (b.fromDate || '').localeCompare(a.fromDate || ''));
 
-  // Gộp theo tên công nhân trong cả năm
-  const agg = {};
-  weeks.forEach(w => (w.workers || []).forEach(wk => {
-    if (!wk.name) return;
-    const a = agg[wk.name] || (agg[wk.name] = { name: wk.name, congs: 0, luong: 0, tong: 0, role: '' });
-    const congs = (wk.d || []).reduce((s, v) => s + (v || 0), 0);
-    a.congs += congs;
-    a.luong = wk.luong || a.luong;
-    a.tong += congs * (wk.luong || 0) + (wk.phucap || 0);
-    a.role = a.role || (typeof cnRoles !== 'undefined' && cnRoles[wk.name]) || '';
-  }));
-  const list = Object.values(agg).sort((a, b) => b.tong - a.tong);
-  const total = list.reduce((s, w) => s + w.tong, 0);
+  // Tổng công + tổng lương của một tuần
+  const sumWeek = w => (w.workers || []).reduce((acc, k) => {
+    const congs = (k.d || []).reduce((s, v) => s + (v || 0), 0);
+    acc.congs += congs;
+    acc.tong  += congs * (k.luong || 0) + (k.phucap || 0);
+    return acc;
+  }, { congs: 0, tong: 0 });
+
+  const total = weeks.reduce((s, w) => s + sumWeek(w).tong, 0);
 
   return `<div class="mb-pad">
-    ${list.length ? list.map(w => `<div class="mb-card mb-card-sm">
-      <div class="mb-row-between" style="margin-bottom:4px">
-        <span style="font-size:13px;font-weight:700">${mbX(w.name)}</span>
-        <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(w.tong)}</span>
-      </div>
-      <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(w.role || 'Công nhân')} · ${(Math.round(w.congs * 10) / 10)} công × ${mbFmt(w.luong)}</div>
-    </div>`).join('') : '<div class="mb-empty">Chưa chấm công cho công trình này</div>'}
+    ${weeks.length ? weeks.map(w => {
+      const { congs, tong } = sumWeek(w);
+      const n = (w.workers || []).length;
+      return `<div class="mb-card mb-card-sm tap" data-act="ccOpenWeek" data-arg="${mbX(w.fromDate)}|${mbX(w.ct || p.name)}">
+        <div class="mb-row-between" style="margin-bottom:4px">
+          <span style="font-size:13px;font-weight:700">${(typeof weekLabel === 'function') ? weekLabel(w.fromDate) : mbDate(w.fromDate)}</span>
+          <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(tong)}</span>
+        </div>
+        <div class="mb-row-between" style="align-items:center">
+          <span style="font-size:11px;color:var(--mb-muted-2)">${n} công nhân · ${Math.round(congs * 10) / 10} công</span>
+          <span style="font-size:11px;font-weight:700;color:var(--mb-primary)">Sửa →</span>
+        </div>
+      </div>`;
+    }).join('') : '<div class="mb-empty">Chưa chấm công cho công trình này</div>'}
     <div class="mb-card mb-card-sm" style="background:#F9FAFB;display:flex;justify-content:space-between">
       <span style="font-size:12.5px;font-weight:700;color:#374151">Tổng lương ${weeks.length} tuần</span>
       <span style="font-size:13.5px;font-weight:800">${mbFull(total)}</span>
@@ -347,9 +355,14 @@ function mbPdChamCong(p) {
   </div>`;
 }
 
+/**
+ * Tiền ứng của một công trình — CHỈ thầu phụ và nhà cung cấp.
+ * Phiếu ứng công nhân là sổ nợ riêng theo người (không gắn với chi phí công
+ * trình), xem tại tab Chấm công → "Ứng CN".
+ */
 function mbPdTienUng(p) {
   const list = (typeof ungRecords !== 'undefined' ? ungRecords : [])
-    .filter(u => !u.deletedAt && inActiveYear(u.ngay) && mbBelongs(u, p))
+    .filter(u => !u.deletedAt && u.loai !== 'congnhan' && inActiveYear(u.ngay) && mbBelongs(u, p))
     .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
   const total = list.reduce((s, u) => s + (u.tien || 0), 0);
 
@@ -739,15 +752,45 @@ function mbCcUng() {
   }).filter(r => r.daUng || r.daTra || r.remain);
 
   const total = rows.reduce((s, r) => s + r.remain, 0);
+  const f = MB.ccUngForm;
 
   return `<div class="mb-pad">
-    <div class="mb-kpi amber" style="border-radius:13px;display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div class="mb-kpi-label">Công nợ công nhân còn lại</div>
-        <div class="mb-kpi-value" style="font-size:17px">${mbFmt(total)}</div>
-      </div>
-      <button class="mb-btn amber" style="width:auto;padding:10px 13px;font-size:12.5px" data-act="goUngCN">+ Ứng CN</button>
+    <div class="mb-kpi amber" style="border-radius:13px">
+      <div class="mb-kpi-label">Công nợ công nhân còn lại</div>
+      <div class="mb-kpi-value" style="font-size:17px">${mbFmt(total)}</div>
+      <div class="mb-kpi-hint">${rows.length} công nhân có phát sinh</div>
     </div>
+
+    <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
+      <div class="mb-sec-title">Ghi phiếu ứng / trả</div>
+
+      <div class="mb-chips even">
+        ${[['ung', 'Ứng tiền'], ['tra', 'Trả nợ']].map(([k, l]) =>
+          `<div class="mb-chip${f.kind === k ? ' on' : ''}" data-act="ccUngKind" data-arg="${k}">${l}</div>`).join('')}
+      </div>
+
+      <div><div class="mb-label">Công nhân</div>
+        <input id="mb-cu-tp" class="mb-input" list="mb-dl-cnung" data-in="ccUngForm.tp" value="${mbX(f.tp)}" placeholder="Nhập hoặc chọn tên"/>
+        <datalist id="mb-dl-cnung">${((typeof ccAllNames === 'function') ? ccAllNames() : []).map(n => `<option value="${mbX(n)}">`).join('')}</datalist></div>
+
+      <div><div class="mb-label">Công trình</div>
+        <select id="mb-cu-ct" class="mb-select" data-in="ccUngForm.ct">${mbCtOptions(f.ct, false)}</select></div>
+
+      <div class="mb-row">
+        <div class="mb-field"><div class="mb-label">Ngày</div>
+          <input id="mb-cu-ngay" class="mb-input" type="date" data-in="ccUngForm.ngay" value="${mbX(f.ngay)}"/></div>
+        <div class="mb-field" style="flex:1.3"><div class="mb-label">Số tiền (đ)</div>
+          <input id="mb-cu-tien" class="mb-input" inputmode="numeric" data-in="ccUngForm.tien" value="${mbX(f.tien)}" placeholder="0"/></div>
+      </div>
+
+      <div><div class="mb-label">Nội dung</div>
+        <input id="mb-cu-nd" class="mb-input" data-in="ccUngForm.nd" value="${mbX(f.nd)}" placeholder="${f.kind === 'tra' ? 'VD: Trả nợ đợt 1' : 'VD: Ứng sinh hoạt'}"/></div>
+
+      <button class="mb-btn ${f.kind === 'tra' ? 'green' : 'amber'}" data-act="saveUngCN">
+        ${f.kind === 'tra' ? 'Lưu phiếu trả nợ' : 'Lưu phiếu ứng'}
+      </button>
+    </div>
+
     <div class="mb-col">
       ${rows.length ? rows.map(r => `<div class="mb-card mb-card-sm">
         <div class="mb-row-between" style="margin-bottom:6px">
@@ -771,14 +814,14 @@ function mbScrTienUng() {
 
 function mbUngNhap() {
   const f = MB.ungForm;
-  const kinds = [['thauphu', 'Thầu phụ'], ['nhacungcap', 'Nhà cung cấp'], ['congnhan', 'Công nhân']];
-  const partyLabel = MB.ungKind === 'congnhan' ? 'Tên công nhân' : MB.ungKind === 'thauphu' ? 'Thầu phụ' : 'Nhà cung cấp';
-  const partyList  = MB.ungKind === 'congnhan' ? (cats.congNhan || [])
-                   : MB.ungKind === 'thauphu'  ? (cats.thauPhu || [])
-                   : (cats.nhaCungCap || []);
+  // Chỉ 2 loại — ứng công nhân nằm ở tab Chấm công (xem chú thích MB.ungKind)
+  const kinds = [['thauphu', 'Thầu phụ'], ['nhacungcap', 'Nhà cung cấp']];
+  const isTp  = MB.ungKind === 'thauphu';
+  const partyLabel = isTp ? 'Thầu phụ' : 'Nhà cung cấp';
+  const partyList  = isTp ? (cats.thauPhu || []) : (cats.nhaCungCap || []);
 
   const recent = (typeof ungRecords !== 'undefined' ? ungRecords : [])
-    .filter(u => !u.deletedAt && inActiveYear(u.ngay))
+    .filter(u => !u.deletedAt && u.loai !== 'congnhan' && inActiveYear(u.ngay))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .slice(0, 8);
 
@@ -826,10 +869,11 @@ function mbUngNhap() {
 }
 
 function mbUngThongKe() {
+  // Bỏ phiếu công nhân — trang này chỉ theo dõi ứng thầu phụ / nhà cung cấp
   const list = (typeof ungRecords !== 'undefined' ? ungRecords : [])
-    .filter(u => !u.deletedAt && inActiveYear(u.ngay));
+    .filter(u => !u.deletedAt && u.loai !== 'congnhan' && inActiveYear(u.ngay));
 
-  const tot = { thauphu: 0, nhacungcap: 0, congnhan: 0 };
+  const tot = { thauphu: 0, nhacungcap: 0 };
   const byParty = {};
   list.forEach(u => {
     if (tot[u.loai] !== undefined) tot[u.loai] += (u.tien || 0);
@@ -840,18 +884,19 @@ function mbUngThongKe() {
   const maxParty = parties.length ? parties[0][1] : 1;
 
   const kpis = [
-    ['Ứng thầu phụ',     mbFmt(tot.thauphu),    ''],
-    ['Ứng nhà cung cấp', mbFmt(tot.nhacungcap), ''],
-    ['Ứng công nhân',    mbFmt(tot.congnhan),   'var(--mb-amber)'],
-    ['Tổng đã ứng',      mbFmt(tot.thauphu + tot.nhacungcap + tot.congnhan), ''],
+    ['Ứng thầu phụ',     mbFmt(tot.thauphu)],
+    ['Ứng nhà cung cấp', mbFmt(tot.nhacungcap)],
   ];
 
   return `<div class="mb-pad">
     <div class="mb-grid2">
-      ${kpis.map(([l, v, c]) => `<div class="mb-kpi" style="border-radius:13px">
+      ${kpis.map(([l, v]) => `<div class="mb-kpi" style="border-radius:13px">
         <div class="mb-kpi-label">${l}</div>
-        <div class="mb-kpi-value" style="font-size:15px;color:${c || 'var(--mb-text)'}">${v}</div>
+        <div class="mb-kpi-value" style="font-size:15px">${v}</div>
       </div>`).join('')}
+    </div>
+    <div style="text-align:center;font-size:11.5px;color:var(--mb-muted-2);margin-top:-4px">
+      ${list.length} phiếu ứng · ${mbYearLabel()}
     </div>
     <div class="mb-sec-title">Ứng theo đối tác</div>
     <div class="mb-col">
@@ -1268,8 +1313,10 @@ function mbScrMore() {
   const pending = mbPending();
   const trashN = (typeof _trashCountAll === 'function') ? _trashCountAll() : 0;
 
+  // Tiền Ứng đã lên bottom nav nên không liệt kê ở đây nữa.
+  // Tổng Quan rời bottom nav xuống đây.
   const rows = [
-    ['tienung',  'Tiền Ứng',       'Thầu phụ · NCC · Công nhân',    'Ư', '#FFFBEB', '#D97706'],
+    ['dashboard', 'Tổng Quan',     'Dashboard chi phí ' + mbYearLabel(), 'T', '#EFF6FF', '#2563EB'],
     ['doanhthu', 'Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận', 'D', '#F0FDF4', '#16A34A'],
     ['congno',   'Công Nợ',        'Còn phải trả theo đối tác',      'N', '#FEF2F2', '#DC2626'],
     ['thietbi',  'Thiết Bị',       'Kho tổng & tại công trình',      'B', '#EFF6FF', '#2563EB'],

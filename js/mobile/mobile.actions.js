@@ -189,7 +189,12 @@ Object.assign(MB_ACTS, {
 
   ccDelWorker: (arg) => { MB.ccWorkers.splice(parseInt(arg, 10), 1); mbRender(); },
 
-  // Mở nhanh một tuần trong lịch sử
+  /**
+   * Mở một tuần đã lưu để sửa. Gọi được từ 2 nơi:
+   *   - Chấm công → "Tổng lương" (đang ở sẵn tab chamcong)
+   *   - Chi tiết công trình → tab "Chấm công" (đang ở tab detail)
+   * Vì vậy phải dùng mbGo() để CHUYỂN TAB, không chỉ mbSeg() đổi tab con.
+   */
   ccOpenWeek: (arg) => {
     const [from, ct] = arg.split('|');
     // Tính offset tuần so với tuần hiện tại
@@ -198,7 +203,8 @@ Object.assign(MB_ACTS, {
     MB.ccOffset  = diff;
     MB.ccCt      = ct;
     MB.ccWorkers = null;
-    mbSeg('chamcong', 'so');
+    MB.seg.chamcong = 'so';
+    mbGo('chamcong');
   },
 
   ccSaveWeek: () => {
@@ -244,10 +250,39 @@ Object.assign(MB_ACTS, {
     mbRender();
   },
 
-  // Sang màn Tiền Ứng, chọn sẵn loại "công nhân"
-  goUngCN: () => {
-    MB.ungKind = 'congnhan';
-    mbGo('tienung', { seg: Object.assign({}, MB.seg, { tienung: 'nhap' }) });
+  // ── Ứng / trả nợ công nhân (tab Chấm công → "Ứng CN") ──
+  // Sổ nợ riêng theo người: ung_v1 với loai='congnhan' + cnKind='ung'|'tra'.
+  // Trang Tiền Ứng và Công Nợ đều lọc bỏ loại này (giống bản desktop).
+  ccUngKind: (arg) => { MB.ccUngForm.kind = arg; mbRender(); },
+
+  saveUngCN: () => {
+    const f = MB.ccUngForm;
+    if (!f.tp.trim())     { mbToast('Nhập tên công nhân', 'error'); return; }
+    if (!mbMoney(f.tien)) { mbToast('Nhập số tiền', 'error'); return; }
+    if (!f.ngay)          { mbToast('Chọn ngày', 'error'); return; }
+
+    const proj = mbFindProjByName(f.ct);
+    const isTra = f.kind === 'tra';
+    ungRecords.unshift(mkRecord({
+      ngay: f.ngay,
+      loai: 'congnhan',
+      cnKind: isTra ? 'tra' : 'ung',
+      tp: f.tp.trim(),
+      congtrinh: proj ? proj.name : (f.ct || ''),
+      projectId: proj ? proj.id : null,
+      tien: mbMoney(f.tien),
+      nd: f.nd.trim() || (isTra ? 'Trả nợ' : 'Ứng tiền'),
+      tinhVaoThucLanh: true,   // trừ thẳng vào cột Thực Lãnh của tuần chấm công
+    }));
+    save('ung_v1', ungRecords);
+
+    // Tên công nhân mới → bổ sung vào danh mục để lần sau gợi ý được
+    if (typeof rebuildCCNameList === 'function') { try { rebuildCCNameList(); } catch (e) {} }
+
+    Object.assign(MB.ccUngForm, { tp: '', tien: '', nd: '' });
+    MB.ccWorkers = null;       // thực lãnh của tuần đổi theo → nạp lại bản nháp
+    mbToast('✅ Đã lưu phiếu ' + (isTra ? 'trả nợ ' : 'ứng ') + mbFull(mbMoney(f.tien)), 'success');
+    mbAfterWrite();
   },
 
   // ══════════════════════════════
