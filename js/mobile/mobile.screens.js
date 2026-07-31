@@ -411,11 +411,9 @@ function mbNhapNhanh() {
 
       <div class="mb-row">
         <div class="mb-field"><div class="mb-label">Nhà cung cấp</div>
-          <input id="mb-f-ncc" class="mb-input" list="mb-dl-ncc" data-in="form.ncc" value="${mbX(f.ncc)}" placeholder="VD: Vật Tư Hòa Phát"/>
-          <datalist id="mb-dl-ncc">${(cats.nhaCungCap || []).map(v => `<option value="${mbX(v)}">`).join('')}</datalist></div>
+          <select id="mb-f-ncc" class="mb-select" data-in="form.ncc">${mbOptionsKeep(cats.nhaCungCap, f.ncc, '-- Chọn NCC --')}</select></div>
         <div class="mb-field"><div class="mb-label">Người chi</div>
-          <input id="mb-f-nguoi" class="mb-input" list="mb-dl-nguoi" data-in="form.nguoi" value="${mbX(f.nguoi)}" placeholder="VD: A Long"/>
-          <datalist id="mb-dl-nguoi">${(cats.nguoiTH || []).map(v => `<option value="${mbX(v)}">`).join('')}</datalist></div>
+          <select id="mb-f-nguoi" class="mb-select" data-in="form.nguoi">${mbOptionsKeep(cats.nguoiTH, f.nguoi, '-- Chọn người chi --')}</select></div>
       </div>
 
       <div><div class="mb-label">Nội dung</div>
@@ -482,9 +480,9 @@ function mbNhapChiTiet() {
         <select id="mb-d-ct" class="mb-select" data-in="detailForm.ct">${mbCtOptions(f.ct, true)}</select></div>
       <div class="mb-row">
         <div class="mb-field"><div class="mb-label">Nhà cung cấp</div>
-          <input id="mb-d-ncc" class="mb-input" data-in="detailForm.ncc" value="${mbX(f.ncc)}" placeholder="VD: Vật Tư Hòa Phát"/></div>
+          <select id="mb-d-ncc" class="mb-select" data-in="detailForm.ncc">${mbOptionsKeep(cats.nhaCungCap, f.ncc, '-- Chọn NCC --')}</select></div>
         <div class="mb-field"><div class="mb-label">Người chi</div>
-          <input id="mb-d-nguoi" class="mb-input" data-in="detailForm.nguoi" value="${mbX(f.nguoi)}" placeholder="VD: A Long"/></div>
+          <select id="mb-d-nguoi" class="mb-select" data-in="detailForm.nguoi">${mbOptionsKeep(cats.nguoiTH, f.nguoi, '-- Chọn người chi --')}</select></div>
       </div>
     </div>
 

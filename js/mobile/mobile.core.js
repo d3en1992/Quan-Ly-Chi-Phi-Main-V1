@@ -166,6 +166,21 @@ function mbOptions(arr, selected) {
 }
 
 /**
+ * <option> từ mảng chuỗi danh mục, có tùy biến dòng đầu (placeholder).
+ * Khác mbOptions ở chỗ: nếu `selected` là giá trị cũ KHÔNG còn trong danh mục
+ * (vd hóa đơn cũ nhập tay, hoặc danh mục đã bị xóa) thì vẫn chèn thêm 1 option
+ * cho giá trị đó để dropdown không âm thầm làm mất dữ liệu đang có.
+ */
+function mbOptionsKeep(arr, selected, placeholder) {
+  const list = [...new Set((arr || []).filter(v => v != null && String(v).trim() !== ''))];
+  const sel  = selected || '';
+  if (sel && !list.includes(sel)) list.unshift(sel);   // giữ lại giá trị cũ
+  return `<option value="">${mbX(placeholder || '-- Chọn --')}</option>` + list.map(v =>
+    `<option value="${mbX(v)}"${v === sel ? ' selected' : ''}>${mbX(v)}</option>`
+  ).join('');
+}
+
+/**
  * Nhãn bộ lọc năm. `activeYears` là một Set:
  *   rỗng   → "Tất cả" (không lọc năm)
  *   n phần tử → liệt kê tăng dần, vd "2024, 2025, 2026"

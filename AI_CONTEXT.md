@@ -1512,6 +1512,23 @@ Sáu thay đổi về thông tin kiến trúc và bộ lọc năm của bản mo
 
 ---
 
+## 9.27 Mobile — Nhà cung cấp / Người chi đổi thành dropdown lấy từ Danh Mục (31/07/2026)
+
+Ở giao diện điện thoại, màn **Nhập Hóa Đơn** (cả subtab **Nhập nhanh** và **Chi tiết**), hai ô **Nhà cung cấp** và **Người chi** trước đây là `<input>` gõ tay (Nhập nhanh có `<datalist>` gợi ý, Chi tiết thì không gợi ý gì). Nay cả bốn ô đổi thành `<select>` chọn từ danh mục: NCC lấy từ `cats.nhaCungCap`, Người chi lấy từ `cats.nguoiTH` — đúng hai danh mục quản lý ở tab **Danh Mục**.
+
+Thêm helper `mbOptionsKeep(arr, selected, placeholder)` trong `mobile.core.js` (đặt cạnh `mbOptions`). Khác `mbOptions` ở ba điểm:
+- Cho tùy biến dòng đầu (`-- Chọn NCC --`, `-- Chọn người chi --`) thay vì cứng `-- Chọn --`.
+- **Giữ lại giá trị cũ không còn trong danh mục:** nếu `selected` không nằm trong `arr` thì vẫn chèn thêm 1 `<option>` cho nó. Cần thiết vì hóa đơn cũ có NCC/người chi gõ tay hoặc danh mục đã bị xóa — nếu không giữ thì dropdown sẽ âm thầm làm mất dữ liệu đang có khi sửa lại phiếu.
+- Lọc rỗng + khử trùng lặp (`Set`), giống `_dedupCatArr` bên desktop.
+
+Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc hai trường này, bỏ trống vẫn lưu được. Select đã tự hoạt động với binding `data-in` sẵn có (nhánh `change` → `mbSetPath` + `mbRender`), không cần thêm sự kiện.
+
+**File đã đụng:** `js/mobile/mobile.core.js` (thêm `mbOptionsKeep`), `js/mobile/mobile.screens.js` (`mbNhapNhanh`, `mbNhapChiTiet`).
+
+**Hàm global mới:** `mbOptionsKeep(arr, selected, placeholder)`.
+
+---
+
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
 
 > Hai file `js/sync/sync.v2format.js` và `js/sync/sync.v2meta.js` **đã bị xóa** (xem [9.9](#99-bỏ-offline-first--online-only--cấu-trúc-b--normalize-29052026--kiến-trúc-hiện-hành)). Phần dưới lưu lại **toàn bộ inventory hàm/biến/localStorage key của engine V2** để khi quét code thấy dấu vết `_v2*` thì biết đó là code/dữ liệu cũ cần dọn. **KHÔNG dùng làm tham chiếu hiện hành.**
