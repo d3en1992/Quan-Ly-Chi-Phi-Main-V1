@@ -311,36 +311,11 @@ function renderCTOverview() {
   yearProjects.forEach(p => { if (counts[p.status] !== undefined) counts[p.status]++; });
   const _ctCount    = yearProjects.filter(p => _projTypeByName(p.name) === 'CT').length;
 
-  const yearLabel = activeYear === 0 ? 'Tất cả năm' : `Năm ${activeYear}`;
-  const invMap    = _buildInvoiceMap();
-
-  // Tổng chi phí (trừ COMPANY — chi phí chung không tính vào CT)
-  const totalCost = invMap.all
-    .filter(i => i.projectId !== 'COMPANY' && i.congtrinh !== PROJECT_COMPANY.name)
-    .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
-
-  // Tổng thu (theo năm)
-  const totalThu = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
-    if (r.deletedAt) return false;
-    return inActiveYear(r.ngay);
-  }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
-
-  const totalLL = totalThu - totalCost;
-  const llClr   = totalLL > 0 ? 'var(--bs-success)' : totalLL < 0 ? 'var(--bs-danger)' : 'var(--bs-secondary-color)';
-  const llPfx   = totalLL > 0 ? '+' : '';
-
   // ── Helpers nội bộ ─────────────────────────────────────────────────
   const kpiCount = (lbl, val, color, bg) =>
     `<div style="background:${bg};border-radius:10px;padding:12px 14px;flex:1;min-width:90px;text-align:center">
        <div style="font-size:10px;color:${color};font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;opacity:.8">${lbl}</div>
        <div style="font-size:26px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace">${val}</div>
-     </div>`;
-
-  const kpiMoney = (lbl, val, color, bg) =>
-    `<div style="background:${bg};border-radius:10px;padding:12px 16px;flex:1;min-width:130px">
-       <div style="font-size:10px;color:var(--bs-secondary-color);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${lbl}</div>
-       <div style="font-size:18px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace;line-height:1.2">${val}</div>
-       <div style="font-size:10px;color:var(--bs-secondary-color);margin-top:2px">${x(yearLabel)}</div>
      </div>`;
 
   const selS = 'padding:7px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none';
@@ -368,15 +343,6 @@ function renderCTOverview() {
       ${kpiCount('Thi công',  counts.active,    'var(--bs-success)',   'rgba(var(--bs-success-rgb),.1)')}
       ${kpiCount('Hoàn thành',counts.completed, 'var(--bs-warning)',   'rgba(var(--bs-warning-rgb),.1)')}
       ${kpiCount('Quyết toán',counts.closed,    'var(--bs-secondary)', 'rgba(var(--bs-secondary-rgb),.1)')}
-    </div>
-
-    <!-- KPI 2: Tài chính tổng -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
-      ${kpiMoney('Tổng Chi Phí',  fmtM(totalCost), 'var(--bs-danger)',   'rgba(var(--bs-danger-rgb),.07)')}
-      ${!isKetoan() ? kpiMoney('Tổng Đã Thu',   fmtM(totalThu),  'var(--bs-success)', 'rgba(var(--bs-success-rgb),.07)') : ''} <!-- [ROLE KETOAN HIDE] -->
-      ${!isKetoan() ? kpiMoney('Lãi / Lỗ',
-          (totalThu || totalCost) ? llPfx + fmtM(totalLL) : '—',
-          llClr, 'rgba(0,0,0,.03)') : ''}
     </div>
 
     <!-- Filter bar -->
