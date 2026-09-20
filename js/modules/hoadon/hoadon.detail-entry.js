@@ -213,7 +213,10 @@ function validateDetailHeaderCategories() {
   const nccOpts   = dedupArr(cats.nhaCungCap  || []);
   const projOpts  = (() => {
     const projs = typeof getAllProjects === 'function' ? getAllProjects() : (window.projects || []);
-    return projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+    const list = projs.filter(p => !p.deletedAt && p.id).map(p => ({ name: p.name, id: p.id }));
+    // getAllProjects() không trả về CÔNG TY (công trình đặc biệt) — thêm thủ công để không bị coi là "không hợp lệ"
+    if (typeof PROJECT_COMPANY !== 'undefined') list.unshift({ name: PROJECT_COMPANY.name, id: PROJECT_COMPANY.id });
+    return list;
   })();
 
   let invalidCount = 0;
