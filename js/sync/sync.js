@@ -15,7 +15,15 @@
 //       - SAVE  = ghi xuống IndexedDB (đọc nhanh) RỒI đẩy cloud gần như tức thì.
 //   • IndexedDB chỉ còn là "bộ nhớ đệm để mở app cho nhanh", không phải nguồn chính.
 //     Khi pull, slice năm đó trong IndexedDB bị cloud ghi đè hoàn toàn.
-//   • 4 doc danh mục cũng được THAY THẾ theo cloud (riêng users giữ mật khẩu local).
+//   • 5 doc danh mục cũng được THAY THẾ theo cloud (riêng users giữ mật khẩu local).
+//
+//   • OUTBOX (từ GĐ1 gia cố đồng bộ — xem core.storage.js):
+//       - save() so "bảng bóng" → ghi vào outbox (IDB, sống qua F5) đúng các doc bị đổi.
+//       - Push ngầm chỉ đẩy doc trong outbox; doc đẩy xong mới gỡ khỏi outbox.
+//       - Pull KHÔNG BAO GIỜ thay thế doc còn trong outbox → GỘP thay vì thay thế.
+//       - Xóa cứng có chủ đích → save(k, v, { purge:[id] }) → purgeIds, để bước gộp
+//         cloud không kéo record đã xóa "sống lại".
+//       - Mở app mà outbox còn dữ liệu → đẩy TRƯỚC rồi mới pull (main.js init()).
 // ─────────────────────────────────────────────────────────────────────────────
 
 'use strict';
@@ -269,340 +277,418 @@ function _applyCatItemArrays(merged) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [9] PUSH — đẩy local lên cloud (mỗi hạng mục/năm = 1 doc + 4 doc danh mục)
+// [8b] HELPERS DÙNG OUTBOX — gộp cloud vào local + loại purgeIds, nạp lại global
 // ══════════════════════════════════════════════════════════════
-// opts.silent   = true  → chạy ngầm, chỉ hiện banner khi lỗi
-// opts.skipPull = true  → bỏ bước đọc-gộp cloud trước khi ghi (dùng sau import)
+
+// Nạp lại biến global của 1 key từ _mem, sau khi dữ liệu cloud được gộp/thay vào _mem.
+// QUAN TRỌNG: nếu biến global (invoices, ccData...) còn trỏ vào mảng CŨ thì lần save()
+// kế tiếp sẽ lưu lại mảng cũ → làm rơi mất record vừa gộp từ máy khác.
+function _refreshGlobal(key) {
+  switch (key) {
+    case 'inv_v3':       if (typeof invoices         !== 'undefined') invoices         = load(key, []); break;
+    case 'ung_v1':       if (typeof ungRecords       !== 'undefined') ungRecords       = load(key, []); break;
+    case 'cc_v2':        if (typeof ccData           !== 'undefined') ccData           = load(key, []); break;
+    case 'tb_v1':        if (typeof tbData           !== 'undefined') tbData           = load(key, []); break;
+    case 'thu_v1':       if (typeof thuRecords       !== 'undefined') thuRecords       = load(key, []); break;
+    case 'projects_v1':  if (typeof projects         !== 'undefined') projects         = load(key, []); break;
+    case 'customers_v1': if (typeof customers        !== 'undefined') customers        = load(key, []); break;
+    case 'hopdong_v1':   if (typeof hopDongData      !== 'undefined') hopDongData      = load(key, {}); break;
+    case 'thauphu_v1':   if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = load(key, []); break;
+    case 'quyettoan_v1': if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load(key, []); break;
+    case 'cat_cn_roles': if (typeof cnRoles          !== 'undefined') cnRoles          = load(key, {}); break;
+  }
+  if (_INV_CACHE_KEYS.has(key) && typeof clearInvoiceCache === 'function') clearInvoiceCache();
+}
+
+// Doc có cờ overwrite (do khôi phục đánh dấu, chưa đẩy xong) không?
+function _outboxIsOverwrite(docId) {
+  const row = _outboxGet(docId);
+  return !!(row && row.overwrite);
+}
+
+// Tập purgeIds (id bị xóa cứng, chưa đẩy) của 1 doc trong outbox
+function _purgeSetOf(docId) {
+  const row = _outboxGet(docId);
+  return new Set(row ? row.purgeIds : []);
+}
+
+// GỘP record cloud của 1 doc năm vào local (KHÔNG thay thế), rồi loại bỏ purgeIds.
+// Dùng khi doc còn thay đổi local chưa đẩy (pull) và ở bước đọc-gộp trước khi ghi (push).
+// Gộp theo id trên TOÀN mảng key: tombstone thắng, sau đó updatedAt mới hơn thắng.
+function _mergeYearIntoLocal(key, cloudRecs, purge) {
+  const local = load(key, []);
+  let merged = (key === 'cc_v2')
+    ? normalizeCC([...local, ...(cloudRecs || [])])
+    : mergeDatasets(local, cloudRecs || []);
+  if (purge && purge.size) merged = merged.filter(r => !(r && purge.has(String(r.id))));
+  _memSet(key, merged);
+  _refreshGlobal(key);
+}
+
+// Tách docId năm → { docId, yr, cat, key, dateField } (null nếu không phải doc năm hợp lệ)
+function _parseYearDocId(docId) {
+  const m = /^y(\d{4})_(.+)$/.exec(docId || '');
+  if (!m) return null;
+  const c = _YEAR_CATS.find(x => x.cat === m[2]);
+  return c ? { docId, yr: m[1], cat: c.cat, key: c.key, dateField: c.dateField } : null;
+}
+
+// ── 5 doc meta dùng chung ──
+const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong'];
+
+function _metaPayload(docId) {
+  switch (docId) {
+    case 'meta_cong_trinh': return fbMetaCTPayload();
+    case 'meta_khach_hang': return fbMetaKHPayload();
+    case 'meta_danh_muc':   return fbMetaDMPayload();
+    case 'meta_tai_khoan':  return fbMetaTKPayload();
+    case 'meta_hop_dong':   return fbMetaHDPayload();
+  }
+  return null;
+}
+
+// Loại các record có purgeId dạng "key:id" khỏi 1 mảng meta
+function _purgeArr(arr, key, purge) {
+  if (!purge || !purge.size || !Array.isArray(arr)) return arr;
+  return arr.filter(r => !(r && purge.has(`${key}:${r.id}`)));
+}
+
+// Áp dữ liệu 1 doc meta cloud (d) vào local.
+//   mode 'replace' : doc KHÔNG còn thay đổi local chưa đẩy → THAY THẾ local bằng cloud (cloud là chuẩn)
+//   mode 'merge'   : doc CÒN thay đổi local chưa đẩy (hoặc đang ở bước đọc-gộp trước khi ghi)
+//                    → GỘP cloud + local, giữ cả 2, rồi loại purgeIds
+// Kiểu gộp theo từng loại dữ liệu:
+//   - projects, customers, thauPhu, quyetToan : mảng có id → mergeDatasets() (tombstone + LWW)
+//   - hopDong   : object map theo key CT → _mergeHopDong() (LWW)
+//   - catItems  : per-item theo updatedAt → _mergeCatItems() + dựng lại mảng tên
+//   - cnRoles, ctYears : object không có timestamp → gộp nông, local đè cloud
+//   - users     : giữ mật khẩu local → _mergeUsersSafe()
+// Trả true nếu có áp dữ liệu.
+function _metaApply(docId, d, mode, purge) {
+  if (!d) return false;
+  const merge = mode === 'merge';
+  switch (docId) {
+    case 'meta_cong_trinh': {
+      if (!Array.isArray(d.projects)) return false;
+      let v = merge ? _purgeArr(mergeDatasets(load('projects_v1', []), d.projects), 'projects_v1', purge) : d.projects;
+      _memSet('projects_v1', v);
+      _refreshGlobal('projects_v1');
+      if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
+      return true;
+    }
+    case 'meta_khach_hang': {
+      if (!Array.isArray(d.customers)) return false;
+      let v = merge ? _purgeArr(mergeDatasets(load('customers_v1', []), d.customers), 'customers_v1', purge) : d.customers;
+      _memSet('customers_v1', v);
+      _refreshGlobal('customers_v1');
+      return true;
+    }
+    case 'meta_danh_muc': {
+      if (d.catItems && typeof d.catItems === 'object') {
+        const v = merge ? _mergeCatItems(load('cat_items_v1', {}), d.catItems) : d.catItems;
+        _memSet('cat_items_v1', v);
+        _applyCatItemArrays(v); // dựng lại cat_loai, cat_ncc... từ bản đã gộp/thay
+      }
+      if (d.cnRoles && typeof d.cnRoles === 'object') {
+        const v = merge ? { ...d.cnRoles, ...load('cat_cn_roles', {}) } : d.cnRoles;
+        _memSet('cat_cn_roles', v);
+        _refreshGlobal('cat_cn_roles');
+      }
+      if (d.ctYears && typeof d.ctYears === 'object') {
+        const v = merge ? { ...d.ctYears, ...load('cat_ct_years', {}) } : d.ctYears;
+        _memSet('cat_ct_years', v);
+        if (typeof cats !== 'undefined') cats.congTrinhYears = v;
+      }
+      return true;
+    }
+    case 'meta_tai_khoan': {
+      if (!Array.isArray(d.users)) return false;
+      let v;
+      if (merge) {
+        v = _mergeUsersSafe(load('users_v1', []), d.users);
+      } else {
+        // Thay theo cloud nhưng vá lại mật khẩu local nếu cloud thiếu
+        const pwById = new Map();
+        load('users_v1', []).forEach(u => { if (u && u.password) pwById.set(u.id || u.username, u.password); });
+        v = d.users.map(u => {
+          if (u && !u.password) {
+            const pw = pwById.get(u.id || u.username);
+            if (pw) return { ...u, password: pw };
+          }
+          return u;
+        });
+      }
+      _memSet('users_v1', v);
+      return true;
+    }
+    case 'meta_hop_dong': {
+      if (d.hopDong && typeof d.hopDong === 'object') {
+        let v = d.hopDong;
+        if (merge) {
+          v = _mergeHopDong(load('hopdong_v1', {}), d.hopDong);
+          if (purge && purge.size) Object.keys(v).forEach(k => { if (purge.has(`hopdong_v1:${k}`)) delete v[k]; });
+        }
+        _memSet('hopdong_v1', v);
+        _refreshGlobal('hopdong_v1');
+      }
+      if (Array.isArray(d.thauPhu)) {
+        const v = merge ? _purgeArr(mergeDatasets(load('thauphu_v1', []), d.thauPhu), 'thauphu_v1', purge) : d.thauPhu;
+        _memSet('thauphu_v1', v);
+        _refreshGlobal('thauphu_v1');
+      }
+      if (Array.isArray(d.quyetToan)) {
+        const v = merge ? _purgeArr(mergeDatasets(load('quyettoan_v1', []), d.quyetToan), 'quyettoan_v1', purge) : d.quyetToan;
+        _memSet('quyettoan_v1', v);
+        _refreshGlobal('quyettoan_v1');
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════════
+// [9] PUSH — đẩy local lên cloud DỰA TRÊN OUTBOX
+// ══════════════════════════════════════════════════════════════
+// Nguyên tắc an toàn (GĐ1 — gia cố đồng bộ):
+//   • Push ngầm (silent) chỉ đẩy ĐÚNG các doc đang nằm trong outbox (doc bẩn).
+//     Push thủ công (nút 🔄) và opts.allYears = đẩy đủ mọi năm × hạng mục + 5 meta.
+//   • Mỗi doc: ĐỌC cloud → GỘP vào local (loại purgeIds) → GHI. Đọc cloud lỗi
+//     (mạng, 403, 429, 500...) → doc đó FAIL, TUYỆT ĐỐI KHÔNG ghi đè, giữ nguyên outbox.
+//   • Doc ghi thành công → gỡ khỏi outbox, TRỪ KHI bị sửa thêm trong lúc push
+//     (lastTs > pushStartTs) → ở lại, lần sau đẩy tiếp.
+//   • Chỉ báo "✅ Đã đồng bộ" khi outbox rỗng. Còn lỗi → tự thử lại với backoff
+//     5s → 15s → 60s → 5 phút (không spam banner).
+// opts.silent   = true  → chạy ngầm, chỉ hiện banner khi lỗi (lần đầu của chuỗi lỗi)
+// opts.skipPull = true  → bỏ bước đọc-gộp cloud (ghi đè thẳng) — chỉ dùng khi CỐ Ý
+//                         ghi đè: khôi phục snapshot/sao lưu, reset mật khẩu mặc định
+// opts.allYears = true  → đẩy đủ mọi năm (dù silent) — dùng khi khôi phục
+// Trả về true nếu đẩy hết (không lỗi và outbox rỗng).
+
+let _pushRetryIdx   = 0;     // đang ở nấc backoff thứ mấy
+let _pushRetryTimer = null;  // hẹn giờ thử lại
+const _PUSH_RETRY_DELAYS = [5_000, 15_000, 60_000, 300_000];
+
+// Hẹn thử đẩy lại khi push lỗi (backoff tăng dần, tối đa 5 phút)
+function _schedulePushRetry() {
+  if (_outboxSize() === 0) { _pushRetryIdx = 0; return; }
+  clearTimeout(_pushRetryTimer);
+  const delay = _PUSH_RETRY_DELAYS[Math.min(_pushRetryIdx, _PUSH_RETRY_DELAYS.length - 1)];
+  _pushRetryIdx++;
+  console.log(`[Sync] ⏳ Sẽ tự thử đẩy lại sau ${delay / 1000}s (lần ${_pushRetryIdx})`);
+  _pushRetryTimer = setTimeout(async () => {
+    _pushRetryTimer = null;
+    if (_outboxSize() === 0) { _pushRetryIdx = 0; return; }
+    if (!fbReady()) return;
+    if (!navigator.onLine || isSyncing()) { _schedulePushRetry(); return; }
+    await pushChanges({ silent: true });
+  }, delay);
+}
+
+// Đẩy 1 doc năm: đọc → gộp → ghi. Lỗi → throw (doc FAIL). Trả về purgeIds đã đẩy.
+async function _pushYearDoc(t, skipPull) {
+  const { docId, yr, key, dateField } = t;
+  const purge = _purgeSetOf(docId);          // chụp purgeIds TẠI THỜI ĐIỂM này
+  // Doc do khôi phục đánh dấu (overwrite) → ghi đè như skipPull, không gộp cloud cũ vào
+  if (!skipPull && !_outboxIsOverwrite(docId)) {
+    const raw = await fsGet(docId);          // lỗi mạng/HTTP ≠ 404 → throw → KHÔNG ghi đè
+    if (raw) {
+      const cd = fsUnwrap(raw);
+      if (!cd || !Array.isArray(cd.records)) {
+        throw new Error(`doc ${docId} trên cloud không đúng định dạng — không dám ghi đè`);
+      }
+      _mergeYearIntoLocal(key, cd.records, purge);
+    } else {
+      // 404: doc chưa có trên cloud. Nếu local cũng trống thì khỏi tạo doc rỗng.
+      if (!fbYearCatPayload(yr, key, dateField).records.length) return [...purge];
+    }
+  }
+  await fsSet(docId, fbYearCatPayload(yr, key, dateField)); // lỗi → throw
+  return [...purge];
+}
+
+// Đẩy 1 doc meta: đọc → gộp → ghi. Lỗi → throw. Trả về purgeIds đã đẩy.
+async function _pushMetaDoc(docId, skipPull) {
+  const purge = _purgeSetOf(docId);
+  if (!skipPull && !_outboxIsOverwrite(docId)) {
+    const raw = await fsGet(docId);
+    let d = null;
+    if (raw) {
+      d = fsUnwrap(raw);
+      if (!d) throw new Error(`doc ${docId} trên cloud không đúng định dạng — không dám ghi đè`);
+    }
+    // meta_khach_hang chưa tồn tại → gộp với customers đời cũ nằm trong meta_cong_trinh
+    if (!d && docId === 'meta_khach_hang') {
+      const ct = fsUnwrap(await fsGet(fbDocMetaCT()));
+      if (ct && Array.isArray(ct.customers)) d = { customers: ct.customers };
+    }
+    if (d) _metaApply(docId, d, 'merge', purge);
+  }
+  await fsSet(docId, _metaPayload(docId));
+  return [...purge];
+}
+
 async function pushChanges(opts = {}) {
   const silent   = opts?.silent   ?? false;
   const skipPull = opts?.skipPull ?? false;
-  if (!fbReady()) { console.log('[Sync] Push bỏ qua — Firebase chưa cấu hình'); return; }
-  if (_syncPushing) { console.log('[Sync] Push bỏ qua — đang sync'); return; }
+  const allYears = opts?.allYears ?? false;
+  if (!fbReady()) { console.log('[Sync] Push bỏ qua — Firebase chưa cấu hình'); return false; }
+  if (_syncPushing) { console.log('[Sync] Push bỏ qua — đang sync'); return false; }
 
   _syncPushing = true;
+  // Mốc bắt đầu push (đồng hồ tăng nghiêm ngặt của outbox): doc nào bị sửa SAU mốc này
+  // sẽ không bị gỡ khỏi outbox dù lần ghi này thành công.
+  const pushStartTs = _outboxNow();
   _ensureSyncDot(); _setSyncDot('syncing');
   _setSyncState('syncing');
   if (!silent) showSyncBanner('⏳ Đang đẩy (push)...');
 
-  // Push ngầm: chỉ năm hiện tại (nhẹ). Push thủ công: tất cả năm.
-  // [FIX đồng bộ] opts.allYears = true → ép đẩy TẤT CẢ các năm dù đang silent.
-  // Bắt buộc dùng khi import file (JSON/Excel) chứa nhiều năm: nếu không, chỉ
-  // năm hiện tại được đẩy lên cloud → thiết bị khác không thấy các năm còn lại.
-  const _allYears = opts?.allYears ?? false;
-  const _curYr = String(activeYear || new Date().getFullYear());
-  // Gộp năm hiện tại + (các) năm thực sự vừa sửa (từ _dirtyYears) để không bỏ sót năm cũ
-  const _extraYrs = (typeof _dirtyYears !== 'undefined') ? [..._dirtyYears] : [];
-  const years  = (silent && !_allYears)
-    ? [...new Set([_curYr, ..._extraYrs])]
-    : _getAllLocalYears();
+  // ── Chọn danh sách doc cần đẩy ──
+  const full     = !silent || allYears;
+  const dirtyIds = _outboxList().map(r => r.docId);
+  const yearTargets = [];
+  const metaTargets = [];
+  const seen = new Set();
+  const addYear = docId => {
+    if (seen.has(docId)) return;
+    const t = _parseYearDocId(docId);
+    if (t) { seen.add(docId); yearTargets.push(t); }
+  };
+  // Doc lạ trong outbox (không thuộc cấu trúc B) → gỡ luôn để khỏi kẹt mãi
+  dirtyIds.forEach(id => {
+    if (!_META_DOCS.includes(id) && !_parseYearDocId(id)) {
+      console.warn('[Sync] Outbox có doc lạ, gỡ bỏ:', id);
+      _outboxClear(id, Infinity);
+    }
+  });
+  if (full) {
+    // Đẩy đủ: mọi năm local + năm của các doc bẩn (vd năm vừa trống sau khi xóa)
+    const years = new Set(_getAllLocalYears());
+    dirtyIds.forEach(id => { const t = _parseYearDocId(id); if (t) years.add(t.yr); });
+    [...years].sort().forEach(yr => {
+      _YEAR_CATS.forEach(({ cat, key, dateField }) => {
+        const docId = fbDocYearCat(parseInt(yr), cat);
+        const has = load(key, []).some(x => x && x[dateField] && String(x[dateField]).startsWith(String(yr)));
+        if (has || _outboxHas(docId)) addYear(docId);
+      });
+    });
+    metaTargets.push(..._META_DOCS);
+  } else {
+    dirtyIds.forEach(id => {
+      if (_META_DOCS.includes(id)) metaTargets.push(id);
+      else addYear(id);
+    });
+  }
 
-  // ── Lọc theo key đã đổi (chỉ áp dụng cho push ngầm) ──
-  // Push thủ công (silent=false) luôn đẩy đủ. Push ngầm: nếu biết key nào đổi
-  // thì chỉ đẩy đúng hạng mục + meta liên quan để tiết kiệm read/write.
-  const _hasDirty   = (typeof _dirtyKeys !== 'undefined' && _dirtyKeys.size > 0);
-  // allYears (import) → KHÔNG thu hẹp: đẩy đủ mọi hạng mục để khôi phục trọn vẹn
-  const _scoped     = silent && _hasDirty && !_allYears;
-  const _catsToPush = _scoped
-    ? _YEAR_CATS.filter(c => _dirtyKeys.has(c.key))
-    : _YEAR_CATS;
-  // Các key kích hoạt doc meta: dùng bảng ánh xạ GLOBAL _META_KEY_DOC (core.storage.js)
-  // thay cho danh sách cục bộ cũ — 1 nguồn duy nhất cho cả outbox lẫn push.
-  const _pushMeta = _scoped
-    ? [..._dirtyKeys].some(k => _isMetaKey(k))
-    : true;
-
-  console.log('[Sync] ▲ Push bắt đầu — năm:', years.join(', '),
-    '| hạng mục:', _catsToPush.map(c => c.cat).join(',') || '(none)',
-    '| meta:', _pushMeta ? 'có' : 'bỏ',
+  console.log('[Sync] ▲ Push bắt đầu —', full ? 'ĐẦY ĐỦ' : 'theo outbox',
+    '| doc năm:', yearTargets.map(t => t.docId).join(',') || '(none)',
+    '| meta:', metaTargets.join(',') || '(none)',
+    skipPull ? '| GHI ĐÈ (skipPull)' : '',
     '| device:', DEVICE_ID.slice(0, 8));
 
+  let ok = 0, fail = 0;
   try {
-    let ok = 0, fail = 0;
-
-    for (const yr of years) {
-      const yrInt = parseInt(yr);
-      // Ghi từng hạng mục theo năm (hoa_don, tien_ung, cham_cong, thiet_bi, thu_tien)
-      for (const { cat, key, dateField } of _catsToPush) {
-        const ys = String(yrInt);
-        const localRecs = load(key, []).filter(x => x[dateField] && x[dateField].startsWith(ys));
-        if (!localRecs.length) continue; // năm này không có dữ liệu hạng mục đó → bỏ qua
-        try {
-          // ── B1: đọc cloud hạng mục này, gộp vào local (tránh đè dữ liệu máy khác) ──
-          if (!skipPull) {
-            const cd = fsUnwrap(await fsGet(fbDocYearCat(yrInt, cat)));
-            if (cd && Array.isArray(cd.records)) {
-              if (key === 'cc_v2') {
-                _memSet('cc_v2', normalizeCC([...load('cc_v2', []), ...cd.records]));
-              } else {
-                _mergeKey(key, cd.records);
-                if (key === 'thu_v1') thuRecords = load('thu_v1', []);
-              }
-            }
-          }
-          // ── B2: ghi đè doc hạng mục bằng dữ liệu local đã gộp ──
-          const res = await fsSet(fbDocYearCat(yrInt, cat), fbYearCatPayload(yrInt, key, dateField));
-          if (res && res.fields) ok++;
-          else { fail++; console.warn(`[Sync] ✗ ${cat} ${yr} ghi lỗi`); }
-        } catch (e) {
-          console.warn(`[Sync] ✗ ${cat} ${yr} exception:`, e.message || e);
-          fail++;
-        }
-      }
-      console.log(`[Sync] ▲ Year ${yr} OK`);
-    }
-
-    // ── 4 doc danh mục dùng chung: đọc-gộp-ghi (bỏ qua nếu meta không đổi) ──
-    if (_pushMeta) {
+    for (const t of yearTargets) {
       try {
-        // GỘP (không thay thế) cloud vào local trước khi ghi, để KHÔNG làm mất
-        // record vừa thêm ở local (lỗi cũ: _pullMeta() thay thế → mất HĐ thầu phụ).
-        if (!skipPull) await _mergeMetaForPush();
-        const metas = [
-          [fbDocMetaCT(), fbMetaCTPayload()],
-          [fbDocMetaKH(), fbMetaKHPayload()],
-          [fbDocMetaDM(), fbMetaDMPayload()],
-          [fbDocMetaTK(), fbMetaTKPayload()],
-          [fbDocMetaHD(), fbMetaHDPayload()],
-        ];
-        for (const [docId, payload] of metas) {
-          const res = await fsSet(docId, payload);
-          if (!(res && res.fields)) console.warn(`[Sync] ✗ ${docId} ghi lỗi`);
-        }
+        const pushed = await _pushYearDoc(t, skipPull);
+        _outboxClear(t.docId, pushStartTs, pushed);
+        ok++;
       } catch (e) {
-        console.warn('[Sync] danh mục push lỗi:', e.message || e);
+        fail++;
+        console.warn(`[Sync] ✗ ${t.docId} lỗi — GIỮ trong outbox, KHÔNG ghi đè cloud:`, e.message || e);
       }
     }
+    for (const docId of metaTargets) {
+      try {
+        const pushed = await _pushMetaDoc(docId, skipPull);
+        _outboxClear(docId, pushStartTs, pushed);
+        ok++;
+      } catch (e) {
+        fail++;
+        console.warn(`[Sync] ✗ ${docId} lỗi — GIỮ trong outbox, KHÔNG ghi đè cloud:`, e.message || e);
+      }
+    }
+  } catch (e) {
+    fail++;
+    console.warn('[Sync] ▲ Push lỗi bất ngờ:', e);
+  } finally {
+    _syncPushing = false;
+  }
 
-    if (fail === 0) {
-      localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-      _setSyncDot('');
-      if (typeof _resetPending === 'function') _resetPending();
+  const remaining = _outboxSize();
+  if (fail === 0) {
+    _pushRetryIdx = 0;
+    clearTimeout(_pushRetryTimer); _pushRetryTimer = null;
+    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+    _setSyncDot('');
+    if (remaining === 0) {
       if (!silent) {
         _setSyncState('success');
         const hhmm = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
         showSyncBanner(`✅ Đã đồng bộ lúc ${hhmm}`, 3000);
-      } else if (typeof updateJbBtn === 'function') {
-        updateJbBtn();
+      } else {
+        _updateSyncBtnBadge();
+        if (typeof updateJbBtn === 'function') updateJbBtn();
       }
-      console.log(`[Sync] ▲ Push xong — ${ok} năm | device: ${DEVICE_ID.slice(0, 8)}`);
     } else {
-      _setSyncDot('error'); _setSyncState('error');
-      showSyncBanner('⚠️ Sync lỗi', 4000);
+      // Có thay đổi mới phát sinh TRONG lúc push → chưa báo ✅, hẹn đẩy tiếp ngay
+      _updateSyncBtnBadge();
+      if (typeof updateJbBtn === 'function') updateJbBtn();
+      schedulePush();
     }
-  } catch (e) {
-    console.warn('[Sync] ▲ Push lỗi toàn bộ:', e);
-    _setSyncDot('offline'); _setSyncState('error');
-    showSyncBanner('⚠️ Mất kết nối internet', 3000);
-  } finally {
-    _syncPushing = false;
+    console.log(`[Sync] ▲ Push xong — ${ok} doc | còn ${remaining} doc chờ | device: ${DEVICE_ID.slice(0, 8)}`);
+  } else {
+    _setSyncDot(navigator.onLine ? 'error' : 'offline'); _setSyncState('error');
+    // Chỉ hiện banner khi người dùng tự bấm, hoặc lần lỗi ĐẦU của 1 chuỗi (không spam)
+    if (!silent || _pushRetryIdx === 0) {
+      showSyncBanner(navigator.onLine
+        ? `⚠️ Sync lỗi ${fail} mục — dữ liệu vẫn giữ trong máy, app sẽ tự thử lại`
+        : '⚠️ Mất kết nối internet — dữ liệu vẫn giữ trong máy, sẽ đẩy khi có mạng', 5000);
+    }
+    console.warn(`[Sync] ▲ Push xong nhưng LỖI ${fail} doc (OK ${ok}) — còn ${remaining} doc trong outbox`);
+    _schedulePushRetry();
   }
+  return fail === 0 && remaining === 0;
 }
 
 // ══════════════════════════════════════════════════════════════
-// [10] PULL META — đọc 4 doc danh mục dùng chung, THAY THẾ local bằng cloud
-//   meta_cong_trinh · meta_danh_muc · meta_tai_khoan · meta_hop_dong
-//   (riêng users: lấy theo cloud nhưng vá lại mật khẩu local nếu cloud thiếu)
+// [10] PULL META — đọc 5 doc danh mục dùng chung
+//   meta_cong_trinh · meta_khach_hang · meta_danh_muc · meta_tai_khoan · meta_hop_dong
+//   • Doc KHÔNG bẩn  → THAY THẾ local bằng cloud (cloud là chuẩn)
+//   • Doc CÒN bẩn    → GỘP (không thay thế) + loại purgeIds, GIỮ outbox để push sau
+//   • Đọc lỗi (mạng/403/500...) → giữ nguyên local doc đó
 // ══════════════════════════════════════════════════════════════
 async function _pullMeta() {
   let changed = false;
-
-  // ── meta_cong_trinh: projects (công trình) — nguồn gốc của cat_ct ──
-  let _ctDoc = null;
-  try {
-    _ctDoc = fsUnwrap(await fsGet(fbDocMetaCT()));
-    if (_ctDoc && Array.isArray(_ctDoc.projects)) {
-      _memSet('projects_v1', _ctDoc.projects);
-      if (typeof projects !== 'undefined') projects = _ctDoc.projects;
-      if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
-      changed = true;
+  let ctDoc = null;
+  for (const docId of _META_DOCS) {
+    try {
+      let d = fsUnwrap(await fsGet(docId));
+      if (docId === 'meta_cong_trinh') ctDoc = d;
+      // meta_khach_hang chưa tồn tại → fallback customers cũ trong meta_cong_trinh (trước 19/06/2026)
+      if (!d && docId === 'meta_khach_hang' && ctDoc && Array.isArray(ctDoc.customers)) {
+        d = { customers: ctDoc.customers };
+      }
+      if (!d) continue;
+      if (_outboxIsOverwrite(docId)) {
+        console.log(`[Sync] ▼ ${docId} đang chờ ghi đè sau khôi phục → giữ nguyên local`);
+        continue;
+      }
+      const dirty = _outboxHas(docId);
+      if (dirty) console.log(`[Sync] ▼ ${docId} còn thay đổi chưa đẩy → GỘP thay vì thay thế`);
+      if (_metaApply(docId, d, dirty ? 'merge' : 'replace', dirty ? _purgeSetOf(docId) : null)) changed = true;
+    } catch (e) {
+      console.warn(`[Sync] ${docId} pull lỗi — giữ nguyên local:`, e.message || e);
     }
-  } catch (e) { console.warn('[Sync] meta_cong_trinh pull lỗi:', e.message || e); }
-
-  // ── meta_khach_hang: customers (Chủ đầu tư/CRM) — doc riêng (tách 19/06/2026) ──
-  // Ưu tiên doc mới; nếu cloud CHƯA có doc này thì fallback đọc customers cũ
-  // nằm trong meta_cong_trinh (dữ liệu trước khi tách) để không mất khách hàng.
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaKH()));
-    let custs = (d && Array.isArray(d.customers)) ? d.customers
-              : (_ctDoc && Array.isArray(_ctDoc.customers)) ? _ctDoc.customers
-              : null;
-    if (custs) {
-      _memSet('customers_v1', custs);
-      if (typeof customers !== 'undefined') customers = custs;
-      changed = true;
-    }
-  } catch (e) { console.warn('[Sync] meta_khach_hang pull lỗi:', e.message || e); }
-
-  // ── meta_danh_muc: catItems (source of truth), vai trò CN, năm theo CT ──
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaDM()));
-    if (d) {
-      if (d.catItems && typeof d.catItems === 'object') {
-        _memSet('cat_items_v1', d.catItems);
-        _applyCatItemArrays(d.catItems);
-      }
-      if (d.cnRoles && typeof d.cnRoles === 'object') {
-        _memSet('cat_cn_roles', d.cnRoles);
-        if (typeof cnRoles !== 'undefined') cnRoles = d.cnRoles;
-      }
-      if (d.ctYears && typeof d.ctYears === 'object') {
-        _memSet('cat_ct_years', d.ctYears);
-        if (typeof cats !== 'undefined') cats.congTrinhYears = d.ctYears;
-      }
-      changed = true;
-    }
-  } catch (e) { console.warn('[Sync] meta_danh_muc pull lỗi:', e.message || e); }
-
-  // ── meta_tai_khoan: users (vá mật khẩu local nếu cloud thiếu) ──
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaTK()));
-    if (d && Array.isArray(d.users)) {
-      const pwById = new Map();
-      load('users_v1', []).forEach(u => {
-        if (u && u.password) pwById.set(u.id || u.username, u.password);
-      });
-      const replaced = d.users.map(u => {
-        if (u && !u.password) {
-          const pw = pwById.get(u.id || u.username);
-          if (pw) return { ...u, password: pw };
-        }
-        return u;
-      });
-      _memSet('users_v1', replaced);
-      changed = true;
-    }
-  } catch (e) { console.warn('[Sync] meta_tai_khoan pull lỗi:', e.message || e); }
-
-  // ── meta_hop_dong: hợp đồng chính + thầu phụ ──
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaHD()));
-    if (d) {
-      if (d.hopDong && typeof d.hopDong === 'object') {
-        _memSet('hopdong_v1', d.hopDong);
-        if (typeof hopDongData !== 'undefined') hopDongData = d.hopDong;
-      }
-      if (Array.isArray(d.thauPhu)) {
-        _memSet('thauphu_v1', d.thauPhu);
-        if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = d.thauPhu;
-      }
-      if (Array.isArray(d.quyetToan)) {
-        _memSet('quyettoan_v1', d.quyetToan);
-        if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = d.quyetToan;
-      }
-      changed = true;
-    }
-  } catch (e) { console.warn('[Sync] meta_hop_dong pull lỗi:', e.message || e); }
-
-  if (changed) console.log('[Sync] ▼ danh mục đã thay thế theo cloud');
+  }
+  if (changed) console.log('[Sync] ▼ danh mục đã cập nhật theo cloud');
   return changed;
 }
 
 // ══════════════════════════════════════════════════════════════
-// [10b] MERGE META TRƯỚC KHI PUSH — GỘP cloud vào local (KHÔNG thay thế)
-// ──────────────────────────────────────────────────────────────
-// ⚠️ KHÁC BIỆT QUAN TRỌNG so với _pullMeta():
-//   • _pullMeta()        = THAY THẾ local bằng cloud (dùng cho PULL thật — cloud là chuẩn).
-//   • _mergeMetaForPush()= GỘP cloud + local, GIỮ cả 2 (dùng cho bước trước PUSH).
-//
-// LÝ DO RA ĐỜI (sửa lỗi mất dữ liệu): Trước đây bước "gộp cloud trước khi ghi"
-// trong pushChanges() lại gọi _pullMeta() — tức là THAY THẾ local bằng cloud cũ.
-// Khi user vừa thêm 1 HĐ thầu phụ / HĐ chính / công trình..., record mới chỉ có ở
-// local, CHƯA có trên cloud. _pullMeta() đọc cloud (chưa có record) rồi GHI ĐÈ local
-// → record mới bị xóa khỏi _mem ngay trước khi build payload → payload đẩy lại data
-// cũ lên cloud → record mới MẤT TRẮNG (F5 lại càng mất vì pull cloud không có nó).
-//
-// Hàm này gộp theo đúng kiểu dữ liệu của từng doc meta để KHÔNG bao giờ làm mất
-// thay đổi local (record vừa thêm) lẫn thay đổi từ máy khác (record chỉ có ở cloud):
-//   - projects, thauPhu : mảng có id+updatedAt+deletedAt → mergeDatasets() (LWW + tombstone)
-//   - hopDong           : object map theo key CT          → _mergeHopDong() (LWW)
-//   - catItems          : per-item theo updatedAt          → _mergeCatItems() + dựng lại mảng tên
-//   - cnRoles, ctYears  : object map không có timestamp     → gộp nông, local đè cloud (local mới nhất)
-//   - users             : giữ mật khẩu local                → _mergeUsersSafe()
-// ══════════════════════════════════════════════════════════════
-async function _mergeMetaForPush() {
-  // ── meta_cong_trinh: projects (mảng) ──
-  let _ctDoc = null;
-  try {
-    _ctDoc = fsUnwrap(await fsGet(fbDocMetaCT()));
-    if (_ctDoc && Array.isArray(_ctDoc.projects)) {
-      const merged = mergeDatasets(load('projects_v1', []), _ctDoc.projects);
-      _memSet('projects_v1', merged);
-      if (typeof projects !== 'undefined') projects = merged;
-    }
-  } catch (e) { console.warn('[Sync] merge-push meta_cong_trinh lỗi:', e.message || e); }
-
-  // ── meta_khach_hang: customers (doc riêng) — LWW + tombstone merge giống projects ──
-  // Fallback: nếu doc mới chưa có customers thì gộp với customers cũ trong meta_cong_trinh.
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaKH()));
-    const cloudCusts = (d && Array.isArray(d.customers)) ? d.customers
-                     : (_ctDoc && Array.isArray(_ctDoc.customers)) ? _ctDoc.customers
-                     : null;
-    if (cloudCusts) {
-      const mergedC = mergeDatasets(load('customers_v1', []), cloudCusts);
-      _memSet('customers_v1', mergedC);
-      if (typeof customers !== 'undefined') customers = mergedC;
-    }
-  } catch (e) { console.warn('[Sync] merge-push meta_khach_hang lỗi:', e.message || e); }
-
-  // ── meta_danh_muc: catItems (per-item), cnRoles + ctYears (object map) ──
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaDM()));
-    if (d) {
-      if (d.catItems && typeof d.catItems === 'object') {
-        const merged = _mergeCatItems(load('cat_items_v1', {}), d.catItems);
-        _memSet('cat_items_v1', merged);
-        _applyCatItemArrays(merged); // dựng lại cat_loai, cat_ncc... từ bản đã gộp
-      }
-      // cnRoles/ctYears không có timestamp từng key → gộp nông: cloud làm nền,
-      // local ghi đè (local là thay đổi user vừa thực hiện, ưu tiên giữ).
-      if (d.cnRoles && typeof d.cnRoles === 'object') {
-        const merged = { ...d.cnRoles, ...load('cat_cn_roles', {}) };
-        _memSet('cat_cn_roles', merged);
-        if (typeof cnRoles !== 'undefined') cnRoles = merged;
-      }
-      if (d.ctYears && typeof d.ctYears === 'object') {
-        const merged = { ...d.ctYears, ...load('cat_ct_years', {}) };
-        _memSet('cat_ct_years', merged);
-        if (typeof cats !== 'undefined') cats.congTrinhYears = merged;
-      }
-    }
-  } catch (e) { console.warn('[Sync] merge-push meta_danh_muc lỗi:', e.message || e); }
-
-  // ── meta_tai_khoan: users (gộp an toàn, giữ mật khẩu local) ──
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaTK()));
-    if (d && Array.isArray(d.users)) {
-      const merged = _mergeUsersSafe(load('users_v1', []), d.users);
-      _memSet('users_v1', merged);
-    }
-  } catch (e) { console.warn('[Sync] merge-push meta_tai_khoan lỗi:', e.message || e); }
-
-  // ── meta_hop_dong: hopDong (object map) + thauPhu (mảng) ──
-  try {
-    const d = fsUnwrap(await fsGet(fbDocMetaHD()));
-    if (d) {
-      if (d.hopDong && typeof d.hopDong === 'object') {
-        const merged = _mergeHopDong(load('hopdong_v1', {}), d.hopDong);
-        _memSet('hopdong_v1', merged);
-        if (typeof hopDongData !== 'undefined') hopDongData = merged;
-      }
-      if (Array.isArray(d.thauPhu)) {
-        const merged = mergeDatasets(load('thauphu_v1', []), d.thauPhu);
-        _memSet('thauphu_v1', merged);
-        if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = merged;
-      }
-      if (Array.isArray(d.quyetToan)) {
-        const merged = mergeDatasets(load('quyettoan_v1', []), d.quyetToan);
-        _memSet('quyettoan_v1', merged);
-        if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = merged;
-      }
-    }
-  } catch (e) { console.warn('[Sync] merge-push meta_hop_dong lỗi:', e.message || e); }
-}
-
-// ══════════════════════════════════════════════════════════════
-// [11] PULL — tải cloud về, THAY THẾ local (danh_muc + từng năm)
+// [11] PULL — tải cloud về (danh mục + từng năm)
+//   • Doc năm KHÔNG bẩn → THAY THẾ slice năm đó bằng cloud (cloud là chuẩn)
+//   • Doc năm CÒN bẩn   → GỘP + loại purgeIds (không bao giờ đè dữ liệu chưa đẩy)
 // ══════════════════════════════════════════════════════════════
 // yr=null → pull tất cả năm local; yr=số → pull đúng năm đó
 async function pullChanges(yr, callback, opts = {}) {
@@ -638,12 +724,12 @@ async function pullChanges(yr, callback, opts = {}) {
   if (!silent) showSyncBanner('⬇ Đang tải (pull)...');
 
   try {
-    // ── Danh mục dùng chung (4 doc meta) ──
+    // ── Danh mục dùng chung (5 doc meta) ──
     let _catsChanged = false;
     try { _catsChanged = await _pullMeta(); }
     catch (e) { console.warn('[Sync] meta pull lỗi:', e.message || e); }
 
-    // ── Dữ liệu từng năm: đọc từng hạng mục, THAY THẾ slice năm đó bằng cloud ──
+    // ── Dữ liệu từng năm ──
     let totalRecords = 0;
 
     // CC cần normalize (gom theo tuần+công trình) sau khi thay slice năm
@@ -656,28 +742,36 @@ async function pullChanges(yr, callback, opts = {}) {
       });
       const normalized = normalizeCC([...kept, ...(cloudCC || [])]);
       _memSet('cc_v2', normalized);
-      if (typeof ccData !== 'undefined') ccData = normalized;
-      totalRecords += (cloudCC || []).length;
+      _refreshGlobal('cc_v2');
     };
 
     for (const yrStr of years) {
       for (const { cat, key } of _YEAR_CATS) {
+        const docId = fbDocYearCat(parseInt(yrStr), cat);
         try {
-          const d = fsUnwrap(await fsGet(fbDocYearCat(parseInt(yrStr), cat)));
+          const d = fsUnwrap(await fsGet(docId)); // lỗi mạng/HTTP → throw → giữ nguyên local
           // doc chưa có / sai định dạng → giữ nguyên local hạng mục đó (an toàn)
           if (!d || !Array.isArray(d.records)) continue;
-          if (key === 'cc_v2') {
+          if (_outboxIsOverwrite(docId)) {
+            // Khôi phục chưa đẩy xong → local là chuẩn, KHÔNG gộp/thay bằng cloud cũ
+            console.log(`[Sync] ▼ ${docId} đang chờ ghi đè sau khôi phục → giữ nguyên local`);
+            continue;
+          } else if (_outboxHas(docId)) {
+            // Còn thay đổi local CHƯA đẩy → KHÔNG thay thế (sẽ mất) → GỘP, giữ outbox cho push sau
+            console.log(`[Sync] ▼ ${docId} còn thay đổi chưa đẩy → GỘP thay vì thay thế`);
+            _mergeYearIntoLocal(key, d.records, _purgeSetOf(docId));
+          } else if (key === 'cc_v2') {
             replaceCC(d.records, yrStr);
           } else {
             _replaceYearData(key, d.records, yrStr);
-            if (key === 'thu_v1') thuRecords = load('thu_v1', []);
-            totalRecords += d.records.length;
+            _refreshGlobal(key);
           }
+          totalRecords += d.records.length;
         } catch (e) {
-          console.warn(`[Sync] Pull ${cat} ${yrStr} lỗi:`, e.message || e);
+          console.warn(`[Sync] Pull ${docId} lỗi — giữ nguyên local:`, e.message || e);
         }
       }
-      console.log(`[Sync] ▼ Năm ${yrStr} đã thay thế theo cloud`);
+      console.log(`[Sync] ▼ Năm ${yrStr} đã cập nhật theo cloud`);
     }
 
     if (!silent) hideSyncBanner();
@@ -713,7 +807,7 @@ function schedulePush() {
     _pushTimer = null;
     if (isSyncing()) { _pushTimer = setTimeout(schedulePush, 3_000); return; }
     if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
-      // skipPull:false → đẩy có gộp cloud trước (an toàn khi nhiều máy cùng ghi 1 năm)
+      // Push ngầm theo outbox, có đọc-gộp cloud trước khi ghi
       await pushChanges({ silent: true });
     }
   }, 800); // ~tức thì — gộp các thao tác gõ liên tiếp
@@ -740,7 +834,8 @@ async function manualSync() {
   _sBtns.forEach(b => { b.disabled = true; b.style.opacity = '.6'; });
 
   try {
-    // B0: nếu còn thay đổi chưa đẩy → đẩy trước (vì pull giờ THAY THẾ, sẽ ghi đè local)
+    // B0: còn doc chưa đẩy → đẩy trước. (Kể cả khi đẩy lỗi, pull ở B1 cũng chỉ GỘP
+    // các doc còn bẩn chứ không thay thế → không mất dữ liệu.)
     if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
       cancelScheduledPush();
       await pushChanges({ silent: true });
@@ -760,7 +855,7 @@ async function manualSync() {
     if (typeof _reloadGlobals === 'function') _reloadGlobals();
     else if (typeof clearAllCache === 'function') clearAllCache();
 
-    // B3: Push (đẩy lên cả year doc + danh_muc)
+    // B3: Push (đẩy đủ mọi năm × hạng mục + 5 meta, có đọc-gộp)
     await pushChanges({ silent: false });
 
     if (typeof resetCatNamesMigrated === 'function') resetCatNamesMigrated();
@@ -780,8 +875,11 @@ async function manualSync() {
 function processQueue() { /* no-op: sync theo batch qua manualSync / schedulePush */ }
 
 // ══════════════════════════════════════════════════════════════
-// [15] FLUSH ON HIDE — đẩy nốt dữ liệu khi tab bị ẩn/đóng
+// [15] FLUSH ON HIDE — đẩy nốt dữ liệu khi tab bị ẩn/đóng (best-effort)
 // (chống mất dữ liệu trên mobile khi khóa màn hình / tắt trình duyệt)
+// Trước đây dùng skipPull:true (ghi đè thẳng cloud → xóa dữ liệu máy khác). Nay push
+// THƯỜNG (có đọc-gộp). Nếu chưa kịp đẩy xong thì dữ liệu vẫn an toàn trong outbox
+// (IDB) → lần mở app sau tự đẩy nốt trước khi pull.
 // ══════════════════════════════════════════════════════════════
 let _lastFlushTs = 0; // giới hạn: tối đa 1 lần / 10s
 (function() {
@@ -791,8 +889,9 @@ let _lastFlushTs = 0; // giới hạn: tối đa 1 lần / 10s
     if (isSyncing()) return;
     if (Date.now() - _lastFlushTs < 10_000) return;
     _lastFlushTs = Date.now();
-    console.log('[Sync] ⚡ Flush on hide — có', _pendingChanges, 'thay đổi chưa sync');
-    pushChanges({ silent: true, skipPull: true });
+    console.log('[Sync] ⚡ Flush on hide — còn', _pendingChanges, 'doc chưa đẩy');
+    cancelScheduledPush();
+    pushChanges({ silent: true });
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) _flushOnHide(); });
   window.addEventListener('pagehide', _flushOnHide);
@@ -804,8 +903,9 @@ let _lastFlushTs = 0; // giới hạn: tối đa 1 lần / 10s
 window.addEventListener('online', () => {
   if (!fbReady()) return;
   if (typeof _pendingChanges !== 'undefined' && _pendingChanges > 0) {
-    console.log('[Sync] 🟢 Có mạng lại — đẩy nốt', _pendingChanges, 'thay đổi');
+    console.log('[Sync] 🟢 Có mạng lại — đẩy nốt', _pendingChanges, 'doc');
     if (typeof toast === 'function') toast('🟢 Có mạng lại — đang đồng bộ...', 'info');
+    _pushRetryIdx = 0;
     schedulePush();
   }
 });

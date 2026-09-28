@@ -76,8 +76,21 @@ function init() {
 
   // Topbar luôn cố định — không dùng compact effect khi cuộn
 
-  // Tải dữ liệu mới nhất từ cloud (nếu đã có Bin ID)
-  gsLoadAll(function(data) {
+  // Tải dữ liệu mới nhất từ cloud.
+  // [GĐ1] Nếu outbox còn dữ liệu chưa đẩy từ phiên trước (vd lưu lúc mất mạng rồi tắt
+  // app) → ĐẨY TRƯỚC rồi mới pull. Dù đẩy lỗi, pull cũng chỉ GỘP các doc còn bẩn chứ
+  // không thay thế → không mất dữ liệu.
+  const _startPull = (cb) => {
+    const _outN = (typeof _outboxSize === 'function') ? _outboxSize() : 0;
+    if (_outN > 0 && fbReady() && typeof pushChanges === 'function') {
+      console.log('[Init] Outbox còn', _outN, 'doc chưa đẩy từ phiên trước → đẩy trước khi pull');
+      pushChanges({ silent: true }).catch(e => console.warn('[Init] Đẩy outbox lỗi:', e))
+        .finally(() => gsLoadAll(cb));
+    } else {
+      gsLoadAll(cb);
+    }
+  };
+  _startPull(function(data) {
     // [FIX Lỗi 1] Reload dữ liệu từ local (IDB) — LUÔN chạy, kể cả khi cloud
     // pull trả về null (vd: bị chặn 2h sau khi nhập JSON, hoặc đang có pull khác
     // chạy song song). Trước đây dòng `if(!data) return` khiến app bỏ qua luôn
@@ -547,8 +560,10 @@ window._dataReady = false;
   // Từ giờ CC invoices được tính động qua buildInvoices(), không lưu vào storage
   const legacyCCCount = invoices.filter(i => i.ccKey).length;
   if (legacyCCCount > 0) {
+    // purge: xóa cứng có chủ đích → báo outbox để bước gộp cloud không kéo chúng về lại
+    const _legacyIds = invoices.filter(i => i.ccKey).map(i => i.id);
     invoices = invoices.filter(i => !i.ccKey);
-    save('inv_v3', invoices);
+    save('inv_v3', invoices, { purge: _legacyIds });
     console.log(`[Migration] Đã xóa ${legacyCCCount} HĐ CC cũ khỏi inv_v3`);
   }
 
@@ -603,8 +618,11 @@ window._dataReady = false;
   // (ở chế độ mobile, _routeFromHash() tự thoát sớm — xem chú thích trong hàm)
   initHashRouter();
 
-  // Reset pending counter sau init (tránh migration/startup saves làm badge sai)
-  if (typeof _resetPending === 'function') _resetPending();
+  // [GĐ1 gia cố đồng bộ] ĐÃ BỎ lời gọi _resetPending() ở đây. Trước đây nó xóa sạch
+  // bộ đếm thay đổi chưa đẩy lúc khởi động → dữ liệu lưu lúc mạng yếu bị "quên" rồi bị
+  // pull đè mất. Nay bộ đếm suy ra từ outbox (lưu bền IDB); migration khởi động không
+  // đổi dữ liệu thật thì bảng bóng không thấy khác biệt → badge không bị sai.
+  if (typeof _outboxOnChange === 'function') _outboxOnChange();
 
   applyNavPermissions();
   renderProjectsPage();

@@ -471,9 +471,19 @@ async function doProjectClear() {
       }
     });
 
-    // Bước 3: Ghi toàn bộ thay đổi vào storage (IDB + _mem + pending sync)
+    // Bước 3: Ghi toàn bộ thay đổi vào storage (IDB + _mem + outbox)
+    // Đây là XÓA CỨNG có chủ đích → báo purge (id/key đã bị bỏ) để bước gộp cloud
+    // khi push không kéo dữ liệu vừa xóa "sống lại".
     Object.entries(keyChanges).forEach(([key, val]) => {
-      save(key, val);
+      const before = load(key, Array.isArray(val) ? [] : {});
+      let purge;
+      if (Array.isArray(val)) {
+        const after = new Set(val.map(r => r && r.id));
+        purge = (before || []).map(r => r && r.id).filter(id => id != null && !after.has(id));
+      } else {
+        purge = Object.keys(before || {}).filter(k => !(k in val));
+      }
+      save(key, val, { purge });
     });
 
     // Bước 4: Reload globals và re-render tab hiện tại
@@ -481,21 +491,24 @@ async function doProjectClear() {
     if (typeof renderActiveTab === 'function') renderActiveTab();
 
     // Bước 5: Push lên cloud để đồng bộ sang mọi thiết bị
+    // pushChanges không throw nữa mà trả false khi còn doc chưa đẩy được (dữ liệu vẫn
+    // nằm an toàn trong outbox, app tự thử lại theo backoff)
+    let pushedAll = false;
     if (typeof fbReady === 'function' && fbReady() && typeof pushChanges === 'function') {
       try {
-        await pushChanges({ silent: false });
+        pushedAll = await pushChanges({ silent: false });
       } catch (e) {
         console.warn('[ProjectClear] Push cloud lỗi:', e);
-        // Không block user — data đã xóa local, cloud sẽ sync khi có mạng
-        toast('⚠️ Đã xóa local nhưng chưa đồng bộ cloud — nhấn Sync để thử lại', 'warning');
       }
     }
 
     closeProjectClearModal();
-    toast(
-      `✅ Đã xóa ${checkedIds.length} hạng mục của "${projectName}" và đồng bộ cloud`,
-      'success'
-    );
+    if (pushedAll) {
+      toast(`✅ Đã xóa ${checkedIds.length} hạng mục của "${projectName}" và đồng bộ cloud`, 'success');
+    } else {
+      // Không block user — data đã xóa local, outbox giữ lệnh xóa, cloud sẽ nhận khi đẩy được
+      toast(`⚠️ Đã xóa ${checkedIds.length} hạng mục ở máy này — cloud chưa nhận hết, app sẽ tự thử đẩy lại`, 'warning');
+    }
 
   } catch (e) {
     console.error('[ProjectClear] Lỗi:', e);

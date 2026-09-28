@@ -102,6 +102,11 @@ async function _doResetAll() {
     // 1. Auto-backup
     if (typeof _snapshotNow === 'function') _snapshotNow('pre-reset-all');
 
+    // 1b. [GĐ1] Reset = CỐ Ý ghi đè toàn bộ → bỏ mọi thay đổi đang chờ đẩy trong outbox
+    //     (nếu để lại, lần push sau sẽ đẩy ngược dữ liệu cũ trước reset lên cloud).
+    if (typeof cancelScheduledPush === 'function') cancelScheduledPush();
+    if (typeof _outboxClearAll === 'function') _outboxClearAll();
+
     // 2. Thu thập tất cả năm TRƯỚC KHI xóa
     const yearsToWipe = (typeof _getAllLocalYears === 'function')
       ? _getAllLocalYears()
@@ -169,6 +174,8 @@ async function _doResetAll() {
     //    Vì pull đời mới = REPLACE local bằng cloud, nên ghi tombstone/rỗng lên cloud
     //    sẽ khiến mọi thiết bị khác pull về thành trống. Ghi THẲNG bằng fsSet
     //    (không qua pushChanges) để tránh merge kéo lại bản ghi cũ từ cloud.
+    //    ⚠️ Đây là chỗ DUY NHẤT (cùng khôi phục snapshot/sao lưu) được phép ghi đè cloud
+    //    KHÔNG điều kiện — vì mục đích chính là xóa sạch.
     if (typeof fbReady === 'function' && fbReady() &&
         typeof fsSet === 'function' && typeof fbDocYearCat === 'function') {
       if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang xóa dữ liệu trên Cloud...');
@@ -191,7 +198,12 @@ async function _doResetAll() {
           ? await _wipeOrphanCloudDocs() : 0;
         console.log('[ResetAll] ✅ Cloud B-wiped, xóa', nDel, 'doc rác — years:', yearsToWipe.join(', '));
       } catch (e) {
-        console.warn('[ResetAll] Cloud wipe lỗi (bỏ qua):', e);
+        // fsSet giờ THROW khi HTTP lỗi (trước đây nuốt lỗi im lặng) → báo rõ cho người dùng
+        console.warn('[ResetAll] Cloud wipe lỗi:', e);
+        if (typeof toast === 'function') {
+          setTimeout(() => toast('⚠️ Xóa dữ liệu trên cloud chưa hoàn tất (' + (e.message || e)
+            + ') — máy khác có thể vẫn thấy dữ liệu cũ. Hãy thử Reset lại khi mạng ổn định.', 'error'), 3200);
+        }
       }
     }
 
@@ -273,7 +285,10 @@ async function _doResetAll() {
     }
 
     if (typeof hideSyncBanner === 'function') hideSyncBanner();
-    if (typeof _resetPending === 'function') _resetPending(); // badge về 0 sau reset
+    // [GĐ1] Dữ liệu vừa bị gán thẳng vào _mem/IDB (không qua save) → dựng lại bảng bóng
+    // cho khớp, và xóa outbox lần nữa (phòng thao tác nào đó chen vào giữa chừng).
+    if (typeof _shadowRebuildAll === 'function') _shadowRebuildAll();
+    if (typeof _outboxClearAll === 'function') _outboxClearAll(); // badge về 0 sau reset
     toast('✅ Đã reset toàn bộ dữ liệu', 'success');
 
     // 9. Refresh UI

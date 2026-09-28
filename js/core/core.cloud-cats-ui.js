@@ -88,25 +88,86 @@ function getFsCounter()  { return { reads: _fsReads, writes: _fsWrites }; }
 function fsUrl(docId) {
   return `${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`;
 }
-function fsGet(docId) {
+// Tạo Error có kèm mã HTTP (status) + body lỗi Firestore (nếu đọc được)
+async function _fsHttpError(r, what) {
+  let body = null;
+  try { body = await r.json(); } catch {}
+  const st  = body && body.error && body.error.status ? ` ${body.error.status}` : '';
+  const err = new Error(`[Firestore] ${what} lỗi HTTP ${r.status}${st}`);
+  err.status = r.status;
+  err.body   = body;
+  return err;
+}
+
+// ĐỌC 1 doc.
+//   • HTTP 200  → trả raw doc (như cũ, caller dùng fsUnwrap())
+//   • HTTP 404  → trả null  (doc chưa tồn tại — hợp lệ)
+//   • Lỗi mạng / HTTP khác (403, 429, 500...) → THROW Error có .status
+// ⚠️ Trước đây hàm này KHÔNG kiểm tra r.ok → lỗi 500/429 bị coi như "doc trống" →
+//    push tưởng cloud rỗng rồi GHI ĐÈ mất toàn bộ dữ liệu cloud. Caller giờ phải
+//    xử lý throw: trong push → doc đó FAIL, không ghi; trong pull → giữ nguyên local.
+async function fsGet(docId) {
   _fsCountRead();
-  return fetch(fsUrl(docId)).then(r=>r.json());
+  let r;
+  try {
+    r = await fetch(fsUrl(docId));
+  } catch (e) {
+    const err = new Error(`[Firestore] Mất kết nối khi đọc ${docId}`);
+    err.status = 0; err.cause = e;
+    throw err;
+  }
+  if (r.status === 404) return null;
+  if (!r.ok) throw await _fsHttpError(r, `đọc ${docId}`);
+  return r.json();
 }
-function fsSet(docId, payload) {
+
+// GHI (upsert) 1 doc. HTTP ≠ 2xx hoặc lỗi mạng → THROW (caller coi doc đó FAIL).
+async function fsSet(docId, payload) {
   _fsCountWrite();
-  // PATCH = upsert (tạo hoặc cập nhật)
-  return fetch(`${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(fsWrap(payload))
-  }).then(r=>r.json());
+  let r;
+  try {
+    // PATCH = upsert (tạo hoặc cập nhật)
+    r = await fetch(`${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fsWrap(payload))
+    });
+  } catch (e) {
+    const err = new Error(`[Firestore] Mất kết nối khi ghi ${docId}`);
+    err.status = 0; err.cause = e;
+    throw err;
+  }
+  if (!r.ok) throw await _fsHttpError(r, `ghi ${docId}`);
+  return r.json();
 }
-// Xóa hẳn 1 doc khỏi Firestore (dùng khi dọn doc rác cấu trúc cũ)
+
+// Xóa hẳn 1 doc khỏi Firestore (dùng khi dọn doc rác cấu trúc cũ).
+// Giữ kiểu trả về cũ: true/false (không throw). 404 = đã không còn → coi là thành công.
 function fsDelete(docId) {
   _fsCountWrite();
   return fetch(`${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}`, { method: 'DELETE' })
-    .then(r => r.ok)
+    .then(r => r.ok || r.status === 404)
     .catch(() => false);
+}
+
+// Liệt kê TÊN mọi doc trong cpct_data (chỉ lấy tên — mask 1 field không tồn tại để
+// không tải nội dung nặng). Dùng khi khôi phục cần biết cloud đang có những doc năm nào.
+// Lỗi → throw.
+async function fsListDocIds() {
+  const ids = [];
+  let pageToken = '';
+  for (let guard = 0; guard < 50; guard++) {
+    _fsCountRead();
+    const q = [`key=${FB_CONFIG.apiKey}`, 'pageSize=300', 'mask.fieldPaths=khongco'];
+    if (pageToken) q.push(`pageToken=${encodeURIComponent(pageToken)}`);
+    const r = await fetch(`${FS_BASE()}?${q.join('&')}`);
+    if (!r.ok) throw await _fsHttpError(r, 'liệt kê cpct_data');
+    const j = await r.json();
+    (j.documents || []).forEach(d => ids.push(String(d.name || '').split('/').pop()));
+    if (!j.nextPageToken) break;
+    pageToken = j.nextPageToken;
+  }
+  return ids;
 }
 
 // ── Dọn doc rác cấu trúc cũ ──────────────────────────────────
@@ -786,7 +847,7 @@ function _setSyncState(state) {
       syncBtn.title = 'Đang đồng bộ...';
       syncBtn.dataset.state = 'syncing';
     } else if (state === 'success') {
-      // Badge sẽ tự cập nhật qua _resetPending() → _updateSyncBtnBadge()
+      // Badge suy ra từ outbox (_pendingChanges = số doc chưa đẩy) → vẽ lại
       _updateSyncBtnBadge();
     } else if (state === 'error') {
       syncBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">warning</span>';

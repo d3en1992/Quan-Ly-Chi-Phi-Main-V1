@@ -112,10 +112,14 @@ const DB_KEY_MAP = {
 // ── In-memory runtime cache — nguồn đọc duy nhất sau khi dbInit() chạy xong ──
 const _mem = {};
 
-// Internal write: cập nhật _mem + IDB — KHÔNG trigger cloud sync
+// Internal write: cập nhật _mem + IDB — KHÔNG trigger cloud sync.
+// Dùng cho dữ liệu đến từ cloud (pull/merge) và chuẩn hóa nội bộ (migration, dựng lại
+// danh mục...) → KHÔNG phải thay đổi của người dùng → chỉ cập nhật "bảng bóng" (_shadow)
+// cho khớp, KHÔNG đánh dấu outbox.
 function _memSet(k, v) {
   _mem[k] = v;
   _dbSave(k, v).catch(e => console.warn('[IDB] _memSet lỗi:', k, e));
+  if (typeof _shadowSet === 'function') _shadowSet(k, v);
 }
 
 // Dedup array by id — keep record with highest updatedAt per id.
@@ -183,6 +187,9 @@ async function dbInit() {
     }
     // Nạp hàng chờ outbox vào RAM (_outboxMem) để các hàm khác đọc ĐỒNG BỘ được
     await _outboxLoad();
+    // Dựng "bảng bóng" từ dữ liệu vừa nạp — mốc để save() so sánh cái gì thật sự đổi
+    _shadowRebuildAll();
+    _outboxOnChange();
     console.log('[IDB] dbInit hoàn tất — IDB-primary mode');
   } catch(e) {
     console.warn('[IDB] dbInit lỗi:', e);
@@ -191,18 +198,15 @@ async function dbInit() {
 
 
 // ══ PENDING CHANGES COUNTER ════════════════════════════════
-// Đặt gần save() để tránh temporal dependency khi save() được gọi.
-// Đếm số lần save() thực sự thay đổi data kể từ lần push cuối.
-// Hiện trên nút 🔄 Sync để user biết còn bao nhiêu thay đổi chưa cloud.
+// ⚠️ Từ GĐ1 (gia cố đồng bộ): 3 biến dưới đây KHÔNG còn tự đếm nữa mà được SUY RA
+// từ outbox (lưu bền trong IDB) qua _outboxOnChange(). Giữ lại tên cũ để code cũ
+// (badge, main.js, mobile.core.js...) không vỡ:
+//   _pendingChanges = số document cloud đang chờ đẩy (số dòng outbox)
+//   _dirtyKeys      = các key local thuộc những doc đó
+//   _dirtyYears     = các năm có doc năm đang chờ đẩy
 
 let _pendingChanges = 0;
-
-// Tập các key đã thay đổi kể từ lần push cuối — để push ngầm chỉ đẩy đúng
-// doc bị ảnh hưởng (tiết kiệm read/write), thay vì đẩy lại toàn bộ.
 const _dirtyKeys = new Set();
-
-// Tập các năm thực sự bị sửa (dựa trên updatedAt của bản ghi vừa nhập).
-// Dùng để push ngầm gộp thêm năm cũ ngoài activeYear, tránh bỏ sót dữ liệu năm khác.
 const _dirtyYears = new Set();
 
 // Mapping key → field chứa ngày của từng loại dữ liệu (để trích năm)
@@ -312,7 +316,10 @@ function _outboxPersist(docId) {
 // Đánh dấu 1 document cloud là "bẩn" (còn thay đổi local chưa đẩy).
 // purgeIds (tùy chọn): các id bị XÓA CỨNG khỏi mảng local — khi push phải loại
 // hẳn chúng khỏi bản gộp với cloud, nếu không bước gộp sẽ kéo chúng "hồi sinh".
-function _outboxMark(docId, purgeIds) {
+// opts.overwrite = true: doc do KHÔI PHỤC (import JSON / sao lưu cloud) đánh dấu →
+//   khi đẩy thì GHI ĐÈ (không gộp cloud cũ vào), khi pull thì giữ nguyên local.
+//   Cờ này giữ đến khi doc được đẩy thành công.
+function _outboxMark(docId, purgeIds, opts) {
   if (!docId) return;
   const now  = _outboxNow();
   const prev = _outboxMem.get(docId);
@@ -321,6 +328,7 @@ function _outboxMark(docId, purgeIds) {
     : { docId, firstTs: now, lastTs: now, count: 0, purgeIds: [] };
   row.lastTs = now;
   row.count  = (row.count || 0) + 1;
+  if (opts && opts.overwrite) row.overwrite = true;
   if (Array.isArray(purgeIds) && purgeIds.length) {
     const set = new Set(row.purgeIds);
     purgeIds.forEach(id => { if (id != null && id !== '') set.add(String(id)); });
@@ -385,25 +393,37 @@ async function _outboxLoad() {
   }
 }
 
-function _incPending() {
-  _pendingChanges++;
+// Gọi mỗi khi outbox đổi → tính lại 3 biến tương thích + vẽ lại badge nút Sync
+function _outboxOnChange() {
+  _pendingChanges = _outboxMem.size;
+  _dirtyKeys.clear();
+  _dirtyYears.clear();
+  for (const docId of _outboxMem.keys()) {
+    const m = /^y(\d{4})_(.+)$/.exec(docId);
+    if (m) {
+      _dirtyYears.add(m[1]);
+      for (const k in _YEAR_KEY_CAT) if (_YEAR_KEY_CAT[k] === m[2]) _dirtyKeys.add(k);
+    } else {
+      for (const k in _META_KEY_DOC) if (_META_KEY_DOC[k] === docId) _dirtyKeys.add(k);
+    }
+  }
   _updateSyncBtnBadge();
 }
 
-// Gọi sau push thành công, hoặc sau startup để reset bộ đếm
-function _resetPending() {
-  _pendingChanges = 0;
-  _dirtyKeys.clear();
-  _dirtyYears.clear();
-  _updateSyncBtnBadge();
-}
+// [Tương thích] Trước đây tăng bộ đếm RAM. Nay bộ đếm suy ra từ outbox → chỉ vẽ lại.
+function _incPending() { _outboxOnChange(); }
+
+// [Tương thích — KHÔNG còn xóa gì] Trước đây xóa sạch bộ đếm RAM (sau push/lúc khởi
+// động) — chính là nguyên nhân mất dấu dữ liệu chưa đẩy. Nay outbox chỉ được gỡ
+// từng doc khi đẩy THÀNH CÔNG (_outboxClear) hoặc khi reset/khôi phục (_outboxClearAll).
+function _resetPending() { _outboxOnChange(); }
 
 function _updateSyncBtnBadge() {
   const btn = document.getElementById('sync-btn');
   if (!btn) return;
   if (_pendingChanges > 0) {
     btn.textContent = `☁️ ${_pendingChanges}`;
-    btn.title = `${_pendingChanges} thay đổi chưa đồng bộ — nhấn để sync ngay`;
+    btn.title = `${_pendingChanges} mục dữ liệu chưa đồng bộ lên cloud — nhấn để sync ngay`;
     btn.dataset.state = 'pending';
   } else {
     const lastTs = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0');
@@ -442,8 +462,107 @@ const _CAT_STAMP_KIND = {
   thu_v1: 'thu', thauphu_v1: 'thauphu', hopdong_v1: 'hopdong',
 };
 
-// opts.skipSync = true → ghi local (IDB + _mem) nhưng KHÔNG tăng pending và KHÔNG lên lịch push
-// Dùng cho cập nhật nội bộ như heartbeat session (lastActive) — không phải thay đổi nghiệp vụ
+// ══ BẢNG BÓNG (_shadow) — phát hiện CHÍNH XÁC cái gì vừa đổi ══════════════
+// ⚠️ BẪY: code hay sửa mảng TẠI CHỖ rồi save cùng mảng đó (vd invoices.push(x);
+// save('inv_v3', invoices)) → _mem[k] cũ và v mới là CÙNG 1 object, không so được.
+// Nên giữ 1 bản "chữ ký" riêng của lần lưu trước:
+//   • Key theo năm (inv_v3, cc_v2, ...): Map(id → { sig, doc })
+//       sig = updatedAt|deletedAt  (record không có updatedAt → dùng JSON rút gọn)
+//       doc = doc năm mà record thuộc về (theo trường ngay/fromDate), vd 'y2025_hoa_don'
+//     ⇒ Mọi sửa đổi nghiệp vụ PHẢI cập nhật updatedAt (mkRecord/mkUpdate/softDeleteRecord)
+//       — sửa tại chỗ không đổi updatedAt coi như "chuẩn hóa nội bộ", không đẩy cloud.
+//   • Các key còn lại (meta, danh mục, hợp đồng...): chuỗi JSON của lần lưu trước.
+// Bảng bóng được dựng ở dbInit() và cập nhật (không đánh dấu) mỗi khi _memSet chạy
+// (dữ liệu từ cloud / chuẩn hóa nội bộ không phải thay đổi của người dùng).
+const _shadow = {};
+
+// Chữ ký 1 record theo năm
+function _recSig(r) {
+  if (r.updatedAt) return `${r.updatedAt}|${r.deletedAt || ''}`;
+  let s = '';
+  try { s = JSON.stringify(r); } catch { s = String(Math.random()); }
+  return `j${s.length}|${s.slice(0, 200)}|${s.slice(-200)}`;
+}
+// Doc năm của 1 record (null nếu record chưa có ngày → không thuộc doc nào)
+function _recYearDoc(k, r) {
+  const f = _YEAR_DATE_FIELD[k];
+  const d = r && (r[f] || (k === 'cc_v2' ? r.from : null));
+  return (d && String(d).length >= 4) ? _yearDocId(k, String(d).slice(0, 4)) : null;
+}
+// Dựng bóng cho 1 key (không đánh dấu gì)
+function _shadowBuild(k, v) {
+  if (_YEAR_KEY_CAT[k]) {
+    const m = new Map();
+    (Array.isArray(v) ? v : []).forEach(r => {
+      if (!r || r.id == null) return;
+      m.set(String(r.id), { sig: _recSig(r), doc: _recYearDoc(k, r) });
+    });
+    return m;
+  }
+  // null / undefined / [] / {} đều coi là "rỗng" như nhau — tránh báo "có thay đổi"
+  // khi key chưa từng lưu (null) được lưu lần đầu bằng giá trị mặc định rỗng.
+  if (v == null) return '∅';
+  if (Array.isArray(v) && !v.length) return '∅';
+  if (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length) return '∅';
+  try { return JSON.stringify(v); } catch { return ''; }
+}
+function _shadowSet(k, v) {
+  if (!_SYNC_DATA_KEYS.has(k)) return;
+  _shadow[k] = _shadowBuild(k, v);
+}
+function _shadowRebuildAll() {
+  _SYNC_DATA_KEYS.forEach(k => { _shadow[k] = _shadowBuild(k, _mem[k]); });
+}
+
+// So v (giá trị vừa lưu) với bảng bóng → đánh dấu outbox đúng các doc bị ảnh hưởng.
+// purge (tùy chọn): danh sách id (hoặc key hợp đồng với hopdong_v1) mà người gọi
+//   CỐ Ý XÓA CỨNG khỏi mảng → ghi vào purgeIds để lúc push/gộp cloud không hồi sinh.
+//   ⚠️ Id biến mất khỏi mảng mà KHÔNG nằm trong purge → CHỈ đánh dấu doc bẩn, KHÔNG
+//   purge. Lý do an toàn: mảng global có thể bị cũ (chưa nạp lại sau khi gộp cloud)
+//   → nếu tự suy ra "xóa cứng" sẽ xóa nhầm dữ liệu máy khác trên cloud. Không purge
+//   thì lần push sau bước gộp cloud tự trả record về (tự lành, như hành vi cũ).
+// Trả về số doc vừa đánh dấu.
+function _shadowDiffMark(k, v, purge) {
+  const purgeSet = new Set((purge || []).map(String));
+  const marks = new Map(); // docId → Set(purgeIds)
+  const mark = (doc, pid) => {
+    if (!doc) return;
+    if (!marks.has(doc)) marks.set(doc, new Set());
+    if (pid != null) marks.get(doc).add(pid);
+  };
+
+  if (_YEAR_KEY_CAT[k]) {
+    const prev = _shadow[k] instanceof Map ? _shadow[k] : new Map();
+    const next = _shadowBuild(k, v);
+    next.forEach((cur, id) => {
+      const p = prev.get(id);
+      if (!p) { mark(cur.doc); return; }                    // record mới
+      if (p.sig !== cur.sig || p.doc !== cur.doc) {
+        mark(cur.doc);                                      // record bị sửa
+        if (p.doc && p.doc !== cur.doc) mark(p.doc);        // đổi ngày sang năm khác → doc năm cũ cũng bẩn
+      }
+    });
+    prev.forEach((p, id) => {
+      if (next.has(id)) return;                             // id biến mất khỏi mảng
+      mark(p.doc, purgeSet.has(id) ? id : null);
+    });
+    _shadow[k] = next;
+  } else {
+    const doc  = _META_KEY_DOC[k];
+    const next = _shadowBuild(k, v);
+    if (doc && next !== _shadow[k]) mark(doc);
+    if (doc) purgeSet.forEach(id => mark(doc, `${k}:${id}`)); // meta: purgeId dạng "key:id"
+    _shadow[k] = next;
+  }
+
+  marks.forEach((pids, doc) => _outboxMark(doc, [...pids]));
+  return marks.size;
+}
+
+// opts.skipSync = true → ghi local (IDB + _mem) nhưng KHÔNG đánh dấu outbox, KHÔNG lên lịch push
+//   Dùng cho cập nhật nội bộ như heartbeat session (lastActive) — không phải thay đổi nghiệp vụ
+// opts.purge = [id...] → các id (hopdong_v1: key) người gọi CỐ Ý XÓA CỨNG khỏi mảng
+//   (thùng rác xóa vĩnh viễn, xóa theo công trình...) — xem _shadowDiffMark()
 function save(k, v, opts) {
   if (typeof stampCatIds === 'function' && _CAT_STAMP_KIND[k] && v) {
     const kind = _CAT_STAMP_KIND[k];
@@ -451,31 +570,22 @@ function save(k, v, opts) {
     else Object.values(v).forEach(r => r && typeof r === 'object' && stampCatIds(r, kind));
   }
   _mem[k] = v;
+  // Lưu ý: phần đồng bộ của _dbSave (gán id/updatedAt cho record thiếu) chạy NGAY
+  // tại đây, trước khi so bảng bóng bên dưới → record mới luôn có id để so.
   _dbSave(k, v).catch(e => console.warn('[IDB] save lỗi:', k, e));
   if (_INV_CACHE_KEYS.has(k) && typeof clearInvoiceCache === 'function') clearInvoiceCache();
-  if (!opts?.skipSync && _SYNC_DATA_KEYS.has(k)) {
-    _incPending();
-    _dirtyKeys.add(k); // ghi nhớ key này đã đổi → push ngầm chỉ đẩy doc liên quan
+  if (!_SYNC_DATA_KEYS.has(k)) return;
+  if (opts?.skipSync) { _shadowSet(k, v); return; }
 
-    // Ghi nhận các năm thực sự bị sửa (để push ngầm không bỏ sót dữ liệu năm cũ)
-    // Chỉ quét record có updatedAt mới trong vài giây gần đây (vừa từ mkRecord/mkUpdate)
-    const _yf = _YEAR_DATE_FIELD[k];
-    if (_yf && Array.isArray(v)) {
-      const now = Date.now();
-      v.forEach(r => {
-        const ts = (r && (r.updatedAt || r.createdAt)) || 0;
-        if (now - ts <= 5000) {
-          const d = r && r[_yf];
-          if (d && String(d).length >= 4) _dirtyYears.add(String(d).slice(0, 4));
-        }
-      });
-    }
+  // So với bảng bóng → đánh dấu outbox (lưu bền IDB) đúng các doc cloud bị ảnh hưởng.
+  // Không có gì đổi thật (vd migration chạy lại) → không đánh dấu, badge không nhảy.
+  const n = _shadowDiffMark(k, v, opts?.purge);
+  if (!n) return;
 
-    // Online 100%: cố đẩy cloud gần như tức thì. Nếu mất mạng → vẫn lưu local
-    // nhưng nhắc user là chưa đẩy được (tránh ngộ nhận đã đồng bộ).
-    if (!navigator.onLine) _warnOfflineSave();
-    if (typeof schedulePush === 'function') schedulePush();
-  }
+  // Online 100%: cố đẩy cloud gần như tức thì. Nếu mất mạng → vẫn lưu local + outbox
+  // (không mất), nhắc user là chưa đẩy được (tránh ngộ nhận đã đồng bộ).
+  if (!navigator.onLine) _warnOfflineSave();
+  if (typeof schedulePush === 'function') schedulePush();
 }
 
 // Nhắc "mất mạng" tối đa 1 lần / 10s để khỏi spam

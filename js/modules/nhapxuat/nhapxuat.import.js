@@ -636,11 +636,12 @@ function _applyImport() {
   if (typeof cancelScheduledPush === 'function') cancelScheduledPush();
   if (typeof _clearQueue       === 'function') _clearQueue();
   if (fbReady() && typeof pushChanges === 'function') {
-    console.log('[Import] ✔ stamped updatedAt=' + _applyNow + ' · force push skipPull');
-    // [FIX đồng bộ] allYears:true → đẩy TẤT CẢ các năm vừa import lên cloud
-    // (file Excel có thể chứa nhiều năm). Thiếu cờ này → thiết bị khác chỉ thấy
-    // năm hiện tại, mất dữ liệu các năm còn lại.
-    pushChanges({ silent: true, skipPull: true, allYears: true });
+    console.log('[Import] ✔ stamped updatedAt=' + _applyNow + ' · push theo outbox (có gộp)');
+    // [GĐ1] Trước đây: skipPull + allYears = GHI ĐÈ THẲNG mọi năm → xóa mất dữ liệu máy
+    // khác vừa nhập cùng năm. Nay: mỗi save() ở trên đã đánh dấu outbox ĐÚNG các doc năm/meta
+    // bị ảnh hưởng (kể cả năm cũ) → push thường chỉ đẩy các doc đó, có đọc-gộp cloud.
+    // Record import đã được stamp updatedAt mới nhất nên luôn thắng khi gộp.
+    pushChanges({ silent: true });
   }
 
   // ── 6. Toast + Log ─────────────────────────────────────────

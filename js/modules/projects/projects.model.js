@@ -66,6 +66,7 @@ function _isValidProject(p) {
 function cleanupInvalidProjects(badNames) {
   const badSet = new Set((badNames || []).map(n => (n || '').trim()));
   const before = projects.length;
+  const idsBefore = projects.map(p => p.id);
   // Giữ lại:
   //  - soft-deleted (không xóa hard)
   //  - valid project KHÔNG trùng tên danh mục
@@ -77,7 +78,10 @@ function cleanupInvalidProjects(badNames) {
     return !canDeleteProject(p.id); // trùng tên danh mục: chỉ xóa khi rỗng (không có dữ liệu)
   });
   if (projects.length < before) {
-    _saveProjects();
+    // Xóa cứng có chủ đích → purge, để lần gộp cloud sau không kéo project rác về lại
+    // (không purge thì mỗi lần mở app lại dọn + đẩy lại mãi)
+    const idsAfter = new Set(projects.map(p => p.id));
+    _saveProjects({ purge: idsBefore.filter(id => id && !idsAfter.has(id)) });
     console.log(`[cleanupProjects] Đã xóa ${before - projects.length} project không hợp lệ khỏi projects_v1`);
   }
 }
@@ -107,8 +111,9 @@ let projects = [];
 //  INTERNAL
 // ══════════════════════════════
 
-function _saveProjects() {
-  save('projects_v1', projects);
+// opts (tùy chọn) truyền thẳng cho save() — vd { purge: [id...] } khi xóa cứng project
+function _saveProjects(opts) {
+  save('projects_v1', projects, opts);
   // Realtime: refresh dropdowns nhập liệu
   if (typeof refreshEntryDropdowns === 'function') refreshEntryDropdowns();
 }
@@ -297,7 +302,8 @@ function _rekeyHopDongOnRename(id, oldName, newName) {
     delete hopDongData[oldName];
     hopDongData[id].projectId = id;
     hopDongData[id].updatedAt = Date.now();
-    save('hopdong_v1', hopDongData);
+    // Key tên CT cũ bị bỏ → purge để gộp cloud không kéo key cũ về lại
+    save('hopdong_v1', hopDongData, { purge: [oldName] });
   }
 }
 

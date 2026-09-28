@@ -267,51 +267,21 @@ function _trashRestore(compositeId) {
   renderThungRac();
 }
 
-// ── ĐẨY LỆNH XÓA VĨNH VIỄN LÊN CLOUD (ghi đè thẳng, KHÔNG gộp lại) ────────────
-// VÌ SAO CẦN RIÊNG (đây là chỗ sửa lỗi "xóa rồi vẫn hồi về"):
-//   save() ở core.storage.js sau khi lưu sẽ TỰ ĐỘNG lên lịch một lần push "thường".
-//   Lần push thường đó có bước B1 = ĐỌC cloud rồi GỘP (merge) ngược vào local.
-//   Bản ghi vừa bị xóa HẲN khỏi mảng local nhưng TRÊN CLOUD vẫn còn (kèm deletedAt)
-//   → bước gộp KÉO NGƯỢC nó về local → ghi lại lên cloud → bản ghi "sống lại"
-//   trong thùng rác ngay khi F5 / đồng bộ.
-//   Ở đây ta HUỶ lần push thường đó, rồi tự GHI ĐÈ từng document cloud bằng dữ liệu
-//   local hiện tại (đã bỏ bản ghi xóa) — KHÔNG đọc-gộp cloud trước. Nhờ vậy lệnh xóa
-//   thật sự thắng, kể cả khi slice của một năm trở thành rỗng sau khi xóa.
-async function _trashPushPurge() {
-  // Huỷ lần push "thường" (có bước gộp) mà save() vừa lên lịch
-  if (typeof cancelScheduledPush === 'function') cancelScheduledPush();
-
-  // Offline / chưa cấu hình Firebase: chỉ giữ thay đổi ở local, không đẩy được
-  if (typeof fbReady !== 'function' || !fbReady()) {
-    if (typeof _resetPending === 'function') _resetPending();
-    return;
-  }
-
-  try {
-    // Tất cả năm đang có dữ liệu local (gồm cả năm vừa trở nên trống sau khi xóa)
-    const years = (typeof _getAllLocalYears === 'function')
-      ? _getAllLocalYears()
-      : [String((typeof activeYear !== 'undefined' && activeYear) || new Date().getFullYear())];
-
-    // GHI ĐÈ từng hạng mục theo năm bằng dữ liệu local hiện tại (đã loại bản ghi xóa).
-    // Không gộp cloud → lệnh xóa "thắng" tuyệt đối, kể cả khi records rỗng.
-    for (const yr of years) {
-      const yrInt = parseInt(yr);
-      for (const { cat, key, dateField } of _YEAR_CATS) {
-        await fsSet(fbDocYearCat(yrInt, cat), fbYearCatPayload(yrInt, key, dateField));
-      }
-    }
-    // Ghi đè meta hợp đồng (HĐ chính + thầu phụ) — cho trường hợp xóa vĩnh viễn hợp đồng
-    await fsSet(fbDocMetaHD(), fbMetaHDPayload());
-
-    if (typeof _resetPending === 'function') _resetPending();
-    if (typeof LAST_SYNC_KEY !== 'undefined') localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-    if (typeof _updateSyncBtnBadge === 'function') _updateSyncBtnBadge();
-    console.log('[Trash] ✅ Đã ghi đè cloud sau khi xóa vĩnh viễn — bản ghi sẽ không hồi về');
-  } catch (e) {
-    console.warn('[Trash] Ghi đè cloud lỗi:', e);
-    if (typeof toast === 'function') toast('⚠️ Đã xóa ở máy này nhưng đẩy cloud lỗi — thử bấm 🔄 Sync', 'error');
-  }
+// ── ĐẨY LỆNH XÓA VĨNH VIỄN LÊN CLOUD ────────────────────────────────────────────
+// LỊCH SỬ (lỗi 9.11 "xóa rồi vẫn hồi về"): push thường có bước ĐỌC cloud rồi GỘP vào
+//   local. Bản ghi vừa xóa HẲN khỏi mảng local nhưng cloud vẫn còn → bước gộp kéo nó
+//   về lại → ghi lên cloud → "sống lại". Bản cũ của hàm này né bằng cách GHI ĐÈ THẲNG
+//   mọi doc năm + meta HĐ, KHÔNG đọc-gộp — nhưng như vậy lại XÓA MẤT dữ liệu máy khác
+//   vừa đẩy lên cùng doc đó (và tốn rất nhiều lượt ghi).
+// CÁCH MỚI (GĐ1): các hàm xóa vĩnh viễn gọi save(k, v, { purge:[id...] }) → outbox ghi
+//   nhớ purgeIds cho đúng doc chứa bản ghi. Push thường ĐỌC-GỘP cloud rồi LOẠI các
+//   purgeIds trước khi ghi → lệnh xóa thắng, mà dữ liệu máy khác vẫn giữ nguyên.
+//   Chỉ đẩy đúng doc bị ảnh hưởng. Mất mạng → purgeIds nằm trong outbox (IDB), có
+//   mạng lại / mở app lần sau sẽ tự đẩy nốt.
+// Hàm giữ tên cũ để không phải sửa nơi gọi; giờ chỉ yêu cầu đẩy ngay theo outbox.
+function _trashPushPurge() {
+  if (typeof fbReady !== 'function' || !fbReady()) return;
+  if (typeof schedulePush === 'function') schedulePush();
 }
 
 // ── Xóa vĩnh viễn 1 bản ghi ───────────────────────────────────────────────────
@@ -322,29 +292,29 @@ function _trashHardDelete(compositeId) {
   if (type === 'hoadon') {
     invoices = invoices.filter(i => String(i.id) !== String(id));
     clearInvoiceCache();
-    save('inv_v3', invoices);
+    save('inv_v3', invoices, { purge: [id] });
     let _tv1 = load('trash_v1', []);
     _tv1 = _tv1.filter(i => String(i.id) !== String(id));
     save('trash_v1', _tv1);
   } else if (type === 'chamcong') {
     ccData = ccData.filter(r => String(r.id) !== String(id));
     clearInvoiceCache();
-    save('cc_v2', ccData);
+    save('cc_v2', ccData, { purge: [id] });
   } else if (type === 'tienung') {
     ungRecords = ungRecords.filter(r => String(r.id) !== String(id));
-    save('ung_v1', ungRecords);
+    save('ung_v1', ungRecords, { purge: [id] });
   } else if (type === 'thietbi') {
     tbData = tbData.filter(r => String(r.id) !== String(id));
-    save('tb_v1', tbData);
+    save('tb_v1', tbData, { purge: [id] });
   } else if (type === 'thutien') {
     thuRecords = thuRecords.filter(r => String(r.id) !== String(id));
-    save('thu_v1', thuRecords);
+    save('thu_v1', thuRecords, { purge: [id] });
   } else if (type === 'hopdong-chinh') {
     delete hopDongData[id];
-    save('hopdong_v1', hopDongData);
+    save('hopdong_v1', hopDongData, { purge: [id] });
   } else if (type === 'hopdong-tp') {
     thauPhuContracts = thauPhuContracts.filter(r => String(r.id) !== String(id));
-    save('thauphu_v1', thauPhuContracts);
+    save('thauphu_v1', thauPhuContracts, { purge: [id] });
   } else { return; }
 
   _trashPushPurge();
@@ -363,7 +333,7 @@ function _trashEmptyCurrentTab() {
     const ids = new Set(recs.map(r => String(r.id)));
     invoices = invoices.filter(r => !ids.has(String(r.id)));
     clearInvoiceCache();
-    save('inv_v3', invoices);
+    save('inv_v3', invoices, { purge: [...ids] });
     let _tv1 = load('trash_v1', []);
     _tv1 = _tv1.filter(i => !ids.has(String(i.id)));
     save('trash_v1', _tv1);
@@ -371,28 +341,29 @@ function _trashEmptyCurrentTab() {
     const ids = new Set(recs.map(r => String(r.id)));
     ccData = ccData.filter(r => !ids.has(String(r.id)));
     clearInvoiceCache();
-    save('cc_v2', ccData);
+    save('cc_v2', ccData, { purge: [...ids] });
   } else if (type === 'tienung') {
     const ids = new Set(recs.map(r => String(r.id)));
     ungRecords = ungRecords.filter(r => !ids.has(String(r.id)));
-    save('ung_v1', ungRecords);
+    save('ung_v1', ungRecords, { purge: [...ids] });
   } else if (type === 'thietbi') {
     const ids = new Set(recs.map(r => String(r.id)));
     tbData = tbData.filter(r => !ids.has(String(r.id)));
-    save('tb_v1', tbData);
+    save('tb_v1', tbData, { purge: [...ids] });
   } else if (type === 'thutien') {
     const ids = new Set(recs.map(r => String(r.id)));
     thuRecords = thuRecords.filter(r => !ids.has(String(r.id)));
-    save('thu_v1', thuRecords);
+    save('thu_v1', thuRecords, { purge: [...ids] });
   } else if (type === 'hopdong') {
     // Xóa HĐ chính
-    recs.filter(r => r._trashLoai === 'Chính').forEach(r => { delete hopDongData[r._trashKey]; });
-    save('hopdong_v1', hopDongData);
+    const hdKeys = recs.filter(r => r._trashLoai === 'Chính').map(r => r._trashKey);
+    hdKeys.forEach(k => { delete hopDongData[k]; });
+    save('hopdong_v1', hopDongData, { purge: hdKeys });
     // Xóa HĐ thầu phụ
     const tpIds = new Set(recs.filter(r => r._trashLoai === 'Thầu phụ').map(r => String(r.id)));
     if (tpIds.size) {
       thauPhuContracts = thauPhuContracts.filter(r => !tpIds.has(String(r.id)));
-      save('thauphu_v1', thauPhuContracts);
+      save('thauphu_v1', thauPhuContracts, { purge: [...tpIds] });
     }
   }
 
@@ -412,7 +383,7 @@ function _trashEmptyAll() {
   if (delInvIds.size) {
     invoices = invoices.filter(r => !delInvIds.has(String(r.id)));
     clearInvoiceCache();
-    save('inv_v3', invoices);
+    save('inv_v3', invoices, { purge: [...delInvIds] });
     save('trash_v1', []);
   }
   // Chấm công
@@ -420,36 +391,35 @@ function _trashEmptyAll() {
   if (delCCIds.size) {
     ccData = ccData.filter(r => !delCCIds.has(String(r.id)));
     clearInvoiceCache();
-    save('cc_v2', ccData);
+    save('cc_v2', ccData, { purge: [...delCCIds] });
   }
   // Tiền ứng
   const delUngIds = new Set((ungRecords || []).filter(r => r.deletedAt).map(r => String(r.id)));
   if (delUngIds.size) {
     ungRecords = ungRecords.filter(r => !delUngIds.has(String(r.id)));
-    save('ung_v1', ungRecords);
+    save('ung_v1', ungRecords, { purge: [...delUngIds] });
   }
   // Thiết bị
   const delTBIds = new Set((tbData || []).filter(r => r.deletedAt).map(r => String(r.id)));
   if (delTBIds.size) {
     tbData = tbData.filter(r => !delTBIds.has(String(r.id)));
-    save('tb_v1', tbData);
+    save('tb_v1', tbData, { purge: [...delTBIds] });
   }
   // Thu tiền
   const delThuIds = new Set((thuRecords || []).filter(r => r.deletedAt).map(r => String(r.id)));
   if (delThuIds.size) {
     thuRecords = thuRecords.filter(r => !delThuIds.has(String(r.id)));
-    save('thu_v1', thuRecords);
+    save('thu_v1', thuRecords, { purge: [...delThuIds] });
   }
   // HĐ chính
-  Object.keys(hopDongData || {}).forEach(k => {
-    if (hopDongData[k].deletedAt) delete hopDongData[k];
-  });
-  save('hopdong_v1', hopDongData);
+  const delHdKeys = Object.keys(hopDongData || {}).filter(k => hopDongData[k] && hopDongData[k].deletedAt);
+  delHdKeys.forEach(k => { delete hopDongData[k]; });
+  save('hopdong_v1', hopDongData, { purge: delHdKeys });
   // HĐ thầu phụ
   const delTPIds = new Set((thauPhuContracts || []).filter(r => r.deletedAt).map(r => String(r.id)));
   if (delTPIds.size) {
     thauPhuContracts = thauPhuContracts.filter(r => !delTPIds.has(String(r.id)));
-    save('thauphu_v1', thauPhuContracts);
+    save('thauphu_v1', thauPhuContracts, { purge: [...delTPIds] });
   }
 
   _trashPushPurge();

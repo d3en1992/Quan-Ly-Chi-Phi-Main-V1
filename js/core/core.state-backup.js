@@ -634,11 +634,47 @@ async function importJSONFull(data) {
 
     await Promise.all(writes);
 
+    // Step 3b: [GĐ1] Dữ liệu vừa gán thẳng vào _mem (không qua save) → dựng lại bảng bóng.
+    // Outbox cũ (thay đổi trước khi khôi phục) bị BỎ — khôi phục là cố ý ghi đè toàn bộ.
+    // Sau đó ĐÁNH DẤU mọi doc cần ghi đè vào outbox (lưu bền IDB): nếu push bên dưới
+    // lỗi giữa chừng thì sau khi tải lại app vẫn biết còn doc nào chưa lên cloud, và
+    // pull sẽ không thay thế chúng bằng dữ liệu cloud cũ.
+    if (typeof _shadowRebuildAll === 'function') _shadowRebuildAll();
+    if (typeof _outboxClearAll === 'function') _outboxClearAll();
+    if (typeof fbReady === 'function' && fbReady() && typeof _outboxMark === 'function') {
+      const docIds = new Set();
+      // (a) Doc năm có dữ liệu trong bản khôi phục
+      if (typeof _YEAR_CATS !== 'undefined') {
+        _YEAR_CATS.forEach(({ cat, key, dateField }) => {
+          (load(key, []) || []).forEach(r => {
+            const d = r && r[dateField];
+            if (d && String(d).length >= 4) docIds.add(fbDocYearCat(String(d).slice(0, 4), cat));
+          });
+        });
+      }
+      // (b) Doc năm ĐANG CÓ trên cloud nhưng bản khôi phục KHÔNG có dữ liệu hạng mục đó
+      //     → phải ghi RỖNG lên, nếu không cloud giữ lại record phát sinh sau ngày sao lưu.
+      try {
+        const ids = await fsListDocIds();
+        ids.forEach(id => { if (typeof _parseYearDocId === 'function' && _parseYearDocId(id)) docIds.add(id); });
+      } catch (e) {
+        console.warn('[Import] Không liệt kê được doc cloud — chỉ ghi đè các năm có dữ liệu:', e.message || e);
+      }
+      // (c) 5 doc meta
+      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong']
+        .forEach(id => docIds.add(id));
+      // overwrite:true → nếu phải đẩy bù sau khi tải lại app, doc này vẫn được GHI ĐÈ
+      // (không gộp dữ liệu cloud cũ vào — đúng ý nghĩa "khôi phục")
+      docIds.forEach(id => _outboxMark(id, null, { overwrite: true }));
+    }
+
     // Step 4: Block pull for 2 h after reload — prevent cloud from overwriting fresh import
     localStorage.setItem('_blockPullUntil', String(Date.now() + 2 * 60 * 60 * 1000));
 
     // Step 5: Push to cloud — skip inner pull so we overwrite cloud cleanly.
-    // pushChanges() ghi theo cấu trúc B (mỗi năm × hạng mục + 4 meta doc).
+    // ⚠️ skipPull:true = GHI ĐÈ KHÔNG ĐIỀU KIỆN — chỉ được phép ở khôi phục/reset (cố ý).
+    // pushChanges() ghi theo cấu trúc B (mỗi năm × hạng mục + 5 meta doc), gồm cả các
+    // doc năm đã đánh dấu ở Step 3b dù trống.
     if (typeof fbReady === 'function' && fbReady()) {
       try {
         _syncPulling = false;
@@ -646,12 +682,16 @@ async function importJSONFull(data) {
         // [FIX đồng bộ] allYears:true → đẩy TẤT CẢ các năm trong file JSON lên
         // cloud (không chỉ năm hiện tại). Nếu thiếu cờ này, thiết bị khác chỉ
         // thấy năm hiện tại, mất hết dữ liệu các năm còn lại.
-        await pushChanges({ silent: true, skipPull: true, allYears: true });
-        console.log('[Import] ✓ Push cloud hoàn tất sau import (tất cả năm)');
+        const allOk = await pushChanges({ silent: true, skipPull: true, allYears: true });
+        console.log(allOk
+          ? '[Import] ✓ Push cloud hoàn tất sau import (tất cả năm)'
+          : '[Import] ⚠ Push cloud chưa xong hết — outbox giữ lại, app tự đẩy tiếp sau khi tải lại');
       } catch(e) {
         console.warn('[Import] Push cloud lỗi (sẽ sync lại sau reload):', e);
       }
     }
+    // Chờ mọi lần ghi outbox xuống IDB xong rồi mới tải lại trang (không mất dấu)
+    if (typeof _outboxQueue !== 'undefined') { try { await _outboxQueue; } catch(_) {} }
 
     // Step 6: Reload — dbInit reads fresh IDB, _reloadGlobals rebuilds everything
     // [FIX Lỗi 2] File JSON có thể chứa NHIỀU năm. Đặt cờ để sau khi reload,

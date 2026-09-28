@@ -475,8 +475,15 @@ function delCCWeekById(id, fromDate, ct) {
 function delCCWorker(wid,name){
   if(!confirm(`Xóa "${name}" khỏi tuần này?`)) return;
   const w=ccData.find(r=>r.id===wid);
-  if(w){ w.workers=w.workers.filter(wk=>wk.name!==name); if(!w.workers.length) ccData=ccData.filter(r=>r.id!==wid); }
-  clearInvoiceCache(); save('cc_v2',ccData); renderCCHistory(); renderCCTLTMini(); toast('Đã xóa');
+  const purge=[];
+  if(w){
+    w.workers=w.workers.filter(wk=>wk.name!==name);
+    // Sửa tại chỗ → PHẢI cập nhật updatedAt để đồng bộ nhận ra thay đổi (và thắng khi gộp với cloud)
+    w.updatedAt=Date.now(); w.deviceId=DEVICE_ID;
+    // Tuần hết công nhân → xóa cứng cả tuần: báo purge để gộp cloud không kéo tuần này về lại
+    if(!w.workers.length){ ccData=ccData.filter(r=>r.id!==wid); purge.push(wid); }
+  }
+  clearInvoiceCache(); save('cc_v2',ccData,{purge}); renderCCHistory(); renderCCTLTMini(); toast('Đã xóa');
 }
 
 // ─── export ────────────────────────────────────────────────────────

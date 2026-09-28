@@ -277,11 +277,13 @@ async function doResetDefaultPasswords() {
 
   saveUsers(out);
 
-  // Đẩy thẳng lên cloud với skipPull:true.
-  // KHÔNG dùng manualSync()/push thường vì chúng pull (THAY THẾ) users từ cloud
-  // trước khi ghi → sẽ kéo bản cũ về đè mất bản reset rồi đẩy ngược bản cũ lên.
+  // Đẩy ngay lên cloud bằng push THƯỜNG theo outbox (chỉ doc meta_tai_khoan vừa đổi).
+  // An toàn: bước đọc-gộp của push dùng _mergeUsersSafe (bản updatedAt mới hơn thắng)
+  // → bản reset (updatedAt = now, sessionVersion+1) luôn thắng bản cũ trên cloud.
+  // [GĐ1] Bỏ skipPull:true cũ — push giờ đẩy theo outbox, skipPull sẽ GHI ĐÈ KHÔNG GỘP
+  // cả những doc khác đang chờ (vd hóa đơn chưa kịp đẩy) → xóa mất dữ liệu máy khác.
   if (typeof pushChanges === 'function' && typeof fbReady === 'function' && fbReady()) {
-    try { await pushChanges({ silent: true, skipPull: true }); } catch {}
+    try { await pushChanges({ silent: true }); } catch {}
   }
 
   return true;

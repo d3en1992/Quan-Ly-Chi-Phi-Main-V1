@@ -723,6 +723,8 @@ function delItem(catId,idx) {
     return;
   }
   if(!confirm(`Xóa "${item}" khỏi danh mục?`)) return;
+  // Ghi nhớ id tiền ứng trước khi lọc → báo purge (xóa cứng có chủ đích) cho outbox
+  const _ungIdsBefore = ungRecords.map(r => r.id);
   if (catId === 'thauPhu') {
     ungRecords = ungRecords.filter(r => !(r.loai === 'thauphu' && r.tp === item));
   }
@@ -735,7 +737,8 @@ function delItem(catId,idx) {
   cats[catId].splice(idx,1);
   // (congTrinh không bao giờ tới đây — đã return sớm ở đầu hàm; quản lý qua Tab Công Trình)
   saveCats(catId);
-  save('ung_v1', ungRecords);
+  const _ungIdsAfter = new Set(ungRecords.map(r => r.id));
+  save('ung_v1', ungRecords, { purge: _ungIdsBefore.filter(id => !_ungIdsAfter.has(id)) });
   renderSettings(); rebuildEntrySelects(); rebuildUngSelects();
   toast(`Đã xóa "${item}"`);
 }
