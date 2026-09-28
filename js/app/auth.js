@@ -760,6 +760,11 @@ function applyRoleUI() {
   if (toolsSection) {
     toolsSection.style.display = (user.role === 'giamdoc' || user.role === 'ketoan') ? 'none' : '';
   }
+  // Nút "Khôi phục từ sao lưu cloud" — CHỈ Quản trị viên (ghi đè toàn hệ thống)
+  const cloudRestoreBtn = document.getElementById('dm-cloud-restore-btn');
+  if (cloudRestoreBtn) {
+    cloudRestoreBtn.style.display = (user.role === 'admin') ? '' : 'none';
+  }
 }
 
 function queueApplyRoleUI() {

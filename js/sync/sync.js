@@ -305,17 +305,10 @@ async function pushChanges(opts = {}) {
   const _catsToPush = _scoped
     ? _YEAR_CATS.filter(c => _dirtyKeys.has(c.key))
     : _YEAR_CATS;
-  // Các key kích hoạt từng doc meta (gộp theo payload tương ứng)
-  const _META_TRIGGER_KEYS = new Set([
-    'projects_v1','cat_ct',                                   // → meta_cong_trinh
-    'customers_v1',                                           // → meta_khach_hang
-    'cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb',
-    'cat_items_v1','cat_cn_roles','cat_ct_years',             // → meta_danh_muc
-    'users_v1',                                               // → meta_tai_khoan
-    'hopdong_v1','thauphu_v1','quyettoan_v1',                 // → meta_hop_dong
-  ]);
+  // Các key kích hoạt doc meta: dùng bảng ánh xạ GLOBAL _META_KEY_DOC (core.storage.js)
+  // thay cho danh sách cục bộ cũ — 1 nguồn duy nhất cho cả outbox lẫn push.
   const _pushMeta = _scoped
-    ? [..._dirtyKeys].some(k => _META_TRIGGER_KEYS.has(k))
+    ? [..._dirtyKeys].some(k => _isMetaKey(k))
     : true;
 
   console.log('[Sync] ▲ Push bắt đầu — năm:', years.join(', '),

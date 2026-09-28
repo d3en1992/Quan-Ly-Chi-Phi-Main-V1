@@ -51,6 +51,14 @@
                 >
                   <span class="material-symbols-outlined msi-gap">download</span>Import JSON
                 </button>
+                <button
+                  id="dm-cloud-restore-btn"
+                  class="btn btn-outline-primary"
+                  onclick="openCloudRestoreModal()"
+                  title="Chọn 1 bản sao lưu tự động hằng ngày trên cloud để khôi phục (chỉ Quản trị viên)"
+                >
+                  <span class="material-symbols-outlined msi-gap">cloud_download</span>Khôi phục từ sao lưu cloud
+                </button>
               </div>
             </div>
 
@@ -147,6 +155,8 @@
               để chuyển thiết bị hoặc lưu trữ<br />
               • <b>Import JSON</b>: Khôi phục từ snapshot — xóa toàn bộ dữ liệu
               hiện tại và ghi đè lên cloud<br />
+              • <b>Sao lưu cloud</b>: App tự chụp toàn bộ dữ liệu cloud mỗi ngày 1 lần
+              (giữ 30 ngày). Nút "Khôi phục từ sao lưu cloud" đưa toàn hệ thống về đúng ngày đã chọn<br />
               • <b>Data version</b>:
               <span
                 id="data-version-badge"

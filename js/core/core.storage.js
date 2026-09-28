@@ -70,6 +70,14 @@ db.version(1).stores({
 db.version(2).stores({
   settings: 'id'  // key-value store: projects, hopdong, thauphu, trash, cat_*, etc.
 });
+// Version 3 — thêm bảng OUTBOX (hàng chờ đẩy cloud, sống sót qua F5/tắt app).
+// Dexie tự GIỮ NGUYÊN mọi bảng khai báo ở version 1–2 (invoices, attendance,
+// equipment, ung, revenue, categories, settings) — chỉ cần khai báo bảng mới.
+// Mỗi dòng outbox = 1 document cloud đang "bẩn" (có thay đổi local chưa đẩy lên):
+//   { docId, firstTs, lastTs, count, purgeIds: string[] }
+db.version(3).stores({
+  outbox: 'docId'
+});
 
 // Mapping: storage key → IDB table config
 // Tất cả data nghiệp vụ đều nằm trong IDB — localStorage CHỈ cho config/device identity
@@ -173,6 +181,8 @@ async function dbInit() {
         _mem[key] = rec ? rec.data : null;
       }
     }
+    // Nạp hàng chờ outbox vào RAM (_outboxMem) để các hàm khác đọc ĐỒNG BỘ được
+    await _outboxLoad();
     console.log('[IDB] dbInit hoàn tất — IDB-primary mode');
   } catch(e) {
     console.warn('[IDB] dbInit lỗi:', e);
@@ -222,6 +232,158 @@ const _SYNC_DATA_KEYS = new Set([
   // cat_items_v1: source of truth per-item — cần pending khi canonicalize tên để push cloud
   'cat_items_v1',
 ]);
+
+// ══ BẢNG ÁNH XẠ key local → document cloud (dùng chung toàn app) ══════════
+// Key theo NĂM → hậu tố doc năm: doc thật = `y{YYYY}_{hậu tố}` (khớp _YEAR_CATS
+// trong core.cloud-cats-ui.js). Trường ngày để biết record thuộc năm nào: _YEAR_DATE_FIELD.
+const _YEAR_KEY_CAT = {
+  inv_v3: 'hoa_don',
+  ung_v1: 'tien_ung',
+  cc_v2:  'cham_cong',
+  tb_v1:  'thiet_bi',
+  thu_v1: 'thu_tien',
+};
+// Key META → doc meta dùng chung (khớp các payload fbMeta*Payload()).
+// ⚠️ 'trash_v1' CỐ Ý KHÔNG có ở đây: không payload cloud nào chứa trash_v1
+// (thùng rác thật đọc từ deletedAt của các store chính) → trash_v1 chỉ là dữ liệu local.
+const _META_KEY_DOC = {
+  projects_v1:  'meta_cong_trinh',
+  cat_ct:       'meta_cong_trinh',   // cat_ct suy ra từ projects → đẩy cùng doc công trình
+  customers_v1: 'meta_khach_hang',
+  cat_loai:     'meta_danh_muc',
+  cat_ncc:      'meta_danh_muc',
+  cat_nguoi:    'meta_danh_muc',
+  cat_tp:       'meta_danh_muc',
+  cat_cn:       'meta_danh_muc',
+  cat_tbteb:    'meta_danh_muc',
+  cat_items_v1: 'meta_danh_muc',
+  cat_cn_roles: 'meta_danh_muc',
+  cat_ct_years: 'meta_danh_muc',
+  users_v1:     'meta_tai_khoan',
+  hopdong_v1:   'meta_hop_dong',
+  thauphu_v1:   'meta_hop_dong',
+  quyettoan_v1: 'meta_hop_dong',
+};
+// Key có thuộc nhóm meta không (thay cho _META_TRIGGER_KEYS cục bộ cũ trong pushChanges)
+function _isMetaKey(k) { return Object.prototype.hasOwnProperty.call(_META_KEY_DOC, k); }
+// Tên doc năm của 1 key theo năm, vd ('inv_v3', 2025) → 'y2025_hoa_don' (null nếu không phải key năm)
+function _yearDocId(k, yr) {
+  const cat = _YEAR_KEY_CAT[k];
+  return (cat && yr) ? `y${yr}_${cat}` : null;
+}
+
+
+// ══ OUTBOX — hàng chờ đẩy cloud LƯU BỀN trong IndexedDB ═══════════════════
+// Vấn đề cũ: bộ đếm _pendingChanges/_dirtyKeys/_dirtyYears chỉ nằm trong RAM →
+// lưu lúc mạng yếu rồi tắt app là mất dấu → mở lại pull REPLACE đè mất dữ liệu.
+// Outbox ghi xuống IDB từng document cloud đang "bẩn", nên dù F5/tắt máy vẫn biết
+// còn gì chưa đẩy. _outboxMem là bản sao trong RAM để đọc đồng bộ (nạp ở dbInit()).
+let _outboxMem = new Map();          // docId → { docId, firstTs, lastTs, count, purgeIds }
+let _outboxQueue = Promise.resolve(); // hàng đợi tuần tự cho MỌI lần ghi IDB outbox
+let _outboxLastTs = 0;               // mốc thời gian lớn nhất đã cấp (đồng hồ tăng dần)
+
+// Đồng hồ TĂNG NGHIÊM NGẶT: 2 lần gọi liên tiếp không bao giờ trả cùng giá trị,
+// kể cả trong cùng 1 mili-giây. Nhờ vậy so sánh "sửa TRƯỚC hay SAU lúc bắt đầu push"
+// (lastTs <= pushStartTs) luôn chính xác, không bị trùng mốc.
+function _outboxNow() {
+  _outboxLastTs = Math.max(Date.now(), _outboxLastTs + 1);
+  return _outboxLastTs;
+}
+
+// Xếp 1 thao tác ghi IDB vào hàng đợi — các lần ghi chạy LẦN LƯỢT, không đua nhau
+// (tránh trường hợp lệnh xóa chạy xong trước lệnh ghi cũ → dòng outbox sống lại).
+function _outboxEnqueue(fn) {
+  _outboxQueue = _outboxQueue
+    .then(fn)
+    .catch(e => console.warn('[Outbox] Ghi IDB lỗi:', e));
+  return _outboxQueue;
+}
+
+// Ghi bản RAM hiện tại của 1 docId xuống IDB (có dòng → put, không có → delete)
+function _outboxPersist(docId) {
+  return _outboxEnqueue(() => {
+    const row = _outboxMem.get(docId);
+    if (!db.outbox) return;
+    return row ? db.outbox.put({ ...row, purgeIds: [...(row.purgeIds || [])] })
+               : db.outbox.delete(docId);
+  });
+}
+
+// Đánh dấu 1 document cloud là "bẩn" (còn thay đổi local chưa đẩy).
+// purgeIds (tùy chọn): các id bị XÓA CỨNG khỏi mảng local — khi push phải loại
+// hẳn chúng khỏi bản gộp với cloud, nếu không bước gộp sẽ kéo chúng "hồi sinh".
+function _outboxMark(docId, purgeIds) {
+  if (!docId) return;
+  const now  = _outboxNow();
+  const prev = _outboxMem.get(docId);
+  const row  = prev
+    ? { ...prev, purgeIds: [...(prev.purgeIds || [])] }
+    : { docId, firstTs: now, lastTs: now, count: 0, purgeIds: [] };
+  row.lastTs = now;
+  row.count  = (row.count || 0) + 1;
+  if (Array.isArray(purgeIds) && purgeIds.length) {
+    const set = new Set(row.purgeIds);
+    purgeIds.forEach(id => { if (id != null && id !== '') set.add(String(id)); });
+    row.purgeIds = [...set];
+  }
+  _outboxMem.set(docId, row);
+  _outboxPersist(docId);
+  if (typeof _outboxOnChange === 'function') _outboxOnChange();
+}
+
+// Gỡ 1 doc khỏi outbox SAU KHI đã đẩy thành công.
+//   beforeTs      : mốc bắt đầu push (lấy bằng _outboxNow()). Chỉ gỡ hẳn nếu doc
+//                   KHÔNG bị sửa thêm sau mốc đó (lastTs <= beforeTs). Nếu bị sửa
+//                   thêm trong lúc push → giữ lại để lần sau đẩy tiếp.
+//   pushedPurgeIds: các purgeId ĐÃ được đẩy trong lần push này → bỏ khỏi dòng
+//                   (purgeId mới phát sinh trong lúc push vẫn được giữ).
+function _outboxClear(docId, beforeTs, pushedPurgeIds) {
+  const row = _outboxMem.get(docId);
+  if (!row) return;
+  if (row.lastTs <= beforeTs) {
+    _outboxMem.delete(docId);
+  } else if (Array.isArray(pushedPurgeIds) && pushedPurgeIds.length) {
+    const done = new Set(pushedPurgeIds.map(String));
+    _outboxMem.set(docId, { ...row, purgeIds: (row.purgeIds || []).filter(id => !done.has(String(id))) });
+  } else {
+    return; // không có gì thay đổi
+  }
+  _outboxPersist(docId);
+  if (typeof _outboxOnChange === 'function') _outboxOnChange();
+}
+
+// Xóa SẠCH outbox (dùng khi reset toàn bộ / khôi phục — cố ý ghi đè cloud)
+function _outboxClearAll() {
+  _outboxMem.clear();
+  _outboxEnqueue(() => db.outbox ? db.outbox.clear() : null);
+  if (typeof _outboxOnChange === 'function') _outboxOnChange();
+}
+
+// Danh sách doc đang bẩn (bản sao, sắp theo lúc bẩn đầu tiên)
+function _outboxList() {
+  return [..._outboxMem.values()]
+    .map(r => ({ ...r, purgeIds: [...(r.purgeIds || [])] }))
+    .sort((a, b) => (a.firstTs || 0) - (b.firstTs || 0));
+}
+function _outboxHas(docId) { return _outboxMem.has(docId); }
+function _outboxGet(docId) {
+  const r = _outboxMem.get(docId);
+  return r ? { ...r, purgeIds: [...(r.purgeIds || [])] } : null;
+}
+function _outboxSize() { return _outboxMem.size; }
+
+// Nạp outbox từ IDB vào RAM — gọi trong dbInit()
+async function _outboxLoad() {
+  try {
+    const rows = db.outbox ? await db.outbox.toArray() : [];
+    _outboxMem = new Map(rows.map(r => [r.docId, { ...r, purgeIds: r.purgeIds || [] }]));
+    rows.forEach(r => { if ((r.lastTs || 0) > _outboxLastTs) _outboxLastTs = r.lastTs; });
+    if (rows.length) console.log('[Outbox] Còn', rows.length, 'doc chưa đẩy từ phiên trước:', rows.map(r => r.docId).join(', '));
+  } catch (e) {
+    console.warn('[Outbox] Nạp lỗi:', e);
+    _outboxMem = new Map();
+  }
+}
 
 function _incPending() {
   _pendingChanges++;

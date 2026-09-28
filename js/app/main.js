@@ -113,6 +113,13 @@ function init() {
     if (typeof renderActiveTab === 'function') renderActiveTab();
     // Chỉ báo "Đồng bộ xong" khi thực sự kéo được dữ liệu mới từ cloud
     if (data) toast(`✅ Đồng bộ xong! ${built2.cts} CT mới`, 'success');
+
+    // Sao lưu cloud hằng ngày (sync.backup.js) — chạy NGẦM, trễ vài giây để không
+    // tranh mạng với lúc app vừa mở. Chỉ chạy khi pull thành công (có kết nối cloud thật).
+    // Hàm tự bỏ qua nếu hôm nay đã có bản sao lưu; mọi lỗi chỉ ghi console.
+    if (data && typeof cloudDailyBackup === 'function') {
+      setTimeout(() => { cloudDailyBackup(); }, 8000);
+    }
   });
 }
 
