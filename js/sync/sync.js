@@ -176,6 +176,11 @@ function normalizeCC(records) {
 // ══════════════════════════════════════════════════════════════
 let _syncPushing = false;
 let _syncPulling = false;
+// Các năm ĐÃ pull đầy đủ từ cloud trong phiên (lần mở app) này.
+// onYearChange() dựa vào đây để biết năm nào cần tải (thay cho kiểu cũ "local có dữ liệu
+// năm đó thì bỏ qua" — kiểu cũ sai khi local chỉ có 1 phần năm, vd vài tuần chấm công vắt năm,
+// hoặc dữ liệu năm đó trong máy đã cũ).
+const _pulledYearsThisSession = new Set();
 function isSyncing() { return _syncPushing || _syncPulling; }
 
 // ══════════════════════════════════════════════════════════════
@@ -784,8 +789,25 @@ async function pullChanges(yr, callback, opts = {}) {
       _refreshGlobal('cc_v2');
     };
 
-    for (const yrStr of years) {
-      for (const { cat, key } of _YEAR_CATS) {
+    // Danh sách doc cần đọc: mọi hạng mục của (các) năm được pull …
+    const jobs = [];
+    years.forEach(yrStr => _YEAR_CATS.forEach(c => jobs.push({ yrStr, cat: c.cat, key: c.key })));
+    // … CỘNG THÊM doc chấm công của NĂM TRƯỚC (fix 29/09/2026).
+    // Lý do: tuần chấm công được lưu theo NGÀY BẮT ĐẦU tuần (fromDate) — tuần 28/12/2025–03/01/2026
+    // nằm trong doc y2025_cham_cong, nhưng hóa đơn lương sinh ra từ tuần đó lại mang ngày
+    // 03/01/2026 và được tính vào tổng chi năm 2026. Nếu chỉ pull 2026 (máy mới / web ẩn danh)
+    // thì thiếu các tuần vắt năm này → tổng CP 2026 thấp hơn máy khác.
+    years.forEach(yrStr => {
+      const prev = String(parseInt(yrStr) - 1);
+      if (!years.includes(prev)) jobs.push({ yrStr: prev, cat: 'cham_cong', key: 'cc_v2' });
+    });
+
+    const _errYears = new Set();   // năm có doc đọc lỗi → chưa coi là "đã tải"
+    let _lastYr = null;
+    for (const { yrStr, cat, key } of jobs) {
+      if (_lastYr !== null && _lastYr !== yrStr) console.log(`[Sync] ▼ Năm ${_lastYr} đã cập nhật theo cloud`);
+      _lastYr = yrStr;
+      {
         const docId = fbDocYearCat(parseInt(yrStr), cat);
         try {
           const d = fsUnwrap(await fsGet(docId)); // lỗi mạng/HTTP → throw → giữ nguyên local
@@ -808,10 +830,12 @@ async function pullChanges(yr, callback, opts = {}) {
           totalRecords += d.records.length;
         } catch (e) {
           console.warn(`[Sync] Pull ${docId} lỗi — giữ nguyên local:`, e.message || e);
+          _errYears.add(String(yrStr));
         }
       }
-      console.log(`[Sync] ▼ Năm ${yrStr} đã cập nhật theo cloud`);
     }
+    if (_lastYr !== null) console.log(`[Sync] ▼ Năm ${_lastYr} đã cập nhật theo cloud`);
+    years.forEach(y => { if (!_errYears.has(String(y))) _pulledYearsThisSession.add(String(y)); });
 
     if (!silent) hideSyncBanner();
     console.log(`[Sync] ▼ Pull xong — ${totalRecords} record từ cloud${_catsChanged ? ', danh mục cập nhật' : ''}`);

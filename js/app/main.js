@@ -359,13 +359,12 @@ function onYearChange() {
     pushChanges({ silent: true });
   }
 
-  // Tìm các năm chưa có data local
-  const missing = [...activeYears].filter(yr => {
-    const ys = String(yr);
-    return !invoices.some(i=>i.ngay&&i.ngay.startsWith(ys))
-        && !ccData.some(w=>w.fromDate&&w.fromDate.startsWith(ys))
-        && !ungRecords.some(u=>u.ngay&&u.ngay.startsWith(ys));
-  });
+  // Tìm các năm CHƯA được tải từ cloud trong phiên này.
+  // [Fix 29/09/2026] Trước đây coi "local có bất kỳ dữ liệu năm đó" là đủ → sai khi máy mới
+  // chỉ có vài tuần chấm công vắt năm của năm trước (tải kèm năm hiện tại) hoặc dữ liệu năm
+  // đó trong máy đã cũ → không bao giờ tải lại, số liệu lệch giữa các máy.
+  const _pulled = (typeof _pulledYearsThisSession !== 'undefined') ? _pulledYearsThisSession : new Set();
+  const missing = [...activeYears].filter(yr => !_pulled.has(String(yr)));
 
   if (!missing.length) {
     renderActiveTab();

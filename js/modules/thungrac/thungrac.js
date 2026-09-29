@@ -70,12 +70,21 @@ function _trashCountAll() {
 }
 
 // ── Lấy danh sách bản ghi đã xóa mềm theo type ───────────────────────────────
+// Sắp xếp CỐ ĐỊNH: ngày xóa mới nhất lên trên (hòa → ngày chứng từ mới hơn, rồi theo id).
+// [Fix 29/09/2026] Trước đây giữ nguyên thứ tự trong mảng — mà thứ tự mảng phụ thuộc năm
+// nào được tải về trước trên từng máy → 2 máy cùng dữ liệu nhưng thùng rác hiện lộn xộn khác nhau.
+function _trashSort(arr) {
+  return arr.sort((a, b) =>
+    (Number(b.deletedAt) || 0) - (Number(a.deletedAt) || 0)
+    || String(b.ngay || b.fromDate || '').localeCompare(String(a.ngay || a.fromDate || ''))
+    || String(a.id || '').localeCompare(String(b.id || '')));
+}
 function _trashGetRecords(type) {
-  if (type === 'hoadon')   return (invoices || []).filter(r => r.deletedAt);
-  if (type === 'chamcong') return (ccData || []).filter(r => r.deletedAt);
-  if (type === 'tienung')  return (ungRecords || []).filter(r => r.deletedAt);
-  if (type === 'thietbi')  return (tbData || []).filter(r => r.deletedAt);
-  if (type === 'thutien')  return (thuRecords || []).filter(r => r.deletedAt);
+  if (type === 'hoadon')   return _trashSort((invoices || []).filter(r => r.deletedAt));
+  if (type === 'chamcong') return _trashSort((ccData || []).filter(r => r.deletedAt));
+  if (type === 'tienung')  return _trashSort((ungRecords || []).filter(r => r.deletedAt));
+  if (type === 'thietbi')  return _trashSort((tbData || []).filter(r => r.deletedAt));
+  if (type === 'thutien')  return _trashSort((thuRecords || []).filter(r => r.deletedAt));
   if (type === 'hopdong') {
     const chinh = Object.entries(hopDongData || {})
       .filter(([, v]) => v.deletedAt)

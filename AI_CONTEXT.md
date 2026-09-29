@@ -313,7 +313,7 @@ Mỗi **năm × hạng mục = 1 doc** + **5 doc meta dùng chung**, tên field 
 | Khởi động | `dbInit()` nạp outbox + dựng bảng bóng. `init()`: outbox còn dữ liệu → `pushChanges` TRƯỚC rồi mới `gsLoadAll()`. Không còn `_resetPending()` lúc khởi động. |
 | Firestore REST | `fsGet`: 404 → null, lỗi khác → throw (trước đây lỗi 500/429 bị coi như "cloud trống" → ghi đè mất dữ liệu). `fsSet`/`fsSetIf`: HTTP ≠ 2xx → throw. |
 | Conflict resolution | `resolveConflict(local, cloud)`: tombstone (`deletedAt`) ưu tiên, sau đó `updatedAt` mới hơn thắng |
-| Multi-year sync | `_getAllLocalYears()` gom năm từ `inv_v3`, `ung_v1`, `cc_v2`, `tb_v1`, `thu_v1`; push/pull theo từng doc `y{YYYY}_<cat>` |
+| Multi-year sync | `_getAllLocalYears()` gom năm từ `inv_v3`, `ung_v1`, `cc_v2`, `tb_v1`, `thu_v1`; push/pull theo từng doc `y{YYYY}_<cat>`. Pull năm Y đọc thêm `y{Y-1}_cham_cong` (tuần vắt năm: lưu theo `fromDate` năm trước nhưng hóa đơn lương tính vào năm Y). `onYearChange()` tải các năm chưa có trong `_pulledYearsThisSession` (xem 9.28.1) |
 | Categories sync | Doc `meta_danh_muc` chứa: <br> - `catItems` (`cat_items_v1`): { [type]: { id, name, isDeleted, updatedAt }[] } (Master category storage) <br> - `cats` (các mảng `cat_loai`, `cat_ncc`, `cat_nguoi`, `cat_tp`, `cat_cn`, `cat_tbteb` — derived từ `catItems`) <br> - `cnRoles` (`cat_cn_roles`) <br> - `ctYears` (`cat_ct_years`) |
 | Pull guard | `_blockPullUntil`/`localStorage._blockPullUntil` chặn pull sau reset/import để tránh cloud cũ ghi đè local mới |
 | Pending | `_pendingChanges` = **số doc trong outbox** (suy ra qua `_outboxOnChange()`); `_dirtyKeys`/`_dirtyYears` suy ra từ docId trong outbox — giữ tên cũ cho badge/`mobile.core.js`/`main.js`. `_incPending()`/`_resetPending()` chỉ còn là hàm tương thích (vẽ lại badge, KHÔNG xóa gì). `save(k,v,{skipSync:true})` không đánh dấu outbox |
@@ -1607,6 +1607,22 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 **Tham chiếu hiện hành đã cập nhật:** mục 1, 2 (dòng 4, 7, 20, 32, **32b mới**), 3, 4 (bảng Dexie `outbox`, luồng dữ liệu, collection `cpct_backup`, sync rules), 6, 7.
 
 **File đã đụng:** `index.html` (script `sync.backup.js`), `pages/danhmuc.html` (nút khôi phục), `js/core/core.storage.js`, `js/core/core.cloud-cats-ui.js`, `js/core/core.state-backup.js`, `js/sync/sync.js`, **mới** `js/sync/sync.backup.js`, `js/app/main.js`, `js/app/auth.js`, `js/legacy/datatools.js`, `js/modules/danhmuc/danhmuc.tools.js`, `js/modules/danhmuc/danhmuc.categories.js`, `js/modules/danhmuc/danhmuc.project-clear.js`, `js/modules/thungrac/thungrac.js`, `js/modules/projects/projects.model.js`, `js/modules/chamcong/chamcong.history-reports.js`, `js/modules/nhapxuat/nhapxuat.import.js`.
+
+### 9.28.1 Fix: máy mới / web ẩn danh thấy Tổng CP thấp hơn + thùng rác khác thứ tự (29/09/2026)
+
+**Triệu chứng:** Máy quen: Tổng CP 2026 = 5.305 tỷ. Web ẩn danh vừa đăng nhập: 5.262 tỷ (thiếu ~43 tr). Ví dụ SC Chùa Thầy Tánh thiếu dòng "Lương tuần 28/12–03/01" (03-01-2026, 6,8 tr); TT Hưng Long, Nhà Tình cũng thiếu vài hóa đơn nhân công. Chọn 2025 rồi chọn lại 2026 thì khớp. Thùng rác 2 bên cùng 58 bản ghi nhưng hiện khác thứ tự.
+
+**Nguyên nhân:**
+1. Tuần chấm công lưu trong doc cloud theo **ngày BẮT ĐẦU tuần** (`fromDate`) → tuần 28/12/2025–03/01/2026 nằm trong `y2025_cham_cong`. Nhưng hóa đơn lương sinh từ tuần đó (`buildInvoices`) mang ngày 03/01/2026 → được tính vào năm 2026. Lúc khởi động app chỉ pull **năm đang xem** (2026) → máy mới thiếu mọi tuần vắt năm. Chọn 2025 → pull 2025 → có đủ.
+2. `onYearChange()` coi năm là "đã có" nếu local có bất kỳ dữ liệu năm đó → máy chỉ có vài record của năm (hoặc dữ liệu cũ) sẽ không bao giờ tải lại năm đó.
+3. Thùng rác hiển thị theo thứ tự mảng trong bộ nhớ — thứ tự này phụ thuộc năm nào được tải về trước trên từng máy.
+
+**Sửa:**
+- `pullChanges()` (`sync.js`): khi pull năm Y, đọc thêm doc `y{Y-1}_cham_cong` (nếu Y-1 không nằm trong danh sách pull) — 1 lượt đọc thêm/năm. Áp dụng cho mọi đường pull: khởi động (`gsLoadAll`), đổi năm, nút Sync, máy mới.
+- Global mới `_pulledYearsThisSession` (`sync.js`): các năm đã pull đủ trong phiên (năm có doc lỗi không được ghi nhận). `onYearChange()` (`main.js`) giờ tải mọi năm đang chọn CHƯA pull trong phiên, thay cho kiểm tra "local có dữ liệu".
+- Thùng rác (`thungrac.js`): helper mới `_trashSort()` — sắp xếp cố định theo ngày xóa mới nhất → ngày chứng từ → id.
+
+**File đã sửa:** `js/sync/sync.js`, `js/app/main.js`, `js/modules/thungrac/thungrac.js`.
 
 ---
 
