@@ -632,7 +632,7 @@ function _applyImport() {
     _blockPullUntil = Date.now() + 15000;
     localStorage.setItem('_blockPullUntil', String(_blockPullUntil));
   }
-  // Hủy debounce push đang chờ (nếu có), xóa queue cũ, push ngay với skipPull
+  // Hủy debounce push đang chờ (nếu có), xóa queue cũ, push ngay theo outbox
   if (typeof cancelScheduledPush === 'function') cancelScheduledPush();
   if (typeof _clearQueue       === 'function') _clearQueue();
   if (fbReady() && typeof pushChanges === 'function') {

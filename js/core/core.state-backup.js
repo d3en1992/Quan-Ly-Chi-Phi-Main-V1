@@ -672,7 +672,8 @@ async function importJSONFull(data) {
     localStorage.setItem('_blockPullUntil', String(Date.now() + 2 * 60 * 60 * 1000));
 
     // Step 5: Push to cloud — skip inner pull so we overwrite cloud cleanly.
-    // ⚠️ skipPull:true = GHI ĐÈ KHÔNG ĐIỀU KIỆN — chỉ được phép ở khôi phục/reset (cố ý).
+    // ⚠️ GHI ĐÈ KHÔNG ĐIỀU KIỆN nhờ cờ overwrite đã đánh dấu ở Step 3b (thay cho
+    //    skipPull cũ, đã bỏ ở GĐ2) — chỉ được phép ở khôi phục/reset (cố ý thay toàn bộ).
     // pushChanges() ghi theo cấu trúc B (mỗi năm × hạng mục + 5 meta doc), gồm cả các
     // doc năm đã đánh dấu ở Step 3b dù trống.
     if (typeof fbReady === 'function' && fbReady()) {
@@ -682,7 +683,7 @@ async function importJSONFull(data) {
         // [FIX đồng bộ] allYears:true → đẩy TẤT CẢ các năm trong file JSON lên
         // cloud (không chỉ năm hiện tại). Nếu thiếu cờ này, thiết bị khác chỉ
         // thấy năm hiện tại, mất hết dữ liệu các năm còn lại.
-        const allOk = await pushChanges({ silent: true, skipPull: true, allYears: true });
+        const allOk = await pushChanges({ silent: true, allYears: true });
         console.log(allOk
           ? '[Import] ✓ Push cloud hoàn tất sau import (tất cả năm)'
           : '[Import] ⚠ Push cloud chưa xong hết — outbox giữ lại, app tự đẩy tiếp sau khi tải lại');

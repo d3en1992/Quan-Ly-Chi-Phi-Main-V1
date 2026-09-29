@@ -450,19 +450,21 @@ function _metaApply(docId, d, mode, purge) {
 // ══════════════════════════════════════════════════════════════
 // [9] PUSH — đẩy local lên cloud DỰA TRÊN OUTBOX
 // ══════════════════════════════════════════════════════════════
-// Nguyên tắc an toàn (GĐ1 — gia cố đồng bộ):
+// Nguyên tắc an toàn (GĐ1 + GĐ2 — gia cố đồng bộ):
 //   • Push ngầm (silent) chỉ đẩy ĐÚNG các doc đang nằm trong outbox (doc bẩn).
 //     Push thủ công (nút 🔄) và opts.allYears = đẩy đủ mọi năm × hạng mục + 5 meta.
-//   • Mỗi doc: ĐỌC cloud → GỘP vào local (loại purgeIds) → GHI. Đọc cloud lỗi
-//     (mạng, 403, 429, 500...) → doc đó FAIL, TUYỆT ĐỐI KHÔNG ghi đè, giữ nguyên outbox.
+//   • Mỗi doc: ĐỌC cloud (kèm updateTime) → GỘP vào local (loại purgeIds) → GHI CÓ
+//     ĐIỀU KIỆN (khóa lạc quan). Máy khác ghi chen → đọc-gộp-ghi lại (tối đa 3 lần).
+//     Đọc cloud lỗi (mạng, 403, 429, 500...) → doc đó FAIL, TUYỆT ĐỐI KHÔNG ghi đè.
 //   • Doc ghi thành công → gỡ khỏi outbox, TRỪ KHI bị sửa thêm trong lúc push
 //     (lastTs > pushStartTs) → ở lại, lần sau đẩy tiếp.
 //   • Chỉ báo "✅ Đã đồng bộ" khi outbox rỗng. Còn lỗi → tự thử lại với backoff
 //     5s → 15s → 60s → 5 phút (không spam banner).
 // opts.silent   = true  → chạy ngầm, chỉ hiện banner khi lỗi (lần đầu của chuỗi lỗi)
-// opts.skipPull = true  → bỏ bước đọc-gộp cloud (ghi đè thẳng) — chỉ dùng khi CỐ Ý
-//                         ghi đè: khôi phục snapshot/sao lưu, reset mật khẩu mặc định
 // opts.allYears = true  → đẩy đủ mọi năm (dù silent) — dùng khi khôi phục
+// [GĐ2] ĐÃ BỎ opts.skipPull (ghi đè thẳng không gộp). Muốn cố ý ghi đè (chỉ khôi phục
+//   snapshot/sao lưu) thì đánh dấu outbox _outboxMark(docId, null, { overwrite:true }).
+//   Truyền skipPull vào sẽ bị bỏ qua (push vẫn đọc-gộp-ghi có điều kiện, an toàn).
 // Trả về true nếu đẩy hết (không lỗi và outbox rỗng).
 
 let _pushRetryIdx   = 0;     // đang ở nấc backoff thứ mấy
@@ -485,53 +487,91 @@ function _schedulePushRetry() {
   }, delay);
 }
 
-// Đẩy 1 doc năm: đọc → gộp → ghi. Lỗi → throw (doc FAIL). Trả về purgeIds đã đẩy.
-async function _pushYearDoc(t, skipPull) {
+// ── Vòng ĐỌC → GỘP → GHI CÓ ĐIỀU KIỆN (khóa lạc quan — GĐ2) ──────────────────
+// Dùng chung cho doc năm và doc meta.
+//   mergeFn(data)    : gộp dữ liệu cloud (đã fsUnwrap; null nếu doc chưa có) vào local.
+//                      Được phép async. Throw nếu dữ liệu cloud sai định dạng.
+//   payloadFn()      : dựng payload từ local SAU KHI gộp
+//   skipIfNewEmpty() : (tùy chọn) doc chưa có trên cloud + local trống → khỏi tạo doc rỗng
+// Máy khác ghi chen vào giữa (xung đột) → đọc lại, gộp lại, ghi lại; tối đa
+// _PUSH_CONFLICT_RETRY lần, mỗi lần chờ ngẫu nhiên 300–1200ms (tránh 2 máy lại đụng nhau).
+// Hết lượt → throw (doc FAIL, giữ outbox, thử lại theo backoff).
+// Doc có cờ overwrite (do KHÔI PHỤC đánh dấu) → GHI ĐÈ KHÔNG ĐIỀU KIỆN, không gộp —
+// chỗ duy nhất (cùng _doResetAll) được phép ghi đè thẳng vì cố ý thay toàn bộ.
+const _PUSH_CONFLICT_RETRY = 3;
+const _sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function _pushDocWithLock(docId, mergeFn, payloadFn, skipIfNewEmpty) {
+  if (_outboxIsOverwrite(docId)) {
+    await fsSet(docId, payloadFn());                       // cố ý ghi đè (khôi phục)
+    return;
+  }
+  for (let attempt = 0; ; attempt++) {
+    // 1) ĐỌC kèm updateTime. Lỗi mạng/HTTP ≠ 404 → throw → doc FAIL, KHÔNG ghi đè
+    const { data, updateTime, exists } = await fsGetWithTime(docId);
+    if (exists && !data) {
+      throw new Error(`doc ${docId} trên cloud không đúng định dạng — không dám ghi đè`);
+    }
+    // 2) GỘP cloud vào local (loại purgeIds)
+    await mergeFn(exists ? data : null);
+    if (!exists && skipIfNewEmpty && skipIfNewEmpty()) return;
+    // 3) GHI CÓ ĐIỀU KIỆN: chỉ thành công nếu không ai ghi chen từ lúc đọc
+    try {
+      await fsSetIf(docId, payloadFn(), exists ? updateTime : null);
+      return;
+    } catch (e) {
+      if (!e.conflict) throw e;                            // lỗi thường → doc FAIL
+      if (attempt >= _PUSH_CONFLICT_RETRY) {
+        throw new Error(`xung đột ${docId} quá ${_PUSH_CONFLICT_RETRY} lần — sẽ thử lại sau`);
+      }
+      console.log(`[Sync] ⚔ Xung đột ${docId} — gộp lại lần ${attempt + 1}/${_PUSH_CONFLICT_RETRY}`);
+      await _sleep(300 + Math.floor(Math.random() * 900));
+    }
+  }
+}
+
+// Đẩy 1 doc năm. Lỗi → throw (doc FAIL).
+// Trả về purgeIds đã đẩy (chụp TRƯỚC khi đẩy — purgeId phát sinh trong lúc đẩy vẫn giữ lại).
+async function _pushYearDoc(t) {
   const { docId, yr, key, dateField } = t;
-  const purge = _purgeSetOf(docId);          // chụp purgeIds TẠI THỜI ĐIỂM này
-  // Doc do khôi phục đánh dấu (overwrite) → ghi đè như skipPull, không gộp cloud cũ vào
-  if (!skipPull && !_outboxIsOverwrite(docId)) {
-    const raw = await fsGet(docId);          // lỗi mạng/HTTP ≠ 404 → throw → KHÔNG ghi đè
-    if (raw) {
-      const cd = fsUnwrap(raw);
-      if (!cd || !Array.isArray(cd.records)) {
+  const purge = _purgeSetOf(docId);
+  await _pushDocWithLock(
+    docId,
+    cd => {
+      if (!cd) return;                                     // 404: chưa có doc → không có gì để gộp
+      if (!Array.isArray(cd.records)) {
         throw new Error(`doc ${docId} trên cloud không đúng định dạng — không dám ghi đè`);
       }
       _mergeYearIntoLocal(key, cd.records, purge);
-    } else {
-      // 404: doc chưa có trên cloud. Nếu local cũng trống thì khỏi tạo doc rỗng.
-      if (!fbYearCatPayload(yr, key, dateField).records.length) return [...purge];
-    }
-  }
-  await fsSet(docId, fbYearCatPayload(yr, key, dateField)); // lỗi → throw
+    },
+    () => fbYearCatPayload(yr, key, dateField),
+    () => !fbYearCatPayload(yr, key, dateField).records.length
+  );
   return [...purge];
 }
 
-// Đẩy 1 doc meta: đọc → gộp → ghi. Lỗi → throw. Trả về purgeIds đã đẩy.
-async function _pushMetaDoc(docId, skipPull) {
+// Đẩy 1 doc meta. Lỗi → throw. Trả về purgeIds đã đẩy.
+async function _pushMetaDoc(docId) {
   const purge = _purgeSetOf(docId);
-  if (!skipPull && !_outboxIsOverwrite(docId)) {
-    const raw = await fsGet(docId);
-    let d = null;
-    if (raw) {
-      d = fsUnwrap(raw);
-      if (!d) throw new Error(`doc ${docId} trên cloud không đúng định dạng — không dám ghi đè`);
-    }
-    // meta_khach_hang chưa tồn tại → gộp với customers đời cũ nằm trong meta_cong_trinh
-    if (!d && docId === 'meta_khach_hang') {
-      const ct = fsUnwrap(await fsGet(fbDocMetaCT()));
-      if (ct && Array.isArray(ct.customers)) d = { customers: ct.customers };
-    }
-    if (d) _metaApply(docId, d, 'merge', purge);
-  }
-  await fsSet(docId, _metaPayload(docId));
+  await _pushDocWithLock(
+    docId,
+    async d => {
+      if (d) { _metaApply(docId, d, 'merge', purge); return; }
+      // meta_khach_hang chưa tồn tại → gộp với customers đời cũ nằm trong meta_cong_trinh
+      if (docId === 'meta_khach_hang') {
+        const ct = fsUnwrap(await fsGet(fbDocMetaCT()));
+        if (ct && Array.isArray(ct.customers)) _metaApply(docId, { customers: ct.customers }, 'merge', purge);
+      }
+    },
+    () => _metaPayload(docId)
+  );
   return [...purge];
 }
 
 async function pushChanges(opts = {}) {
   const silent   = opts?.silent   ?? false;
-  const skipPull = opts?.skipPull ?? false;
   const allYears = opts?.allYears ?? false;
+  if (opts?.skipPull) console.warn('[Sync] opts.skipPull đã bỏ từ GĐ2 — bỏ qua, push vẫn đọc-gộp an toàn');
   if (!fbReady()) { console.log('[Sync] Push bỏ qua — Firebase chưa cấu hình'); return false; }
   if (_syncPushing) { console.log('[Sync] Push bỏ qua — đang sync'); return false; }
 
@@ -583,14 +623,13 @@ async function pushChanges(opts = {}) {
   console.log('[Sync] ▲ Push bắt đầu —', full ? 'ĐẦY ĐỦ' : 'theo outbox',
     '| doc năm:', yearTargets.map(t => t.docId).join(',') || '(none)',
     '| meta:', metaTargets.join(',') || '(none)',
-    skipPull ? '| GHI ĐÈ (skipPull)' : '',
     '| device:', DEVICE_ID.slice(0, 8));
 
   let ok = 0, fail = 0;
   try {
     for (const t of yearTargets) {
       try {
-        const pushed = await _pushYearDoc(t, skipPull);
+        const pushed = await _pushYearDoc(t);
         _outboxClear(t.docId, pushStartTs, pushed);
         ok++;
       } catch (e) {
@@ -600,7 +639,7 @@ async function pushChanges(opts = {}) {
     }
     for (const docId of metaTargets) {
       try {
-        const pushed = await _pushMetaDoc(docId, skipPull);
+        const pushed = await _pushMetaDoc(docId);
         _outboxClear(docId, pushStartTs, pushed);
         ok++;
       } catch (e) {

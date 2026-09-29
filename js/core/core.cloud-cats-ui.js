@@ -121,7 +121,9 @@ async function fsGet(docId) {
   return r.json();
 }
 
-// GHI (upsert) 1 doc. HTTP ≠ 2xx hoặc lỗi mạng → THROW (caller coi doc đó FAIL).
+// GHI (upsert) 1 doc KHÔNG điều kiện. HTTP ≠ 2xx hoặc lỗi mạng → THROW (caller coi doc đó FAIL).
+// ⚠️ Từ GĐ2 chỉ dùng cho các chỗ CỐ Ý ghi đè: reset toàn bộ (_doResetAll), khôi phục
+// (doc có cờ overwrite trong outbox). Mọi chỗ ghi dữ liệu thường dùng fsSetIf().
 async function fsSet(docId, payload) {
   _fsCountWrite();
   let r;
@@ -139,6 +141,63 @@ async function fsSet(docId, payload) {
   }
   if (!r.ok) throw await _fsHttpError(r, `ghi ${docId}`);
   return r.json();
+}
+
+// ══ KHÓA LẠC QUAN (GĐ2) — chống 2 máy ghi đè nhau ══════════════════════
+// Ý tưởng: mỗi doc Firestore có "dấu thời gian cập nhật" updateTime (do server cấp,
+// đổi mỗi lần doc bị ghi). Khi push: ĐỌC doc (nhớ updateTime) → GỘP → GHI KÈM ĐIỀU
+// KIỆN "chỉ ghi nếu updateTime trên server VẪN y như lúc tôi đọc". Nếu máy khác đã
+// ghi chen vào giữa → server TỪ CHỐI (xung đột) → đọc lại, gộp lại, ghi lại.
+// Nhờ vậy không bao giờ có chuyện máy ghi sau xóa mất record của máy ghi trước.
+
+// Đọc 1 doc kèm updateTime → { data, updateTime, exists, raw }.
+//   data   : nội dung đã fsUnwrap (null nếu doc chưa có / không đúng định dạng)
+//   exists : doc có tồn tại trên server không (404 → false)
+// Lỗi mạng / HTTP ≠ 2xx,404 → THROW (giống fsGet).
+async function fsGetWithTime(docId) {
+  const raw = await fsGet(docId);
+  if (!raw) return { data: null, updateTime: null, exists: false, raw: null };
+  return { data: fsUnwrap(raw), updateTime: raw.updateTime || null, exists: true, raw };
+}
+
+// Phản hồi lỗi này có phải "xung đột điều kiện" (máy khác vừa ghi chen) không?
+// Firestore REST trả về tùy trường hợp: 400 FAILED_PRECONDITION (updateTime lệch),
+// 409 ALREADY_EXISTS (đòi "chưa tồn tại" nhưng doc đã có), 412, hoặc 404 khi đòi
+// updateTime cũ mà doc đã bị xóa. Xét cả mã HTTP lẫn body error.status.
+function _fsIsConflict(status, body, hadUpdateTime) {
+  const st = body && body.error && body.error.status;
+  if (status === 409 || status === 412) return true;
+  if (st === 'FAILED_PRECONDITION' || st === 'ALREADY_EXISTS' || st === 'ABORTED') return true;
+  if (status === 404 && hadUpdateTime) return true;
+  return false;
+}
+
+// GHI CÓ ĐIỀU KIỆN.
+//   updateTime có giá trị → chỉ ghi nếu doc trên server vẫn đúng updateTime đó
+//   updateTime = null     → chỉ ghi nếu doc CHƯA tồn tại (currentDocument.exists=false)
+// Xung đột → THROW Error có .conflict = true (caller đọc-gộp-ghi lại).
+// Lỗi khác (mạng, 403, 500...) → THROW Error có .status (caller coi doc đó FAIL).
+async function fsSetIf(docId, payload, updateTime) {
+  _fsCountWrite();
+  const cond = updateTime
+    ? `currentDocument.updateTime=${encodeURIComponent(updateTime)}`
+    : 'currentDocument.exists=false';
+  let r;
+  try {
+    r = await fetch(`${FS_BASE()}/${docId}?key=${FB_CONFIG.apiKey}&${cond}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fsWrap(payload))
+    });
+  } catch (e) {
+    const err = new Error(`[Firestore] Mất kết nối khi ghi ${docId}`);
+    err.status = 0; err.cause = e;
+    throw err;
+  }
+  if (r.ok) return r.json();
+  const err = await _fsHttpError(r, `ghi có điều kiện ${docId}`);
+  if (_fsIsConflict(r.status, err.body, !!updateTime)) err.conflict = true;
+  throw err;
 }
 
 // Xóa hẳn 1 doc khỏi Firestore (dùng khi dọn doc rác cấu trúc cũ).
