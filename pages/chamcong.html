@@ -394,7 +394,8 @@
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title"><span class="material-symbols-outlined msi-gap">attach_money</span>Tiền ứng Công Nhân</h5>
+                <!-- Tiêu đề đổi động: "Tiền ứng Công Nhân" (thêm mới) / "Sửa giao dịch ứng CN" (chỉnh sửa) -->
+                <h5 class="modal-title"><span class="material-symbols-outlined msi-gap">attach_money</span><span id="cc-ung-m-title">Tiền ứng Công Nhân</span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
               </div>
               <div class="modal-body">
@@ -441,7 +442,8 @@
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()"><span class="material-symbols-outlined msi-gap">save</span>Lưu giao dịch</button>
+                <!-- Text nút đổi động: "Lưu giao dịch" (thêm mới) / "Cập nhật giao dịch" (chỉnh sửa) -->
+                <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="saveCCUng()"><span class="material-symbols-outlined msi-gap">save</span><span id="cc-ung-m-save-text">Lưu giao dịch</span></button>
               </div>
             </div>
           </div>

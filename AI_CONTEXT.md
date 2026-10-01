@@ -1665,6 +1665,21 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `js/modules/thungrac/thungrac.js`, `js/core/core.state-backup.js`.
 
+### 9.30 Ứng Công Nhân: nút Sửa giao dịch trong Lịch sử công nợ (01/10/2026)
+
+**Yêu cầu:** popup "Lịch sử công nợ" của 1 CN có nút ✏️ để sửa giao dịch ứng/trả, dùng lại popup "Tiền ứng Công Nhân"; nút lưu đổi thành "Cập nhật giao dịch".
+
+**Sửa (`chamcong.ung-ledger.js`):**
+- Global mới `_ccUngEditId` (id đang sửa, `null` = thêm mới), `_ccUngEditReturnName` (tên CN để mở lại Lịch sử sau khi sửa).
+- `openCCUngModal(prefillName, editRec)`: thêm tham số `editRec` → đổ dữ liệu cũ (loại, tick Thực Lãnh, ngày, tên, tiền, CT theo `projectId`, ghi chú) và đổi tiêu đề/nút. Không truyền → thêm mới như cũ.
+- `saveCCUng()`: đang sửa → `mkUpdate` đè giao dịch cũ (giữ id/createdAt); refresh bảng Tổng Lương nếu cờ Thực Lãnh mới HOẶC cũ đang bật (bỏ tick cũng phải gỡ số khỏi tuần cũ).
+- Hàm mới `editCCUngRecord(id)`: đóng popup Lịch sử → mở popup sửa (tránh 2 modal Bootstrap chồng nhau); popup sửa đóng (Lưu/Hủy) → tự mở lại Lịch sử với số liệu mới.
+- `renderCCUngHistory`: dòng sổ cái (có id) có thêm nút `edit` cạnh nút xóa; dòng chấm công cũ (Vay/Trừ cũ) không sửa được.
+
+**Sửa (`pages/chamcong.html`):** ID mới `#cc-ung-m-title` (tiêu đề popup), `#cc-ung-m-save-text` (chữ trên nút lưu).
+
+**File đã sửa:** `js/modules/chamcong/chamcong.ung-ledger.js`, `pages/chamcong.html`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

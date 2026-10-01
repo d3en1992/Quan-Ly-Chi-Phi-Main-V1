@@ -183,7 +183,15 @@ function renderCCUngLedger() {
 }
 
 // ─── Popup "Tiền ứng CN" (Ứng tiền / Trả nợ) ─────────────────────────
-function openCCUngModal(prefillName) {
+// Trạng thái chế độ SỬA của popup:
+//   _ccUngEditId         = id giao dịch đang sửa (null → đang thêm mới)
+//   _ccUngEditReturnName = tên CN của popup Lịch sử đã mở trước đó;
+//                          đóng popup sửa xong sẽ mở lại Lịch sử của CN này.
+let _ccUngEditId = null;
+let _ccUngEditReturnName = null;
+
+// editRec: truyền record (ung_v1) khi mở ở chế độ SỬA; bỏ trống khi thêm mới.
+function openCCUngModal(prefillName, editRec) {
   if (typeof rebuildCCNameList === "function") rebuildCCNameList();
 
   const dateEl = document.getElementById("cc-ung-m-date");
@@ -192,14 +200,47 @@ function openCCUngModal(prefillName) {
   const ctEl = document.getElementById("cc-ung-m-ct");
   const ndEl = document.getElementById("cc-ung-m-nd");
   const kindUng = document.getElementById("cc-ung-m-kind-ung");
-  if (kindUng) kindUng.checked = true; // mặc định: Ứng tiền
+  const kindTra = document.getElementById("cc-ung-m-kind-tra");
   const tlChk = document.getElementById("cc-ung-m-tl");
-  if (tlChk) tlChk.checked = false; // mặc định: KHÔNG cộng/trừ vào Thực Lãnh
-  if (dateEl) dateEl.value = today();
-  if (nameEl) nameEl.value = prefillName || "";
-  if (tienEl) tienEl.value = "";
-  if (ndEl) ndEl.value = "";
-  if (ctEl) ctEl.innerHTML = _buildProjOpts("", "-- Không gắn công trình --");
+
+  _ccUngEditId = editRec ? editRec.id : null;
+
+  if (editRec) {
+    // ── Chế độ SỬA: đổ dữ liệu giao dịch cũ vào form ──
+    const isTra = editRec.cnKind === "tra";
+    if (kindUng) kindUng.checked = !isTra;
+    if (kindTra) kindTra.checked = isTra;
+    if (tlChk) tlChk.checked = !!editRec.tinhVaoThucLanh;
+    if (dateEl) dateEl.value = editRec.ngay || today();
+    if (nameEl) nameEl.value = editRec.tp || "";
+    if (tienEl)
+      tienEl.value = Number(editRec.tien) ? numFmt(Number(editRec.tien)) : "";
+    if (ndEl) ndEl.value = editRec.nd || "";
+    // Ưu tiên tên CT theo projectId (tên CT có thể đã đổi), fallback tên lưu sẵn
+    const ctName = editRec.projectId
+      ? resolveProjectName(editRec)
+      : editRec.congtrinh || "";
+    if (ctEl)
+      ctEl.innerHTML = _buildProjOpts(ctName, "-- Không gắn công trình --");
+  } else {
+    // ── Chế độ THÊM MỚI: form trống ──
+    if (kindUng) kindUng.checked = true; // mặc định: Ứng tiền
+    if (tlChk) tlChk.checked = false; // mặc định: KHÔNG cộng/trừ vào Thực Lãnh
+    if (dateEl) dateEl.value = today();
+    if (nameEl) nameEl.value = prefillName || "";
+    if (tienEl) tienEl.value = "";
+    if (ndEl) ndEl.value = "";
+    if (ctEl) ctEl.innerHTML = _buildProjOpts("", "-- Không gắn công trình --");
+  }
+
+  // Đổi tiêu đề + text nút Lưu theo chế độ
+  const titleEl = document.getElementById("cc-ung-m-title");
+  if (titleEl)
+    titleEl.textContent = editRec ? "Sửa giao dịch ứng CN" : "Tiền ứng Công Nhân";
+  const saveTxt = document.getElementById("cc-ung-m-save-text");
+  if (saveTxt)
+    saveTxt.textContent = editRec ? "Cập nhật giao dịch" : "Lưu giao dịch";
+
   _ccUngSyncTLLabel();   // đồng bộ text checkbox theo loại giao dịch
   _ccUngSyncRoleBadge(); // đồng bộ badge vai trò theo tên (nếu có prefill)
 
@@ -288,20 +329,39 @@ function saveCCUng() {
     );
   if (tien <= 0) return toast("Nhập số tiền > 0!", "error");
 
-  ungRecords.unshift(
-    mkRecord({
-      ngay: date,
-      loai: "congnhan",
-      cnKind: kind === "tra" ? "tra" : "ung",
-      tp: canonical,
-      congtrinh: ct,
-      projectId: ctPid || null,
-      tien,
-      nd,
-      tinhVaoThucLanh: tinhVaoTL, // cờ đồng bộ vào cột Thực Lãnh
-    }),
-  );
+  // Dữ liệu chung cho cả thêm mới lẫn cập nhật
+  const fields = {
+    ngay: date,
+    loai: "congnhan",
+    cnKind: kind === "tra" ? "tra" : "ung",
+    tp: canonical,
+    congtrinh: ct,
+    projectId: ctPid || null,
+    tien,
+    nd,
+    tinhVaoThucLanh: tinhVaoTL, // cờ đồng bộ vào cột Thực Lãnh
+  };
+
+  const isEdit = !!_ccUngEditId;
+  // Ghi nhận cờ Thực Lãnh CŨ để biết có cần refresh bảng Tổng Lương không
+  // (bỏ tick khi sửa cũng phải refresh để gỡ số tiền khỏi Thực Lãnh tuần cũ).
+  let oldTinhVaoTL = false;
+  if (isEdit) {
+    // ── Chế độ SỬA: cập nhật đè lên giao dịch cũ (giữ id, createdAt) ──
+    const idx = ungRecords.findIndex(
+      (r) => String(r.id) === String(_ccUngEditId),
+    );
+    if (idx < 0 || ungRecords[idx].deletedAt)
+      return toast("Không tìm thấy giao dịch cần sửa (có thể đã bị xóa)!", "error");
+    oldTinhVaoTL = !!ungRecords[idx].tinhVaoThucLanh;
+    ungRecords[idx] = mkUpdate(ungRecords[idx], fields);
+  } else {
+    // ── Chế độ THÊM MỚI ──
+    ungRecords.unshift(mkRecord(fields));
+  }
   save("ung_v1", ungRecords);
+  // Nếu đổi tên CN khi sửa → popup Lịch sử mở lại theo tên mới
+  if (isEdit && _ccUngEditReturnName) _ccUngEditReturnName = canonical;
 
   const el = document.getElementById("cc-ung-modal");
   if (el && typeof bootstrap !== "undefined")
@@ -311,7 +371,7 @@ function saveCCUng() {
   renderCCUngLedger();
   // Nếu có tick "tính vào Thực Lãnh" → refresh các bảng Tổng Lương Tuần để cột
   // Thực Lãnh cập nhật ngay (guard vì các hàm nằm ở file nạp sau).
-  if (tinhVaoTL) {
+  if (tinhVaoTL || oldTinhVaoTL) {
     if (typeof renderCCTLTMini === "function") renderCCTLTMini();
     if (typeof renderCCTLT === "function") renderCCTLT();
   }
@@ -322,9 +382,50 @@ function saveCCUng() {
       : " · đã cộng vào Thực Lãnh tuần"
     : "";
   toast(
-    `✅ Đã ghi ${kind === "tra" ? "trả nợ" : "ứng"} ${numFmt(tien)} cho ${canonical}${tlNote}`,
+    isEdit
+      ? `✅ Đã cập nhật giao dịch ${kind === "tra" ? "trả nợ" : "ứng"} ${numFmt(tien)} của ${canonical}${tlNote}`
+      : `✅ Đã ghi ${kind === "tra" ? "trả nợ" : "ứng"} ${numFmt(tien)} cho ${canonical}${tlNote}`,
     "success",
   );
+}
+
+// ─── Sửa 1 giao dịch từ popup Lịch sử công nợ ─────────────────────────
+// Bootstrap không hỗ trợ tốt 2 modal chồng nhau → đóng popup Lịch sử trước,
+// mở popup "Tiền ứng CN" ở chế độ sửa; khi popup sửa đóng (Lưu hoặc Hủy)
+// sẽ tự mở lại popup Lịch sử của công nhân đó (đã cập nhật số liệu).
+function editCCUngRecord(id) {
+  const rec = ungRecords.find((r) => String(r.id) === String(id));
+  if (!rec || rec.deletedAt) return toast("Không tìm thấy giao dịch!", "error");
+  _ccUngEditReturnName = rec.tp || null;
+
+  const histEl = document.getElementById("cc-ung-hist-modal");
+  const editEl = document.getElementById("cc-ung-modal");
+  if (typeof bootstrap === "undefined" || !editEl) return;
+
+  // Khi popup sửa đóng → thoát chế độ sửa + mở lại Lịch sử (chỉ chạy 1 lần)
+  editEl.addEventListener(
+    "hidden.bs.modal",
+    () => {
+      _ccUngEditId = null;
+      const back = _ccUngEditReturnName;
+      _ccUngEditReturnName = null;
+      if (back) openCCUngHist(back);
+    },
+    { once: true },
+  );
+
+  const histModal = histEl ? bootstrap.Modal.getInstance(histEl) : null;
+  if (histEl && histEl.classList.contains("show") && histModal) {
+    // Chờ popup Lịch sử đóng hẳn rồi mới mở popup sửa (tránh lỗi backdrop)
+    histEl.addEventListener(
+      "hidden.bs.modal",
+      () => openCCUngModal(rec.tp, rec),
+      { once: true },
+    );
+    histModal.hide();
+  } else {
+    openCCUngModal(rec.tp, rec);
+  }
 }
 
 // ─── Lịch sử ứng/trả của 1 công nhân ─────────────────────────────────
@@ -402,8 +503,13 @@ function renderCCUngHistory(name) {
     .map((it) => {
       totUng += it.ung;
       totTru += it.tru;
+      // Chỉ giao dịch sổ cái (có id) mới sửa/xóa được; dữ liệu chấm công cũ thì không
+      const idSafe = it.id ? String(it.id).replace(/'/g, "\\'") : "";
       const delBtn = it.id
-        ? `<button class="del-btn" title="Xóa giao dịch" onclick="delCCUngRecord('${String(it.id).replace(/'/g, "\\'")}')"><span class="material-symbols-outlined">close</span></button>`
+        ? `<span style="display:inline-flex;gap:2px;white-space:nowrap">` +
+          `<button class="del-btn" title="Sửa giao dịch" style="color:var(--gold)" onclick="editCCUngRecord('${idSafe}')"><span class="material-symbols-outlined">edit</span></button>` +
+          `<button class="del-btn" title="Xóa giao dịch" onclick="delCCUngRecord('${idSafe}')"><span class="material-symbols-outlined">close</span></button>` +
+          `</span>`
         : "";
       const typeLabel =
         it.type === "tra"
