@@ -305,7 +305,6 @@ select.cell-input {
 @media (max-width: 480px) {
   .detail-invoice-footer { align-items: stretch; padding: 10px 12px; }
   .detail-footer-row { max-width: 100%; }
-  /* detail-footer-ck-input → form-control (Sprint 3) */
 }
 .detail-footer-label {
   font-size: 12px; font-weight: 600; color: var(--bs-secondary-color);
@@ -316,9 +315,29 @@ select.cell-input {
   font-size: 14px; color: var(--bs-body-color); min-width: 130px; text-align: right;
 }
 .detail-footer-val.hi { color: var(--bs-success); font-size: 16px; }
-/* detail-footer-ck-input removed — now form-control form-control-sm text-end (Sprint 3) */
-.detail-footer-total-row { padding-top: 8px; border-top: 2px solid var(--bs-border-color-translucent); margin-top: 2px; }
+/* Footer chỉ còn 1 dòng Tổng thành tiền → bỏ đường kẻ ngăn cách phía trên (01/10/2026) */
 .detail-footer-total-row .detail-footer-label { color: var(--bs-body-color); font-size: 13px; }
+
+/* ── Ô chọn có gõ tìm kiếm (searchable select) — dùng ở header Hóa Đơn Chi Tiết ──
+   <select> gốc bị ẩn (vẫn giữ value + option cho code cũ), ô input hiển thị phía trên. */
+.ss-wrap { position: relative; display: inline-block; }
+.ss-wrap > select { display: none !important; }
+.ss-input { width: 100%; cursor: text; text-overflow: ellipsis; }
+.ss-input.sheet-cell-invalid { border-color: var(--bs-danger); box-shadow: 0 0 0 .15rem rgba(var(--bs-danger-rgb), .25); }
+.ss-list {
+  position: absolute; top: calc(100% + 2px); left: 0; z-index: 1060;
+  min-width: 100%; width: max-content; max-width: min(520px, 92vw); max-height: 300px; overflow-y: auto;
+  background: var(--bs-body-bg); color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color); border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.15); padding: 4px 0; display: none;
+}
+.ss-list.open { display: block; }
+.ss-item { padding: 6px 12px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-item.placeholder { color: var(--bs-secondary-color); font-style: italic; }
+.ss-item.selected { font-weight: 700; }
+.ss-item.active, .ss-item:hover { background: var(--bs-primary-bg-subtle); color: var(--bs-emphasis-color); }
+.ss-item mark { padding: 0; background: rgba(var(--bs-warning-rgb), .35); color: inherit; }
+.ss-empty { padding: 6px 12px; font-size: 12px; color: var(--bs-secondary-color); }
 .detail-nd-bar {
   background: var(--bs-body-bg); border: 1px solid var(--bs-border-color);
   border-top: none; border-radius: 0 0 10px 10px;

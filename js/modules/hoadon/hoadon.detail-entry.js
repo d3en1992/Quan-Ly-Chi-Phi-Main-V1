@@ -71,19 +71,8 @@ function _initDetailFormSelects() {
       ([...cats.nguoiTH]||[]).sort((a,b)=>a.localeCompare(b,'vi')).map(v=>`<option value="${x(v)}" ${v===detNguoiV?'selected':''}>${x(v)}</option>`).join('');
   }
 
-  // PHẦN 3: Format #detail-footer-ck (số tiền → hàng nghìn, % → giữ nguyên)
-  const footerCk = document.getElementById('detail-footer-ck');
-  if(footerCk && !footerCk.dataset.fmtInit) {
-    footerCk.dataset.fmtInit = '1';
-    footerCk.addEventListener('focus', function() {
-      const v = this.value.trim();
-      if(v && !v.endsWith('%')) { const n = parseMoney(v); if(n) this.value = String(n); }
-    });
-    footerCk.addEventListener('blur', function() {
-      const v = this.value.trim();
-      if(v && !v.endsWith('%')) { const n = parseMoney(v); this.value = n ? numFmt(n) : v; }
-    });
-  }
+  // Biến 4 dropdown header thành ô chọn có GÕ ĐỂ TÌM (idempotent — gọi lại không tạo trùng)
+  [loaiSel, ctSel, nccSel, detNguoiSel].forEach(s => _ssEnhance(s));
 }
 
 function renderDetailRowHTML(d, num) {
@@ -174,17 +163,13 @@ function calcDetailRow(tr) {
   }
 }
 
+// Tổng thành tiền = cộng cột Thành tiền của mọi dòng (CK đã tính riêng từng dòng).
+// (01/10/2026) Bỏ "Tổng Cộng (TC)" + "Chiết Khấu Tổng" → không còn trừ CK cấp hóa đơn.
 function calcDetailTotals() {
-  let tc = 0;
+  let tong = 0;
   getDetailRows().forEach(tr => {
-    tc += parseInt(tr.dataset.tt||'0', 10) || 0;
+    tong += parseInt(tr.dataset.tt||'0', 10) || 0;
   });
-  const tcEl = document.getElementById('detail-tc');
-  if(tcEl) tcEl.textContent = numFmt(tc);
-
-  // Dùng calcRowMoney(sl=1, dongia=tc, ck) để tái dùng logic CK
-  const ckStr = (document.getElementById('detail-footer-ck')?.value||'').trim();
-  const tong = calcRowMoney(1, tc, ckStr);
 
   const tongEl = document.getElementById('detail-tong');
   if(tongEl) { tongEl.textContent = numFmt(tong); tongEl.dataset.raw = tong; }
@@ -280,11 +265,12 @@ function saveDetailInvoice() {
   const tong = parseInt(document.getElementById('detail-tong').dataset.raw||'0') || 0;
   const nd = document.getElementById('detail-nd').value.trim();
   const ncc = document.getElementById('detail-ncc')?.value || '';
-  const footerCkStr = (document.getElementById('detail-footer-ck')?.value||'').trim();
   const container = document.getElementById('inr-hd-chitiet');
   const editId = container.dataset.editId;
 
-  const invFields = _ensureInvRef({ ngay, congtrinh: ct, loai, nguoi: detailNguoi, ncc, nd, tien: tong, thanhtien: tong, footerCkStr, items, source: 'detail', projectId: _detCtPid || null });
+  // footerCkStr: '' → xóa CK tổng cũ (nếu HĐ cũ có) để dữ liệu khớp tổng mới = tổng các dòng
+  // (mkUpdate gộp đè lên record cũ nên phải ghi rõ '' thay vì bỏ field)
+  const invFields = _ensureInvRef({ ngay, congtrinh: ct, loai, nguoi: detailNguoi, ncc, nd, tien: tong, thanhtien: tong, footerCkStr: '', items, source: 'detail', projectId: _detCtPid || null });
 
   if(editId) {
     const idx = invoices.findIndex(i => String(i.id) === String(editId));
@@ -314,8 +300,6 @@ function clearDetailForm() {
   document.getElementById('detail-tbody').innerHTML = '';
   for(let i=0; i<5; i++) addDetailRow();
   _initDetailSheetGrid();
-  const ckEl = document.getElementById('detail-footer-ck');
-  if(ckEl) ckEl.value = '';
   const ndEl = document.getElementById('detail-nd');
   if(ndEl) ndEl.value = '';
   const nccEl = document.getElementById('detail-ncc');
@@ -416,22 +400,188 @@ function openDetailEdit(inv) {
 
     document.getElementById('detail-nd').value = inv.nd || '';
 
-    const ckEl2 = document.getElementById('detail-footer-ck');
-    if(ckEl2) {
-      const ckRaw = inv.footerCkStr || '';
-      ckEl2.value = (ckRaw && !ckRaw.endsWith('%'))
-        ? (() => { const n = parseMoney(ckRaw); return n ? numFmt(n) : ckRaw; })()
-        : ckRaw;
-    }
     calcDetailTotals();
     document.getElementById('inr-hd-chitiet').dataset.editId = String(inv.id);
     const saveBtn2 = document.getElementById('detail-save-btn');
     if(saveBtn2) saveBtn2.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Cập Nhật';
-    toast('✏️ Chỉnh sửa hóa đơn chi tiết rồi nhấn 💾 Cập Nhật','success');
+    // HĐ cũ có "Chiết khấu tổng" (tính năng đã bỏ) → cảnh báo tổng sẽ tính lại khi Cập Nhật
+    if ((inv.footerCkStr || '').trim()) {
+      toast(`⚠️ HĐ này có Chiết khấu tổng cũ "${inv.footerCkStr}" — tính năng đã bỏ. Nếu Cập Nhật, tổng = cộng các dòng (hãy nhập CK vào từng dòng nếu cần).`, 'error');
+    } else {
+      toast('✏️ Chỉnh sửa hóa đơn chi tiết rồi nhấn 💾 Cập Nhật','success');
+    }
   }, 120);
 }
 
 // Trả về tất cả <tr> trong bảng hóa đơn chi tiết
 function getDetailRows() {
   return [...document.querySelectorAll('#detail-tbody tr')];
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Ô CHỌN CÓ GÕ ĐỂ TÌM (searchable select) — (01/10/2026)
+// ══════════════════════════════════════════════════════════════════
+// Cách làm: GIỮ NGUYÊN <select> gốc (ẩn đi) làm nơi lưu giá trị → mọi code cũ
+// (đọc .value, selectedOptions[0].dataset.pid, dựng lại innerHTML, _setSelectFlexible,
+// validateCategoryCell...) vẫn chạy y như trước. Phía trên đặt 1 ô <input> để gõ:
+//   • Bấm vào ô → hiện toàn bộ danh sách; gõ chữ → lọc theo tên (không phân biệt dấu/hoa thường)
+//   • ↑/↓ di chuyển, Enter chọn, Esc hủy; click chuột để chọn
+//   • Rời ô mà chữ gõ không khớp mục nào → trả lại tên đang chọn (không cho nhập tên lạ)
+// Đồng bộ ngược: khi code khác đổi option / gán .value cho <select> → ô input tự cập nhật.
+
+// Chuẩn hóa để so khớp: bỏ dấu tiếng Việt, đ→d, chữ thường, gộp khoảng trắng
+function _ssNorm(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Cập nhật chữ hiển thị trên ô input theo option đang chọn của <select>
+function _ssRefresh(sel) {
+  const st = sel && sel._ss;
+  if (!st) return;
+  const opt = sel.selectedOptions[0];
+  const placeholderOpt = sel.options[0] && sel.options[0].value === '' ? sel.options[0] : null;
+  st.input.placeholder = placeholderOpt ? placeholderOpt.textContent : '';
+  // Đang mở danh sách để gõ thì không ghi đè chữ người dùng đang gõ
+  if (!st.open) st.input.value = (opt && opt.value !== '') ? opt.textContent : '';
+  st.input.title = st.input.value;
+  // Đồng bộ trạng thái "ô sai" (validateCategoryCell gắn class lên <select>)
+  st.input.classList.toggle('sheet-cell-invalid', sel.classList.contains('sheet-cell-invalid'));
+  if (sel.title) st.input.title = sel.title;
+}
+
+// Vẽ danh sách gợi ý theo chữ đang gõ
+function _ssRenderList(sel, query) {
+  const st = sel._ss;
+  const q = _ssNorm(query);
+  const esc = typeof x === 'function' ? x : (s => String(s));
+  st.items = [...sel.options].filter(o => !o.disabled && (!q || o.value === '' || _ssNorm(o.textContent).includes(q)));
+  // Khi đang gõ tìm thì ẩn dòng "-- Chọn ... --" cho gọn
+  if (q) st.items = st.items.filter(o => o.value !== '');
+  if (!st.items.length) {
+    st.list.innerHTML = '<div class="ss-empty">Không tìm thấy — kiểm tra lại tên hoặc thêm ở tab Danh Mục</div>';
+    st.active = -1;
+    return;
+  }
+  // Mặc định tô sáng mục đang chọn (nếu có trong danh sách), không thì mục đầu tiên
+  const curIdx = st.items.findIndex(o => o.value === sel.value && o.value !== '');
+  st.active = q ? 0 : Math.max(0, curIdx);
+  st.list.innerHTML = st.items.map((o, i) => {
+    const cls = ['ss-item', o.value === '' ? 'placeholder' : '', o.value === sel.value && o.value !== '' ? 'selected' : '', i === st.active ? 'active' : ''].join(' ');
+    return `<div class="${cls}" data-i="${i}" title="${esc(o.textContent)}">${esc(o.textContent)}</div>`;
+  }).join('');
+  _ssScrollActive(sel);
+}
+
+function _ssScrollActive(sel) {
+  const el = sel._ss.list.querySelector('.ss-item.active');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+function _ssOpen(sel) {
+  const st = sel._ss;
+  st.open = true;
+  st.list.classList.add('open');
+  _ssRenderList(sel, '');
+}
+
+function _ssClose(sel) {
+  const st = sel._ss;
+  st.open = false;
+  st.list.classList.remove('open');
+  _ssRefresh(sel); // trả chữ hiển thị về mục đang chọn
+}
+
+// Chọn 1 option → gán vào <select> gốc + phát sự kiện change như người dùng chọn thật
+function _ssPick(sel, opt) {
+  if (!opt) return;
+  sel.value = opt.value;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  _ssClose(sel);
+}
+
+function _ssEnhance(sel) {
+  if (!sel || sel._ss || sel.tagName !== 'SELECT') return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'ss-wrap';
+  // Giữ độ rộng tối thiểu như <select> cũ để layout header không bị xô lệch
+  wrap.style.minWidth = sel.style.minWidth || '160px';
+  if (sel.style.maxWidth) wrap.style.maxWidth = sel.style.maxWidth;
+  // <select> w-auto tự giãn theo tên dài nhất → lấy độ rộng thực tế lúc còn hiển thị
+  const w = sel.offsetWidth;
+  if (w > 0) wrap.style.width = w + 'px';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'form-select form-select-sm ss-input';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.id = sel.id ? sel.id + '-ss' : '';
+  const list = document.createElement('div');
+  list.className = 'ss-list';
+
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(input);
+  wrap.appendChild(list);
+  wrap.appendChild(sel);
+  sel._ss = { wrap, input, list, items: [], active: -1, open: false };
+
+  // Bắt mọi lần code khác gán sel.value = ... (không phát sự kiện) → cập nhật ô hiển thị
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  Object.defineProperty(sel, 'value', {
+    configurable: true,
+    get() { return desc.get.call(this); },
+    set(v) { desc.set.call(this, v); _ssRefresh(this); },
+  });
+  // Option bị dựng lại (innerHTML) hoặc class "ô sai" thay đổi → cập nhật ô hiển thị
+  new MutationObserver(() => _ssRefresh(sel))
+    .observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'title'] });
+  sel.addEventListener('change', () => _ssRefresh(sel));
+
+  input.addEventListener('focus', () => { _ssOpen(sel); input.select(); });
+  input.addEventListener('click', () => { if (!sel._ss.open) { _ssOpen(sel); input.select(); } });
+  input.addEventListener('input', () => {
+    if (!sel._ss.open) { sel._ss.open = true; list.classList.add('open'); }
+    _ssRenderList(sel, input.value);
+  });
+  input.addEventListener('keydown', e => {
+    const st = sel._ss;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!st.open) { _ssOpen(sel); return; }
+      if (!st.items.length) return;
+      st.active = (st.active + (e.key === 'ArrowDown' ? 1 : -1) + st.items.length) % st.items.length;
+      list.querySelectorAll('.ss-item').forEach((el, i) => el.classList.toggle('active', i === st.active));
+      _ssScrollActive(sel);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (st.open && st.active >= 0) _ssPick(sel, st.items[st.active]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      _ssClose(sel);
+      input.blur();
+    } else if (e.key === 'Tab') {
+      // Tab: nếu đang gõ dở và có đúng mục tô sáng → chọn luôn rồi sang ô kế
+      if (st.open && input.value.trim() && st.active >= 0) _ssPick(sel, st.items[st.active]);
+    }
+  });
+  input.addEventListener('blur', () => {
+    const st = sel._ss;
+    if (!st.open) return;
+    // Chữ gõ khớp CHÍNH XÁC 1 mục (không phân biệt dấu) → chọn mục đó; không thì giữ mục cũ
+    const typed = _ssNorm(input.value);
+    if (typed) {
+      const exact = [...sel.options].find(o => o.value !== '' && _ssNorm(o.textContent) === typed);
+      if (exact && exact.value !== sel.value) { _ssPick(sel, exact); return; }
+    }
+    _ssClose(sel);
+  });
+  // mousedown + preventDefault: chọn được trước khi ô input mất focus (blur)
+  list.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const it = e.target.closest('.ss-item');
+    if (it) _ssPick(sel, sel._ss.items[+it.dataset.i]);
+  });
+
+  _ssRefresh(sel);
 }

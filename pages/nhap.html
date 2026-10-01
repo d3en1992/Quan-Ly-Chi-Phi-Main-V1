@@ -178,22 +178,9 @@
               </div>
             </div>
 
-            <!-- Footer: TC, chiết khấu tổng, tổng thành tiền -->
+            <!-- Footer: chỉ còn Tổng thành tiền (= tổng cột Thành tiền các dòng).
+                 (01/10/2026) Đã bỏ "Tổng Cộng (TC)" và "Chiết Khấu Tổng" — CK nhập theo từng dòng. -->
             <div class="detail-invoice-footer">
-              <div class="detail-footer-row">
-                <span class="detail-footer-label">Tổng Cộng (TC)</span>
-                <span class="detail-footer-val" id="detail-tc">0</span>
-              </div>
-              <div class="detail-footer-row">
-                <span class="detail-footer-label">Chiết Khấu Tổng</span>
-                <input
-                  class="form-control form-control-sm text-end"
-                  style="width:140px"
-                  id="detail-footer-ck"
-                  placeholder="% hoặc số tiền..."
-                  oninput="calcDetailTotals()"
-                />
-              </div>
               <div class="detail-footer-row detail-footer-total-row">
                 <span class="detail-footer-label">Tổng Thành Tiền</span>
                 <span class="detail-footer-val hi" id="detail-tong">0</span>

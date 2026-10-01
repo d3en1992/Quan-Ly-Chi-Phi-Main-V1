@@ -1698,6 +1698,18 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `js/core/core.cloud-cats-ui.js`, `js/sync/sync.js`, `js/modules/danhmuc/danhmuc.categories.js`, `js/modules/nhapxuat/nhapxuat.import.js`.
 
+### 9.32 Hóa Đơn Chi Tiết: dropdown gõ để tìm + bỏ TC/Chiết khấu tổng (01/10/2026)
+
+**1. Dropdown gõ để tìm** (Loại · Công trình · NCC · Người TH):
+- Hàm mới trong `hoadon.detail-entry.js`: `_ssEnhance(sel)`, `_ssRefresh`, `_ssRenderList`, `_ssOpen`, `_ssClose`, `_ssPick`, `_ssScrollActive`, `_ssNorm`. Gọi ở cuối `_initDetailFormSelects()`.
+- `<select>` gốc GIỮ NGUYÊN (ẩn trong `.ss-wrap`) → code cũ đọc `.value`/`dataset.pid`/dựng lại `innerHTML` không đổi. Ô `<input id="<selectId>-ss">` hiển thị phía trên; lọc không dấu; ↑↓/Enter/Esc/Tab; rời ô mà không khớp → trả về mục cũ.
+- Đồng bộ ngược: override `value` setter trên instance + `MutationObserver` (option, class `sheet-cell-invalid`, title).
+- CSS mới `.ss-wrap`, `.ss-input`, `.ss-list`, `.ss-item`, `.ss-empty` (style.css).
+
+**2. Bỏ "Tổng Cộng (TC)" + "Chiết Khấu Tổng":** xóa `#detail-tc`, `#detail-footer-ck` (nhap.html) và code liên quan; `calcDetailTotals` = tổng cột Thành tiền. `saveDetailInvoice` ghi `footerCkStr: ''`. `openDetailEdit` cảnh báo nếu HĐ cũ có `footerCkStr`. Giữ nguyên `footerCkStr` trong nhập/xuất Excel (`nhapxuat.parsers.js`, `nhapxuat.export.js`) để file cũ vẫn đọc được.
+
+**File đã sửa:** `pages/nhap.html`, `js/modules/hoadon/hoadon.detail-entry.js`, `assets/css/style.css`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
