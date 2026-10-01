@@ -633,6 +633,10 @@ function _catUsageScan(type) {
   } else if (type === 'ncc') {
     invs.forEach(i => add(rn(i, 'inv', 'ncc', i.ncc)));
     ungs.forEach(r => { if (r.loai === 'nhacungcap') add(rn(r, 'ung', 'tp', r.tp)); });
+    // HĐ chấm công có NCC mặc định "CÔNG TY NGUYỄN HỮU" (CC_DEFAULT_NCC, tienich.js)
+    if (typeof getInvoicesCached === 'function') {
+      getInvoicesCached().forEach(i => { if (i && i.source === 'cc') add(i.ncc); });
+    }
   } else if (type === 'nguoi') {
     // CHỈ HĐ nhập tay — HĐ chấm công có "người" là tên công nhân, không phải Người TH
     invs.forEach(i => add(rn(i, 'inv', 'nguoi', i.nguoi)));

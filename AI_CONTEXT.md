@@ -1747,6 +1747,16 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `pages/nhap.html`, `js/core/core.cloud-cats-ui.js`, `js/core/core.state-backup.js`, `js/app/main.js`, `js/modules/danhmuc/danhmuc.categories.js`, `js/modules/hoadon/hoadon.sheet-grid.js`, `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`, `js/modules/hoadon/hoadon.list-trash.js`.
 
+### 9.35 Cảnh báo trùng 100% + NCC mặc định cho HĐ chấm công (01/10/2026)
+
+**1. Cảnh báo trùng lặp 100%** (`hoadon.quick-entry.js`): hằng `_DUP_MSG`, hàm mới `_invDupKey` (ngày | projectId hoặc tên CT | loại | người TH | NCC | tiền | nội dung | dòng hàng — so không dấu/hoa thường), `_findExactDupInvoices(list)` (so HĐ đã lưu chưa xóa, bỏ qua chính HĐ đang sửa qua `_selfId`, bắt cả 2 dòng giống nhau trong cùng form), `_confirmDupSave` (confirm, liệt kê tối đa 5 HĐ).
+- `saveAllRows`: bước 1 trùng 100% (cả thêm mới + cập nhật) → OK lưu luôn (bỏ bước 2), Hủy giữ form; bước 2 vẫn là so gần giống cũ (`_showDupModal`).
+- `saveDetailInvoice`: kiểm tra trước khi ghi (cả dòng hàng).
+
+**2. NCC mặc định cho HĐ chấm công** (`legacy/tienich.js`): hằng mới `CC_DEFAULT_NCC = 'CÔNG TY NGUYỄN HỮU'`; `buildInvoices()` gán cho HĐ Nhân Công + HĐ Mua Lẻ. HĐ chấm công tính động từ `cc_v2` (không lưu `inv_v3`) → áp dụng ngay cho toàn bộ dữ liệu cũ/mới/import, KHÔNG cần ghi lại cloud. `_catUsageScan('ncc')` thêm NCC của HĐ chấm công → tự có trong danh mục NCC (và không xóa được).
+
+**File đã sửa:** `js/legacy/tienich.js`, `js/core/core.cloud-cats-ui.js`, `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

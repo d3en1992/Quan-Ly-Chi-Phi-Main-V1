@@ -321,7 +321,21 @@ function saveAllRows(skipDupCheck) {
   if(errRow>0) { toast(`${errRow} dòng có lỗi (thiếu thông tin hoặc công trình đã quyết toán)!`,'error'); return; }
   if(!rows.length) { toast('Không có dòng hợp lệ!','error'); return; }
 
-  // Kiểm tra trùng — chỉ cho dòng MỚI (không phải edit)
+  // (01/10/2026) Bước 1 — trùng 100% (mọi trường) với HĐ đã lưu hoặc giữa các dòng trong form,
+  // áp dụng cả khi THÊM MỚI lẫn CẬP NHẬT (bỏ qua chính HĐ đang sửa).
+  // OK → lưu luôn (bỏ qua bước so gần giống bên dưới để không hỏi 2 lần); Hủy → giữ form.
+  if(!skipDupCheck) {
+    const exact = _findExactDupInvoices(rows.map(r => ({
+      ..._ensureInvRef({ ...r.payload, thanhtien: r.payload.tien }), _selfId: r.editId,
+    })));
+    if (exact.length) {
+      if (!_confirmDupSave(exact)) return;
+      _doSaveRows(rows);
+      return;
+    }
+  }
+
+  // Bước 2 — gần giống (cùng ngày + CT + số tiền, nội dung giống ≥70%) — chỉ cho dòng MỚI
   if(!skipDupCheck) {
     const newRows = rows.filter(r => !r.editId);
     const dupRows = [];
@@ -428,6 +442,54 @@ function forceSaveAll() {
   const overlay = document.getElementById('dup-modal-overlay');
   const allRows = overlay._allRows;
   if(allRows) _doSaveRows(allRows);
+}
+
+// ══ CẢNH BÁO TRÙNG LẶP 100% (01/10/2026) ═════════════════════════════
+// "Chữ ký" của 1 hóa đơn: Ngày | Công trình | Loại | Người TH | NCC | Số tiền | Nội dung |
+// các dòng hàng (HĐ chi tiết). So khớp không phân biệt hoa/thường, dấu, khoảng trắng thừa.
+// Công trình so theo projectId (nếu có) để tránh lệch do đổi tên CT.
+const _DUP_MSG = 'Phát hiện hóa đơn trùng lặp với dữ liệu đã nhập. Bạn có chắc chắn muốn lưu tiếp không?';
+function _invDupKey(r) {
+  const n = v => (typeof normalizeKey === 'function' ? normalizeKey(v || '') : String(v || '').toLowerCase().trim());
+  const ct = r.projectId ? 'pid:' + r.projectId : 'ct:' + n(r.congtrinh);
+  const items = Array.isArray(r.items)
+    ? r.items.map(it => [n(it.ten), n(it.dv), Number(it.sl) || 0, Number(it.dongia) || 0, n(it.ck)].join('~')).join(';')
+    : '';
+  return [r.ngay || '', ct, n(r.loai), n(r.nguoi), n(r.ncc),
+          Number(r.thanhtien || r.tien) || 0, n(r.nd), items].join('|');
+}
+
+/**
+ * Tìm HĐ đã lưu trùng 100% với các HĐ sắp lưu.
+ * @param {Array<Object>} list  mỗi phần tử: field HĐ (đã qua _ensureInvRef) + _selfId (id HĐ đang sửa, nếu có)
+ * @returns {Array<{rec, dup}>} danh sách cặp trùng (dup = HĐ đã lưu, hoặc dòng khác trong cùng form)
+ */
+function _findExactDupInvoices(list) {
+  const saved = new Map(); // key → HĐ đã lưu (chưa xóa, HĐ nhập tay)
+  (typeof invoices !== 'undefined' ? invoices : []).forEach(i => {
+    if (!i || i.deletedAt || i.ccKey) return;
+    const k = _invDupKey(i);
+    if (!saved.has(k)) saved.set(k, []);
+    saved.get(k).push(i);
+  });
+  const out = [];
+  const inForm = new Map(); // phát hiện 2 dòng giống hệt nhau ngay trong form
+  list.forEach(rec => {
+    const k = _invDupKey(rec);
+    const hit = (saved.get(k) || []).find(i => String(i.id) !== String(rec._selfId || ''));
+    if (hit) out.push({ rec, dup: hit });
+    else if (inForm.has(k)) out.push({ rec, dup: inForm.get(k) });
+    inForm.set(k, rec);
+  });
+  return out;
+}
+
+// Hộp thoại xác nhận: OK → lưu tiếp; Hủy → giữ nguyên form để sửa
+function _confirmDupSave(dups) {
+  const lines = dups.slice(0, 5).map(({ rec }) =>
+    `• ${rec.ngay} · ${rec.congtrinh || ''} · ${rec.loai || ''} · ${numFmt(rec.thanhtien || rec.tien || 0)} đ${rec.nd ? ' · ' + rec.nd : ''}`);
+  const more = dups.length > 5 ? `\n… và ${dups.length - 5} hóa đơn khác` : '';
+  return confirm(`${_DUP_MSG}\n\n${lines.join('\n')}${more}`);
 }
 
 // ── Đảm bảo cả projectId lẫn congtrinh luôn nhất quán trước khi lưu ──

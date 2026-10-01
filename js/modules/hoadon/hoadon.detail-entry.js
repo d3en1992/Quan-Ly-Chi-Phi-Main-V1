@@ -273,6 +273,11 @@ function saveDetailInvoice() {
   // (mkUpdate gộp đè lên record cũ nên phải ghi rõ '' thay vì bỏ field)
   const invFields = _ensureInvRef({ ngay, congtrinh: ct, loai, nguoi: detailNguoi, ncc, nd, tien: tong, thanhtien: tong, footerCkStr: '', items, source: 'detail', projectId: _detCtPid || null });
 
+  // (01/10/2026) Cảnh báo trùng 100% (ngày, CT, loại, người TH, NCC, tổng tiền, nội dung,
+  // từng dòng hàng) với HĐ đã lưu — bỏ qua chính HĐ đang sửa. Hủy → giữ nguyên form.
+  const _dups = _findExactDupInvoices([{ ...invFields, _selfId: editId || '' }]);
+  if (_dups.length && !_confirmDupSave(_dups)) return;
+
   if(editId) {
     const idx = invoices.findIndex(i => String(i.id) === String(editId));
     if(idx >= 0) {

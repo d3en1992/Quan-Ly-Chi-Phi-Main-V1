@@ -46,6 +46,12 @@ function updateTop() {
 // Trả về: manual invoices (source='manual') + CC invoices (source='cc')
 // Tất cả module hiển thị chi phí phải dùng hàm này thay vì đọc invoices trực tiếp
 // ══════════════════════════════════════════════════════════════
+// (01/10/2026) Nhà cung cấp mặc định cho MỌI hóa đơn phát sinh từ Sổ chấm công
+// (Nhân Công + HĐ Mua Lẻ). HĐ chấm công KHÔNG lưu trong inv_v3 mà được tính động bên dưới
+// từ cc_v2 → gán ở đây là áp dụng cho toàn bộ dữ liệu cũ + mới + dữ liệu import (Excel/JSON
+// chấm công nhập vào cc_v2 rồi cũng đi qua hàm này), không cần ghi lại gì lên cloud.
+const CC_DEFAULT_NCC = 'CÔNG TY NGUYỄN HỮU';
+
 function buildInvoices() {
   // ── Đọc trực tiếp từ _mem (load) — PURE, không phụ thuộc global invoices/ccData ──
   // Lý do: globals có thể stale sau pull nếu _reloadGlobals() chưa chạy;
@@ -82,7 +88,7 @@ function buildInvoices() {
       const key = pfx+wk.name+'|hdml';
       ccInvs.push({ id:key, ccKey:key, source:'cc',
         ngay:toDate, congtrinh:ct, projectId:week.projectId||null, loai:'Hóa Đơn Lẻ',
-        nguoi:wk.name, ncc:'',
+        nguoi:wk.name, ncc:CC_DEFAULT_NCC, // NCC mặc định cho HĐ chấm công
         nd: wk.nd || ('HĐ mua lẻ – '+wk.name+' ('+_vi(fromDate)+'–'+_vi(toDate)+')'),
         tien:wk.hdmuale, thanhtien:wk.hdmuale, _ts:0
       });
@@ -97,7 +103,7 @@ function buildInvoices() {
       const fw = (workers.find(w=>w.name)||{name:''}).name;
       ccInvs.push({ id:ncKey, ccKey:ncKey, source:'cc',
         ngay:toDate, congtrinh:ct, projectId:week.projectId||null, loai:'Nhân Công',
-        nguoi:fw, ncc:'',
+        nguoi:fw, ncc:CC_DEFAULT_NCC, // NCC mặc định cho HĐ chấm công
         nd:'Lương tuần '+_vi(fromDate)+'–'+_vi(toDate),
         tien:totalLuong, thanhtien:totalLuong, _ts:0
       });
