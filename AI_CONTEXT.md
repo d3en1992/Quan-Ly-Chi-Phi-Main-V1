@@ -1710,6 +1710,23 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `pages/nhap.html`, `js/modules/hoadon/hoadon.detail-entry.js`, `assets/css/style.css`.
 
+### 9.33 Gợi ý + điền nhanh kiểu Excel (Tab/Enter) cho Nhập Nhanh & HĐ Chi Tiết (01/10/2026)
+
+**Trước:** danh sách gợi ý có hiện nhưng không tô sáng sẵn mục nào → Tab chỉ đóng danh sách, Enter chỉ xuống dòng, phải bấm ↓ hoặc chuột mới chọn được. Ô Nội dung / Tên hàng hóa không có gợi ý.
+
+**Sửa (`hoadon.sheet-grid.js`):**
+- `_showAcForEl(el, col, config, autoPick)` / `_showAc(..., autoPick)`: khi người dùng VỪA GÕ (sự kiện `input`) → tô sáng kết quả đầu tiên; lúc mới focus (chưa gõ) → không tô sáng (Tab/Enter chỉ di chuyển, không đổi giá trị có sẵn).
+- `_onKeydown`: Tab (không Shift) chốt gợi ý đang tô sáng rồi mới sang ô kế (Enter vốn đã chốt).
+- `_filterItems`: thứ tự khớp nguyên tên → bắt đầu bằng → chứa.
+- Kiểu cột mới `history-autocomplete` (gợi ý từ lịch sử, cho gõ tự do, không canonical/không báo đỏ; chỉ hiện khi đã gõ chữ). Helper `_isAcType`.
+- `_acSuppress`: chặn sự kiện `input` do chính `_acSelectIdx` phát ra làm danh sách bung lại.
+
+**Sửa (`hoadon.quick-entry.js`):** hàm mới `invHistorySuggest(kind)` ('nd' | 'ten') — gom từ `invoices` (bỏ HĐ đã xóa), gộp trùng không phân biệt hoa/thường, sắp theo số lần dùng rồi ngày gần nhất, cache theo tham chiếu + độ dài mảng (tối đa 60s). Cột `nd` của Nhập Nhanh → `history-autocomplete`.
+
+**Sửa (`hoadon.detail-entry.js`):** cột `ten` của HĐ Chi Tiết → `history-autocomplete` với `invHistorySuggest('ten')`.
+
+**File đã sửa:** `js/modules/hoadon/hoadon.sheet-grid.js`, `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

@@ -36,7 +36,8 @@ function _initDetailSheetGrid() {
       generateDetailNd();
     },
     columns: [
-      { field: 'ten',    type: 'text',   suggestFromAbove: true },
+      // Tên hàng hóa: gợi ý từ các vật tư đã nhập trong HĐ chi tiết trước đây (vẫn gõ tự do)
+      { field: 'ten',    type: 'history-autocomplete', source: () => invHistorySuggest('ten'), suggestFromAbove: true },
       { field: 'dv',     type: 'text',   copyFromAbove: true },
       { field: 'sl',     type: 'number' },
       { field: 'dongia', type: 'money' },

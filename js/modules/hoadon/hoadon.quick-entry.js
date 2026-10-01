@@ -37,7 +37,8 @@ function _initQuickSheetGrid() {
         },
         required: true, copyFromAbove: true },
       { field: 'tien',  type: 'money' },
-      { field: 'nd',    type: 'text', suggestFromAbove: true },
+      // Nội dung: gợi ý từ các nội dung đã nhập trước đây (vẫn cho gõ tự do)
+      { field: 'nd',    type: 'history-autocomplete', source: () => invHistorySuggest('nd'), suggestFromAbove: true },
       { field: 'nguoi', type: 'autocomplete',
         source: () => { const d = typeof _dedupCatArr === 'function' ? _dedupCatArr : a => [...a].filter(Boolean); return d(cats.nguoiTH||[]); },
         copyFromAbove: true },
@@ -407,6 +408,41 @@ function _doSaveRows(rows) {
 // ══════════════════════════════════════════════════════════════
 // HELPERS (shared — dùng cho cả quick-entry và detail-entry)
 // ══════════════════════════════════════════════════════════════
+
+// ── Gợi ý từ LỊCH SỬ đã nhập (01/10/2026) ─────────────────────────────
+// Gom các giá trị chữ đã từng nhập trong hóa đơn (bỏ HĐ đã xóa), gộp trùng không phân
+// biệt hoa/thường, sắp theo SỐ LẦN dùng nhiều nhất → rồi ngày gần nhất. Kết quả cache
+// lại, chỉ tính lại khi mảng invoices đổi (thêm/xóa) hoặc sau 60 giây.
+//   kind = 'nd'  → Nội dung của HĐ (tab Nhập Nhanh)
+//   kind = 'ten' → Tên hàng hóa/vật tư trong items của HĐ chi tiết
+const _invHistCache = {};
+function invHistorySuggest(kind) {
+  const ref = typeof invoices !== 'undefined' && Array.isArray(invoices) ? invoices : [];
+  const c = _invHistCache[kind];
+  if (c && c.ref === ref && c.len === ref.length && Date.now() - c.ts < 60000) return c.list;
+
+  const map = new Map(); // khóa chữ thường → { name, n: số lần dùng, last: ngày gần nhất }
+  const add = (raw, ngay) => {
+    const name = String(raw || '').trim().replace(/\s+/g, ' ');
+    if (!name || name.length > 120) return; // bỏ chuỗi quá dài (nội dung ghép nhiều món)
+    const k = name.toLowerCase();
+    const e = map.get(k);
+    if (!e) { map.set(k, { name, n: 1, last: ngay || '' }); return; }
+    e.n++;
+    // Giữ cách viết của lần nhập GẦN NHẤT
+    if ((ngay || '') > e.last) { e.last = ngay || ''; e.name = name; }
+  };
+  ref.forEach(inv => {
+    if (!inv || inv.deletedAt) return;
+    if (kind === 'nd') add(inv.nd, inv.ngay);
+    else if (kind === 'ten' && Array.isArray(inv.items)) inv.items.forEach(it => add(it && it.ten, inv.ngay));
+  });
+  const list = [...map.values()]
+    .sort((a, b) => (b.n - a.n) || (b.last > a.last ? 1 : b.last < a.last ? -1 : 0))
+    .map(e => e.name);
+  _invHistCache[kind] = { ref, len: ref.length, ts: Date.now(), list };
+  return list;
+}
 
 // Tính thành tiền một dòng: sl × dongia áp chiết khấu ck
 // ck = "" → không CK | "5%" → giảm 5% | "50000" → giảm tiền cố định

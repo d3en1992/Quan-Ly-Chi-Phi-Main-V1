@@ -439,7 +439,10 @@ function _onKeydown(e, config) {
       return;
     }
     if (e.key === 'Tab') {
-      _hideAc();
+      // (01/10/2026) Tab cũng CHỐT gợi ý đang tô sáng (giống Enter) rồi mới sang ô kế
+      // → gõ "bảo" + Tab = điền "Bảo Hiểm Tai Nạn Cn" như Excel
+      if (_acState.activeIdx >= 0 && !e.shiftKey) _acConfirm();
+      else _hideAc();
       // Fall through to Tab below
     }
   }
@@ -699,43 +702,61 @@ function _acIsOpen() {
   return _acDropdownEl && _acDropdownEl.style.display !== 'none';
 }
 
+// Thứ tự kết quả: (1) khớp NGUYÊN tên → (2) BẮT ĐẦU bằng chữ gõ → (3) CHỨA chữ gõ.
+// Khớp nguyên tên đứng đầu để ô đang có "Cát" + Tab không bị đổi thành "Cát TN".
 function _filterItems(query, items) {
   if (!query || !query.trim()) return items.slice(0, 25);
   const q = _normVi(query);
-  const starts = [], contains = [];
+  const exact = [], starts = [], contains = [];
   for (const item of items) {
     const name = typeof item === 'string' ? item : item.name;
     const n = _normVi(name);
-    if (n.startsWith(q)) starts.push(item);
+    if (n === q) exact.push(item);
+    else if (n.startsWith(q)) starts.push(item);
     else if (n.includes(q)) contains.push(item);
   }
-  return [...starts, ...contains].slice(0, 25);
+  return [...exact, ...starts, ...contains].slice(0, 25);
 }
 
-function _showAcForEl(el, col, config) {
+// Kiểu ô có danh sách gợi ý:
+//   autocomplete / project-autocomplete : bắt buộc chọn trong danh mục (sai → ô đỏ)
+//   history-autocomplete                : gợi ý từ LỊCH SỬ đã nhập, vẫn cho gõ tự do
+function _isAcType(col) {
+  return !!col && (col.type === 'autocomplete' || col.type === 'project-autocomplete' || col.type === 'history-autocomplete');
+}
+
+// autoPick = true khi người dùng VỪA GÕ → tô sáng sẵn kết quả khớp nhất đầu tiên,
+// để Tab/Enter điền luôn. Lúc mới focus vào ô (chưa gõ) thì không tô sáng → Tab/Enter
+// chỉ di chuyển ô như bình thường, không tự đổi giá trị đang có.
+function _showAcForEl(el, col, config, autoPick) {
   const query = el.value;
   let rawItems = [];
-  if (col.type === 'autocomplete') {
+  if (col.type === 'autocomplete' || col.type === 'history-autocomplete') {
     const src = typeof col.source === 'function' ? col.source() : (col.source || []);
     rawItems = src.map(s => (typeof s === 'string' ? { name: s, id: null } : s));
   } else if (col.type === 'project-autocomplete') {
     const src = typeof col.source === 'function' ? col.source() : [];
     rawItems = src;
   }
+  // Ô lịch sử: chỉ gợi ý khi đã gõ chữ (ô trống không bung danh sách dài gây rối)
+  if (col.type === 'history-autocomplete' && !query.trim()) { if (_acState.el === el) _hideAc(); return; }
   const filtered = _filterItems(query, rawItems);
-  _showAc(el, filtered, col, config);
+  // Ô lịch sử: chữ gõ đã trùng y hệt gợi ý duy nhất → không cần hiện nữa
+  if (col.type === 'history-autocomplete' && filtered.length === 1
+      && _normVi(filtered[0].name) === _normVi(query)) { if (_acState.el === el) _hideAc(); return; }
+  _showAc(el, filtered, col, config, autoPick && !!query.trim());
 }
 
-function _showAc(el, items, col, config) {
+function _showAc(el, items, col, config, autoPick) {
   _acState.el = el; _acState.items = items; _acState.col = col;
-  _acState.config = config; _acState.activeIdx = -1;
+  _acState.config = config; _acState.activeIdx = (autoPick && items.length) ? 0 : -1;
 
   const dd = _getAcDropdown();
   if (!items.length) { _hideAc(); return; }
 
   dd.innerHTML = items.map((item, i) => {
     const name = typeof item === 'string' ? item : item.name;
-    return `<div class="sheet-autocomplete-item" data-idx="${i}">${_escHtml(name)}</div>`;
+    return `<div class="sheet-autocomplete-item${i === _acState.activeIdx ? ' active' : ''}" data-idx="${i}">${_escHtml(name)}</div>`;
   }).join('');
 
   dd.style.display = 'block';
@@ -780,9 +801,12 @@ function _acSelectIdx(idx) {
   el.value = name;
   if (id !== null && 'pid' in el.dataset) el.dataset.pid = id;
   el.classList.remove('sheet-cell-invalid');
-  _triggerChange(el);
   _hideAc();
+  // Chặn sự kiện 'input' do chính lệnh chọn phát ra làm danh sách bung lại
+  _acSuppress = true;
+  try { _triggerChange(el); } finally { _acSuppress = false; }
 }
+let _acSuppress = false;
 
 function _canonicalizeAcValue(el, col) {
   const val = el.value.trim();
@@ -918,9 +942,9 @@ function _bindGrid(config) {
       const aboveVal = _getAboveValue(el, config);
       if (aboveVal) el.placeholder = aboveVal;
     }
-    // Autocomplete
+    // Autocomplete (mới focus → hiện danh sách nhưng KHÔNG tô sáng sẵn)
     if (col && (col.type === 'autocomplete' || col.type === 'project-autocomplete')) {
-      _showAcForEl(el, col, config);
+      _showAcForEl(el, col, config, false);
     }
   });
 
@@ -943,8 +967,10 @@ function _bindGrid(config) {
     if (!el.matches(config.cellSelector || 'input')) return;
     const col = _getColConfig(config, el);
     if (!col) return;
-    if (col.type === 'autocomplete' || col.type === 'project-autocomplete') {
-      _showAcForEl(el, col, config);
+    if (_acSuppress) return; // input do lệnh chọn gợi ý phát ra → bỏ qua
+    if (_isAcType(col)) {
+      // Người dùng đang gõ → tô sáng kết quả khớp nhất để Tab/Enter điền luôn
+      _showAcForEl(el, col, config, true);
       if (col.type === 'project-autocomplete') el.dataset.pid = ''; // reset pid when typing
     }
   });
