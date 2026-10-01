@@ -405,6 +405,11 @@ function _trashTomb(r, now) {
            deviceId: (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : r.deviceId };
 }
 
+// Danh sách bản ghi vừa xóa vĩnh viễn trong lần bấm hiện tại — để sau khi đẩy cloud,
+// _trashVerifyCloud() đọc lại đúng các doc đó xác nhận lệnh xóa đã lên cloud.
+// Mỗi phần tử: { type, id, docId }
+let _trashPurgeLog = [];
+
 // Xóa vĩnh viễn các id thuộc 1 loại (chỉ đụng bản ĐANG Ở THÙNG RÁC). Trả về số bản ghi đã xử lý.
 function _trashPurgeIds(type, ids) {
   const idSet = new Set([...ids].map(String));
@@ -413,7 +418,10 @@ function _trashPurgeIds(type, ids) {
   let n = 0;
   if (type === 'hopdong-chinh') {
     idSet.forEach(k => {
-      if (_trashIn(hopDongData[k])) { hopDongData[k] = _trashTomb(hopDongData[k], now); n++; }
+      if (_trashIn(hopDongData[k])) {
+        hopDongData[k] = _trashTomb(hopDongData[k], now); n++;
+        _trashPurgeLog.push({ type, id: k, docId: 'meta_hop_dong' });
+      }
     });
     if (n) save('hopdong_v1', hopDongData);
     return n;
@@ -423,6 +431,10 @@ function _trashPurgeIds(type, ids) {
   const arr = store.get().map(r => {
     if (!_trashIn(r) || !idSet.has(String(r.id))) return r;
     n++;
+    // Doc cloud chứa bản ghi: HĐ thầu phụ → meta_hop_dong; còn lại → doc năm theo ngày
+    const docId = type === 'hopdong-tp' ? 'meta_hop_dong'
+      : (typeof _recYearDoc === 'function' ? _recYearDoc(store.key, r) : null);
+    if (docId) _trashPurgeLog.push({ type, id: String(r.id), docId });
     return _trashTomb(r, now);
   });
   if (!n) return 0;
@@ -454,16 +466,93 @@ function _trashGcTombstones() {
   }
 }
 
-// Yêu cầu đẩy cloud ngay + báo cho người dùng biết lệnh xóa đã lên cloud chưa
-function _trashPushPurge(count) {
+// ══════════════════════════════════════════════════════════════════════════════
+// ĐẨY CLOUD + XÁC NHẬN LỆNH XÓA ĐÃ LÊN CLOUD (01/10/2026 — phương án B)
+// ══════════════════════════════════════════════════════════════════════════════
+// Trước đây chỉ hẹn đẩy rồi báo "Đã xóa" ngay → máy này thấy trống nhưng cloud có thể
+// vẫn còn (đẩy lỗi, tắt tab sớm, máy khác ghi chen) → thiết bị mới đăng nhập thấy lại.
+// Giờ: đẩy NGAY → chờ đẩy xong → ĐỌC LẠI đúng các doc cloud chứa bản ghi vừa xóa →
+// mỗi bản ghi phải KHÔNG CÒN hoặc là BIA MỘ (purgedAt). Báo kết quả thật cho người dùng.
+const _trashSleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Chờ đến khi không còn pull/push nào đang chạy (tối đa ~30 giây)
+async function _trashWaitSyncIdle() {
+  for (let i = 0; i < 60; i++) {
+    if (typeof isSyncing !== 'function' || !isSyncing()) return true;
+    await _trashSleep(500);
+  }
+  return false;
+}
+
+// Đọc lại cloud, trả về { ok:[...], bad:[...], unknown:[...] } theo từng bản ghi trong log
+//   ok      : cloud đã không còn bản ghi / đã là bia mộ
+//   bad     : cloud VẪN CÒN bản ghi (chưa nhận lệnh xóa)
+//   unknown : không đọc được doc (mất mạng / lỗi HTTP) → chưa xác nhận được
+async function _trashVerifyCloud(log) {
+  const res = { ok: [], bad: [], unknown: [] };
+  const byDoc = new Map();
+  log.forEach(it => { if (!byDoc.has(it.docId)) byDoc.set(it.docId, []); byDoc.get(it.docId).push(it); });
+
+  for (const [docId, items] of byDoc) {
+    let d;
+    try { d = fsUnwrap(await fsGet(docId)); }
+    catch (e) { console.warn('[Trash] Không đọc được', docId, e.message || e); res.unknown.push(...items); continue; }
+
+    items.forEach(it => {
+      let rec = null;
+      if (d) {
+        if (it.type === 'hopdong-chinh')   rec = d.hopDong ? d.hopDong[it.id] : null;
+        else if (it.type === 'hopdong-tp') rec = (d.thauPhu || []).find(r => r && String(r.id) === it.id);
+        else                               rec = (d.records || []).find(r => r && String(r.id) === it.id);
+      }
+      // Doc không tồn tại / bản ghi không còn / đã là bia mộ → coi như đã xóa trên cloud
+      if (!rec || rec.purgedAt) res.ok.push(it);
+      else res.bad.push(it);
+    });
+  }
+  return res;
+}
+
+// Đẩy cloud ngay + xác nhận + báo kết quả. Gọi sau khi _trashPurgeIds() đã chạy xong.
+async function _trashPushPurge(count) {
+  const log = _trashPurgeLog;
+  _trashPurgeLog = [];
   const msg = `Đã xóa vĩnh viễn ${count} bản ghi`;
   if (typeof fbReady !== 'function' || !fbReady()) { toast(msg, 'success'); return; }
   if (!navigator.onLine) {
     toast(`${msg} trên máy này — đang mất mạng, sẽ đẩy lên cloud khi có mạng lại`, 'error');
     return;
   }
-  toast(`${msg} — đang đồng bộ lên cloud...`, 'success');
-  if (typeof schedulePush === 'function') schedulePush();
+  toast(`${msg} — đang đẩy lên cloud và kiểm tra...`, 'info');
+
+  try {
+    // 1) Đẩy ngay (không chờ hẹn giờ). Đang có sync khác chạy → chờ nó xong trước.
+    if (typeof cancelScheduledPush === 'function') cancelScheduledPush();
+    await _trashWaitSyncIdle();
+    if (typeof pushChanges === 'function') await pushChanges({ silent: true });
+    await _trashWaitSyncIdle();
+
+    // 2) Đọc lại cloud xác nhận
+    if (!log.length) { toast(`✅ ${msg}`, 'success'); return; }
+    const r = await _trashVerifyCloud(log);
+
+    if (!r.bad.length && !r.unknown.length) {
+      toast(`✅ ${msg} — đã xác nhận trên cloud`, 'success');
+      return;
+    }
+    if (r.bad.length) {
+      console.warn('[Trash] Cloud VẪN CÒN các bản ghi:', r.bad);
+      toast(`⚠️ ${r.bad.length}/${log.length} bản ghi CHƯA được xóa trên cloud — app sẽ tự thử đẩy lại. `
+        + `Nếu vẫn còn, bấm 🔄 Sync rồi xóa lại.`, 'error');
+    } else {
+      toast(`⚠️ ${msg} trên máy này nhưng CHƯA kiểm tra được cloud (lỗi mạng) — app sẽ tự đẩy lại`, 'error');
+    }
+    if (typeof schedulePush === 'function') schedulePush();
+  } catch (e) {
+    console.warn('[Trash] Đẩy/kiểm tra cloud lỗi:', e);
+    toast(`⚠️ ${msg} trên máy này nhưng đẩy cloud lỗi — app sẽ tự thử lại`, 'error');
+    if (typeof schedulePush === 'function') schedulePush();
+  }
 }
 
 // ── Xóa vĩnh viễn 1 bản ghi ───────────────────────────────────────────────────

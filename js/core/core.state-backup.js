@@ -525,7 +525,9 @@ function importJSON(file) {
         : (json._time ? new Date(json._time).toLocaleString('vi-VN') : '(không rõ)');
 
       // Modal xác nhận thay vì confirm() để UX tốt hơn
-      _showImportJSONConfirm({ data, c, ts });
+      // exportedAt (ms) dùng để đếm thay đổi phát sinh SAU thời điểm snapshot
+      const exportedAt = Number(json.meta?.exportedAt) || (json._time ? Date.parse(json._time) : 0) || 0;
+      _showImportJSONConfirm({ data, c, ts, exportedAt });
     } catch(err) {
       toast('❌ Lỗi đọc file JSON: ' + err.message, 'error');
     }
@@ -534,7 +536,86 @@ function importJSON(file) {
 }
 
 // ── Hiển thị modal xác nhận import JSON ───────────────────────
-function _showImportJSONConfirm({ data, c, ts }) {
+// ── PHÂN TÍCH FILE SNAPSHOT TRƯỚC KHI IMPORT (01/10/2026 — phương án D) ──────
+// Import = QUAY THỜI GIAN về lúc xuất file, ghi đè cloud + mọi thiết bị. Trước khi cho
+// bấm, đo 2 rủi ro lớn nhất:
+//   (1) missingYears: năm có dữ liệu trên CLOUD nhưng file KHÔNG có (vd file xuất từ máy
+//       chỉ tải 2026) → bản cũ sẽ GHI RỖNG các doc năm đó = mất trắng dữ liệu năm đó.
+//   (2) newerCount: số bản ghi trong máy được tạo/sửa/xóa SAU lúc xuất file → sẽ bị
+//       mất / quay về trạng thái cũ (bản ghi đã xóa vĩnh viễn sau đó sẽ hiện lại).
+// Năm của 1 doc cloud dạng y2025_hoa_don
+const _IMP_YEAR_KEYS = ['inv_v3', 'ung_v1', 'cc_v2', 'tb_v1', 'thu_v1'];
+const _IMP_REC_KEYS  = [..._IMP_YEAR_KEYS, 'projects_v1', 'customers_v1', 'thauphu_v1', 'quyettoan_v1'];
+
+// Tập docId năm mà file có dữ liệu
+function _impFileYearDocs(data) {
+  const docs = new Set();
+  if (typeof _YEAR_CATS === 'undefined') return docs;
+  _YEAR_CATS.forEach(({ cat, key, dateField }) => {
+    (Array.isArray(data[key]) ? data[key] : []).forEach(r => {
+      const d = r && (r[dateField] || (key === 'cc_v2' ? r.from : null));
+      if (d && String(d).length >= 4) docs.add(fbDocYearCat(String(d).slice(0, 4), cat));
+    });
+  });
+  return docs;
+}
+
+async function _impAnalyze(data, exportedAt) {
+  const res = { missingDocs: [], missingYears: [], cloudChecked: false, newerCount: 0 };
+
+  // (1) So doc năm trên cloud với doc năm trong file
+  if (typeof fbReady === 'function' && fbReady() && typeof fsListDocIds === 'function') {
+    try {
+      const fileDocs = _impFileYearDocs(data);
+      const ids = await fsListDocIds();
+      res.missingDocs = ids.filter(id => typeof _parseYearDocId === 'function' && _parseYearDocId(id) && !fileDocs.has(id));
+      res.missingYears = [...new Set(res.missingDocs.map(id => id.slice(1, 5)))].sort();
+      res.cloudChecked = true;
+    } catch (e) { console.warn('[Import] Không liệt kê được doc cloud:', e.message || e); }
+  }
+
+  // (2) Đếm bản ghi trong máy có thay đổi SAU lúc xuất file
+  if (exportedAt) {
+    const tsOf = r => Math.max(Number(r && r.updatedAt) || 0, Number(r && r.deletedAt) || 0, Number(r && r.purgedAt) || 0);
+    _IMP_REC_KEYS.forEach(k => {
+      (Array.isArray(_mem[k]) ? _mem[k] : []).forEach(r => { if (tsOf(r) > exportedAt) res.newerCount++; });
+    });
+    Object.values(_mem.hopdong_v1 || {}).forEach(r => { if (tsOf(r) > exportedAt) res.newerCount++; });
+  }
+  return res;
+}
+
+async function _showImportJSONConfirm({ data, c, ts, exportedAt }) {
+  if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang kiểm tra file snapshot...');
+  let an;
+  try { an = await _impAnalyze(data, exportedAt); }
+  finally { if (typeof hideSyncBanner === 'function') hideSyncBanner(); }
+
+  // Khối cảnh báo theo kết quả phân tích
+  let warnHtml = '';
+  if (an.missingYears.length) {
+    warnHtml += `<div style="background:#f8d7da;border:2px solid #dc3545;border-radius:8px;padding:12px 14px;font-size:13px;color:#721c24;line-height:1.7;margin-bottom:12px">
+      <b>⛔ File THIẾU dữ liệu năm: ${an.missingYears.join(', ')}</b><br>
+      Cloud đang có dữ liệu các năm này nhưng file không có. Nếu ghi đè toàn bộ, dữ liệu các năm này sẽ bị <b>XÓA TRẮNG</b>.
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;cursor:pointer;color:#000">
+        <input type="checkbox" id="imp-keep-years" checked style="margin-top:4px">
+        <span><b>Giữ nguyên dữ liệu các năm không có trong file</b> (khuyên dùng) — chỉ thay các năm có trong file</span>
+      </label>
+    </div>`;
+  } else if (!an.cloudChecked && typeof fbReady === 'function' && fbReady()) {
+    warnHtml += `<div style="background:#fff3cd;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:12px">
+      ⚠️ Không kiểm tra được cloud (lỗi mạng) — không biết file có thiếu năm nào không. Nên hủy và thử lại khi có mạng.
+    </div>`;
+  }
+  if (an.newerCount > 0) {
+    warnHtml += `<div style="background:#fff3cd;border:2px solid #ffc107;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;margin-bottom:12px">
+      <b>⚠️ File CŨ hơn dữ liệu hiện tại</b><br>
+      Có <b>${an.newerCount}</b> bản ghi được tạo / sửa / xóa <b>sau</b> lúc xuất file (${ts}).
+      Import sẽ làm các thay đổi đó <b>biến mất</b>, và bản ghi đã xóa sau thời điểm đó có thể <b>hiện lại</b>.
+    </div>`;
+  }
+  window._pendingImportMissingDocs = an.missingDocs;
+
   let ov = document.getElementById('import-json-overlay');
   if (!ov) {
     ov = document.createElement('div');
@@ -542,13 +623,14 @@ function _showImportJSONConfirm({ data, c, ts }) {
     ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;align-items:center;justify-content:center';
     document.body.appendChild(ov);
   }
-  ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:420px;width:94vw;background:#fff;border-radius:14px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 16px 56px rgba(0,0,0,.25)">
+  ov.innerHTML = `<div onclick="event.stopPropagation()" style="max-width:420px;width:94vw;max-height:92vh;overflow-y:auto;background:#fff;border-radius:14px;padding:24px;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 16px 56px rgba(0,0,0,.25)">
     <div style="font-size:28px;text-align:center;margin-bottom:10px"><span class="material-symbols-outlined">warning</span></div>
     <h3 style="font-size:16px;font-weight:800;margin:0 0 12px;text-align:center;color:var(--bs-danger)">KHÔI PHỤC TOÀN BỘ DỮ LIỆU</h3>
     <div style="background:#fff3cd;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.8;margin-bottom:16px">
       <span class="material-symbols-outlined msi-gap">calendar_month</span>Snapshot lúc: <b>${ts}</b><br>
       <span class="material-symbols-outlined msi-gap">bar_chart</span>Nội dung: ${c.inv} HĐ · ${c.ung} tiền ứng · ${c.cc} tuần CC · ${c.tb} thiết bị
     </div>
+    ${warnHtml}
     <div style="background:#f8d7da;border-radius:8px;padding:12px 14px;font-size:13px;color:#721c24;line-height:1.8;margin-bottom:20px">
       • Xóa toàn bộ dữ liệu hiện tại<br>
       • Ghi đè tất cả thiết bị<br>
@@ -556,7 +638,7 @@ function _showImportJSONConfirm({ data, c, ts }) {
     </div>
     <div style="display:flex;gap:10px">
       <button onclick="document.getElementById('import-json-overlay').style.display='none'" style="flex:1;padding:11px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-family:inherit;font-size:13px;cursor:pointer">Hủy</button>
-      <button onclick="importJSONFull(window._pendingImportData)" style="flex:2;padding:11px;border-radius:8px;border:none;background:var(--bs-danger);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">Khôi phục</button>
+      <button onclick="importJSONFull(window._pendingImportData, { keepDocs: (document.getElementById('imp-keep-years')||{}).checked ? window._pendingImportMissingDocs : [] })" style="flex:2;padding:11px;border-radius:8px;border:none;background:var(--bs-danger);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">Khôi phục</button>
     </div>
   </div>`;
   window._pendingImportData = data;
@@ -564,11 +646,36 @@ function _showImportJSONConfirm({ data, c, ts }) {
 }
 
 // ── Hard reset: xóa DB, ghi clean data, push cloud, reload ──
-async function importJSONFull(data) {
+// opts.keepDocs (01/10/2026): danh sách doc năm trên cloud mà file KHÔNG có, người dùng chọn
+//   "Giữ nguyên" → tải các doc đó từ cloud về và GỘP vào dữ liệu import TRƯỚC khi xóa máy,
+//   để bước ghi đè (Step 3b) ghi lại đúng nội dung cũ thay vì ghi RỖNG (mất trắng năm đó).
+//   Tải lỗi bất kỳ doc nào → HỦY import (an toàn hơn là import thiếu).
+async function importJSONFull(data, opts) {
   const ov = document.getElementById('import-json-overlay');
   if (ov) ov.style.display = 'none';
 
   if (!data || !Object.keys(data).length) { toast('❌ Dữ liệu không hợp lệ', 'error'); return; }
+
+  const keepDocs = (opts && Array.isArray(opts.keepDocs)) ? opts.keepDocs : [];
+  if (keepDocs.length) {
+    if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang tải dữ liệu các năm cần giữ nguyên...');
+    try {
+      data = { ...data };   // không sửa object gốc của file
+      for (const docId of keepDocs) {
+        const t = (typeof _parseYearDocId === 'function') ? _parseYearDocId(docId) : null;
+        if (!t) continue;
+        const d = fsUnwrap(await fsGet(docId));          // lỗi mạng → throw → hủy import
+        const recs = (d && Array.isArray(d.records)) ? d.records : [];
+        if (recs.length) data[t.key] = [...(Array.isArray(data[t.key]) ? data[t.key] : []), ...recs];
+        console.log(`[Import] Giữ nguyên ${docId}: ${recs.length} bản ghi từ cloud`);
+      }
+    } catch (e) {
+      if (typeof hideSyncBanner === 'function') hideSyncBanner();
+      console.error('[Import] Tải doc cần giữ lỗi:', e);
+      toast('❌ Không tải được dữ liệu các năm cần giữ nguyên — ĐÃ HỦY import, dữ liệu chưa bị thay đổi. Kiểm tra mạng rồi thử lại.', 'error');
+      return;
+    }
+  }
 
   // Block any concurrent sync
   try { _syncPulling = true; } catch(_) {}

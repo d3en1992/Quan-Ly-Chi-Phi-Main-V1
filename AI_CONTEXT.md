@@ -1650,6 +1650,21 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `js/modules/thungrac/thungrac.js`, `js/sync/sync.js`, `js/modules/chamcong/chamcong.core.js`, `js/core/core.cloud-cats-ui.js`.
 
+### 9.29.1 Xác nhận xóa vĩnh viễn trên cloud + Import snapshot an toàn (01/10/2026)
+
+**Bối cảnh:** máy chính xóa vĩnh viễn xong thấy thùng rác trống, nhưng web ẩn danh (tải từ cloud) vẫn thấy 7 bản ghi → lệnh xóa chưa thật sự lên cloud mà app vẫn báo thành công. Import JSON từ file thiếu năm sẽ ghi RỖNG các doc năm đó trên cloud; file cũ làm mất thay đổi phát sinh sau và làm bản ghi đã xóa hiện lại — trước đây không cảnh báo.
+
+**Sửa (B — `thungrac.js`):**
+- Global mới `_trashPurgeLog` (`{type, id, docId}`): `_trashPurgeIds` ghi lại doc cloud chứa từng bản ghi vừa xóa (doc năm qua `_recYearDoc`, HĐ → `meta_hop_dong`).
+- `_trashPushPurge(count)` giờ là async: đẩy NGAY (`cancelScheduledPush` + `pushChanges({silent})`, chờ `_trashWaitSyncIdle`) → `_trashVerifyCloud(log)` đọc lại đúng các doc đó → bản ghi phải không còn hoặc là bia mộ. Báo "✅ đã xác nhận trên cloud", hoặc "⚠️ X bản ghi CHƯA được xóa trên cloud" / "chưa kiểm tra được" + `schedulePush()` thử lại.
+
+**Sửa (D — `core.state-backup.js`):**
+- `importJSON` truyền thêm `exportedAt`. Hàm mới `_impFileYearDocs`, `_impAnalyze` (so doc năm cloud qua `fsListDocIds` với file; đếm bản ghi trong `_mem` có `updatedAt/deletedAt/purgedAt` > `exportedAt`). Hằng mới `_IMP_YEAR_KEYS`, `_IMP_REC_KEYS`.
+- `_showImportJSONConfirm` (giờ async) hiện cảnh báo đỏ "File THIẾU dữ liệu năm …" kèm ô chọn `#imp-keep-years` (mặc định bật), và cảnh báo vàng "File CŨ hơn dữ liệu hiện tại (N bản ghi)". Global `window._pendingImportMissingDocs`.
+- `importJSONFull(data, opts)`: `opts.keepDocs` → tải các doc năm đó từ cloud, gộp vào dữ liệu import TRƯỚC khi xóa máy (lỗi tải → hủy import, chưa đụng dữ liệu). Khôi phục từ sao lưu cloud (`danhmuc.tools.js`) gọi không có `opts` → hành vi cũ.
+
+**File đã sửa:** `js/modules/thungrac/thungrac.js`, `js/core/core.state-backup.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
