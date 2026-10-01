@@ -5,8 +5,9 @@
 //   - Thẻ KPI tổng quan (nợ TP, nợ NCC, đã ứng)
 //   - Bộ lọc nâng cao: công trình, nhóm đối tác, tháng (chỉ tháng có dữ liệu), tìm kiếm
 //   - Bảng chi tiết: thanh tiến độ % đã ứng + badge trạng thái màu
-//   - CHỈ hiển thị đối tác đã có phát sinh tiền ứng (Đã Ứng > 0); thẻ KPI
-//     tính trên cùng tập dòng này nên luôn đồng bộ với bảng.
+//   - Hiển thị đối tác đã có phát sinh tiền ứng (Đã Ứng > 0) + thầu phụ đã có HĐ thầu phụ
+//     (dù chưa ứng); thẻ KPI tính trên cùng tập dòng này nên luôn đồng bộ với bảng.
+//   - |Còn phải TT| ≤ 100.000đ → làm tròn 0, badge "Đã xong" (CN_DONE_TOLERANCE).
 //
 // Nguồn dữ liệu (đều là biến global đã nạp trước):
 //   - thauPhuContracts (thauphu_v1) : giá trị HĐ thầu phụ
@@ -88,11 +89,23 @@ function _cnBuildRows() {
     });
 
   return Object.values(map)
-    .map(row => ({ ...row, conPhaiTT: (row.value || 0) - (row.daUng || 0) }))
-    // CHỈ giữ đối tác đã có phát sinh TIỀN ỨNG (cột Đã Ứng > 0).
+    .map(row => {
+      let conPhaiTT = (row.value || 0) - (row.daUng || 0);
+      // (02/10/2026) Chênh lệch nhỏ trong khoảng ±100.000đ (nợ lẻ / ứng dư lẻ) coi như
+      // ĐÃ XONG → làm tròn Còn phải TT = 0 cho dễ nhìn (badge, KPI, dòng tổng đều theo số này).
+      if (Math.abs(conPhaiTT) <= CN_DONE_TOLERANCE) conPhaiTT = 0;
+      return { ...row, conPhaiTT };
+    })
+    // Giữ dòng khi:
+    //   • đã có phát sinh TIỀN ỨNG (Đã Ứng > 0), HOẶC
+    //   • (02/10/2026) THẦU PHỤ đã có HỢP ĐỒNG thầu phụ (giá trị HĐ > 0) dù chưa ứng đồng nào
+    //     → thấy được toàn bộ công nợ phải trả theo hợp đồng.
     // → Bảng + thẻ KPI đều dựa trên tập này nên luôn đồng bộ số liệu.
-    .filter(row => (row.daUng || 0) > 0);
+    .filter(row => (row.daUng || 0) > 0 || (row.group === 'thauphu' && (row.value || 0) > 0));
 }
+
+// Ngưỡng làm tròn "đã xong": |Còn phải TT| ≤ 100.000đ → hiển thị 0 / Đã xong
+const CN_DONE_TOLERANCE = 100000;
 
 // ─── Badge trạng thái theo số tiền còn phải TT ────────────────
 function _cnStatusBadge(row) {

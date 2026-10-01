@@ -1787,6 +1787,11 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `index.html`, `pages/nhapung.html`, `js/app/auth.js`, `js/app/main.js`, `js/mobile/mobile.core.js`, `js/mobile/mobile.screens.js`.
 
+### 9.38 Công nợ TP/NCC: hiện thầu phụ có HĐ chưa ứng + làm tròn ±100k = Đã xong (02/10/2026)
+- `_cnBuildRows` (doanhthu.congno.js): giữ dòng nếu Đã ứng > 0 **hoặc** (thầu phụ có giá trị HĐ > 0). Hằng mới `CN_DONE_TOLERANCE = 100000`: |Còn phải TT| ≤ 100.000đ → gán 0 (badge "Đã xong", KPI, dòng tổng, mobile đều theo).
+
+**File đã sửa:** `js/modules/doanhthu/doanhthu.congno.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
