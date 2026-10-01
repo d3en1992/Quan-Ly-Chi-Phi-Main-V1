@@ -20,6 +20,10 @@
             <button class="btn btn-outline-secondary" onclick="clearUngTable()">
               <span class="material-symbols-outlined msi-gap">delete</span>Xóa form
             </button>
+            <!-- (02/10/2026) Nút Lưu dời lên cạnh Xóa form — chốt phiếu không cần cuộn trang -->
+            <button class="btn btn-success" id="ung-save-btn" onclick="saveAllUngRows()">
+              <span class="material-symbols-outlined msi-gap">save</span>Lưu phiếu ứng
+            </button>
           </div>
         </div>
 
@@ -86,11 +90,6 @@
           </div>
         </div>
 
-        <div class="save-bar d-flex justify-content-end align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
-          <button class="btn btn-success" id="ung-save-btn" onclick="saveAllUngRows()">
-            <span class="material-symbols-outlined msi-gap">save</span>Lưu phiếu ứng
-          </button>
-        </div>
 
         <!-- Phiếu Ứng Gần Đây (10 phiếu mới nhất TP + NCC) — render bởi renderUngMini() -->
         <div style="margin-top: 20px">

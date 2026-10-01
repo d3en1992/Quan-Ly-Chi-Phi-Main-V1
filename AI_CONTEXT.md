@@ -1780,6 +1780,13 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 - `_ungRenderDebt` chỉ còn 1 câu: "Tổng nợ công ty đang nợ hợp lệ: X đ" (chưa chọn đối tác → trống).
 - XÓA: phụ đề "(phân bổ đa công trình)", placeholder ô Tổng tiền ứng, `#ung-row-count` + `#ung-entry-total`, nút + hàm `ungFillDebtRows`, CSS `.ung-debt-main/.ung-debt-sub/.ung-ct-hint`.
 
+### 9.37 Menu Ứng TP/NCC + Công Nợ TP/NCC, nút Lưu phiếu ứng lên trên, mở Công nợ cho Kế toán (02/10/2026)
+- `pages/nhapung.html`: `#ung-save-btn` dời lên header cạnh "Xóa form"; bỏ thanh `.save-bar` cuối form.
+- `index.html` (sidebar): "TIỀN ỨNG" → **ỨNG TP/NCC**; "CÔNG NỢ" → **CÔNG NỢ TP/NCC** và dời nút `data-page="congno"` lên ngay dưới `nhapung` (trước THEO DÕI TB). `main.js` `_PAGE_LABELS` đổi theo. Mobile: nhãn `congno` → "Công Nợ TP/NCC" (`mobile.core.js`, `mobile.screens.js`).
+- Phân quyền: `applyRoleUI` (auth.js) + `mbCanSee` (mobile.core.js) — role `ketoan` nay chỉ bị ẩn `dashboard`, `doanhthu`; được xem `congno` (gồm cả sub-tab THẦU PHỤ — giá trị HĐ thầu phụ).
+
+**File đã sửa:** `index.html`, `pages/nhapung.html`, `js/app/auth.js`, `js/app/main.js`, `js/mobile/mobile.core.js`, `js/mobile/mobile.screens.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

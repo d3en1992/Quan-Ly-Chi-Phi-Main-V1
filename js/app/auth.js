@@ -751,7 +751,8 @@ function applyRoleUI() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     const page = btn.dataset.page;
     let visible = true;
-    if (user.role === 'ketoan' && ['dashboard', 'doanhthu', 'congno'].includes(page)) {
+    // (02/10/2026) Mở tab CÔNG NỢ TP/NCC (congno) cho Kế toán — chỉ còn ẩn Dashboard + Doanh Thu
+    if (user.role === 'ketoan' && ['dashboard', 'doanhthu'].includes(page)) {
       visible = false;
     }
     btn.style.display = visible ? '' : 'none';

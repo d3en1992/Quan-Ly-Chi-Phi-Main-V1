@@ -131,9 +131,10 @@ function mbRole() {
   return u ? (u.role || '') : '';
 }
 
-/** Kế toán không được xem Tổng quan / Doanh thu / Công nợ (khớp applyRoleUI của desktop) */
+/** Kế toán không được xem Tổng quan / Doanh thu (khớp applyRoleUI của desktop).
+ *  (02/10/2026) Đã mở tab Công nợ TP/NCC cho Kế toán. */
 function mbCanSee(tab) {
-  if (mbRole() === 'ketoan' && ['dashboard', 'doanhthu', 'congno'].includes(tab)) return false;
+  if (mbRole() === 'ketoan' && ['dashboard', 'doanhthu'].includes(tab)) return false;
   return true;
 }
 
@@ -227,7 +228,7 @@ function mbTitles() {
     chamcong:  ['Chấm Công',      'Sổ công & lương tuần'],
     tienung:   ['Tiền Ứng',       'Thầu phụ · NCC · Công nhân'],
     doanhthu:  ['Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận'],
-    congno:    ['Công Nợ',        'Đối tác còn phải trả / thu'],
+    congno:    ['Công Nợ TP/NCC',      'Đối tác còn phải trả / thu'],
     thietbi:   ['Thiết Bị',       'Kho tổng & tại công trình'],
     danhmuc:   ['Danh Mục',       'Loại CP · NCC · Người · Thầu phụ'],
     thongke:   ['Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí'],

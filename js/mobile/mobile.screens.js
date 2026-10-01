@@ -1316,7 +1316,7 @@ function mbScrMore() {
   const rows = [
     ['dashboard', 'Tổng Quan',     'Dashboard chi phí ' + mbYearLabel(), 'T', '#EFF6FF', '#2563EB'],
     ['doanhthu', 'Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận', 'D', '#F0FDF4', '#16A34A'],
-    ['congno',   'Công Nợ',        'Còn phải trả theo đối tác',      'N', '#FEF2F2', '#DC2626'],
+    ['congno',   'Công Nợ TP/NCC',      'Còn phải trả theo đối tác',      'N', '#FEF2F2', '#DC2626'],
     ['thietbi',  'Thiết Bị',       'Kho tổng & tại công trình',      'B', '#EFF6FF', '#2563EB'],
     ['thongke',  'Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí',       'K', '#F5F3FF', '#7C3AED'],
     ['danhmuc',  'Danh Mục',       'Loại CP · NCC · Người · Thầu phụ', 'M', '#F3F4F6', '#4B5563'],

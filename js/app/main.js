@@ -195,8 +195,8 @@ function goPage(btn, id) {
   const _PAGE_LABELS = {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
     thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
-    nhapung: '💰 Tiền Ứng', thietbi: '🔧 Theo Dõi TB',
-    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', congno: '💳 Công Nợ', dashboard: '📊 Dashboard',
+    nhapung: '💰 Ứng TP/NCC', thietbi: '🔧 Theo Dõi TB',
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
     thungrac: '🗑️ Thùng Rác'
   };
   _setTopbarTabTitle(_PAGE_LABELS[id] || '');
