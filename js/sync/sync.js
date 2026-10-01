@@ -269,36 +269,43 @@ function _mergeHopDong(localHd, cloudHd) {
 }
 
 // Gộp cat_items_v1 (per-item theo updatedAt) + dedup theo tên + canonical hóa tên
+// (01/10/2026) Sửa lỗi danh mục đã xóa bị "hồi sinh":
+//   1. Item BẢN TẠM (seed — tạo từ DEFAULTS trên máy mới/web ẩn danh) của local bị BỎ
+//      nếu cloud đã có dữ liệu cho loại đó → mặc định trong code không lọt lên cloud.
+//   2. Trùng tên giải quyết bằng _catResolveNameConflicts: bản mới nhất THEO TÊN thắng,
+//      kể cả bia mộ → bia mộ "Chi Phí Khác" mới hơn sẽ xóa luôn bản cũ khác id.
+//   3. Canonical hóa tên KHÔNG đóng dấu updatedAt = bây giờ (trước đây đóng dấu → bản
+//      local chỉ đổi hoa/thường cũng thành "mới nhất" và đè thao tác xóa trên cloud).
 function _mergeCatItems(localItems, cloudItems) {
-  const _normKey = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
-    .replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();
-  const nowMs = Date.now();
   const merged   = {};
-  const allTypes = new Set([...Object.keys(localItems || {}), ...Object.keys(cloudItems || {})]);
+  localItems = localItems || {};
+  cloudItems = cloudItems || {};
+  const allTypes = new Set([...Object.keys(localItems), ...Object.keys(cloudItems)]);
   allTypes.forEach(type => {
+    const cloudArr = Array.isArray(cloudItems[type]) ? cloudItems[type] : [];
+    const cloudIds = new Set(cloudArr.map(ci => ci && ci.id));
     const byId = new Map();
-    (localItems[type] || []).forEach(item => byId.set(item.id, item));
-    (cloudItems[type] || []).forEach(ci => {
-      const li = byId.get(ci.id);
-      if (!li || (ci.updatedAt || 0) >= (li.updatedAt || 0)) byId.set(ci.id, ci);
+    (localItems[type] || []).forEach(item => {
+      if (!item) return;
+      // Bản tạm chưa từng được người dùng đụng tới + cloud đã có dữ liệu → bỏ
+      if (item.seed && cloudArr.length && !cloudIds.has(item.id)) return;
+      byId.set(item.id, { ...item });
     });
-    const byNorm = new Map();
-    [...byId.values()]
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .forEach(item => {
-        if (item.isDeleted) return;
-        const norm = _normKey(item.name);
-        if (byNorm.has(norm)) byId.set(item.id, { ...item, isDeleted: true, updatedAt: nowMs });
-        else byNorm.set(norm, item.id);
-      });
-    merged[type] = [...byId.values()];
+    cloudArr.forEach(ci => {
+      if (!ci) return;
+      const li = byId.get(ci.id);
+      if (!li || (ci.updatedAt || 0) >= (li.updatedAt || 0)) byId.set(ci.id, { ...ci });
+    });
+    const list = [...byId.values()];
+    if (typeof _catResolveNameConflicts === 'function') _catResolveNameConflicts(list);
+    merged[type] = list;
   });
   if (typeof normalizeCatDisplayName === 'function') {
     Object.keys(merged).forEach(type => {
       (merged[type] || []).forEach(item => {
         if (item.isDeleted) return;
         const canonical = normalizeCatDisplayName(type, item.name);
-        if (canonical !== item.name) { item.name = canonical; item.updatedAt = nowMs; }
+        if (canonical !== item.name) item.name = canonical;
       });
     });
   }
@@ -316,12 +323,32 @@ function _applyCatItemArrays(merged) {
         ? normalizeCatDisplayName(type, i.name) : i.name)
       .filter(n => { const k = _normKey(n); return seen.has(k) ? false : (seen.add(k), true); });
   };
-  if (merged.loai)  _memSet('cat_loai',  nameArr(merged.loai,  'loai'));
-  if (merged.ncc)   _memSet('cat_ncc',   nameArr(merged.ncc,   'ncc'));
-  if (merged.nguoi) _memSet('cat_nguoi', nameArr(merged.nguoi, 'nguoi'));
-  if (merged.tp)    _memSet('cat_tp',    nameArr(merged.tp,    'tp'));
-  if (merged.cn)    _memSet('cat_cn',    nameArr(merged.cn,    'cn'));
-  if (merged.tbteb) _memSet('cat_tbteb', nameArr(merged.tbteb, 'tbteb'));
+  // (01/10/2026) Gán luôn vào biến global cats.* — trước đây chỉ ghi _mem nên cats.* vẫn
+  // giữ danh sách CŨ (còn tên đã xóa ở máy khác) cho tới khi chuyển tab → thao tác danh
+  // mục kế tiếp lưu ngược danh sách cũ lên cloud.
+  const _set = (sk, catId, arr) => {
+    _memSet(sk, arr);
+    if (typeof cats !== 'undefined') cats[catId] = arr;
+  };
+  if (merged.loai)  _set('cat_loai',  'loaiChiPhi', nameArr(merged.loai,  'loai'));
+  if (merged.ncc)   _set('cat_ncc',   'nhaCungCap', nameArr(merged.ncc,   'ncc'));
+  if (merged.nguoi) _set('cat_nguoi', 'nguoiTH',    nameArr(merged.nguoi, 'nguoi'));
+  if (merged.tp)    _set('cat_tp',    'thauPhu',    nameArr(merged.tp,    'tp'));
+  if (merged.cn)    _set('cat_cn',    'congNhan',   nameArr(merged.cn,    'cn'));
+  if (merged.tbteb) _set('cat_tbteb', 'tbTen',      nameArr(merged.tbteb, 'tbteb'));
+  if (typeof rebuildCatIdMaps === 'function') rebuildCatIdMaps();
+  _dmRerenderIfActive();
+}
+
+// Đang mở tab Danh Mục → vẽ lại để thấy ngay thay đổi từ máy khác, và để chỉ số dòng
+// (idx trong nút Sửa/Xóa) khớp với mảng cats.* mới. Bỏ qua nếu người dùng đang gõ
+// trong tab (ô sửa tên / ô thêm mới / ô tìm) để không làm mất chữ đang nhập.
+function _dmRerenderIfActive() {
+  const page = document.getElementById('page-danhmuc');
+  if (!page || !page.classList.contains('active')) return;
+  const ae = document.activeElement;
+  if (ae && page.contains(ae) && ae.tagName === 'INPUT') return;
+  if (typeof renderSettings === 'function') setTimeout(() => { try { renderSettings(); } catch (e) {} }, 0);
 }
 
 // ══════════════════════════════════════════════════════════════

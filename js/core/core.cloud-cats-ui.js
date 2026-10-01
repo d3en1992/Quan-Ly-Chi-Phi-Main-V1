@@ -504,18 +504,125 @@ function _updateYearBtn() {
   else btn.textContent = [...ay].sort((a,b)=>a-b).join(', ');
 }
 
+// Lưu 1 danh mục.
+// ⚠️ (01/10/2026) Đổi cách làm: cat_items_v1 là NGUỒN GỐC DUY NHẤT. Trước đây hàm này
+// so mảng tên cats[catId] với cat_items_v1 rồi tự suy ra "thêm/xóa/hồi sinh" → nếu mảng
+// cats[catId] bị CŨ (vd vừa kéo cloud về mà biến global chưa nạp lại) thì tên đã xóa
+// trên máy khác bị HỒI SINH, tên mới thêm ở máy khác bị XÓA. Nay:
+//   • Thêm / xóa / đổi tên phải gọi rõ ràng catItemUpsert / catItemDelete / renameCatItemInPlace
+//   • saveCats chỉ DỰNG LẠI cats[catId] từ master rồi lưu mảng tên (dữ liệu suy ra)
 function saveCats(catId) {
   const cfg = CATS.find(c=>c.id===catId);
   if (cfg) {
-    save(cfg.sk, cats[catId]); // ghi _mem + IDB + trigger sync
     if (catId === 'congTrinh') {
+      save(cfg.sk, cats[catId]); // congTrinh quản lý bởi projects_v1, không có master item
       save('cat_ct_years', cats.congTrinhYears || {});
+    } else if (_CATITEM_TYPE_MAP[catId]) {
+      const type = _CATITEM_TYPE_MAP[catId];
+      const all  = load('cat_items_v1', {});
+      // Máy chưa từng có master cho loại này → khởi tạo từ mảng hiện có (chỉ THÊM)
+      if (!Array.isArray(all[type])) _syncCatItems(catId, cats[catId]);
+      cats[catId] = _catActiveNames(type);
+      save(cfg.sk, cats[catId]); // ghi _mem + IDB + trigger sync
+    } else {
+      save(cfg.sk, cats[catId]);
     }
-    // Đồng bộ sang cat_items_v1 để track soft-delete per-item
-    _syncCatItems(catId, cats[catId]);
   }
   // Realtime: refresh tất cả dropdowns nhập liệu
   if (typeof refreshEntryDropdowns === 'function') refreshEntryDropdowns();
+}
+
+// Danh sách tên đang dùng (chưa xóa) của 1 loại trong master — đã canonical + dedup
+function _catActiveNames(type) {
+  const allItems = load('cat_items_v1', {});
+  const seen = new Set();
+  return (allItems[type] || []).filter(i => i && !i.isDeleted)
+    .map(i => normalizeCatDisplayName(type, i.name))
+    .filter(n => { const k = _catNormKey(n); return k && !seen.has(k) ? (seen.add(k), true) : false; });
+}
+
+/**
+ * THÊM 1 tên vào danh mục (hoặc HỒI SINH nếu tên đó từng bị xóa) — thao tác của người dùng.
+ * Đóng dấu updatedAt = bây giờ → thắng mọi bản cũ hơn khi gộp với cloud.
+ * Lưu bằng save() → đánh dấu doc meta_danh_muc cần đẩy lên cloud.
+ */
+function catItemUpsert(catId, name) {
+  const type = _catType(catId);
+  name = normalizeCatDisplayName(type, name);
+  if (!type || !name) return false;
+  const allItems = load('cat_items_v1', {});
+  const arr = allItems[type] || (allItems[type] = []);
+  const norm = _catNormKey(name);
+  const now = Date.now();
+  // Đã có bản đang dùng → không làm gì
+  if (arr.some(it => it && !it.isDeleted && _catNormKey(it.name) === norm)) return false;
+  // Có bản đã xóa → hồi sinh chính id đó (giữ liên kết *Id của record cũ)
+  const dead = arr.filter(it => it && it.isDeleted && _catNormKey(it.name) === norm)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+  if (dead) {
+    dead.name = name; dead.isDeleted = false; dead.updatedAt = now; delete dead.seed;
+  } else {
+    arr.push({ id: crypto.randomUUID(), name, isDeleted: false, updatedAt: now });
+  }
+  save('cat_items_v1', allItems);
+  rebuildCatIdMaps();
+  return true;
+}
+
+/**
+ * XÓA MỀM 1 tên khỏi danh mục — thao tác của người dùng.
+ * Đánh dấu isDeleted + updatedAt = bây giờ (bia mộ) để máy khác gộp cũng thấy đã xóa.
+ */
+function catItemDelete(catId, name) {
+  const type = _catType(catId);
+  if (!type || !name) return false;
+  const allItems = load('cat_items_v1', {});
+  const norm = _catNormKey(name);
+  const now = Date.now();
+  let hit = false;
+  (allItems[type] || []).forEach(it => {
+    if (it && !it.isDeleted && _catNormKey(it.name) === norm) {
+      it.isDeleted = true; it.updatedAt = now; delete it.seed; hit = true;
+    }
+  });
+  if (hit) { save('cat_items_v1', allItems); rebuildCatIdMaps(); }
+  return hit;
+}
+
+/**
+ * Giải quyết TRÙNG TÊN trong 1 loại danh mục (dùng chung cho dedup local + gộp cloud).
+ * Quy tắc "bản mới nhất theo TÊN thắng" (kể cả bản đã xóa):
+ *   - Nhóm các item cùng tên (normalized). Bản có updatedAt lớn nhất là bản thắng;
+ *     hòa thì ưu tiên bản đang dùng.
+ *   - Bản thắng là BIA MỘ (đã xóa) → mọi bản đang dùng cùng tên mà CŨ HƠN cũng bị xóa
+ *     → tên đã xóa không thể bị một bản cũ/bản mặc định (id khác) "hồi sinh".
+ *   - Bản thắng đang dùng → các bản đang dùng khác cùng tên là bản trùng → đánh dấu xóa.
+ * KHÔNG đổi updatedAt của bản bị đánh dấu (đây là chuẩn hóa, không phải thao tác người dùng
+ * — nếu đóng dấu "bây giờ" thì bia mộ trùng lặp sẽ đè mất tên đang dùng).
+ * @returns {boolean} true nếu có thay đổi
+ */
+function _catResolveNameConflicts(items) {
+  let changed = false;
+  const groups = new Map();
+  (items || []).forEach(it => {
+    if (!it) return;
+    const k = _catNormKey(it.name);
+    if (!k) return;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(it);
+  });
+  groups.forEach(list => {
+    if (list.length < 2) return;
+    const winner = list.slice().sort((a, b) =>
+      ((b.updatedAt || 0) - (a.updatedAt || 0)) || ((a.isDeleted ? 1 : 0) - (b.isDeleted ? 1 : 0))
+    )[0];
+    list.forEach(it => {
+      if (it === winner || it.isDeleted) return;
+      it.isDeleted = true; // bản cũ hơn bia mộ, hoặc bản trùng của bản thắng đang dùng
+      changed = true;
+    });
+  });
+  return changed;
 }
 
 
@@ -536,29 +643,14 @@ function _catNormKey(s) {
     .trim();
 }
 
-// Dọn dẹp duplicate trong cat_items_v1 (gọi lúc startup & sau pull)
-// Giữ bản có updatedAt cao nhất, mark bản còn lại isDeleted=true
+// Dọn dẹp trùng tên trong cat_items_v1 (gọi lúc startup & sau pull)
+// Quy tắc xem _catResolveNameConflicts (bản mới nhất theo tên thắng, kể cả bia mộ)
 function _dedupCatItemsNow() {
   const allItems = load('cat_items_v1', {});
   if (!allItems || !Object.keys(allItems).length) return false;
   let changed = false;
-  const now = Date.now();
   Object.keys(allItems).forEach(type => {
-    const byNorm = new Map(); // normKey → item (winner)
-    (allItems[type] || []).forEach(item => {
-      if (item.isDeleted) return;
-      const norm = _catNormKey(item.name);
-      if (!byNorm.has(norm)) { byNorm.set(norm, item); return; }
-      // Duplicate: giữ bản mới hơn, delete bản cũ hơn
-      const winner = byNorm.get(norm);
-      if ((item.updatedAt || 0) > (winner.updatedAt || 0)) {
-        winner.isDeleted = true; winner.updatedAt = now;
-        byNorm.set(norm, item);
-      } else {
-        item.isDeleted = true; item.updatedAt = now;
-      }
-      changed = true;
-    });
+    if (_catResolveNameConflicts(allItems[type])) changed = true;
   });
   if (changed) {
     _memSet('cat_items_v1', allItems);
@@ -604,62 +696,53 @@ function normalizeCatDisplayName(catIdOrType, name) {
 }
 
 /**
- * Đồng bộ string array → cat_items_v1 sau mỗi lần user thay đổi danh mục.
- * Tự detect thêm mới (add) và xóa (isDeleted=true).
- * Gọi từ saveCats() — không tăng pending (saveCats đã tăng qua save(cfg.sk)).
+ * Bổ sung các tên trong nameArr vào cat_items_v1 — CHỈ THÊM, không bao giờ tự xóa.
+ * (01/10/2026) Trước đây hàm này còn tự XÓA tên không có trong nameArr và tự HỒI SINH
+ * tên đã xóa có trong nameArr → nameArr cũ (biến global chưa nạp lại sau khi kéo cloud,
+ * hoặc mảng mặc định DEFAULTS trên máy mới) làm danh mục đã xóa sống lại. Nay:
+ *   - Tên chưa từng có → thêm mới.
+ *   - Tên đã bị xóa (bia mộ) → GIỮ NGUYÊN đã xóa, trừ khi opts.revive = true
+ *     (dùng cho import: file nhập có dùng tên đó thì hồi sinh có chủ đích).
+ * Dùng cho: khởi tạo master lần đầu (saveCats) và nhập dữ liệu (nhapxuat.import.js).
  */
-function _syncCatItems(catId, nameArr) {
+function _syncCatItems(catId, nameArr, opts) {
   const type = _CATITEM_TYPE_MAP[catId];
   if (!type) return; // congTrinh → bỏ qua
   const allItems = load('cat_items_v1', {});
   const typeItems = (allItems[type] || []).slice();
   const now = Date.now();
+  const revive = !!(opts && opts.revive);
 
-  // Canonicalize tên các item đang tồn tại (sửa "COPHA" → "Copha", v.v.)
+  // Canonicalize tên (sửa "COPHA" → "Copha") — KHÔNG đổi updatedAt: mọi máy đều tự
+  // canonical giống nhau, nếu đóng dấu "bây giờ" thì bản này sẽ đè cả bia mộ trên cloud.
   typeItems.forEach(item => {
     if (item.isDeleted) return;
     const canonical = normalizeCatDisplayName(type, item.name);
-    if (canonical !== item.name) {
-      item.name = canonical;
-      item.updatedAt = now;
-    }
+    if (canonical !== item.name) item.name = canonical;
   });
 
-  // Dedup nameArr trước (phòng khi array đã bị rác từ trước)
-  const seenNorm = new Set();
-  const dedupedNames = (nameArr || []).filter(Boolean).filter(name => {
+  const byNorm = new Map();
+  typeItems.forEach(i => {
+    const k = _catNormKey(i.name);
+    // Ưu tiên giữ tham chiếu bản đang dùng nếu có cả bản xóa lẫn bản dùng
+    if (!byNorm.has(k) || !i.isDeleted) byNorm.set(k, i);
+  });
+  (nameArr || []).filter(Boolean).forEach(raw => {
+    const name = normalizeCatDisplayName(type, raw);
     const k = _catNormKey(name);
-    return seenNorm.has(k) ? false : (seenNorm.add(k), true);
-  });
-  // Dùng normalized key để so sánh — tránh tạo UUID mới khi chỉ khác case/dấu
-  const nameSetNorm = new Set(dedupedNames.map(_catNormKey));
-
-  // Soft-delete: item active nhưng không còn trong nameArr (normalized)
-  typeItems.forEach(item => {
-    const norm = _catNormKey(item.name);
-    if (!item.isDeleted && !nameSetNorm.has(norm)) {
-      item.isDeleted = true;
-      item.updatedAt = now;
-    }
-    // Khôi phục nếu tên xuất hiện lại
-    if (item.isDeleted && nameSetNorm.has(norm)) {
-      item.isDeleted = false;
-      item.updatedAt = now;
-    }
-  });
-
-  // Thêm mới: tên chưa có trong items (normalized) — tránh tạo UUID trùng
-  const existingNorm = new Set(typeItems.map(i => _catNormKey(i.name)));
-  dedupedNames.forEach(name => {
-    const k = _catNormKey(name);
-    if (!existingNorm.has(k)) {
-      typeItems.push({ id: crypto.randomUUID(), name, isDeleted: false, updatedAt: now });
-      existingNorm.add(k); // tránh thêm 2 lần trong cùng 1 loop
+    if (!k) return;
+    const ex = byNorm.get(k);
+    if (!ex) {
+      const it = { id: crypto.randomUUID(), name, isDeleted: false, updatedAt: now };
+      typeItems.push(it);
+      byNorm.set(k, it);
+    } else if (ex.isDeleted && revive) {
+      ex.isDeleted = false; ex.name = name; ex.updatedAt = now; delete ex.seed;
     }
   });
 
   allItems[type] = typeItems;
-  _memSet('cat_items_v1', allItems);
+  save('cat_items_v1', allItems); // đánh dấu meta_danh_muc cần đẩy (nếu có thay đổi thật)
   rebuildCatIdMaps();
 }
 
@@ -681,8 +764,10 @@ function renameCatItemInPlace(catIdOrType, oldName, newName) {
   item.name = newName;
   item.isDeleted = false;
   item.updatedAt = Date.now();
+  delete item.seed;
   allItems[type] = arr;
-  _memSet('cat_items_v1', allItems);
+  // save() (thay _memSet) → đổi tên là thao tác người dùng, phải đánh dấu đẩy cloud
+  save('cat_items_v1', allItems);
   rebuildCatIdMaps();
   return true;
 }
@@ -698,7 +783,7 @@ function _rebuildCatArrsFromItems() {
   if (!allItems || !Object.keys(allItems).length) return;
 
   // Canonicalize item.name trong cat_items_v1 (sửa "COPHA" → "Copha", v.v.)
-  const now = Date.now();
+  // KHÔNG đổi updatedAt (xem _syncCatItems) — tránh bản mặc định/bản cũ đè bia mộ cloud
   let itemsChanged = false;
   Object.keys(allItems).forEach(type => {
     (allItems[type] || []).forEach(item => {
@@ -706,7 +791,6 @@ function _rebuildCatArrsFromItems() {
       const canonical = normalizeCatDisplayName(type, item.name);
       if (canonical !== item.name) {
         item.name = canonical;
-        item.updatedAt = now;
         itemsChanged = true;
       }
     });
@@ -845,9 +929,13 @@ function recCatName(rec, kind, which) {
 function _migrateCatItemsIfNeeded() {
   const existing = load('cat_items_v1', {});
   if (existing && Object.keys(existing).length) return; // đã migrate rồi
-  const now = Date.now();
+  // (01/10/2026) Item tạo ra ở đây chỉ là BẢN TẠM (máy mới / web ẩn danh: mảng tên
+  // thường là DEFAULTS trong code) → đánh dấu seed + updatedAt = 0 để KHÔNG BAO GIỜ
+  // thắng dữ liệu thật trên cloud. Trước đây dùng updatedAt = bây giờ → khi gộp với
+  // cloud, các tên mặc định (vd "Chi Phí Khác", "Bàn Uốn Sắt") mới hơn bia mộ trên
+  // cloud → bị hồi sinh rồi đẩy ngược lên cloud cho mọi máy.
   const toItems = (arr) => (arr || []).map(name => ({
-    id: crypto.randomUUID(), name, isDeleted: false, updatedAt: now
+    id: crypto.randomUUID(), name, isDeleted: false, updatedAt: 0, seed: true
   }));
   const allItems = {
     loai:  toItems(cats.loaiChiPhi),

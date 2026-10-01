@@ -315,7 +315,8 @@ function renderSettings() {
         }
       });
       if (toAdd.length) {
-        cats.tbTen = [...(cats.tbTen || []), ...toAdd];
+        // Thêm tường minh vào master (hồi sinh nếu tên từng bị xóa — vì đang có thiết bị dùng)
+        toAdd.forEach(n => catItemUpsert('tbTen', n));
         saveCats('tbTen');
       }
     }
@@ -593,6 +594,8 @@ function finishEdit(catId,idx) {
   const inp=document.getElementById(`se-${catId}-${idx}`);
   let newVal=normalizeName(catId, inp.value);
   if(!newVal){cancelEdit(catId,idx);return;}
+  // Danh mục vừa được đồng bộ từ máy khác → idx trên giao diện có thể đã lệch
+  if (!_dmIdxStillValid(catId, idx)) return;
   inp.value = newVal; // cập nhật input để hiển thị tên đã chuẩn hóa
   const old=cats[catId][idx];
   if(newVal===old){cancelEdit(catId,idx);return;} // không thay đổi thực sự
@@ -606,7 +609,8 @@ function finishEdit(catId,idx) {
 
   // ── Đổi tên item master TẠI CHỖ (giữ nguyên id) ──────────────────────
   // Record CÓ *Id (loaiId/nccId/...) sẽ tự hiển thị tên mới qua recCatName()/catName().
-  if (typeof renameCatItemInPlace === 'function') renameCatItemInPlace(catId, old, newVal);
+  // Không tìm thấy item master của tên cũ (dữ liệu lệch) → thêm tên mới vào master
+  if (!renameCatItemInPlace(catId, old, newVal)) catItemUpsert(catId, newVal);
 
   // ── Quét & cập nhật TÊN đã lưu trong mọi record ──────────────────────
   // Dữ liệu cũ phần lớn CHƯA có *Id → phải sửa thẳng text để tên mới lan tới
@@ -659,7 +663,9 @@ function addItem(catId) {
   const normVal = normalizeKey(val);
   const isDup = cats[catId].some(existing => normalizeKey(existing) === normVal);
   if(isDup){toast(`⚠️ "${val}" đã tồn tại trong danh mục!`,'error');return;}
-  cats[catId].push(val);
+  // Ghi tường minh vào master cat_items_v1 (thêm mới, hoặc hồi sinh nếu tên từng bị xóa)
+  // → saveCats dựng lại cats[catId] từ master rồi đẩy cloud
+  catItemUpsert(catId, val);
   // (congTrinh không bao giờ tới đây — đã return sớm ở đầu hàm; quản lý qua Tab Công Trình)
   saveCats(catId); inp.value='';
   renderSettings(); rebuildEntrySelects(); rebuildUngSelects();
@@ -708,12 +714,29 @@ function isItemInUse(catId, item) {
   return false;
 }
 
+// Kiểm tra dòng idx trên giao diện còn đúng là tên trong cats[catId][idx] không.
+// Lý do: danh mục có thể vừa được kéo mới từ cloud (máy khác thêm/xóa) làm mảng
+// cats[catId] đổi thứ tự → nút Sửa/Xóa đang hiển thị trỏ sai tên → xóa/đổi nhầm.
+function _dmIdxStillValid(catId, idx) {
+  // Giao diện điện thoại (body.mb-on) tự vẽ danh sách từ cats.* mỗi lần render,
+  // không dùng DOM desktop → không kiểm tra được ở đây, cho qua.
+  if (document.body.classList.contains('mb-on')) return true;
+  const el = document.getElementById(`sn-${catId}-${idx}`);
+  const cur = (cats[catId] || [])[idx];
+  if (el && cur !== undefined && el.textContent === cur) return true;
+  toast('🔄 Danh mục vừa được đồng bộ từ thiết bị khác — đã tải lại, vui lòng thao tác lại', 'info');
+  renderSettings();
+  return false;
+}
+
 function delItem(catId,idx) {
   // congTrinh không được xóa qua danh mục — phải xóa/kết thúc qua Tab Công Trình
   if (catId === 'congTrinh') {
     toast('💡 Quản lý công trình tại Tab Công Trình — đổi trạng thái thành "Đã quyết toán" để ẩn', 'info');
     return;
   }
+  // Danh mục vừa được đồng bộ từ máy khác → idx trên giao diện có thể đã lệch → chặn xóa nhầm
+  if (!_dmIdxStillValid(catId, idx)) return;
   const item=cats[catId][idx];
   if(isItemInUse(catId, item)) {
     const msg = catId === 'tbTen'
@@ -734,7 +757,8 @@ function delItem(catId,idx) {
   if (catId === 'congNhan') {
     ungRecords = ungRecords.filter(r => !(r.loai === 'congnhan' && r.tp === item));
   }
-  cats[catId].splice(idx,1);
+  // Xóa mềm tường minh trong master (bia mộ có updatedAt) → máy khác gộp cũng thấy đã xóa
+  catItemDelete(catId, item);
   // (congTrinh không bao giờ tới đây — đã return sớm ở đầu hàm; quản lý qua Tab Công Trình)
   saveCats(catId);
   const _ungIdsAfter = new Set(ungRecords.map(r => r.id));

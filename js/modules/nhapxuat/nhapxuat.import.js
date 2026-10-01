@@ -389,7 +389,8 @@ function _applyImport() {
       if (!added.length) return 0;
       save(key, combined);
       if (assign) assign(combined);
-      if (catId && typeof _syncCatItems === 'function') _syncCatItems(catId, combined);
+      // Chỉ ghi master các tên MỚI từ file nhập; revive → tên từng bị xóa mà file có dùng thì bật lại
+      if (catId && typeof _syncCatItems === 'function') _syncCatItems(catId, added, { revive: true });
       return added.length;
     };
 
@@ -529,7 +530,7 @@ function _applyImport() {
       if (added.length) {
         save('cat_cn', combined);
         cats.congNhan = combined;
-        if (typeof _syncCatItems === 'function') _syncCatItems('congNhan', combined);
+        if (typeof _syncCatItems === 'function') _syncCatItems('congNhan', added, { revive: true });
         _log('cc', `ℹ️ Tự thêm ${added.length} CN mới vào danh mục: ${added.join(', ')}`);
       }
     }

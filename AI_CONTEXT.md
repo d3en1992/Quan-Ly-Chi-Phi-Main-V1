@@ -1680,6 +1680,24 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `js/modules/chamcong/chamcong.ung-ledger.js`, `pages/chamcong.html`.
 
+### 9.31 Fix: Danh mục đã xóa bị "hồi sinh" sau 1 ngày (01/10/2026)
+
+**Triệu chứng:** xóa "Chi Phí Khác" (Loại CP), "Bàn Uốn Sắt", "Cây Chống Tăng" (Thiết bị) → hôm sau hiện lại. Tất cả đều là tên trong `DEFAULTS` (core.storage.js).
+
+**Nguyên nhân:**
+1. Máy mới / web ẩn danh: `cats.*` lấy `DEFAULTS` → `_migrateCatItemsIfNeeded` tạo item với `updatedAt = bây giờ`; canonical hóa tên (vd "Bàn uốn sắt" → "Bàn Uốn Sắt") cũng đóng dấu "bây giờ" và `save()` → đánh dấu `meta_danh_muc`. Khi đẩy (đọc-gộp), `_mergeCatItems` dedup theo tên chỉ xét bản ĐANG DÙNG → bản mặc định (id khác, mới hơn) thắng bia mộ cloud → đẩy ngược lên cloud cho mọi máy.
+2. `saveCats` → `_syncCatItems` so mảng `cats[catId]` với master rồi tự suy ra xóa/hồi sinh. Sau khi kéo cloud, `_applyCatItemArrays` chỉ ghi `_mem` → `cats.*` vẫn CŨ → thao tác danh mục kế tiếp hồi sinh tên đã xóa ở máy khác (và xóa tên mới thêm ở máy khác).
+
+**Sửa:**
+- `core.cloud-cats-ui.js`: hàm mới `catItemUpsert`, `catItemDelete` (thao tác tường minh, `save('cat_items_v1')`), `_catActiveNames`, `_catResolveNameConflicts` (bản mới nhất THEO TÊN thắng, kể cả bia mộ; không đóng dấu lại updatedAt). `saveCats` chỉ dựng lại `cats[catId]` từ master. `_syncCatItems(catId, names, {revive})` chỉ THÊM (hồi sinh khi `revive`). Canonical hóa không đổi `updatedAt`. `renameCatItemInPlace` dùng `save()`. Migration tạo item `seed: true, updatedAt: 0`.
+- `sync.js`: `_mergeCatItems` bỏ item `seed` local khi cloud đã có dữ liệu loại đó + dùng `_catResolveNameConflicts`. `_applyCatItemArrays` gán luôn `cats.*` + `rebuildCatIdMaps()` + hàm mới `_dmRerenderIfActive()` (vẽ lại tab Danh mục nếu đang mở và không gõ dở).
+- `danhmuc.categories.js`: `addItem` → `catItemUpsert`; `delItem` → `catItemDelete`; `finishEdit` → `renameCatItemInPlace` (fallback upsert); tbTen tự bổ sung → `catItemUpsert`. Hàm mới `_dmIdxStillValid` chặn sửa/xóa nhầm khi danh sách vừa đổi do đồng bộ (bỏ qua trên mobile).
+- `nhapxuat.import.js`: `_syncCatItems(catId, added, { revive: true })`.
+
+**Lưu ý dữ liệu hiện tại:** các tên đã hồi sinh đang là "đang dùng" mới trên cloud → cần xóa lại 1 lần; từ nay không hồi sinh nữa.
+
+**File đã sửa:** `js/core/core.cloud-cats-ui.js`, `js/sync/sync.js`, `js/modules/danhmuc/danhmuc.categories.js`, `js/modules/nhapxuat/nhapxuat.import.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
