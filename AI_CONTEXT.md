@@ -1774,6 +1774,12 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `pages/nhapung.html`, `js/modules/tienung/tienung.entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`, `assets/css/style.css`.
 
+#### 9.36.1 Tối giản form Nhập Tiền Ứng (01/10/2026)
+- Bảng phân bổ dùng đúng cấu trúc bảng Nhập nhanh (`col-ct`/`col-tien`/`col-nd`, `<td><input class="cell-input">`, nút "+ 1 dòng"/"+ 5 dòng"); ô CT (select + `_ssEnhance`) được CSS cho giống `.cell-input`.
+- Placeholder ô tiền: `_ungUpdateRowPlaceholder` (thay `_ungUpdateRowHint`) = số nợ CT, không có thì "0". Bỏ chữ "· còn nợ" trong option CT, bỏ dòng gợi ý dưới ô tiền (`.ung-ct-hint`).
+- `_ungRenderDebt` chỉ còn 1 câu: "Tổng nợ công ty đang nợ hợp lệ: X đ" (chưa chọn đối tác → trống).
+- XÓA: phụ đề "(phân bổ đa công trình)", placeholder ô Tổng tiền ứng, `#ung-row-count` + `#ung-entry-total`, nút + hàm `ungFillDebtRows`, CSS `.ung-debt-main/.ung-debt-sub/.ung-ct-hint`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

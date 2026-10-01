@@ -110,32 +110,14 @@ function _ungDebtOfCt(name, pid) {
   return _ungDebt.valid.find(c => c.key === key) || null;
 }
 
-// Vẽ dòng "Tổng nợ hợp lệ" dưới đầu phiếu
+// Vẽ dòng tổng nợ dưới đầu phiếu — CHỈ 1 câu tĩnh, không icon/màu/giải thích phụ:
+//   "Tổng nợ công ty đang nợ hợp lệ: 23.325.600 đ"
+// Chưa chọn đối tác → để trống.
 function _ungRenderDebt() {
   const box = document.getElementById('ung-debt-info');
   if (!box) return;
-  const loai = document.getElementById('ung-loai')?.value || 'thauphu';
   const tp = document.getElementById('ung-tp')?.value || '';
-  const who = loai === 'nhacungcap' ? 'nhà cung cấp' : 'thầu phụ';
-  if (!tp) {
-    box.innerHTML = `<span class="ung-debt-sub">Chọn ${who} để xem công ty đang nợ bao nhiêu.</span>`;
-    return;
-  }
-  const d = _ungDebt || { valid: [], total: 0, over: 0, unalloc: 0 };
-  const basis = loai === 'nhacungcap' ? 'có chi phí với NCC này' : 'có hợp đồng thầu phụ';
-  if (!d.valid.length) {
-    box.innerHTML = `<span class="ung-debt-sub"><span class="material-symbols-outlined msi-gap">info</span>Chưa có công trình nào ${basis} — không tính được công nợ.</span>`
-      + (d.unalloc > 0 ? `<span class="ung-debt-sub"> · Ứng chung chưa phân bổ: <b>${numFmt(d.unalloc)} đ</b></span>` : '');
-    return;
-  }
-  const nNo = d.valid.filter(c => c.con > 0).length;
-  let html = `<span class="ung-debt-main">🔴 Tổng nợ công ty đang nợ hợp lệ: <span class="font-monospace">${numFmt(d.total)} đ</span></span>`
-    + ` <span class="ung-debt-sub">(${nNo}/${d.valid.length} công trình ${basis} còn nợ)</span>`;
-  const subs = [];
-  if (d.unalloc > 0) subs.push(`Ứng chung chưa phân bổ: <b>${numFmt(d.unalloc)} đ</b> → còn phải trả thực tế: <b>${numFmt(Math.max(0, d.total - d.unalloc))} đ</b>`);
-  if (d.over > 0) subs.push(`Đã ứng dư ở CT khác: <b>${numFmt(d.over)} đ</b>`);
-  if (subs.length) html += `<div class="ung-debt-sub mt-1">${subs.join(' · ')}</div>`;
-  box.innerHTML = html;
+  box.textContent = tp ? `Tổng nợ công ty đang nợ hợp lệ: ${numFmt((_ungDebt && _ungDebt.total) || 0) || 0} đ` : '';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -164,7 +146,8 @@ function _ungBuildPartnerOpts(keepVal) {
 }
 
 // Option Công trình cho 1 dòng phân bổ:
-//   1) CT còn nợ của đối tác (kèm số nợ) xếp đầu  2) các CT đang hoạt động khác
+//   1) CT còn nợ của đối tác xếp đầu (chỉ tên — số nợ hiện ở placeholder ô tiền)
+//   2) các CT đang hoạt động khác
 function _ungCtOptionsHtml(selName, selPid) {
   let html = '<option value="">-- Chọn công trình --</option>';
   const used = new Set();
@@ -175,7 +158,7 @@ function _ungCtOptionsHtml(selName, selPid) {
     html += `<option value="${x(name)}"${pid ? ` data-pid="${x(pid)}"` : ''}>${x(label || name)}</option>`;
   };
   (_ungDebt ? _ungDebt.valid : []).forEach(c => {
-    if (c.con > 0) add(c.name, c.pid, `${c.name} · còn nợ ${numFmt(c.con)}`);
+    if (c.con > 0) add(c.name, c.pid);
   });
   const projs = [
     ...(typeof PROJECT_COMPANY !== 'undefined' && PROJECT_COMPANY ? [PROJECT_COMPANY] : []),
@@ -228,48 +211,37 @@ function addUngRow(d = {}) {
   if (!tbody) return;
   const num = tbody.children.length + 1;
   const tr = document.createElement('tr');
+  // Cấu trúc ô giống hệt bảng Nhập nhanh: <td><input class="cell-input ..."></td>
   tr.innerHTML = `
     <td class="row-num">${num}</td>
-    <td style="padding:0"><select class="cell-input" data-f="ct">${_ungCtOptionsHtml(d.congtrinh, d.projectId)}</select></td>
-    <td style="padding:0">
-      <input class="cell-input right tien-input" data-f="tien" data-raw="${d.tien || ''}" value="${d.tien ? numFmt(d.tien) : ''}"
-        placeholder="Số tiền ứng cho CT này..." inputmode="decimal" autocomplete="off">
-      <span class="ung-ct-hint" data-f="hint"></span>
-    </td>
-    <td><input class="cell-input" data-f="nd" value="${x(d.nd || '')}" placeholder="Nhập diễn giải..."></td>
+    <td><select class="cell-input" data-f="ct">${_ungCtOptionsHtml(d.congtrinh, d.projectId)}</select></td>
+    <td><input class="cell-input right tien-input" data-f="tien" data-raw="${d.tien || ''}" value="${d.tien ? numFmt(d.tien) : ''}"
+      placeholder="0" inputmode="decimal" autocomplete="off"></td>
+    <td><input class="cell-input" data-f="nd" value="${x(d.nd || '')}" placeholder="Nội dung..."></td>
     <td><button class="del-btn" onclick="delUngRow(this)" title="Xóa dòng"><span class="material-symbols-outlined">close</span></button></td>
   `;
   tbody.appendChild(tr);
 
   const ctSel = tr.querySelector('[data-f="ct"]');
   _ungSelectCt(ctSel, d.congtrinh, d.projectId);
-  ctSel.addEventListener('change', () => { _ungUpdateRowHint(tr); calcUngSummary(); });
+  ctSel.addEventListener('change', () => { _ungUpdateRowPlaceholder(tr); calcUngSummary(); });
   if (typeof _ssEnhance === 'function') _ssEnhance(ctSel); // gõ để tìm công trình
 
   _ungBindMoney(tr.querySelector('[data-f="tien"]'), calcUngSummary);
-  _ungUpdateRowHint(tr);
+  _ungUpdateRowPlaceholder(tr);
 }
 
 function addUngRows(n) { for (let i = 0; i < n; i++) addUngRow(); calcUngSummary(); }
 
-// Placeholder ô tiền = số CT đó còn nợ; dòng gợi ý nhỏ + cảnh báo nếu nhập vượt nợ
-function _ungUpdateRowHint(tr) {
+// Chữ mờ (placeholder) ô Số tiền = số đối tác còn nợ tại công trình đang chọn (vd "6.000.000").
+// CT không còn nợ / chưa chọn CT → "0" như bảng Nhập nhanh.
+function _ungUpdateRowPlaceholder(tr) {
   const sel = tr.querySelector('[data-f="ct"]');
   const inp = tr.querySelector('[data-f="tien"]');
-  const hint = tr.querySelector('[data-f="hint"]');
-  const opt = sel?.selectedOptions?.[0];
+  if (!sel || !inp) return;
+  const opt = sel.selectedOptions[0];
   const c = opt && opt.value ? _ungDebtOfCt(opt.value, opt.dataset.pid) : null;
-  if (c && c.con > 0) {
-    inp.placeholder = numFmt(c.con);
-    const typed = _ungRaw(inp);
-    hint.textContent = typed > c.con ? `⚠ vượt nợ CT (${numFmt(c.con)} đ)` : `Nợ CT: ${numFmt(c.con)} đ`;
-    hint.classList.toggle('over', typed > c.con);
-  } else {
-    inp.placeholder = opt && opt.value ? '0' : 'Số tiền ứng cho CT này...';
-    hint.textContent = opt && opt.value && _ungDebt && document.getElementById('ung-tp')?.value
-      ? (c ? 'CT đã ứng đủ' : 'CT chưa có HĐ/chi phí') : '';
-    hint.classList.remove('over');
-  }
+  inp.placeholder = (c && c.con > 0) ? numFmt(c.con) : '0';
 }
 
 function delUngRow(btn) { btn.closest('tr').remove(); renumberUng(); calcUngSummary(); }
@@ -286,17 +258,11 @@ function clearUngRows() {
 //  TỔNG HỢP REALTIME: đã phân bổ / còn lại
 // ══════════════════════════════════════════════════════════════
 function calcUngSummary() {
-  let cnt = 0, alloc = 0;
+  let alloc = 0;
   document.querySelectorAll('#ung-tbody tr').forEach(tr => {
-    const ct = tr.querySelector('[data-f="ct"]')?.value || '';
-    const tien = _ungRaw(tr.querySelector('[data-f="tien"]'));
-    if (ct || tien > 0) { cnt++; alloc += tien; }
-    _ungUpdateRowHint(tr);
+    alloc += _ungRaw(tr.querySelector('[data-f="tien"]'));
+    _ungUpdateRowPlaceholder(tr);
   });
-  const cntEl = document.getElementById('ung-row-count');
-  if (cntEl) cntEl.textContent = cnt;
-  const totEl = document.getElementById('ung-entry-total');
-  if (totEl) totEl.textContent = fmtM(alloc);
 
   // Trừ lùi: Tổng tiền ứng − đã phân bổ. Bỏ trống Tổng → tổng = đã phân bổ.
   const totalRaw = _ungRaw(document.getElementById('ung-total'));
@@ -336,39 +302,6 @@ function onUngPartnerChange() {
   _ungRenderDebt();
   rebuildUngSelects(true);
   calcUngSummary();
-}
-
-// Nút "Tự chia theo nợ": thêm các CT còn nợ chưa có trong bảng, chia Tổng tiền ứng lần lượt
-// theo số nợ (CT nợ nhiều trước). Bỏ trống Tổng → điền đủ số nợ từng CT.
-function ungFillDebtRows() {
-  if (!document.getElementById('ung-tp')?.value) { toast('Chọn thầu phụ / nhà cung cấp trước', 'error'); return; }
-  const debts = (_ungDebt ? _ungDebt.valid : []).filter(c => c.con > 0);
-  if (!debts.length) { toast('Đối tác này không có công trình nào còn nợ hợp lệ', 'info'); return; }
-  const tbody = document.getElementById('ung-tbody');
-  // Bỏ dòng trống, giữ dòng đã nhập
-  [...tbody.querySelectorAll('tr')].forEach(tr => {
-    if (!tr.querySelector('[data-f="ct"]')?.value && !_ungRaw(tr.querySelector('[data-f="tien"]'))) tr.remove();
-  });
-  const have = new Set([...tbody.querySelectorAll('tr')].map(tr => {
-    const o = tr.querySelector('[data-f="ct"]')?.selectedOptions?.[0];
-    return o && o.value ? _ungCtKey({ congtrinh: o.value, projectId: o.dataset.pid || null }) : '';
-  }));
-  let alloc = 0;
-  tbody.querySelectorAll('tr').forEach(tr => { alloc += _ungRaw(tr.querySelector('[data-f="tien"]')); });
-  const totalRaw = _ungRaw(document.getElementById('ung-total'));
-  let left = totalRaw ? totalRaw - alloc : Infinity;
-  let added = 0;
-  for (const c of debts) {
-    if (left <= 0) break;
-    if (have.has(c.key)) continue;
-    const amt = Math.min(c.con, left);
-    addUngRow({ congtrinh: c.name, projectId: c.pid, tien: amt });
-    left -= amt; added++;
-  }
-  renumberUng();
-  if (!tbody.children.length) addUngRow();
-  calcUngSummary();
-  toast(added ? `Đã thêm ${added} công trình còn nợ` : 'Không còn công trình nợ nào để thêm / đã hết tiền để chia', added ? 'success' : 'info');
 }
 
 // ══════════════════════════════════════════════════════════════
