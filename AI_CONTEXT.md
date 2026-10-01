@@ -1757,6 +1757,23 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `js/legacy/tienich.js`, `js/core/core.cloud-cats-ui.js`, `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`.
 
+### 9.36 Form Nhập Tiền Ứng — phân bổ đa công trình + tổng nợ hợp lệ (01/10/2026)
+
+**Giao diện (`pages/nhapung.html`)** — thay bảng nhập cũ (mỗi dòng 1 đối tác) bằng phiếu 1 đối tác:
+- Đầu phiếu `.ung-head-grid`: `#ung-date`, `#ung-loai` (thauphu/nhacungcap), `#ung-tp` (select + `_ssEnhance`), `#ung-total` (Tổng tiền ứng, bỏ trống = tổng phân bổ), `#ung-tp-label`, `#ung-debt-info`.
+- `#ung-remain` (Còn lại realtime), bảng `#ung-tbody` (Công trình · Số tiền · Nội dung), nút "+ Thêm công trình", "Tự chia theo nợ" (`ungFillDebtRows`), `#ung-save-btn` chuyển xuống thanh lưu. Giữ `#ung-row-count`, `#ung-entry-total` (= đã phân bổ).
+- CSS mới: `.ung-head-grid`, `.ung-debt-info`, `.ung-remain(.zero/.pos/.neg)`, `.ung-ct-hint(.over)`.
+
+**Logic (`tienung.entry.js` — viết lại, giữ tên hàm cũ):**
+- `ungPartnerDebt(loai, tp, excludeId)` — nợ theo CT trên TOÀN BỘ năm: TP = HĐ thầu phụ (giaTri+phatSinh), NCC = tổng hóa đơn có NCC đó; chỉ CT có giá trị > 0 (bỏ CT chưa có HĐ/chi phí). Trả `{valid[{key,name,pid,value,daUng,con}], total (Σ con>0), over, unalloc (phiếu không gắn CT)}`. `_ungCtKey` (pid ưu tiên), `_ungDebtOfCt`, `_ungRenderDebt`.
+- Dropdown CT `_ungCtOptionsHtml`: CT còn nợ (kèm "· còn nợ X") lên đầu, rồi CT đang hoạt động; `_ungSelectCt`. Placeholder ô tiền = số nợ CT, `_ungUpdateRowHint` cảnh báo vượt nợ.
+- `calcUngSummary`: đã phân bổ + Còn lại = Tổng − phân bổ. `saveAllUngRows`: mỗi dòng = 1 bản ghi `ung_v1` như cũ; phân bổ vượt tổng → chặn; còn dư → confirm lưu thành phiếu không gắn CT nội dung `UNG_CHUNG_ND` ("Ứng chung chờ phân bổ"). Sửa phiếu: dòng đầu `mkUpdate` phiếu cũ, dòng sau tạo mới; công nợ loại trừ phiếu đang sửa.
+- Hàm mới khác: `onUngPartnerChange`, `_ungBuildPartnerOpts`, `_ungBindMoney`, `_ungRaw`. `onUngLoaiChange` nay cho select đầu phiếu. `rebuildUngSelects(keepPartner)`.
+
+**Ô chọn gõ tìm (`hoadon.detail-entry.js`):** `.ss-list` đổi sang `position: fixed` + `_ssPlace()` (mở lên trên nếu thiếu chỗ), `_ssOpenSel`, tự dời theo scroll/resize → không bị cắt trong bảng cuộn ngang.
+
+**File đã sửa:** `pages/nhapung.html`, `js/modules/tienung/tienung.entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`, `assets/css/style.css`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

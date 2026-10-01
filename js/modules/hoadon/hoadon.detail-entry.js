@@ -582,16 +582,42 @@ function _ssScrollActive(sel) {
   if (el) el.scrollIntoView({ block: 'nearest' });
 }
 
+// Đặt danh sách ngay dưới ô input theo tọa độ MÀN HÌNH (position: fixed) — để không bị
+// cắt khi ô nằm trong bảng có thanh cuộn (overflow) như bảng phân bổ Tiền Ứng.
+// Không đủ chỗ phía dưới → mở lên trên.
+let _ssOpenSel = null;
+function _ssPlace(sel) {
+  const st = sel && sel._ss;
+  if (!st || !st.open) return;
+  const r = st.input.getBoundingClientRect();
+  st.list.style.left = Math.max(4, r.left) + 'px';
+  st.list.style.minWidth = r.width + 'px';
+  const below = window.innerHeight - r.bottom;
+  if (below < 220 && r.top > below) {
+    st.list.style.top = '';
+    st.list.style.bottom = (window.innerHeight - r.top + 2) + 'px';
+  } else {
+    st.list.style.bottom = '';
+    st.list.style.top = (r.bottom + 2) + 'px';
+  }
+}
+// Cuộn trang / đổi cỡ cửa sổ → dời danh sách đang mở theo ô input
+window.addEventListener('scroll', () => { if (_ssOpenSel) _ssPlace(_ssOpenSel); }, true);
+window.addEventListener('resize', () => { if (_ssOpenSel) _ssPlace(_ssOpenSel); });
+
 function _ssOpen(sel) {
   const st = sel._ss;
   st.open = true;
+  _ssOpenSel = sel;
   st.list.classList.add('open');
   _ssRenderList(sel, '');
+  _ssPlace(sel);
 }
 
 function _ssClose(sel) {
   const st = sel._ss;
   st.open = false;
+  if (_ssOpenSel === sel) _ssOpenSel = null;
   st.list.classList.remove('open');
   _ssRefresh(sel); // trả chữ hiển thị về mục đang chọn
 }
@@ -645,8 +671,9 @@ function _ssEnhance(sel) {
   input.addEventListener('focus', () => { _ssOpen(sel); input.select(); });
   input.addEventListener('click', () => { if (!sel._ss.open) { _ssOpen(sel); input.select(); } });
   input.addEventListener('input', () => {
-    if (!sel._ss.open) { sel._ss.open = true; list.classList.add('open'); }
+    if (!sel._ss.open) { sel._ss.open = true; _ssOpenSel = sel; list.classList.add('open'); }
     _ssRenderList(sel, input.value);
+    _ssPlace(sel);
   });
   input.addEventListener('keydown', e => {
     const st = sel._ss;

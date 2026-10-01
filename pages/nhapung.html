@@ -8,28 +8,53 @@
 
         <!-- ══ SUBTAB 1: Nhập Tiền Ứng + Phiếu Ứng Gần Đây ══ -->
         <div class="sub-page active" id="ung-sub-nhap">
-        <!-- Bảng 1: Nhập tiền ứng -->
+        <!-- Bảng 1: Nhập tiền ứng — PHÂN BỔ ĐA CÔNG TRÌNH (01/10/2026)
+             1 phiếu = 1 Thầu phụ/NCC + Tổng tiền ứng, chia ra nhiều công trình.
+             Mỗi dòng phân bổ lưu thành 1 bản ghi ung_v1 như cũ (báo cáo/công nợ không đổi).
+             Logic: js/modules/tienung/tienung.entry.js -->
         <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-            <span class="dot"></span>Nhập Tiền Ứng
+            <span class="dot"></span>Nhập Tiền Ứng <span class="text-secondary fw-normal" style="font-size:12px">(phân bổ đa công trình)</span>
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <button class="btn btn-outline-secondary" onclick="clearUngTable()">
-              <span class="material-symbols-outlined msi-gap">delete</span>Xóa bảng
-            </button>
-            <button
-              class="btn btn-success"
-              id="ung-save-btn"
-              onclick="saveAllUngRows()"
-            >
-              <span class="material-symbols-outlined msi-gap">save</span>Lưu tất cả
+              <span class="material-symbols-outlined msi-gap">delete</span>Xóa form
             </button>
           </div>
         </div>
 
-        <div class="entry-date-bar">
-          <span class="bar-label">Ngày</span>
-          <input type="date" id="ung-date" class="form-control form-control-sm w-auto" />
+        <!-- Đầu phiếu: Ngày · Đối tượng · Thầu phụ/NCC · Tổng tiền ứng -->
+        <div class="ung-head card shadow-sm p-3 mb-2">
+          <div class="ung-head-grid">
+            <div>
+              <label class="form-label small fw-bold mb-1" for="ung-date">Ngày ứng</label>
+              <input type="date" id="ung-date" class="form-control form-control-sm" />
+            </div>
+            <div>
+              <label class="form-label small fw-bold mb-1" for="ung-loai">Đối tượng</label>
+              <select id="ung-loai" class="form-select form-select-sm" onchange="onUngLoaiChange(this)">
+                <option value="thauphu">Thầu phụ</option>
+                <option value="nhacungcap">Nhà cung cấp</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small fw-bold mb-1" for="ung-tp" id="ung-tp-label">Thầu phụ <span class="text-danger">*</span></label>
+              <select id="ung-tp" class="form-select form-select-sm" style="min-width:220px" onchange="onUngPartnerChange()"></select>
+            </div>
+            <div>
+              <label class="form-label small fw-bold mb-1" for="ung-total">Tổng số tiền ứng (đ)</label>
+              <input type="text" id="ung-total" class="form-control form-control-sm text-end tien-input font-monospace fw-bold"
+                inputmode="decimal" placeholder="Bỏ trống = tổng các dòng phân bổ" autocomplete="off" />
+            </div>
+          </div>
+          <!-- Tổng nợ hợp lệ của đối tác — render bởi _ungRenderDebt() -->
+          <div id="ung-debt-info" class="ung-debt-info mt-2"></div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-2">
+          <div class="fw-bold" style="font-size:13px"><span class="material-symbols-outlined msi-gap">location_on</span>Phân bổ cho công trình</div>
+          <!-- Trừ lùi realtime: Tổng ứng − đã phân bổ -->
+          <span id="ung-remain" class="ung-remain badge">Còn lại: 0 đ</span>
         </div>
 
         <div class="entry-table-wrap">
@@ -38,44 +63,39 @@
               <thead>
                 <tr>
                   <th class="col-num">#</th>
-                  <th style="width: 110px">Đối Tượng</th>
-                  <th style="width: 200px">
-                    Thầu Phụ / Công Nhân
-                    <span class="text-warning">*</span>
-                  </th>
-                  <th style="width: 220px">Công Trình</th>
-                  <th style="width: 140px">Số Tiền Ứng (đ)</th>
-                  <th style="min-width: 220px">Nội Dung / Ghi Chú</th>
+                  <th style="min-width: 260px">Công Trình <span class="text-warning">*</span></th>
+                  <th style="width: 190px">Số Tiền Ứng Cho CT (đ)</th>
+                  <th style="min-width: 220px">Nội Dung / Diễn Giải</th>
                   <th class="col-del"></th>
                 </tr>
               </thead>
               <tbody id="ung-tbody"></tbody>
             </table>
           </div>
-          <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary">
+          <div class="add-row-bar d-flex gap-2 align-items-center p-2 border-top bg-body-tertiary flex-wrap">
             <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(1)">
-              + 1 dòng
+              + Thêm công trình
             </button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(5)">
-              + 5 dòng
-            </button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="addUngRows(10)">
-              + 10 dòng
+            <button class="btn btn-outline-warning btn-sm" onclick="ungFillDebtRows()" title="Tự thêm các công trình còn nợ của đối tác và chia Tổng tiền ứng lần lượt theo số nợ">
+              <span class="material-symbols-outlined msi-gap">auto_fix_high</span>Tự chia theo nợ
             </button>
             <span class="text-secondary" style="font-size: 11px; margin-left: 8px"
-              >Tab để di chuyển giữa các ô</span
+              >Số mờ trong ô tiền = số CT đó còn nợ. Phần dư chưa chia sẽ lưu thành "Ứng chung chờ phân bổ".</span
             >
           </div>
         </div>
 
         <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4">
           <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
-            <span>Dòng có dữ liệu: <strong id="ung-row-count">0</strong></span>
+            <span>Số công trình: <strong id="ung-row-count">0</strong></span>
             <span
-              >Tổng tiền ứng:
+              >Đã phân bổ:
               <span class="hi" id="ung-entry-total">0 đ</span></span
             >
           </div>
+          <button class="btn btn-success" id="ung-save-btn" onclick="saveAllUngRows()">
+            <span class="material-symbols-outlined msi-gap">save</span>Lưu phiếu ứng
+          </button>
         </div>
 
         <!-- Phiếu Ứng Gần Đây (10 phiếu mới nhất TP + NCC) — render bởi renderUngMini() -->
