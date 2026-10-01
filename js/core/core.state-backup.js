@@ -327,6 +327,10 @@ function _reloadGlobals() {
   _rebuildCatArrsFromItems();
   // Xóa toàn bộ cache runtime — bắt buộc để render thấy data mới sau pull
   clearAllCache();
+  // (01/10/2026) Tên danh mục đang được dùng trong HĐ/tiền ứng/chấm công... mà thiếu trong
+  // Danh mục → tự thêm lại (chỉ ghi khi thực sự thiếu). Xem catBackfillFromRecords.
+  try { if (typeof catBackfillFromRecords === 'function') catBackfillFromRecords(); }
+  catch (e) { console.warn('[Cats] catBackfillFromRecords lỗi:', e); }
   // Rebuild cats.congTrinh từ projects — derived data, không tăng pending counter
   if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
   // Đảm bảo mọi tên công nhân trong ccData đều có trong danh mục — quan trọng sau import

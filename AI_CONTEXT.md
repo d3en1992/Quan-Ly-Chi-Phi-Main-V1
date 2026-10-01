@@ -1727,6 +1727,26 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 
 **File đã sửa:** `js/modules/hoadon/hoadon.sheet-grid.js`, `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`.
 
+### 9.34 Reset form sau khi lưu + Sao chép/Dán form + Danh mục thiếu & validate HĐ cũ (01/10/2026)
+
+**1. Reset form sau khi lưu/cập nhật:**
+- Nhập nhanh: `_doSaveRows` → `entry-date = today()` + `initTable(5)`.
+- HĐ chi tiết: `clearDetailForm(full)` — `full=true` (sau `saveDetailInvoice`) xóa cả Ngày→hôm nay, Loại, CT, `dataset.orig`; nút "Xóa form" (`full` không truyền) giữ hành vi cũ.
+- `today()` (main.js) đổi sang giờ máy (trước dùng `toISOString` = UTC → 0h–7h sáng VN ra ngày hôm qua).
+
+**2. Sao chép / Dán form** (nút mới trong `pages/nhap.html`, cả 2 tab):
+- Bộ nhớ tạm `_hdClipSet/_hdClipGet/_hdClipTime` (quick-entry.js), ngăn `quick`/`detail`, lưu thêm localStorage key `hd_form_clip_v1` (chỉ máy này).
+- Nhập nhanh: `copyQuickForm`, `pasteQuickForm`, `_quickFormRows` (ngày + mọi dòng kèm `projectId`). `addRow({_blank:true})` = dòng đệm không copy Loại/CT từ dòng trên.
+- HĐ chi tiết: `copyDetailForm`, `pasteDetailForm`, `_detailFormItems` (ngày, loại, CT + pid, NCC, người TH, dòng hàng, nội dung). Dán luôn tạo HĐ MỚI (thoát chế độ sửa).
+
+**3. Danh mục thiếu so với dữ liệu đã nhập:**
+- Nguyên nhân: (a) lỗi đồng bộ cũ (trước 9.31) đánh dấu xóa danh mục máy khác vừa thêm → HĐ còn tên nhưng danh mục mất; (b) tab Danh Mục ẩn mục chỉ dùng ở năm khác; (c) Thống kê đếm theo chữ gốc (khác hoa/thường tính 2 lần) và cột "người" của HĐ chấm công là tên công nhân (không phải Người TH).
+- `core.cloud-cats-ui.js`: hàm mới `_catUsageNames(type)` (cache 2s theo độ dài các mảng) / `_catUsageScan`, `_catUsageSig`, `catBackfillFromRecords()` — tên đang dùng trong record (chưa xóa) mà thiếu/bia mộ trong master → `catItemUpsert`. Gọi ở `_reloadGlobals` (core.state-backup.js), sau pull khởi động (main.js), đầu `openEntryEdit`/`openDetailEdit`.
+- `danhmuc.categories.js`: `isItemInUse` + `_isDmItemUsedAnytime` + `renderCNItem` + `renderTbTenItem` dùng `_catUsageNames`. **Sửa lỗi:** NCC trước kiểm tra nhầm phiếu ứng THẦU PHỤ → NCC chỉ có phiếu ứng NCC bị coi "chưa dùng", xóa được và `delItem` xóa luôn phiếu ứng đó. `_isDmItemUsedInYear` sửa tương tự. Thêm `_dmShowAllYears` + `_dmToggleAllYears` (link "+N mục năm khác" ở tiêu đề card).
+- Validate: `validateCategoryCell` + `_canonicalizeAcValue` (sheet-grid) cho qua nếu giá trị = `el.dataset.orig` (giá trị gốc HĐ đang sửa). `openEntryEdit` gán `dataset.orig` + truyền `projectId` (trước bỏ sót). `openDetailEdit` gán `dataset.orig`, Loại dùng `_setSelectFlexible` (option tạm "(*)").
+
+**File đã sửa:** `pages/nhap.html`, `js/core/core.cloud-cats-ui.js`, `js/core/core.state-backup.js`, `js/app/main.js`, `js/modules/danhmuc/danhmuc.categories.js`, `js/modules/hoadon/hoadon.sheet-grid.js`, `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`, `js/modules/hoadon/hoadon.list-trash.js`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

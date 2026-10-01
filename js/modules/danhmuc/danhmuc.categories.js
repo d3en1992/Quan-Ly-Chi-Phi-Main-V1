@@ -113,8 +113,10 @@ function _isDmItemUsedInYear(catId, item) {
         && normalizeKey(i[cfg.refField] || '') === nItem)) return true;
   }
   if (catId === 'thauPhu' || catId === 'nhaCungCap') {
+    // Phiếu ứng: thầu phụ ↔ loai 'thauphu', NCC ↔ loai 'nhacungcap' (bản cũ dùng 'thauphu' cho cả 2)
+    const wantLoai = catId === 'nhaCungCap' ? 'nhacungcap' : 'thauphu';
     if (ungRecords.some(r => !r.deletedAt && inActiveYear(r.ngay)
-        && (r.loai || 'thauphu') === 'thauphu'
+        && (r.loai || 'thauphu') === wantLoai
         && normalizeKey(r.tp || '') === nItem)) return true;
   }
   if (catId === 'congNhan') {
@@ -137,6 +139,10 @@ function _isDmItemUsedInYear(catId, item) {
 function _isDmItemUsedAnytime(catId, item) {
   const nItem = normalizeKey(item);
   if (!nItem) return false;
+  // (01/10/2026) Dùng chung bộ quét đầy đủ (giống isItemInUse) cho các loại có master item
+  if (typeof _catUsageNames === 'function' && typeof _CATITEM_TYPE_MAP !== 'undefined' && _CATITEM_TYPE_MAP[catId]) {
+    return _catUsageNames(_CATITEM_TYPE_MAP[catId]).has(_catNormKey(item));
+  }
   const invs = getInvoicesCached();
   const cfg = CATS.find(c => c.id === catId);
   if (cfg && cfg.refField) {
@@ -341,7 +347,7 @@ function renderSettings() {
 
     // Lọc theo năm: tbTen luôn hiển thị 100%; các card khác lọc 3 trạng thái
     const allDeduped = [...dedupMap.values()];
-    const filteredByYear = cfg.id === 'tbTen'
+    const inYearView = cfg.id === 'tbTen'
       ? allDeduped
       : allDeduped.filter(({item}) => {
           const usedInYear = _isDmItemUsedInYear(cfg.id, item);
@@ -349,10 +355,17 @@ function renderSettings() {
           const usedAnytime = _isDmItemUsedAnytime(cfg.id, item);
           return !usedAnytime;                  // Chưa từng dùng → hiện; dùng năm khác → ẩn
         });
+    // (01/10/2026) Mục CHỈ dùng ở năm khác bị ẩn → trước đây người dùng tưởng danh mục bị
+    // mất. Nay hiện số mục đang ẩn + link bật/tắt "hiện tất cả năm".
+    const hiddenN = allDeduped.length - inYearView.length;
+    const filteredByYear = _dmShowAllYears ? allDeduped : inYearView;
 
     const filtered = filteredByYear
       .sort((a, b) => (a.item || '').localeCompare(b.item || '', 'vi'));
-    const countLabel = `${filtered.length}`;
+    const toggleLink = hiddenN > 0
+      ? ` · <a href="#" class="link-secondary" onclick="_dmToggleAllYears(event)" title="Các mục chỉ phát sinh ở năm khác năm đang chọn">${_dmShowAllYears ? 'ẩn ' + hiddenN + ' mục năm khác' : '+' + hiddenN + ' mục năm khác'}</a>`
+      : '';
+    const countLabel = `${filtered.length}${toggleLink}`;
     const card=document.createElement('div');
     card.className='settings-card card shadow-sm overflow-hidden';
     card.innerHTML=`
@@ -378,6 +391,14 @@ function renderSettings() {
   });
   // Render panel sao lưu
   renderBackupList();
+}
+
+// Bật/tắt hiện cả các mục chỉ dùng ở năm khác (áp dụng cho mọi card)
+let _dmShowAllYears = false;
+function _dmToggleAllYears(e) {
+  if (e) e.preventDefault();
+  _dmShowAllYears = !_dmShowAllYears;
+  renderSettings();
 }
 
 // ── Per-card search filter ────────────────────────────────────────
@@ -431,8 +452,8 @@ function renderItem(catId,item,idx) {
 // ── Render item Công Nhân với cột T/P ────────────────────────────
 function renderCNItem(name, idx) {
   const role = cnRoles[name] || '';
-  // Chỉ tính record chưa bị xóa mềm
-  const inUse = ccData.some(w => !w.deletedAt && w.workers && w.workers.some(wk => wk.name === name));
+  // Đang dùng = có trong chấm công HOẶC phiếu ứng công nhân (record chưa xóa) — xem isItemInUse
+  const inUse = isItemInUse('congNhan', name);
   return `<div class="settings-item" id="si-congNhan-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-congNhan-${idx}" ondblclick="startEdit('congNhan',${idx})">${x(name)}</span>
     ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
@@ -465,7 +486,7 @@ function updateCNRole(idx, role) {
 
 // ── Render item Thiết Bị (tbTen) ──────────────────────────────────
 function renderTbTenItem(item, idx) {
-  const inUse = typeof tbData !== 'undefined' && tbData.some(t => t.ten === item);
+  const inUse = isItemInUse('tbTen', item); // bỏ qua thiết bị đã xóa, so khớp không dấu
   return `<div class="settings-item" id="si-tbTen-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
     <span class="s-name" id="sn-tbTen-${idx}" ondblclick="startEdit('tbTen',${idx})">${x(item)}</span>
     ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
@@ -681,6 +702,14 @@ function addItem(catId) {
 function isItemInUse(catId, item) {
   const nk = normalizeKey; // alias ngắn
   const nItem = nk(item);
+  // (01/10/2026) Dùng chung bộ quét _catUsageNames (core.cloud-cats-ui.js) cho mọi loại
+  // danh mục: quét ĐỦ các bảng (HĐ, tiền ứng đúng loại, chấm công, thu tiền, HĐ thầu phụ,
+  // thiết bị). Bản cũ kiểm tra NCC nhầm sang phiếu ứng THẦU PHỤ → NCC chỉ có phiếu ứng NCC
+  // bị coi là "chưa dùng" → cho xóa, và delItem xóa luôn các phiếu ứng đó.
+  const _type = (typeof _CATITEM_TYPE_MAP !== 'undefined') ? _CATITEM_TYPE_MAP[catId] : null;
+  if (_type && typeof _catUsageNames === 'function') {
+    return _catUsageNames(_type).has(_catNormKey(item));
+  }
   // tbTen — kiểm tra trong tbData, so sánh normalized
   if (catId === 'tbTen') return typeof tbData !== 'undefined'
     && tbData.some(t => !t.deletedAt && nk(t.ten) === nItem);

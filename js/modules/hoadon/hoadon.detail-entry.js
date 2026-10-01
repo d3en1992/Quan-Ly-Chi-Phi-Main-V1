@@ -292,12 +292,17 @@ function saveDetailInvoice() {
 
   clearInvoiceCache(); save('inv_v3', invoices);
   buildYearSelect(); updateTop();
+  // (01/10/2026) Lưu xong → làm sạch TOÀN BỘ form + Ngày về hôm nay, chống bấm lưu 2 lần /
+  // sửa form cũ rồi lưu tiếp tạo HĐ trùng. Muốn nhập HĐ tương tự → dùng Sao chép / Dán form.
+  clearDetailForm(true);
   renderTodayInvoices();
   buildFilters(); filterAndRender();
-  clearDetailForm();
 }
 
-function clearDetailForm() {
+// Xóa form Hóa đơn chi tiết.
+//   full = false (nút "Xóa form"): xóa dòng hàng, nội dung, NCC, Người TH — giữ Ngày/Loại/CT
+//   full = true  (sau khi Lưu/Cập nhật thành công): xóa SẠCH mọi ô + Ngày về hôm nay
+function clearDetailForm(full) {
   document.getElementById('detail-tbody').innerHTML = '';
   for(let i=0; i<5; i++) addDetailRow();
   _initDetailSheetGrid();
@@ -307,6 +312,21 @@ function clearDetailForm() {
   if(nccEl) nccEl.value = '';
   const nguoiEl = document.getElementById('detail-nguoi');
   if(nguoiEl) nguoiEl.value = '';
+  if (full === true) {
+    const dEl = document.getElementById('detail-ngay');
+    if (dEl) dEl.value = today();
+    const lEl = document.getElementById('detail-loai');
+    if (lEl) lEl.value = '';
+    const cEl = document.getElementById('detail-ct');
+    if (cEl) cEl.value = '';
+  }
+  // Bỏ "giá trị gốc" của HĐ cũ (nếu vừa sửa) + bỏ tô đỏ
+  ['detail-loai', 'detail-ct', 'detail-ncc', 'detail-nguoi'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    delete el.dataset.orig;
+    if (typeof clearCellInvalid === 'function') clearCellInvalid(el);
+  });
   const container = document.getElementById('inr-hd-chitiet');
   if(container) container.dataset.editId = '';
   const saveBtn = document.getElementById('detail-save-btn');
@@ -357,6 +377,8 @@ function openDetailEdit(inv) {
   const navBtn = document.querySelector('.nav-btn[data-page="nhap"]');
   if (navBtn) goPage(navBtn, 'nhap');
   window.scrollTo({top:0, behavior:'smooth'});
+  // Bổ sung danh mục còn thiếu trước khi nạp HĐ cũ (để dropdown/validate thấy đủ tên)
+  if (typeof catBackfillFromRecords === 'function') { try { catBackfillFromRecords(); } catch (e) {} }
   // Dùng một setTimeout duy nhất — loại bỏ double-timeout gây race condition trên mobile
   setTimeout(() => {
     const innerBtn = document.querySelector('.nav-link[onclick*="inr-hd-chitiet"]');
@@ -369,7 +391,10 @@ function openDetailEdit(inv) {
     const loaiSel = document.getElementById('detail-loai');
     if(loaiSel) {
       loaiSel.innerHTML = '<option value="">-- Chọn Loại --</option>' +
-        cats.loaiChiPhi.map(v => `<option value="${x(v)}" ${v===(recCatName(inv,'inv','loai')||'')?'selected':''}>${x(v)}</option>`).join('');
+        [...cats.loaiChiPhi].sort((a,b)=>a.localeCompare(b,'vi')).map(v => `<option value="${x(v)}">${x(v)}</option>`).join('');
+      // So khớp linh hoạt + option tạm "(*)" nếu loại không còn trong danh mục —
+      // trước đây không khớp → ô trống → báo "Loại chi phí là bắt buộc" và chặn Cập Nhật
+      _setSelectFlexible(loaiSel, recCatName(inv,'inv','loai') || inv.loai || '');
     }
 
     const _dCtSel = document.getElementById('detail-ct');
@@ -390,6 +415,15 @@ function openDetailEdit(inv) {
     // FIX: NCC/Người TH so khớp linh hoạt (trim + case-insensitive + orphan fallback)
     _setSelectFlexible(document.getElementById('detail-ncc'),   recCatName(inv,'inv','ncc'));
     _setSelectFlexible(document.getElementById('detail-nguoi'), recCatName(inv,'inv','nguoi'));
+
+    // (01/10/2026) Ghi nhớ GIÁ TRỊ GỐC của HĐ cũ → giữ nguyên thì validate cho qua dù danh
+    // mục/công trình không còn trong danh sách (validateCategoryCell kiểm tra dataset.orig)
+    ['detail-loai', 'detail-ct', 'detail-ncc', 'detail-nguoi'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.value) el.dataset.orig = el.value; else delete el.dataset.orig;
+      if (typeof clearCellInvalid === 'function') clearCellInvalid(el);
+    });
 
     // Load items — xóa sạch rồi render lại toàn bộ
     const tbody = document.getElementById('detail-tbody');
@@ -417,6 +451,70 @@ function openDetailEdit(inv) {
 // Trả về tất cả <tr> trong bảng hóa đơn chi tiết
 function getDetailRows() {
   return [...document.querySelectorAll('#detail-tbody tr')];
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SAO CHÉP / DÁN FORM HÓA ĐƠN CHI TIẾT (01/10/2026)
+//  Bộ nhớ tạm dùng chung _hdClipSet/_hdClipGet (hoadon.quick-entry.js), ngăn 'detail'.
+// ══════════════════════════════════════════════════════════════
+
+// Đọc các dòng hàng hóa CÓ dữ liệu
+function _detailFormItems() {
+  const items = [];
+  getDetailRows().forEach(tr => {
+    const d = getRowData(tr);
+    if (d.ten || d.dongia) items.push({ ten: d.ten, dv: d.dv, sl: d.sl, dongia: d.dongia, ck: d.ck });
+  });
+  return items;
+}
+
+// Sao chép: Ngày + Loại + Công trình (kèm projectId) + NCC + Người TH + các dòng hàng + Nội dung
+function copyDetailForm() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const items = _detailFormItems();
+  const ctSel = document.getElementById('detail-ct');
+  const clip = {
+    ngay: v('detail-ngay'), loai: v('detail-loai'), ct: v('detail-ct'),
+    ctPid: ctSel?.selectedOptions?.[0]?.dataset?.pid || '',
+    ncc: v('detail-ncc'), nguoi: v('detail-nguoi'), nd: v('detail-nd'), items,
+  };
+  if (!clip.loai && !clip.ct && !clip.ncc && !clip.nguoi && !items.length) {
+    toast('Form đang trống — chưa có gì để sao chép', 'error'); return;
+  }
+  _hdClipSet('detail', clip);
+  toast(`📋 Đã sao chép form (${items.length} dòng hàng). Lưu xong bấm "Dán form" để nhập HĐ tương tự.`, 'success');
+}
+
+// Dán form đã sao chép (tạo HĐ MỚI — thoát chế độ sửa HĐ cũ nếu đang sửa)
+function pasteDetailForm() {
+  const clip = _hdClipGet('detail');
+  if (!clip) { toast('Chưa có form nào được sao chép — bấm "Sao chép form" trước', 'error'); return; }
+  const hasData = _detailFormItems().length
+    || ['detail-loai', 'detail-ct', 'detail-ncc', 'detail-nguoi'].some(id => document.getElementById(id)?.value);
+  if (hasData && !confirm('Form đang có dữ liệu. Thay bằng form đã sao chép?')) return;
+
+  _initDetailFormSelects(); // đảm bảo dropdown có đủ danh mục mới nhất
+  clearDetailForm(true);    // xóa sạch + thoát chế độ sửa (editId, giá trị gốc)
+  if (clip.ngay) document.getElementById('detail-ngay').value = clip.ngay;
+  _setSelectFlexible(document.getElementById('detail-loai'),  clip.loai);
+  const ctSel = document.getElementById('detail-ct');
+  _setSelectFlexible(ctSel, clip.ct);
+  // CT không còn trong danh sách (option tạm "(*)") → gắn lại projectId đã sao chép
+  const ctOpt = ctSel?.selectedOptions?.[0];
+  if (ctOpt && !ctOpt.dataset.pid && clip.ctPid) ctOpt.dataset.pid = clip.ctPid;
+  _setSelectFlexible(document.getElementById('detail-ncc'),   clip.ncc);
+  _setSelectFlexible(document.getElementById('detail-nguoi'), clip.nguoi);
+
+  const tbody = document.getElementById('detail-tbody');
+  tbody.innerHTML = '';
+  const items = Array.isArray(clip.items) ? clip.items : [];
+  items.forEach(it => addDetailRow({ ...it }));
+  for (let i = items.length; i < 5; i++) addDetailRow();
+  getDetailRows().forEach(tr => calcDetailRow(tr));
+  calcDetailTotals();
+  document.getElementById('detail-nd').value = clip.nd || '';
+  renderTodayInvoices();
+  toast(`📥 Đã dán form sao chép lúc ${_hdClipTime(clip)} — sửa số tiền/nội dung rồi Lưu`, 'success');
 }
 
 // ══════════════════════════════════════════════════════════════════

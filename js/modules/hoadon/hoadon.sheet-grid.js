@@ -89,6 +89,15 @@ function validateCategoryCell(el, options, optConfig) {
     return { ok: true, value: canonicalName, message: '' };
   }
 
+  // (01/10/2026) Ngoại lệ "dữ liệu lịch sử": ô đang SỬA hóa đơn cũ và người dùng GIỮ
+  // NGUYÊN giá trị gốc (dataset.orig — gán lúc nạp HĐ vào form) → cho qua, không khóa
+  // nút Cập nhật chỉ vì danh mục/công trình đó nay không còn trong danh sách.
+  const orig = el.dataset ? el.dataset.orig : '';
+  if (orig && _normVi(orig) === normVal) {
+    clearCellInvalid(el);
+    return { ok: true, value: val, message: '', legacy: true };
+  }
+
   const msg = label + ' không hợp lệ: "' + val + '"';
   markCellInvalid(el, msg);
   return { ok: false, value: val, message: msg };
@@ -825,6 +834,9 @@ function _canonicalizeAcValue(el, col) {
     if (typeof match === 'object' && match.id !== null && 'pid' in el.dataset) {
       el.dataset.pid = match.id || '';
     }
+    el.classList.remove('sheet-cell-invalid');
+  } else if (el.dataset.orig && _normVi(el.dataset.orig) === normVal) {
+    // Giữ nguyên giá trị gốc của HĐ cũ đang sửa → không tô đỏ (xem validateCategoryCell)
     el.classList.remove('sheet-cell-invalid');
   } else if (col.required) {
     el.classList.add('sheet-cell-invalid');

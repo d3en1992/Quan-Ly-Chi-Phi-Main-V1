@@ -25,6 +25,13 @@
                 <span class="dot"></span>Nhập Hóa Đơn
               </div>
               <div class="d-flex gap-2 flex-wrap align-items-center">
+                <!-- Sao chép / Dán toàn bộ form (Ngày + mọi ô kể cả danh mục) — copyQuickForm / pasteQuickForm -->
+                <button class="btn btn-outline-primary" onclick="copyQuickForm()" title="Sao chép Ngày + toàn bộ các dòng đang nhập">
+                  <span class="material-symbols-outlined msi-gap">content_copy</span>Sao chép form
+                </button>
+                <button class="btn btn-outline-primary" onclick="pasteQuickForm()" title="Dán form đã sao chép để nhập hóa đơn tương tự">
+                  <span class="material-symbols-outlined msi-gap">content_paste</span>Dán form
+                </button>
                 <button class="btn btn-outline-secondary" onclick="clearTable()">
                   <span class="material-symbols-outlined msi-gap">delete</span>Xóa bảng
                 </button>
@@ -100,9 +107,18 @@
               <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
                 <span class="dot"></span>Hóa Đơn Chi Tiết
               </div>
-              <button class="btn btn-outline-secondary" onclick="clearDetailForm()">
-                <span class="material-symbols-outlined msi-gap">delete</span>Xóa form
-              </button>
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <!-- Sao chép / Dán toàn bộ form (Ngày, Loại, CT, NCC, Người TH, dòng hàng, Nội dung) -->
+                <button class="btn btn-outline-primary" onclick="copyDetailForm()" title="Sao chép toàn bộ hóa đơn đang nhập">
+                  <span class="material-symbols-outlined msi-gap">content_copy</span>Sao chép form
+                </button>
+                <button class="btn btn-outline-primary" onclick="pasteDetailForm()" title="Dán form đã sao chép để nhập hóa đơn tương tự">
+                  <span class="material-symbols-outlined msi-gap">content_paste</span>Dán form
+                </button>
+                <button class="btn btn-outline-secondary" onclick="clearDetailForm()">
+                  <span class="material-symbols-outlined msi-gap">delete</span>Xóa form
+                </button>
+              </div>
             </div>
 
             <!-- Header: Ngày · Loại CP · Công Trình · NCC · Người TH — 1 hàng ngang, không nhãn -->

@@ -198,6 +198,8 @@ function openEntryEdit(inv) {
     goSubPage(subBtn, 'sub-nhap-hd');
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Bổ sung danh mục còn thiếu trước khi nạp HĐ cũ (để gợi ý/validate thấy đủ tên)
+  if (typeof catBackfillFromRecords === 'function') { try { catBackfillFromRecords(); } catch (e) {} }
   setTimeout(() => {
     // 3. Chuyển về inner tab Nhập nhanh
     const innerBtn = document.querySelector('.nav-link[onclick*="inr-nhap-nhanh"]');
@@ -209,7 +211,9 @@ function openEntryEdit(inv) {
     const _eLoai  = recCatName(inv,'inv','loai')  || inv.loai;
     const _eNcc   = recCatName(inv,'inv','ncc')   || inv.ncc   || '';
     const _eNguoi = recCatName(inv,'inv','nguoi') || inv.nguoi || '';
-    addRow({ loai: _eLoai, congtrinh: inv.congtrinh,
+    // projectId: giữ liên kết công trình gốc (kể cả CT đã xóa/đổi tên) — trước đây bỏ sót
+    // nên khi Cập nhật, HĐ có thể mất projectId nếu tra theo tên không ra.
+    addRow({ loai: _eLoai, congtrinh: inv.congtrinh, projectId: inv.projectId || '',
              nguoi: _eNguoi, ncc: _eNcc, nd: inv.nd || '', tien: inv.tien || 0 });
     const row = document.querySelector('#entry-tbody tr');
     if (row) {
@@ -219,6 +223,12 @@ function openEntryEdit(inv) {
       _setSelectFlexible(row.querySelector('[data-f="ncc"]'),   _eNcc);
       _setSelectFlexible(row.querySelector('[data-f="nguoi"]'), _eNguoi);
       _setSelectFlexible(row.querySelector('[data-f="loai"]'),  _eLoai);
+      // (01/10/2026) Ghi nhớ GIÁ TRỊ GỐC của HĐ cũ → giữ nguyên thì validate cho qua
+      // dù danh mục/công trình đó không còn trong danh sách (xem validateCategoryCell)
+      ['loai', 'ct', 'nguoi', 'ncc'].forEach(f => {
+        const el = row.querySelector(`[data-f="${f}"]`);
+        if (el && el.value) el.dataset.orig = el.value;
+      });
     }
     calcSummary();
     const _eBtn = document.getElementById('entry-save-btn');

@@ -133,7 +133,8 @@ function refreshEntryDropdowns() {
 function addRow(d={}) {
   const tbody = document.getElementById('entry-tbody');
   // Copy loai/CT từ dòng trên nếu không có dữ liệu truyền vào
-  if(!d.loai && !d.congtrinh) {
+  // (d._blank = true → dòng trống hoàn toàn, dùng khi Dán form để thêm dòng đệm)
+  if(!d.loai && !d.congtrinh && !d._blank) {
     const lastRow = tbody.querySelector('tr:last-child');
     if(lastRow) {
       const prevLoai = lastRow.querySelector('[data-f="loai"]')?.value || '';
@@ -198,6 +199,80 @@ function calcSummary() {
 function clearTable() {
   if(!confirm('Xóa toàn bộ bảng nhập hiện tại?')) return;
   initTable(5);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SAO CHÉP / DÁN TOÀN BỘ FORM (01/10/2026) — dùng chung cho Nhập nhanh + HĐ chi tiết
+// ══════════════════════════════════════════════════════════════
+// "Bộ nhớ tạm" riêng của app (không phải clipboard hệ điều hành) để giữ được cả Ngày,
+// các ô dropdown/danh mục, projectId công trình. Lưu thêm vào localStorage để F5 vẫn còn
+// (chỉ là tiện ích trên máy này — không đồng bộ cloud). Mỗi tab 1 ngăn riêng: quick / detail.
+const _HD_CLIP_KEY = 'hd_form_clip_v1';
+const _hdClipMem = {};
+function _hdClipSet(kind, data) {
+  _hdClipMem[kind] = { ...data, copiedAt: Date.now() };
+  try {
+    const all = JSON.parse(localStorage.getItem(_HD_CLIP_KEY) || '{}') || {};
+    all[kind] = _hdClipMem[kind];
+    localStorage.setItem(_HD_CLIP_KEY, JSON.stringify(all));
+  } catch (e) { /* trình duyệt chặn localStorage → vẫn dùng được trong phiên */ }
+}
+function _hdClipGet(kind) {
+  if (_hdClipMem[kind]) return _hdClipMem[kind];
+  try {
+    const all = JSON.parse(localStorage.getItem(_HD_CLIP_KEY) || '{}') || {};
+    if (all[kind]) _hdClipMem[kind] = all[kind];
+  } catch (e) {}
+  return _hdClipMem[kind] || null;
+}
+// Giờ:phút lúc sao chép — hiện trong thông báo cho người dùng biết đang dán bản nào
+function _hdClipTime(clip) {
+  try { return new Date(clip.copiedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return ''; }
+}
+
+// Đọc các dòng CÓ dữ liệu trong bảng Nhập nhanh
+function _quickFormRows() {
+  const rows = [];
+  document.querySelectorAll('#entry-tbody tr').forEach(tr => {
+    const g = f => (tr.querySelector(`[data-f="${f}"]`)?.value || '').trim();
+    const ctEl = tr.querySelector('[data-f="ct"]');
+    const r = {
+      loai: g('loai'), congtrinh: g('ct'), projectId: ctEl?.dataset?.pid || '',
+      tien: parseInt(tr.querySelector('[data-f="tien"]')?.dataset.raw || '0', 10) || 0,
+      nd: g('nd'), nguoi: g('nguoi'), ncc: g('ncc'),
+    };
+    if (r.loai || r.congtrinh || r.tien || r.nd || r.nguoi || r.ncc) rows.push(r);
+  });
+  return rows;
+}
+
+// Sao chép toàn bộ form Nhập nhanh: Ngày + mọi dòng (Loại, CT, Số tiền, Nội dung, Người TH, NCC)
+function copyQuickForm() {
+  const rows = _quickFormRows();
+  if (!rows.length) { toast('Form đang trống — chưa có gì để sao chép', 'error'); return; }
+  _hdClipSet('quick', { ngay: document.getElementById('entry-date')?.value || '', rows });
+  toast(`📋 Đã sao chép form (${rows.length} dòng). Lưu xong bấm "Dán form" để nhập HĐ tương tự.`, 'success');
+}
+
+// Dán form đã sao chép vào bảng Nhập nhanh (tạo HĐ MỚI — không mang chế độ sửa HĐ cũ)
+function pasteQuickForm() {
+  const clip = _hdClipGet('quick');
+  if (!clip || !Array.isArray(clip.rows) || !clip.rows.length) {
+    toast('Chưa có form nào được sao chép — bấm "Sao chép form" trước', 'error'); return;
+  }
+  if (_quickFormRows().length && !confirm('Bảng đang có dữ liệu. Thay bằng form đã sao chép?')) return;
+  const dEl = document.getElementById('entry-date');
+  if (dEl && clip.ngay) dEl.value = clip.ngay;
+  document.getElementById('entry-tbody').innerHTML = '';
+  clip.rows.forEach(r => addRow({ ...r }));
+  for (let i = clip.rows.length; i < 5; i++) addRow({ _blank: true }); // dòng đệm trống
+  _initQuickSheetGrid();
+  calcSummary();
+  const btn = document.getElementById('entry-save-btn');
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
+  renderTodayInvoices();
+  toast(`📥 Đã dán form sao chép lúc ${_hdClipTime(clip)} — sửa số tiền/nội dung rồi Lưu`, 'success');
 }
 
 function saveAllRows(skipDupCheck) {
@@ -398,6 +473,13 @@ function _doSaveRows(rows) {
   else toast(`✅ Đã lưu ${saved} mới, cập nhật ${updated} hóa đơn!`, 'success');
   const _eBtn = document.getElementById('entry-save-btn');
   if (_eBtn) _eBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
+
+  // (01/10/2026) Lưu/Cập nhật xong → làm SẠCH bảng nhập + Ngày về hôm nay.
+  // Chống lỗi thao tác: bấm lưu 2 lần, hoặc giữ form cũ sửa chút rồi lưu tiếp → HĐ trùng /
+  // sai ngày. Cần nhập HĐ tương tự → bấm "Sao chép form" TRƯỚC khi lưu rồi "Dán form".
+  const _dEl = document.getElementById('entry-date');
+  if (_dEl) _dEl.value = today();
+  initTable(5);
 
   // Tự động refresh sub-tab "HĐ/CP nhập trong ngày"
   renderTodayInvoices();

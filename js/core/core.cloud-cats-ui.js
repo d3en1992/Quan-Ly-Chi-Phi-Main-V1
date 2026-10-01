@@ -590,6 +590,97 @@ function catItemDelete(catId, name) {
 }
 
 /**
+ * Thu thập các tên danh mục ĐANG ĐƯỢC DÙNG trong dữ liệu đã nhập (bỏ record đã xóa).
+ * Nguồn dùng chung cho: kiểm tra "đang dùng" (không cho xóa) + tự bổ sung danh mục thiếu.
+ * Tên lấy qua recCatName (id ưu tiên) → nếu record trỏ id item đã đổi tên/đã xóa vẫn ra đúng tên.
+ * @param {string} type  'loai' | 'ncc' | 'nguoi' | 'tp' | 'cn' | 'tbteb'
+ * @returns {Map<normKey, name>}
+ */
+// Cache ngắn (2 giây) — tab Danh Mục gọi isItemInUse cho TỪNG dòng → tránh quét lại
+// toàn bộ dữ liệu hàng trăm lần trong 1 lần vẽ. Dữ liệu đổi (thêm/xóa record) → độ dài
+// mảng đổi → tự tính lại ngay.
+const _catUsageCache = {};
+function _catUsageSig() {
+  return ['inv_v3', 'ung_v1', 'cc_v2', 'tb_v1', 'thu_v1', 'thauphu_v1']
+    .map(k => { const a = load(k, []); return Array.isArray(a) ? a.length : 0; }).join('|');
+}
+function _catUsageNames(type) {
+  const sig = _catUsageSig();
+  const c = _catUsageCache[type];
+  if (c && c.sig === sig && Date.now() - c.ts < 2000) return c.map;
+  const out = _catUsageScan(type);
+  _catUsageCache[type] = { sig, ts: Date.now(), map: out };
+  return out;
+}
+function _catUsageScan(type) {
+  const out = new Map();
+  const add = (n) => {
+    const name = String(n || '').trim().replace(/\s+/g, ' ');
+    const k = _catNormKey(name);
+    if (k && !out.has(k)) out.set(k, name);
+  };
+  const alive = arr => (Array.isArray(arr) ? arr : []).filter(r => r && !r.deletedAt);
+  const invs  = alive(load('inv_v3', []));
+  const ungs  = alive(load('ung_v1', []));
+  const rn = (r, kind, which, fb) => (typeof recCatName === 'function' ? recCatName(r, kind, which) : '') || fb;
+
+  if (type === 'loai') {
+    invs.forEach(i => add(rn(i, 'inv', 'loai', i.loai)));
+    // HĐ suy ra từ chấm công (Nhân Công / Hóa Đơn Lẻ) cũng hiện ở Thống kê → cần có trong danh mục
+    if (typeof getInvoicesCached === 'function') {
+      getInvoicesCached().forEach(i => { if (i && i.source === 'cc') add(i.loai); });
+    }
+  } else if (type === 'ncc') {
+    invs.forEach(i => add(rn(i, 'inv', 'ncc', i.ncc)));
+    ungs.forEach(r => { if (r.loai === 'nhacungcap') add(rn(r, 'ung', 'tp', r.tp)); });
+  } else if (type === 'nguoi') {
+    // CHỈ HĐ nhập tay — HĐ chấm công có "người" là tên công nhân, không phải Người TH
+    invs.forEach(i => add(rn(i, 'inv', 'nguoi', i.nguoi)));
+    alive(load('thu_v1', [])).forEach(r => add(rn(r, 'thu', 'nguoi', r.nguoi)));
+    Object.values(load('hopdong_v1', {}) || {}).forEach(r => {
+      if (r && !r.deletedAt && !r.purgedAt) add(rn(r, 'hopdong', 'nguoi', r.nguoi));
+    });
+  } else if (type === 'tp') {
+    ungs.forEach(r => { if ((r.loai || 'thauphu') === 'thauphu') add(rn(r, 'ung', 'tp', r.tp)); });
+    alive(load('thauphu_v1', [])).forEach(r => add(rn(r, 'thauphu', 'thauphu', r.thauphu)));
+  } else if (type === 'cn') {
+    alive(load('cc_v2', [])).forEach(w => (w.workers || []).forEach(wk => add(wk && wk.name)));
+    ungs.forEach(r => { if (r.loai === 'congnhan') add(rn(r, 'ung', 'tp', r.tp)); });
+  } else if (type === 'tbteb') {
+    alive(load('tb_v1', [])).forEach(t => add(rn(t, 'tb', 'ten', t.ten)));
+  }
+  return out;
+}
+
+/**
+ * TỰ BỔ SUNG danh mục còn thiếu từ dữ liệu đã nhập — (01/10/2026)
+ * Lý do: trước bản sửa 9.31, khi đồng bộ giữa các máy, danh mục mới thêm ở máy này có thể
+ * bị máy khác (đang giữ danh sách cũ) đánh dấu XÓA → hóa đơn vẫn mang tên đó nhưng danh mục
+ * không còn → sửa HĐ cũ bị báo "không hợp lệ". Hàm này quét mọi record đang dùng, tên nào
+ * không có trong danh mục (hoặc đang là bia mộ) → thêm/hồi sinh lại.
+ * An toàn chạy nhiều lần: chỉ ghi khi THỰC SỰ thiếu. Trả về số tên đã bổ sung.
+ */
+function catBackfillFromRecords() {
+  if (typeof load !== 'function' || typeof cats === 'undefined') return 0;
+  let added = 0;
+  const changedCats = [];
+  Object.entries(_CATITEM_TYPE_MAP).forEach(([catId, type]) => {
+    const active = new Set(_catActiveNames(type).map(_catNormKey));
+    let hit = false;
+    _catUsageNames(type).forEach((name, k) => {
+      if (active.has(k)) return;
+      if (catItemUpsert(catId, name)) { added++; hit = true; active.add(k); }
+    });
+    if (hit) changedCats.push(catId);
+  });
+  if (changedCats.length) {
+    changedCats.forEach(catId => { cats[catId] = _catActiveNames(_CATITEM_TYPE_MAP[catId]); save(CATS.find(c => c.id === catId).sk, cats[catId]); });
+    console.log('[Cats] catBackfillFromRecords: bổ sung', added, 'tên thiếu vào', changedCats.join(', '));
+  }
+  return added;
+}
+
+/**
  * Giải quyết TRÙNG TÊN trong 1 loại danh mục (dùng chung cho dedup local + gộp cloud).
  * Quy tắc "bản mới nhất theo TÊN thắng" (kể cả bản đã xóa):
  *   - Nhóm các item cùng tên (normalized). Bản có updatedAt lớn nhất là bản thắng;

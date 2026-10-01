@@ -108,6 +108,9 @@ function init() {
     cats.nhaCungCap     = load('cat_ncc',      DEFAULTS.nhaCungCap);
     cats.nguoiTH        = load('cat_nguoi',    DEFAULTS.nguoiTH);
     cats.tbTen          = load('cat_tbteb',    DEFAULTS.tbTen);
+    // (01/10/2026) Sau khi kéo cloud: bổ sung danh mục còn thiếu so với dữ liệu đã nhập
+    try { if (typeof catBackfillFromRecords === 'function') catBackfillFromRecords(); }
+    catch (e) { console.warn('[Init] catBackfillFromRecords lỗi:', e); }
 
     // [FIX Lỗi 1] Nếu năm đang chọn (mặc định = năm hiện tại) KHÔNG có dữ liệu
     // nào, nhưng các năm khác lại có → tự chuyển bộ lọc sang "Tất cả" để app
@@ -136,7 +139,12 @@ function init() {
   });
 }
 
-function today() { return new Date().toISOString().split('T')[0]; }
+// Ngày hôm nay theo GIỜ MÁY (YYYY-MM-DD).
+// (01/10/2026) Trước dùng toISOString() = giờ UTC → từ 0h–7h sáng ở VN ra ngày HÔM QUA.
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 // ── [FIX Lỗi 1] Tự chọn năm có dữ liệu khi năm hiện tại trống ────────────
 // Giải quyết tình huống: mở app lên, bộ lọc mặc định là năm hiện tại nhưng
