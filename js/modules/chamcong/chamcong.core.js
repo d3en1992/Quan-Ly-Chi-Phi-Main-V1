@@ -27,7 +27,12 @@ function _dedupCC(arr) {
   };
   const records = (typeof _fillCCProjectId === 'function') ? _fillCCProjectId(arr || []) : (arr || []);
   const byKey   = new Map();
+  // (01/10/2026) Bia mộ xóa vĩnh viễn (purgedAt) giữ riêng theo id, không tranh chỗ
+  // với tuần đang sống cùng tuần + công trình (giống normalizeCC trong sync.js)
+  const tombs   = new Map();
+  records.forEach(r => { if (r && r.purgedAt) tombs.set(String(r.id), r); });
   records.forEach(r => {
+    if (!r || r.purgedAt || tombs.has(String(r.id))) return;
     const key  = (r.fromDate || r.from || '') + '__' + (r.projectId || r.ct || '');
     const prev = byKey.get(key);
     if (!prev) { byKey.set(key, r); return; }
@@ -39,7 +44,7 @@ function _dedupCC(arr) {
       byKey.set(key, r);
     }
   });
-  return [...byKey.values()];
+  return [...byKey.values(), ...tombs.values()];
 }
 
 let ccData = _dedupCC(load('cc_v2', [])).filter(x=>{

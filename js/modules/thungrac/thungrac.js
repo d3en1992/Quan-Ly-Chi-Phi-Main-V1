@@ -1,5 +1,6 @@
 // thungrac.js — Tab Thùng Rác thống nhất: xem, khôi phục, xóa vĩnh viễn dữ liệu đã xóa mềm
 // Đọc trực tiếp từ deletedAt != null trên các storage chính (không dùng trash_v1 riêng)
+// Bản có purgedAt = "bia mộ" đã xóa vĩnh viễn → không hiện ở đây (xem _trashPurgeIds)
 // Load order: sau tất cả module chức năng, trước main.js
 
 // ── Trạng thái ────────────────────────────────────────────────────────────────
@@ -18,6 +19,9 @@ const _TRASH_TABS = [
 function renderThungRac() {
   const page = document.getElementById('page-thungrac');
   if (!page) return;
+
+  // Dọn bia mộ xóa vĩnh viễn đã quá hạn giữ (xem _trashGcTombstones)
+  try { _trashGcTombstones(); } catch (e) { console.warn('[Trash] Dọn bia mộ lỗi:', e); }
 
   const totalCount = _trashCountAll();
 
@@ -79,17 +83,20 @@ function _trashSort(arr) {
     || String(b.ngay || b.fromDate || '').localeCompare(String(a.ngay || a.fromDate || ''))
     || String(a.id || '').localeCompare(String(b.id || '')));
 }
+// Bản ghi nằm trong thùng rác = đã xóa mềm (deletedAt) và CHƯA xóa vĩnh viễn (purgedAt).
+// Bản có purgedAt là "bia mộ" — ẩn khỏi thùng rác, chỉ giữ lại để báo cho các máy khác.
+const _trashIn = r => r && r.deletedAt && !r.purgedAt;
 function _trashGetRecords(type) {
-  if (type === 'hoadon')   return _trashSort((invoices || []).filter(r => r.deletedAt));
-  if (type === 'chamcong') return _trashSort((ccData || []).filter(r => r.deletedAt));
-  if (type === 'tienung')  return _trashSort((ungRecords || []).filter(r => r.deletedAt));
-  if (type === 'thietbi')  return _trashSort((tbData || []).filter(r => r.deletedAt));
-  if (type === 'thutien')  return _trashSort((thuRecords || []).filter(r => r.deletedAt));
+  if (type === 'hoadon')   return _trashSort((invoices || []).filter(_trashIn));
+  if (type === 'chamcong') return _trashSort((ccData || []).filter(_trashIn));
+  if (type === 'tienung')  return _trashSort((ungRecords || []).filter(_trashIn));
+  if (type === 'thietbi')  return _trashSort((tbData || []).filter(_trashIn));
+  if (type === 'thutien')  return _trashSort((thuRecords || []).filter(_trashIn));
   if (type === 'hopdong') {
     const chinh = Object.entries(hopDongData || {})
-      .filter(([, v]) => v.deletedAt)
+      .filter(([, v]) => _trashIn(v))
       .map(([k, v]) => ({ ...v, _trashKey: k, _trashLoai: 'Chính' }));
-    const tp = (thauPhuContracts || []).filter(r => r.deletedAt)
+    const tp = (thauPhuContracts || []).filter(_trashIn)
       .map(r => ({ ...r, _trashLoai: 'Thầu phụ' }));
     return [...chinh, ...tp].sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
   }
@@ -198,6 +205,15 @@ function _trashBuildRow(type, r) {
       <td class="text-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd || '—')}</td>`;
   }
 
+  // Nhãn cảnh báo dữ liệu cũ thiếu trường (xem _trashCheck)
+  const chk = _trashCheck(type === 'hopdong' ? (r._trashLoai === 'Chính' ? 'hopdong-chinh' : 'hopdong-tp') : type, r);
+  const probs = [...chk.errors, ...chk.fixNotes, ...chk.warns];
+  if (probs.length) {
+    const color = chk.errors.length ? 'bg-danger' : 'bg-warning text-dark';
+    const tag = `<span class="badge ${color} ms-1" style="font-size:9px;cursor:help" title="${x(probs.join('\n'))}">⚠ ${chk.errors.length ? 'Lỗi dữ liệu' : 'Thiếu trường'}</span>`;
+    cells = cells.replace(/<\/td>/, tag + '</td>');   // gắn vào ô đầu tiên của dòng
+  }
+
   return `<tr>
     ${cells}
     <td class="font-monospace text-danger" style="font-size:11px;white-space:nowrap">${deletedDate}</td>
@@ -224,72 +240,229 @@ function _trashActionBtns(type, r) {
   </div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// KHO DỮ LIỆU THEO LOẠI — dùng chung cho khôi phục / xóa vĩnh viễn / dọn bia mộ
+// ══════════════════════════════════════════════════════════════════════════════
+// key  : khóa lưu trữ (save/load)
+// get  : lấy mảng global hiện tại
+// set  : gán lại mảng global (và xóa cache hóa đơn nếu cần)
+const _TRASH_STORES = {
+  hoadon:       { key: 'inv_v3',     get: () => invoices,         set: v => { invoices = v; clearInvoiceCache(); } },
+  chamcong:     { key: 'cc_v2',      get: () => ccData,           set: v => { ccData = v; clearInvoiceCache(); } },
+  tienung:      { key: 'ung_v1',     get: () => ungRecords,       set: v => { ungRecords = v; } },
+  thietbi:      { key: 'tb_v1',      get: () => tbData,           set: v => { tbData = v; } },
+  thutien:      { key: 'thu_v1',     get: () => thuRecords,       set: v => { thuRecords = v; } },
+  'hopdong-tp': { key: 'thauphu_v1', get: () => thauPhuContracts, set: v => { thauPhuContracts = v; } },
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// KIỂM TRA DỮ LIỆU TRƯỚC KHI KHÔI PHỤC (01/10/2026)
+// ══════════════════════════════════════════════════════════════════════════════
+// Dữ liệu đời cũ (đồng bộ từ Firebase về) có thể thiếu trường quan trọng. Khôi phục
+// nguyên trạng sẽ làm báo cáo / tổng chi tính sai mà không ai biết.
+// Trả về:
+//   errors   : lỗi KHÔNG THỂ tự sửa → CHẶN khôi phục (khuyên xóa vĩnh viễn)
+//   fixes    : các trường TỰ ĐIỀN được (vd toDate = fromDate + 6 ngày)
+//   fixNotes : mô tả các trường sẽ tự điền (hiện cho người dùng)
+//   warns    : thiếu thông tin phụ — vẫn khôi phục được nhưng nên kiểm tra lại
+const _TRASH_ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const _trashIsISO = d => typeof d === 'string' && _TRASH_ISO_RE.test(d);
+
+function _trashCheck(type, r) {
+  const errors = [], warns = [], fixNotes = [], fixes = {};
+  if (!r) return { errors: ['Không tìm thấy bản ghi'], warns, fixNotes, fixes };
+
+  // Thiếu công trình (cả id lẫn tên) → chỉ cảnh báo, vì khôi phục xong vẫn sửa tay được
+  const noProject = (nameField) => !r.projectId && !r[nameField];
+
+  if (type === 'chamcong') {
+    // Ngày bắt đầu tuần: bản đời cũ có thể chỉ có 'from' → tự chuyển sang fromDate
+    const from = r.fromDate || r.from;
+    if (!_trashIsISO(from)) {
+      errors.push('Thiếu ngày bắt đầu tuần (fromDate)');
+    } else {
+      if (!r.fromDate) { fixes.fromDate = from; fixNotes.push(`Ngày bắt đầu tuần → ${viShort(from)}`); }
+      // Thiếu ngày kết thúc → tự tính = ngày bắt đầu (Chủ nhật) + 6 ngày (Thứ bảy)
+      if (!_trashIsISO(r.toDate)) {
+        fixes.toDate = ccSaturdayISO(from);
+        fixNotes.push(`Thiếu ngày kết thúc tuần → tự điền ${viShort(fixes.toDate)}`);
+      }
+    }
+    if (!Array.isArray(r.workers)) errors.push('Thiếu danh sách công nhân (workers)');
+    else if (!r.workers.length)    warns.push('Tuần không có công nhân nào');
+    if (noProject('ct')) errors.push('Thiếu công trình');
+    // Đã có tuần ĐANG SỐNG cùng tuần + công trình → khôi phục sẽ đè mất tuần đó
+    // (quy tắc 1 tuần + 1 công trình = 1 bản ghi)
+    if (_trashIsISO(from)) {
+      const proj = r.projectId || r.ct || '';
+      const dup = (ccData || []).find(o => o && !o.deletedAt && String(o.id) !== String(r.id)
+        && (o.fromDate || o.from) === from && (o.projectId || o.ct || '') === proj);
+      if (dup) errors.push('Đã có tuần chấm công khác (đang dùng) cùng tuần + công trình — khôi phục sẽ ghi đè mất tuần đó');
+    }
+  } else if (type === 'hoadon' || type === 'tienung' || type === 'thietbi' || type === 'thutien') {
+    // Ngày là bắt buộc: thiếu ngày thì bản ghi không thuộc năm nào → không lên được cloud
+    if (!_trashIsISO(r.ngay)) errors.push('Thiếu hoặc sai ngày (ngay)');
+    if (type === 'hoadon') {
+      if (noProject('congtrinh')) warns.push('Thiếu công trình');
+      if (!(Number(r.thanhtien || r.tien) > 0)) warns.push('Không có số tiền');
+    } else if (type === 'tienung') {
+      if (noProject('congtrinh')) warns.push('Thiếu công trình');
+      if (!(Number(r.tien) > 0)) warns.push('Không có số tiền');
+    } else if (type === 'thietbi') {
+      if (noProject('ct')) warns.push('Thiếu công trình');
+      if (!r.ten) warns.push('Thiếu tên thiết bị');
+    } else if (type === 'thutien') {
+      if (noProject('congtrinh')) warns.push('Thiếu công trình');
+      if (!(Number(r.tien) > 0)) warns.push('Không có số tiền');
+    }
+  } else if (type === 'hopdong-tp') {
+    if (noProject('congtrinh')) warns.push('Thiếu công trình');
+    if (!(Number(r.giaTri) > 0)) warns.push('Không có giá trị hợp đồng');
+  } else if (type === 'hopdong-chinh') {
+    if (!(Number(r.giaTri) > 0)) warns.push('Không có giá trị hợp đồng');
+  }
+  return { errors, warns, fixNotes, fixes };
+}
+
 // ── Khôi phục ─────────────────────────────────────────────────────────────────
+// (01/10/2026) Kiểm tra dữ liệu trước khi khôi phục:
+//   • Có lỗi không tự sửa được → CHẶN, báo lý do, khuyên xóa vĩnh viễn
+//   • Có trường tự điền được / thiếu thông tin phụ → hỏi xác nhận, liệt kê rõ
+// Khôi phục đặt updatedAt = now → mới hơn thời điểm xóa → khi gộp cloud bản khôi phục
+// thắng (xem resolveConflict trong sync.js).
 function _trashRestore(compositeId) {
   const [type, id] = compositeId.split('||');
   const now = Date.now();
 
-  if (type === 'hoadon') {
-    const idx = invoices.findIndex(i => String(i.id) === String(id));
-    if (idx < 0) return;
-    invoices[idx] = { ...invoices[idx], deletedAt: null, deletedBy: null, updatedAt: now, deviceId: DEVICE_ID };
-    clearInvoiceCache();
-    save('inv_v3', invoices);
-    // Đồng bộ với trash_v1 cũ nếu còn tồn tại
-    let _tv1 = load('trash_v1', []);
-    _tv1 = _tv1.filter(i => String(i.id) !== String(id));
-    save('trash_v1', _tv1);
-  } else if (type === 'chamcong') {
-    const idx = ccData.findIndex(r => String(r.id) === String(id));
-    if (idx < 0) return;
-    ccData[idx] = { ...ccData[idx], deletedAt: null, deletedBy: null, updatedAt: now, deviceId: DEVICE_ID };
-    clearInvoiceCache();
-    save('cc_v2', ccData);
-  } else if (type === 'tienung') {
-    const idx = ungRecords.findIndex(r => String(r.id) === String(id));
-    if (idx < 0) return;
-    ungRecords[idx] = { ...ungRecords[idx], deletedAt: null, deletedBy: null, updatedAt: now, deviceId: DEVICE_ID };
-    save('ung_v1', ungRecords);
-  } else if (type === 'thietbi') {
-    const idx = tbData.findIndex(r => String(r.id) === String(id));
-    if (idx < 0) return;
-    tbData[idx] = { ...tbData[idx], deletedAt: null, deletedBy: null, updatedAt: now, deviceId: DEVICE_ID };
-    save('tb_v1', tbData);
-  } else if (type === 'thutien') {
-    const idx = thuRecords.findIndex(r => String(r.id) === String(id));
-    if (idx < 0) return;
-    thuRecords[idx] = { ...thuRecords[idx], deletedAt: null, deletedBy: null, updatedAt: now, deviceId: DEVICE_ID };
-    save('thu_v1', thuRecords);
-  } else if (type === 'hopdong-chinh') {
-    if (!hopDongData[id]) return;
-    hopDongData[id] = { ...hopDongData[id], deletedAt: null, deletedBy: null, updatedAt: now };
+  // Tìm bản ghi
+  let rec = null, idx = -1, store = null;
+  if (type === 'hopdong-chinh') {
+    rec = hopDongData[id] || null;
+  } else {
+    store = _TRASH_STORES[type];
+    if (!store) return;
+    idx = store.get().findIndex(r => String(r.id) === String(id));
+    rec = idx >= 0 ? store.get()[idx] : null;
+  }
+  if (!rec || rec.purgedAt) { toast('Không tìm thấy bản ghi (có thể đã bị xóa vĩnh viễn ở máy khác)', 'error'); renderThungRac(); return; }
+
+  // Kiểm tra dữ liệu
+  const chk = _trashCheck(type, rec);
+  if (chk.errors.length) {
+    alert('⛔ KHÔNG THỂ KHÔI PHỤC bản ghi này vì dữ liệu cũ bị lỗi:\n\n• '
+      + chk.errors.join('\n• ')
+      + '\n\nKhôi phục sẽ làm sai báo cáo / tổng chi phí. Nên XÓA VĨNH VIỄN bản ghi này và nhập lại nếu cần.');
+    return;
+  }
+  if (chk.fixNotes.length || chk.warns.length) {
+    let msg = '⚠️ Bản ghi này là dữ liệu cũ, chưa đủ chuẩn:\n';
+    if (chk.fixNotes.length) msg += '\nSẽ TỰ ĐỘNG BỔ SUNG:\n• ' + chk.fixNotes.join('\n• ') + '\n';
+    if (chk.warns.length)    msg += '\nCÒN THIẾU (cần kiểm tra/sửa tay sau khi khôi phục):\n• ' + chk.warns.join('\n• ') + '\n';
+    msg += '\nVẫn khôi phục?';
+    if (!confirm(msg)) return;
+  }
+
+  // Áp dụng: bổ sung trường + bỏ cờ xóa
+  const restored = { ...rec, ...chk.fixes, deletedAt: null, deletedBy: null, updatedAt: now };
+  if (type === 'hopdong-chinh') {
+    hopDongData[id] = restored;
     save('hopdong_v1', hopDongData);
-  } else if (type === 'hopdong-tp') {
-    const idx = thauPhuContracts.findIndex(r => String(r.id) === String(id));
-    if (idx < 0) return;
-    thauPhuContracts[idx] = { ...thauPhuContracts[idx], deletedAt: null, deletedBy: null, updatedAt: now, deviceId: DEVICE_ID };
-    save('thauphu_v1', thauPhuContracts);
-  } else { return; }
+  } else {
+    restored.deviceId = DEVICE_ID;
+    const arr = store.get().slice();
+    arr[idx] = restored;
+    store.set(arr);
+    save(store.key, arr);
+    if (type === 'hoadon') {
+      // Đồng bộ với trash_v1 cũ nếu còn tồn tại
+      save('trash_v1', load('trash_v1', []).filter(i => String(i.id) !== String(id)));
+    }
+  }
 
   if (typeof schedulePush === 'function') schedulePush();
   toast('✅ Đã khôi phục bản ghi!', 'success');
   renderThungRac();
 }
 
-// ── ĐẨY LỆNH XÓA VĨNH VIỄN LÊN CLOUD ────────────────────────────────────────────
-// LỊCH SỬ (lỗi 9.11 "xóa rồi vẫn hồi về"): push thường có bước ĐỌC cloud rồi GỘP vào
-//   local. Bản ghi vừa xóa HẲN khỏi mảng local nhưng cloud vẫn còn → bước gộp kéo nó
-//   về lại → ghi lên cloud → "sống lại". Bản cũ của hàm này né bằng cách GHI ĐÈ THẲNG
-//   mọi doc năm + meta HĐ, KHÔNG đọc-gộp — nhưng như vậy lại XÓA MẤT dữ liệu máy khác
-//   vừa đẩy lên cùng doc đó (và tốn rất nhiều lượt ghi).
-// CÁCH MỚI (GĐ1): các hàm xóa vĩnh viễn gọi save(k, v, { purge:[id...] }) → outbox ghi
-//   nhớ purgeIds cho đúng doc chứa bản ghi. Push thường ĐỌC-GỘP cloud rồi LOẠI các
-//   purgeIds trước khi ghi → lệnh xóa thắng, mà dữ liệu máy khác vẫn giữ nguyên.
-//   Chỉ đẩy đúng doc bị ảnh hưởng. Mất mạng → purgeIds nằm trong outbox (IDB), có
-//   mạng lại / mở app lần sau sẽ tự đẩy nốt.
-// Hàm giữ tên cũ để không phải sửa nơi gọi; giờ chỉ yêu cầu đẩy ngay theo outbox.
-function _trashPushPurge() {
-  if (typeof fbReady !== 'function' || !fbReady()) return;
+// ══════════════════════════════════════════════════════════════════════════════
+// XÓA VĨNH VIỄN BẰNG "BIA MỘ" (01/10/2026)
+// ══════════════════════════════════════════════════════════════════════════════
+// LỖI CŨ: xóa vĩnh viễn = bỏ HẲN bản ghi khỏi mảng + báo purgeIds cho outbox. Lệnh xóa
+//   chỉ nằm ở máy vừa xóa → máy khác (hoặc tab cũ) vẫn giữ bản xóa mềm, lần đẩy cloud
+//   kế tiếp gộp bản đó lên lại → mở app trên thiết bị mới thấy bản ghi "sống lại".
+// CÁCH MỚI: giữ lại bản ghi nhưng gắn purgedAt (= "bia mộ"):
+//   • Thùng rác ẩn bản có purgedAt; mọi màn hình khác đã ẩn sẵn vì vẫn có deletedAt.
+//   • Bia mộ được đồng bộ lên cloud như dữ liệu thường. Khi gộp, bia mộ LUÔN THẮNG
+//     (resolveConflict / _mergeHopDong / normalizeCC trong sync.js) → máy nào còn bản
+//     cũ cũng bị thay bằng bia mộ, không máy nào làm bản ghi sống lại được.
+//   • Sau _TRASH_TOMB_KEEP_DAYS ngày, bia mộ được dọn hẳn (_trashGcTombstones) để
+//     không phình dữ liệu — lúc đó mọi máy đã đồng bộ xong từ lâu.
+const _TRASH_TOMB_KEEP_DAYS = 90;
+
+// Chuyển 1 bản ghi thành bia mộ
+function _trashTomb(r, now) {
+  return { ...r, deletedAt: r.deletedAt || now, purgedAt: now, updatedAt: now,
+           deviceId: (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : r.deviceId };
+}
+
+// Xóa vĩnh viễn các id thuộc 1 loại (chỉ đụng bản ĐANG Ở THÙNG RÁC). Trả về số bản ghi đã xử lý.
+function _trashPurgeIds(type, ids) {
+  const idSet = new Set([...ids].map(String));
+  if (!idSet.size) return 0;
+  const now = Date.now();
+  let n = 0;
+  if (type === 'hopdong-chinh') {
+    idSet.forEach(k => {
+      if (_trashIn(hopDongData[k])) { hopDongData[k] = _trashTomb(hopDongData[k], now); n++; }
+    });
+    if (n) save('hopdong_v1', hopDongData);
+    return n;
+  }
+  const store = _TRASH_STORES[type];
+  if (!store) return 0;
+  const arr = store.get().map(r => {
+    if (!_trashIn(r) || !idSet.has(String(r.id))) return r;
+    n++;
+    return _trashTomb(r, now);
+  });
+  if (!n) return 0;
+  store.set(arr);
+  save(store.key, arr);
+  if (type === 'hoadon') {
+    save('trash_v1', load('trash_v1', []).filter(i => !idSet.has(String(i.id))));
+  }
+  return n;
+}
+
+// Dọn bia mộ quá hạn: bỏ hẳn khỏi mảng (kèm purge để bước gộp cloud không kéo về lại).
+// Chạy mỗi lần mở tab Thùng Rác — nhẹ, chỉ quét các mảng đã có trong bộ nhớ.
+function _trashGcTombstones() {
+  const limit = Date.now() - _TRASH_TOMB_KEEP_DAYS * 86400000;
+  const old = r => r && r.purgedAt && Number(r.purgedAt) < limit;
+  Object.values(_TRASH_STORES).forEach(store => {
+    const cur = store.get() || [];
+    const ids = cur.filter(old).map(r => String(r.id));
+    if (!ids.length) return;
+    const arr = cur.filter(r => !old(r));
+    store.set(arr);
+    save(store.key, arr, { purge: ids });
+  });
+  const hdKeys = Object.keys(hopDongData || {}).filter(k => old(hopDongData[k]));
+  if (hdKeys.length) {
+    hdKeys.forEach(k => { delete hopDongData[k]; });
+    save('hopdong_v1', hopDongData, { purge: hdKeys });
+  }
+}
+
+// Yêu cầu đẩy cloud ngay + báo cho người dùng biết lệnh xóa đã lên cloud chưa
+function _trashPushPurge(count) {
+  const msg = `Đã xóa vĩnh viễn ${count} bản ghi`;
+  if (typeof fbReady !== 'function' || !fbReady()) { toast(msg, 'success'); return; }
+  if (!navigator.onLine) {
+    toast(`${msg} trên máy này — đang mất mạng, sẽ đẩy lên cloud khi có mạng lại`, 'error');
+    return;
+  }
+  toast(`${msg} — đang đồng bộ lên cloud...`, 'success');
   if (typeof schedulePush === 'function') schedulePush();
 }
 
@@ -297,37 +470,9 @@ function _trashPushPurge() {
 function _trashHardDelete(compositeId) {
   if (!confirm('⚠️ Xóa vĩnh viễn?\nDữ liệu sẽ KHÔNG THỂ khôi phục!')) return;
   const [type, id] = compositeId.split('||');
-
-  if (type === 'hoadon') {
-    invoices = invoices.filter(i => String(i.id) !== String(id));
-    clearInvoiceCache();
-    save('inv_v3', invoices, { purge: [id] });
-    let _tv1 = load('trash_v1', []);
-    _tv1 = _tv1.filter(i => String(i.id) !== String(id));
-    save('trash_v1', _tv1);
-  } else if (type === 'chamcong') {
-    ccData = ccData.filter(r => String(r.id) !== String(id));
-    clearInvoiceCache();
-    save('cc_v2', ccData, { purge: [id] });
-  } else if (type === 'tienung') {
-    ungRecords = ungRecords.filter(r => String(r.id) !== String(id));
-    save('ung_v1', ungRecords, { purge: [id] });
-  } else if (type === 'thietbi') {
-    tbData = tbData.filter(r => String(r.id) !== String(id));
-    save('tb_v1', tbData, { purge: [id] });
-  } else if (type === 'thutien') {
-    thuRecords = thuRecords.filter(r => String(r.id) !== String(id));
-    save('thu_v1', thuRecords, { purge: [id] });
-  } else if (type === 'hopdong-chinh') {
-    delete hopDongData[id];
-    save('hopdong_v1', hopDongData, { purge: [id] });
-  } else if (type === 'hopdong-tp') {
-    thauPhuContracts = thauPhuContracts.filter(r => String(r.id) !== String(id));
-    save('thauphu_v1', thauPhuContracts, { purge: [id] });
-  } else { return; }
-
-  _trashPushPurge();
-  toast('Đã xóa vĩnh viễn', 'success');
+  const n = _trashPurgeIds(type, [id]);
+  if (!n) { toast('Không tìm thấy bản ghi', 'error'); renderThungRac(); return; }
+  _trashPushPurge(n);
   renderThungRac();
 }
 
@@ -338,46 +483,14 @@ function _trashEmptyCurrentTab() {
   if (!recs.length) { toast('Thùng rác tab này đang trống!', ''); return; }
   if (!confirm(`⚠️ Xóa vĩnh viễn ${recs.length} bản ghi trong tab này?\nKHÔNG THỂ KHÔI PHỤC!`)) return;
 
-  if (type === 'hoadon') {
-    const ids = new Set(recs.map(r => String(r.id)));
-    invoices = invoices.filter(r => !ids.has(String(r.id)));
-    clearInvoiceCache();
-    save('inv_v3', invoices, { purge: [...ids] });
-    let _tv1 = load('trash_v1', []);
-    _tv1 = _tv1.filter(i => !ids.has(String(i.id)));
-    save('trash_v1', _tv1);
-  } else if (type === 'chamcong') {
-    const ids = new Set(recs.map(r => String(r.id)));
-    ccData = ccData.filter(r => !ids.has(String(r.id)));
-    clearInvoiceCache();
-    save('cc_v2', ccData, { purge: [...ids] });
-  } else if (type === 'tienung') {
-    const ids = new Set(recs.map(r => String(r.id)));
-    ungRecords = ungRecords.filter(r => !ids.has(String(r.id)));
-    save('ung_v1', ungRecords, { purge: [...ids] });
-  } else if (type === 'thietbi') {
-    const ids = new Set(recs.map(r => String(r.id)));
-    tbData = tbData.filter(r => !ids.has(String(r.id)));
-    save('tb_v1', tbData, { purge: [...ids] });
-  } else if (type === 'thutien') {
-    const ids = new Set(recs.map(r => String(r.id)));
-    thuRecords = thuRecords.filter(r => !ids.has(String(r.id)));
-    save('thu_v1', thuRecords, { purge: [...ids] });
-  } else if (type === 'hopdong') {
-    // Xóa HĐ chính
-    const hdKeys = recs.filter(r => r._trashLoai === 'Chính').map(r => r._trashKey);
-    hdKeys.forEach(k => { delete hopDongData[k]; });
-    save('hopdong_v1', hopDongData, { purge: hdKeys });
-    // Xóa HĐ thầu phụ
-    const tpIds = new Set(recs.filter(r => r._trashLoai === 'Thầu phụ').map(r => String(r.id)));
-    if (tpIds.size) {
-      thauPhuContracts = thauPhuContracts.filter(r => !tpIds.has(String(r.id)));
-      save('thauphu_v1', thauPhuContracts, { purge: [...tpIds] });
-    }
+  let n = 0;
+  if (type === 'hopdong') {
+    n += _trashPurgeIds('hopdong-chinh', recs.filter(r => r._trashLoai === 'Chính').map(r => r._trashKey));
+    n += _trashPurgeIds('hopdong-tp',    recs.filter(r => r._trashLoai === 'Thầu phụ').map(r => r.id));
+  } else {
+    n = _trashPurgeIds(type, recs.map(r => r.id));
   }
-
-  _trashPushPurge();
-  toast(`Đã xóa vĩnh viễn ${recs.length} bản ghi`, 'success');
+  _trashPushPurge(n);
   renderThungRac();
 }
 
@@ -387,51 +500,13 @@ function _trashEmptyAll() {
   if (!total) { toast('Thùng rác đang trống!', ''); return; }
   if (!confirm(`⚠️ Xóa vĩnh viễn TOÀN BỘ ${total} bản ghi trong thùng rác?\nKHÔNG THỂ KHÔI PHỤC!`)) return;
 
-  // Hóa đơn
-  const delInvIds = new Set((invoices || []).filter(r => r.deletedAt).map(r => String(r.id)));
-  if (delInvIds.size) {
-    invoices = invoices.filter(r => !delInvIds.has(String(r.id)));
-    clearInvoiceCache();
-    save('inv_v3', invoices, { purge: [...delInvIds] });
-    save('trash_v1', []);
-  }
-  // Chấm công
-  const delCCIds = new Set((ccData || []).filter(r => r.deletedAt).map(r => String(r.id)));
-  if (delCCIds.size) {
-    ccData = ccData.filter(r => !delCCIds.has(String(r.id)));
-    clearInvoiceCache();
-    save('cc_v2', ccData, { purge: [...delCCIds] });
-  }
-  // Tiền ứng
-  const delUngIds = new Set((ungRecords || []).filter(r => r.deletedAt).map(r => String(r.id)));
-  if (delUngIds.size) {
-    ungRecords = ungRecords.filter(r => !delUngIds.has(String(r.id)));
-    save('ung_v1', ungRecords, { purge: [...delUngIds] });
-  }
-  // Thiết bị
-  const delTBIds = new Set((tbData || []).filter(r => r.deletedAt).map(r => String(r.id)));
-  if (delTBIds.size) {
-    tbData = tbData.filter(r => !delTBIds.has(String(r.id)));
-    save('tb_v1', tbData, { purge: [...delTBIds] });
-  }
-  // Thu tiền
-  const delThuIds = new Set((thuRecords || []).filter(r => r.deletedAt).map(r => String(r.id)));
-  if (delThuIds.size) {
-    thuRecords = thuRecords.filter(r => !delThuIds.has(String(r.id)));
-    save('thu_v1', thuRecords, { purge: [...delThuIds] });
-  }
-  // HĐ chính
-  const delHdKeys = Object.keys(hopDongData || {}).filter(k => hopDongData[k] && hopDongData[k].deletedAt);
-  delHdKeys.forEach(k => { delete hopDongData[k]; });
-  save('hopdong_v1', hopDongData, { purge: delHdKeys });
-  // HĐ thầu phụ
-  const delTPIds = new Set((thauPhuContracts || []).filter(r => r.deletedAt).map(r => String(r.id)));
-  if (delTPIds.size) {
-    thauPhuContracts = thauPhuContracts.filter(r => !delTPIds.has(String(r.id)));
-    save('thauphu_v1', thauPhuContracts, { purge: [...delTPIds] });
-  }
+  let n = 0;
+  ['hoadon', 'chamcong', 'tienung', 'thietbi', 'thutien', 'hopdong-tp'].forEach(type => {
+    n += _trashPurgeIds(type, (_TRASH_STORES[type].get() || []).filter(_trashIn).map(r => r.id));
+  });
+  n += _trashPurgeIds('hopdong-chinh', Object.keys(hopDongData || {}).filter(k => _trashIn(hopDongData[k])));
+  if (load('trash_v1', []).length) save('trash_v1', []);
 
-  _trashPushPurge();
-  toast('🧹 Đã làm sạch toàn bộ thùng rác!', 'success');
+  _trashPushPurge(n);
   renderThungRac();
 }

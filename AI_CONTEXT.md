@@ -46,6 +46,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.22 Tái cấu trúc UI/UX Modal Chi Tiết Công Trình (đưa lại Lãi/Lỗ + 3 tab) (16/07/2026)](#922-tái-cấu-trúc-uiux-modal-chi-tiết-công-trình-đưa-lại-lãilỗ--3-tab-16072026)
    - [9.26 Giao diện điện thoại (mobile shell) + PWA cài được (25/07/2026)](#926-giao-diện-điện-thoại-mobile-shell--pwa-cài-được-25072026)
    - [9.28 Gia cố đồng bộ: Outbox + Sao lưu cloud hằng ngày + Khóa lạc quan (28–29/09/2026)](#928-gia-cố-đồng-bộ-outbox--sao-lưu-cloud-hằng-ngày--khóa-lạc-quan-2829092026)
+   - [9.29 Thùng rác: xóa vĩnh viễn bằng "bia mộ" + kiểm tra dữ liệu khi khôi phục (01/10/2026)](#929-thùng-rác-xóa-vĩnh-viễn-bằng-bia-mộ--kiểm-tra-dữ-liệu-khi-khôi-phục-01102026)
 
 **Phụ lục**
 
@@ -312,7 +313,8 @@ Mỗi **năm × hạng mục = 1 doc** + **5 doc meta dùng chung**, tên field 
 | Ghi đè có chủ đích | Chỉ **Reset toàn bộ** (`_doResetAll` — `fsSet` thẳng) và **Khôi phục** (`importJSONFull` — đánh dấu outbox `{overwrite:true}`) được ghi đè không điều kiện. Doc có cờ overwrite: push ghi đè không đọc-gộp, pull giữ nguyên local. `opts.skipPull` đã BỎ (GĐ2). |
 | Khởi động | `dbInit()` nạp outbox + dựng bảng bóng. `init()`: outbox còn dữ liệu → `pushChanges` TRƯỚC rồi mới `gsLoadAll()`. Không còn `_resetPending()` lúc khởi động. |
 | Firestore REST | `fsGet`: 404 → null, lỗi khác → throw (trước đây lỗi 500/429 bị coi như "cloud trống" → ghi đè mất dữ liệu). `fsSet`/`fsSetIf`: HTTP ≠ 2xx → throw. |
-| Conflict resolution | `resolveConflict(local, cloud)`: tombstone (`deletedAt`) ưu tiên, sau đó `updatedAt` mới hơn thắng |
+| Conflict resolution | `resolveConflict(local, cloud)` (từ 01/10/2026): **bia mộ `purgedAt` luôn thắng**; một bên xóa mềm / một bên sống → bên xóa thắng nếu `deletedAt >= updatedAt` của bản sống, ngược lại bản sống thắng (để "Khôi phục" có tác dụng); cùng trạng thái → `updatedAt` mới hơn thắng. `_mergeHopDong` cũng ưu tiên `purgedAt`. `normalizeCC`/`_dedupCC`: bia mộ không tranh chỗ "tuần + công trình", giữ riêng theo id |
+| Xóa vĩnh viễn (thùng rác) | Từ 01/10/2026: KHÔNG bỏ hẳn bản ghi mà gắn `purgedAt` (bia mộ, `_trashPurgeIds`) → đồng bộ như dữ liệu thường, máy khác không làm sống lại được. Thùng rác lọc `deletedAt && !purgedAt`. Bia mộ quá 90 ngày được `_trashGcTombstones()` bỏ hẳn (kèm `purge`) khi mở tab Thùng Rác |
 | Multi-year sync | `_getAllLocalYears()` gom năm từ `inv_v3`, `ung_v1`, `cc_v2`, `tb_v1`, `thu_v1`; push/pull theo từng doc `y{YYYY}_<cat>`. Pull năm Y đọc thêm `y{Y-1}_cham_cong` (tuần vắt năm: lưu theo `fromDate` năm trước nhưng hóa đơn lương tính vào năm Y). `onYearChange()` tải các năm chưa có trong `_pulledYearsThisSession` (xem 9.28.1) |
 | Categories sync | Doc `meta_danh_muc` chứa: <br> - `catItems` (`cat_items_v1`): { [type]: { id, name, isDeleted, updatedAt }[] } (Master category storage) <br> - `cats` (các mảng `cat_loai`, `cat_ncc`, `cat_nguoi`, `cat_tp`, `cat_cn`, `cat_tbteb` — derived từ `catItems`) <br> - `cnRoles` (`cat_cn_roles`) <br> - `ctYears` (`cat_ct_years`) |
 | Pull guard | `_blockPullUntil`/`localStorage._blockPullUntil` chặn pull sau reset/import để tránh cloud cũ ghi đè local mới |
@@ -1623,6 +1625,30 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 - Thùng rác (`thungrac.js`): helper mới `_trashSort()` — sắp xếp cố định theo ngày xóa mới nhất → ngày chứng từ → id.
 
 **File đã sửa:** `js/sync/sync.js`, `js/app/main.js`, `js/modules/thungrac/thungrac.js`.
+
+### 9.29 Thùng rác: xóa vĩnh viễn bằng "bia mộ" + kiểm tra dữ liệu khi khôi phục (01/10/2026)
+
+**Triệu chứng:**
+1. Xóa vĩnh viễn 1 bản ghi hoặc "Làm sạch thùng rác" xong, đăng nhập trên thiết bị mới vẫn thấy các bản ghi đó.
+2. Thùng rác còn dữ liệu đời cũ thiếu trường (vd tuần chấm công không có `toDate`). Bấm "Khôi phục" sẽ đưa dữ liệu thiếu trường vào báo cáo / tổng chi mà không cảnh báo.
+3. (Phát hiện thêm khi rà code) Bấm "Khôi phục" xong, lần đẩy cloud kế tiếp gộp với bản xóa mềm trên cloud → `resolveConflict` cho bên xóa LUÔN thắng → bản ghi lại bị xóa.
+
+**Nguyên nhân:**
+- Xóa vĩnh viễn bỏ HẲN bản ghi khỏi mảng, lệnh xóa (`purgeIds`) chỉ nằm trong outbox của máy vừa xóa. Máy khác / tab cũ còn bản xóa mềm → đẩy lên gộp lại → bản ghi sống lại trên cloud.
+- `normalizeCC` gom theo "tuần + công trình": bản trùng đời cũ (khác id) không bị lệnh xóa theo id bắt được.
+- `fbYearCatPayload` chỉ dùng `fromDate`, còn `_recYearDoc` có dùng thêm `from` → chấm công đời cũ chỉ có `from` không lên đúng doc năm.
+
+**Sửa:**
+- `thungrac.js`: xóa vĩnh viễn giờ gắn `purgedAt` (bia mộ) thay vì bỏ hẳn bản ghi. Hàm mới: `_TRASH_STORES`, `_trashIn`, `_trashTomb`, `_trashPurgeIds`, `_trashGcTombstones` (bỏ bia mộ quá `_TRASH_TOMB_KEEP_DAYS` = 90 ngày, chạy khi mở tab), `_trashCheck`. `_trashPushPurge(count)` báo rõ đang đồng bộ / mất mạng. `_trashHardDelete`, `_trashEmptyCurrentTab`, `_trashEmptyAll` viết lại dùng `_trashPurgeIds`.
+- `_trashRestore`: chạy `_trashCheck` trước khi khôi phục. Lỗi không tự sửa được (thiếu ngày, thiếu `workers`, thiếu công trình ở chấm công, hoặc đã có tuần đang dùng cùng tuần + công trình) → chặn. Tự điền được (`toDate = ccSaturdayISO(fromDate)`, `fromDate` từ `from`) / thiếu thông tin phụ → hỏi xác nhận. Dòng thùng rác có nhãn "⚠ Thiếu trường" / "⚠ Lỗi dữ liệu".
+- `sync.js`: `resolveConflict` — `purgedAt` luôn thắng; xóa mềm so với bản sống theo thời điểm (`deletedAt` vs `updatedAt`). `_mergeHopDong` ưu tiên `purgedAt`. `normalizeCC` giữ bia mộ riêng theo id, bỏ bản trùng xóa mềm cùng tuần + công trình đã xóa trước lúc purge.
+- `chamcong.core.js`: `_dedupCC` (bản fallback) cũng tách bia mộ riêng.
+- `core.cloud-cats-ui.js`: `fbYearCatPayload` dùng `fromDate || from` cho `cc_v2`.
+- Thùng rác mobile dùng chung các hàm trên nên tự áp dụng.
+
+**Lưu ý:** bản ghi đã "sống lại" trên cloud trước bản sửa này vẫn còn trong thùng rác. Cần xóa vĩnh viễn lại 1 lần (lần này bia mộ sẽ giữ chúng không hiện lại).
+
+**File đã sửa:** `js/modules/thungrac/thungrac.js`, `js/sync/sync.js`, `js/modules/chamcong/chamcong.core.js`, `js/core/core.cloud-cats-ui.js`.
 
 ---
 

@@ -60,10 +60,24 @@ function softDeleteRecord(arr, id, extra = {}) {
 // [3] CONFLICT RESOLUTION — bản nào mới hơn thì thắng (tombstone ưu tiên)
 // ══════════════════════════════════════════════════════════════
 function resolveConflict(local, cloud) {
-  // Ưu tiên tombstone: nếu 1 bên đã xóa, bên kia chưa → bên xóa thắng
-  // (tránh record "sống lại" khi thiết bị khác chưa nhận được lệnh xóa)
-  if (local.deletedAt && !cloud.deletedAt) return local;
-  if (!local.deletedAt && cloud.deletedAt) return cloud;
+  // (01/10/2026) BIA MỘ XÓA VĨNH VIỄN (purgedAt) LUÔN THẮNG — bất kể updatedAt.
+  // Lý do: máy khác còn giữ bản xóa mềm/bản cũ của record này, khi đẩy lên sẽ
+  // gộp lại → nếu không có luật này, record đã xóa vĩnh viễn sẽ "sống lại".
+  if (local.purgedAt || cloud.purgedAt) {
+    if (local.purgedAt && cloud.purgedAt) return (local.purgedAt >= cloud.purgedAt) ? local : cloud;
+    return local.purgedAt ? local : cloud;
+  }
+  // Một bên xóa mềm, bên kia còn sống → so THỜI ĐIỂM XÓA với lần sửa cuối của bản sống:
+  //   • Xóa xảy ra SAU lần sửa cuối → bên xóa thắng (máy khác chưa nhận lệnh xóa)
+  //   • Bản sống được sửa SAU lúc xóa (vd bấm "Khôi phục" từ thùng rác) → bản sống thắng
+  // (Trước 01/10/2026: bên xóa LUÔN thắng → bấm Khôi phục xong, lần đẩy cloud kế tiếp
+  //  gộp với bản xóa trên cloud và record lại bị xóa → khôi phục không có tác dụng.)
+  if (local.deletedAt && !cloud.deletedAt) {
+    return (Number(local.deletedAt) >= _safeTs(cloud.updatedAt || cloud.createdAt || 0)) ? local : cloud;
+  }
+  if (!local.deletedAt && cloud.deletedAt) {
+    return (Number(cloud.deletedAt) >= _safeTs(local.updatedAt || local.createdAt || 0)) ? cloud : local;
+  }
 
   // Cùng trạng thái → bản có updatedAt mới hơn thắng
   const lt = local.updatedAt || local.createdAt || local._ts || 0;
@@ -153,8 +167,32 @@ function _fillCCProjectId(records) {
 // Gom CC theo (tuần + công trình), giữ bản mới nhất
 function normalizeCC(records) {
   const filled = _fillCCProjectId(records || []);
+  // (01/10/2026) Tách BIA MỘ xóa vĩnh viễn (purgedAt) ra riêng:
+  //   • Bia mộ KHÔNG tham gia tranh chấp "1 tuần + 1 công trình = 1 record" — nếu không,
+  //     bia mộ (updatedAt mới) sẽ đè mất tuần ĐANG SỐNG cùng tuần + công trình.
+  //   • Bia mộ giữ theo id (nhiều bia mộ trùng id → giữ bản purgedAt mới nhất).
+  //   • Record khác cùng id với bia mộ → bỏ (bia mộ thắng tuyệt đối).
+  //   • Bản XÓA MỀM khác id nhưng cùng tuần + công trình, xóa TRƯỚC lúc purge → bỏ luôn
+  //     (đây là bản trùng đời cũ, nếu giữ sẽ hiện lại trong thùng rác). Bản đang sống
+  //     thì không bao giờ bị bỏ.
+  const tombs = new Map();
+  filled.forEach(r => {
+    if (!r || !r.purgedAt) return;
+    const prev = tombs.get(String(r.id));
+    if (!prev || r.purgedAt > prev.purgedAt) tombs.set(String(r.id), r);
+  });
+  const tombKeyTs = new Map(); // "tuần__công trình" → purgedAt lớn nhất
+  tombs.forEach(t => {
+    const k = `${t.fromDate || t.from || ''}__${t.projectId || t.ct || ''}`;
+    tombKeyTs.set(k, Math.max(tombKeyTs.get(k) || 0, Number(t.purgedAt) || 0));
+  });
   const byKey = new Map();
   filled.forEach(r => {
+    if (!r || r.purgedAt || tombs.has(String(r.id))) return;
+    if (r.deletedAt && tombKeyTs.size) {
+      const tk = `${r.fromDate || r.from || ''}__${r.projectId || r.ct || ''}`;
+      if (tombKeyTs.has(tk) && Number(r.deletedAt) <= tombKeyTs.get(tk)) return;
+    }
     const date = r.fromDate || r.from || '';
     const proj = r.projectId || r.ct  || '';
     const key  = `${date}__${proj}`;
@@ -168,7 +206,7 @@ function normalizeCC(records) {
       byKey.set(key, r); // hòa + có tombstone → bản xóa thắng
     }
   });
-  return [...byKey.values()];
+  return [...byKey.values(), ...tombs.values()];
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -218,6 +256,11 @@ function _mergeHopDong(localHd, cloudHd) {
   Object.entries(localHd || {}).forEach(([ct, local]) => {
     const cloud = merged[ct];
     if (!cloud) { merged[ct] = local; return; }
+    // (01/10/2026) Bia mộ xóa vĩnh viễn (purgedAt) luôn thắng — tránh HĐ "sống lại"
+    if (local.purgedAt || cloud.purgedAt) {
+      if ((Number(local.purgedAt) || 0) >= (Number(cloud.purgedAt) || 0)) merged[ct] = local;
+      return;
+    }
     const localTs = Math.max(Number(local.updatedAt) || 0, Number(local.deletedAt) || 0);
     const cloudTs = Math.max(Number(cloud.updatedAt) || 0, Number(cloud.deletedAt) || 0);
     if (localTs >= cloudTs) merged[ct] = local;

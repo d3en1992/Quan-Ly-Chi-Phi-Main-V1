@@ -48,7 +48,13 @@ const _YEAR_CATS = [
 // Payload 1 hạng mục theo năm — lưu record nguyên dạng (tên field đầy đủ)
 function fbYearCatPayload(yr, key, dateField) {
   const ys = String(yr);
-  const records = load(key, []).filter(x => x[dateField] && x[dateField].startsWith(ys));
+  // (01/10/2026) Chấm công đời cũ có thể chỉ có 'from' (không có fromDate) → dùng cùng
+  // quy tắc với _recYearDoc() trong core.storage.js, để record (và lệnh xóa của nó)
+  // được đẩy vào ĐÚNG doc năm thay vì bị bỏ sót.
+  const records = load(key, []).filter(x => {
+    const d = x && (x[dateField] || (key === 'cc_v2' ? x.from : null));
+    return d && String(d).startsWith(ys);
+  });
   return { v: 4, yr: Number(yr), cat: key, records };
 }
 
