@@ -432,6 +432,8 @@ function editUngRecord(id) {
   if (!rec) return;
   // Phiếu ứng công nhân sửa ở tab Chấm Công (popup Tiền ứng CN)
   if (rec.loai === 'congnhan') { toast('Phiếu ứng công nhân sửa ở tab Chấm Công → Ứng Công Nhân', 'info'); return; }
+  // Phiếu tự sinh từ Tất toán → chỉ xem, không sửa
+  if (rec.autoSettle) { toast('Phiếu tự sinh từ Tất toán — chỉ xem, không sửa được', 'error'); return; }
 
   _editingUngId = id;
   document.getElementById('ung-date').value = rec.ngay || '';

@@ -18,7 +18,8 @@
 //     → Bootstrap Modal xác nhận (chọn ngày phiếu) → OK → mỗi dòng tạo 1 PHIẾU ỨNG thật (ung_v1)
 //     đúng bằng số còn phải trả → các dòng mờ dần rồi bị xóa khỏi DOM.
 //     → Đã ứng = Giá trị, Còn phải TT = 0 → dòng tự biến mất; tab Công Nợ / Ứng TP/NCC tự nhảy số.
-//   • Phiếu tự sinh gắn cờ: autoSettle:true, settleId (mã của LẦN tất toán), settledBy.
+//   • Phiếu tự sinh gắn cờ: autoSettle:true, settleId (mã của LẦN tất toán), settledBy (tài khoản),
+//     nguoi (Người TH chọn trong popup). Phiếu này CHỈ XEM ở tab Ứng TP/NCC (không sửa/xóa lẻ).
 //     → Hoàn tác / Hủy = xóa mềm mọi phiếu cùng settleId (vào thùng rác như phiếu thường).
 //   • Quyền: chỉ Admin + Giám đốc (_qtCanEdit — quyettoan.congtrinh.js).
 
@@ -122,7 +123,7 @@ function _ttBatches() {
   (typeof ungRecords !== 'undefined' ? ungRecords : [])
     .filter(r => r.autoSettle && r.settleId && !r.deletedAt)
     .forEach(r => {
-      const b = by[r.settleId] || (by[r.settleId] = { id: r.settleId, ngay: r.ngay, by: r.settledBy || '', ts: r.createdAt || 0, recs: [], total: 0 });
+      const b = by[r.settleId] || (by[r.settleId] = { id: r.settleId, ngay: r.ngay, by: r.nguoi || r.settledBy || '', ts: r.createdAt || 0, recs: [], total: 0 });
       b.recs.push(r);
       b.total += r.tien || 0;
       if ((r.createdAt || 0) > b.ts) b.ts = r.createdAt || 0;
@@ -297,7 +298,18 @@ function _ttOpenConfirm(idxs) {
     ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:12px">⚠ Máy chưa tải dữ liệu năm <strong>${miss.join(', ')}</strong>. Nếu đối tác có phát sinh ở năm đó, số còn phải trả có thể chưa đúng — hãy chọn năm đó (hoặc "Tất cả năm") ở thanh trên để tải trước khi tất toán.</div>`
     : '';
   m.querySelector('#tt-cm-ngay').value = today();
+  // Người TH: lấy từ Danh mục "Người thực hiện"; chọn sẵn người đã chọn lần trước (nhớ trên máy này)
+  const nguoiSel = m.querySelector('#tt-cm-nguoi');
+  const allNguoi = [...new Set([...((typeof cats !== 'undefined' && cats.nguoiTH) || [])].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+  nguoiSel.innerHTML = '<option value="">-- Chọn --</option>' + allNguoi.map(v => `<option value="${x(v)}">${x(v)}</option>`).join('');
+  const last = ttLastNguoi();
+  if (last && allNguoi.includes(last)) nguoiSel.value = last;
   bootstrap.Modal.getOrCreateInstance(m).show();
+}
+
+// Người TH đã chọn ở lần tất toán trước trên máy này ('' nếu chưa có / bộ nhớ bị chặn)
+function ttLastNguoi() {
+  try { return localStorage.getItem('tt_last_nguoi') || ''; } catch (e) { return ''; }
 }
 
 // Tạo modal 1 lần và gắn vào <body> — để không bị ẩn theo .page / .sub-page đang display:none
@@ -320,8 +332,16 @@ function _ttEnsureModal() {
           <p id="tt-cm-msg" class="mb-2" style="font-size:14px"></p>
           <div id="tt-cm-detail" class="text-secondary mb-3" style="font-size:12px"></div>
           <div id="tt-cm-warn"></div>
-          <label for="tt-cm-ngay" class="form-label mb-1" style="font-size:12px;font-weight:600">Ngày phiếu chi</label>
-          <input type="date" id="tt-cm-ngay" class="form-control form-control-sm" style="max-width:180px">
+          <div class="row g-2">
+            <div class="col-12 col-sm-5">
+              <label for="tt-cm-ngay" class="form-label mb-1" style="font-size:12px;font-weight:600">Ngày phiếu chi</label>
+              <input type="date" id="tt-cm-ngay" class="form-control form-control-sm">
+            </div>
+            <div class="col-12 col-sm-7">
+              <label for="tt-cm-nguoi" class="form-label mb-1" style="font-size:12px;font-weight:600">Người TH *</label>
+              <select id="tt-cm-nguoi" class="form-select form-select-sm"><option value="">-- Chọn --</option></select>
+            </div>
+          </div>
           <div class="text-secondary mt-2" style="font-size:11px">Phiếu tự sinh nằm ở tab Ứng TP/NCC. Có thể Hoàn tác ngay sau khi tạo.</div>
         </div>
         <div class="modal-footer py-2">
@@ -343,13 +363,16 @@ function _ttConfirmOk() {
   if (!pend) return;
   const ngay = m?.querySelector('#tt-cm-ngay')?.value || '';
   if (!ngay) { toast('Vui lòng chọn Ngày phiếu chi!', 'error'); return; }
+  const nguoi = m?.querySelector('#tt-cm-nguoi')?.value || '';
+  if (!nguoi) { toast('Vui lòng chọn Người TH!', 'error'); return; }
+  try { localStorage.setItem('tt_last_nguoi', nguoi); } catch (e) {}
   // Tính lại số dư ngay lúc bấm OK (phòng dữ liệu vừa đổi do đồng bộ)
   const keySet = new Set(pend.keys);
   const fresh = _ttBuildRows().filter(r => keySet.has(r.key));
   bootstrap.Modal.getOrCreateInstance(m).hide();
   if (!fresh.length) { toast('Các dòng đã chọn đều đã hết nợ', 'info'); ttRender(); return; }
 
-  const settleId = ttCreatePhieu(fresh, ngay);
+  const settleId = ttCreatePhieu(fresh, ngay, nguoi);
   const total = fresh.reduce((s, r) => s + r.con, 0);
 
   // Hiệu ứng: dòng chuyển xanh → mờ dần → xóa khỏi DOM, sau đó vẽ lại tổng + KPI
@@ -369,8 +392,10 @@ function _ttConfirmOk() {
 // ── LÕI: tạo phiếu ứng tất toán cho các dòng (KHÔNG hỏi, KHÔNG đụng giao diện) ──
 // Dùng chung cho desktop (_ttConfirmOk) và điện thoại (mobile.actions.js → ttSettleMb).
 // Trả về settleId của lần tất toán (để Hoàn tác).
-function ttCreatePhieu(rows, ngay) {
+// nguoi: Người TH (tên người thực tế chi tiền) — ghi vào nội dung phiếu; trống → dùng tên tài khoản.
+function ttCreatePhieu(rows, ngay, nguoi) {
   const user = getCurrentUser()?.username || 'Không rõ';
+  nguoi = (nguoi || '').trim();
   const settleId = 'tt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   rows.forEach(r => {
     const rec = {
@@ -381,10 +406,11 @@ function ttCreatePhieu(rows, ngay) {
       congtrinh: r.pid === 'COMPANY' ? r.ctName : (r.ctName || ''),
       projectId: r.pid || null,
       tien: r.con,                         // đúng bằng số còn phải trả → số dư về 0
-      nd: `Tất toán công nợ (${user})`,
+      nd: `Tất toán công nợ (${nguoi || user})`,
+      nguoi,                               // Người TH chọn trong popup
       autoSettle: true,                    // cờ nhận diện phiếu tự sinh
       settleId,                            // mã lần tất toán — để Hoàn tác / Hủy cả lô
-      settledBy: user,
+      settledBy: user,                     // tài khoản đăng nhập thực hiện thao tác
     };
     // Gắn lại id danh mục theo tên (phòng khi partnerId trống) — giữ liên kết khi đổi tên đối tác
     if (!rec.tpId && typeof stampCatIds === 'function') stampCatIds(rec, 'ung');
@@ -460,6 +486,7 @@ window.ttUpdateBulkBtn   = ttUpdateBulkBtn;
 window.ttUndoLast        = ttUndoLast;
 window.ttCancelBatch     = ttCancelBatch;
 window.ttCreatePhieu     = ttCreatePhieu;
+window.ttLastNguoi       = ttLastNguoi;
 window.ttBuildRows       = _ttBuildRows;
 window.ttBatches         = _ttBatches;
 window.ttRemoveBatch     = _ttRemoveBatch;

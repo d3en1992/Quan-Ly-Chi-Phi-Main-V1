@@ -386,7 +386,8 @@ Object.assign(MB_ACTS, {
     const miss = (typeof qtMissingYears === 'function') ? qtMissingYears() : [];
     const warn = miss.length ? `\n\n⚠ Máy chưa tải dữ liệu năm ${miss.join(', ')} — số dư có thể chưa đủ.` : '';
     if (!confirm(`Tất toán ${r.partner} — ${r.ctName || 'không gắn CT'}?\n\nTạo phiếu ứng ${mbFull(r.con)} ngày ${mbDate(ngay)}.${warn}`)) return;
-    const id = ttCreatePhieu([r], ngay);
+    // Người TH: dùng người đã chọn ở lần tất toán gần nhất trên máy (trống → tên tài khoản)
+    const id = ttCreatePhieu([r], ngay, (typeof ttLastNguoi === 'function') ? ttLastNguoi() : '');
     MB.ttLast = { id, msg: '✅ Đã tất toán ' + r.partner + ' · ' + mbFull(r.con) };
     mbToast('✅ Đã tất toán ' + r.partner, 'success');
     mbAfterWrite();

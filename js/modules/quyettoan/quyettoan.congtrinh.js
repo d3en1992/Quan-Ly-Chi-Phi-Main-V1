@@ -232,7 +232,7 @@ function _qtFillForm(r, count) {
 }
 
 // ── Reset form ──
-// keepCt = true : giữ công trình đang chọn (sau khi Lưu / Hủy thay đổi) → nạp lại bản quyết toán
+// keepCt = true : giữ công trình đang chọn (Hủy thay đổi / sau khi Xóa) → nạp lại bản quyết toán
 //                 của CT nếu có (chế độ Sửa), không có thì về form trống (chế độ Thêm)
 // keepCt = false: bỏ chọn công trình → ẩn form
 function qtResetForm(keepCt) {
@@ -435,8 +435,10 @@ function qtSave() {
     if (typeof renderProjectsPage === 'function') renderProjectsPage();
   }
 
-  qtPopulateSels();          // cập nhật nhãn "(đã QT)" nếu vừa đóng CT (giữ CT đang chọn)
-  qtResetForm(true);         // GIỮ công trình → form nạp lại bản vừa lưu (chế độ Sửa), số liệu cập nhật
+  qtPopulateSels();          // cập nhật nhãn "(đã QT)" nếu vừa đóng CT
+  // Lưu / Cập nhật xong → LÀM SẠCH toàn bộ form, ô công trình về "-- Chọn công trình --"
+  // (tránh người dùng thao tác nhầm tiếp vào công trình cũ). Bảng lịch sử vẫn thấy bản vừa lưu.
+  qtResetForm(false);
   _qtRefreshOtherTabs();
 }
 

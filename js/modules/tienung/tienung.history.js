@@ -169,14 +169,29 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
         <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
         <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
         <td style="white-space:nowrap">
-          <div style="display:flex;gap:4px;justify-content:flex-end">
-            <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')"><span class="material-symbols-outlined">edit</span></button>
-            <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
-          </div>
+          ${_ungActionsHtml(r)}
         </td>
       </tr>`).join('')}</tbody>
     </table>
   </div>${pagHtml}`;
+}
+
+// ── Cột thao tác của 1 phiếu ứng ──
+// Phiếu TỰ SINH từ "Tất toán TP/NCC" (autoSettle) → CHỈ XEM: ẩn nút Sửa/Xóa, hiện nhãn khóa.
+// Muốn hủy phải vào tab Quyết Toán → Tất toán TP/NCC → Lịch sử tất toán (hủy cả lô cho đúng sổ).
+// Dùng chung cho bảng Thầu Phụ / NCC (sub-tab Thống kê ứng) và bảng "Phiếu Ứng Gần Đây".
+function _ungActionsHtml(r) {
+  if (r.autoSettle) {
+    return `<div style="display:flex;justify-content:flex-end">
+      <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:10px;cursor:help"
+        title="Phiếu tự sinh từ Tất toán${r.settledBy ? ' (' + x(r.settledBy) + ')' : ''} — chỉ xem. Muốn hủy: tab Quyết Toán → Tất toán TP/NCC → Lịch sử tất toán.">
+        <span class="material-symbols-outlined" style="font-size:12px;vertical-align:-2px">lock</span> Tất toán</span>
+    </div>`;
+  }
+  return `<div style="display:flex;gap:4px;justify-content:flex-end">
+    <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')"><span class="material-symbols-outlined">edit</span></button>
+    <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
+  </div>`;
 }
 
 function renderUngTpSection() {
@@ -246,10 +261,7 @@ function renderUngMini() {
       <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
       <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
       <td style="white-space:nowrap">
-        <div style="display:flex;gap:4px;justify-content:flex-end">
-          <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')"><span class="material-symbols-outlined">edit</span></button>
-          <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
-        </div>
+        ${_ungActionsHtml(r)}
       </td>
     </tr>`;
   }).join('');
@@ -279,6 +291,8 @@ function renderUngMini() {
 function delUngRecord(id) {
   const idx = ungRecords.findIndex(r => String(r.id) === String(id));
   if (idx < 0) return;
+  // Phiếu tự sinh từ Tất toán → chỉ xem, không xóa lẻ ở đây
+  if (ungRecords[idx].autoSettle) { toast('Phiếu tự sinh từ Tất toán — chỉ xem. Muốn hủy: tab Quyết Toán → Tất toán TP/NCC → Lịch sử tất toán', 'error'); return; }
   if (!confirm('Xóa bản ghi tiền ứng này?')) return;
   const now = Date.now();
   ungRecords[idx] = { ...ungRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
