@@ -1557,6 +1557,10 @@ body { overscroll-behavior-y: none; }
 #kho-list-table select { width: 100%; min-width: 0; }
 #kho-list-table button { white-space: nowrap; }
 
+/* Ô "Thông Tin Máy" bấm để sửa trực tiếp (tbEditGhichu) */
+.tb-ghichu-cell { cursor: text; }
+.tb-ghichu-cell:hover { background: #fffbef; box-shadow: inset 0 0 0 1px var(--gold); }
+
 /* 8. Thống Kê */
 #tb-vonke-table { table-layout: auto; width: 100%; }
 #tb-vonke-table thead th,

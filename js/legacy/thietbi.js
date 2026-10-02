@@ -23,6 +23,15 @@ function isKhoTong(r) {
   return r.projectId === 'COMPANY';
 }
 
+// ── Helper: khóa so khớp "Thông Tin Máy" (trường ghichu) khi gộp nhóm ──
+// (02/10/2026) Thiết bị chỉ được gộp chung 1 dòng khi trùng: Nơi (CT/Kho) + Tên + Tình trạng + Thông Tin Máy.
+// Bỏ khoảng trắng thừa + không phân biệt hoa/thường ("Mới thay nhớt" = "mới  thay nhớt"),
+// nhưng VẪN phân biệt dấu để 2 ghi chú khác nghĩa không bị gộp nhầm.
+// Để trống → khóa rỗng → mọi thiết bị trống Thông Tin Máy gộp chung với nhau.
+function _tbGhiKey(s) {
+  return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 // ══════════════════════════════════════════════════════════════════
 // [MIGRATION] Chuẩn hóa dữ liệu cũ — chạy 1 lần khi load
 // - ct === "KHO TỔNG" mà thiếu projectId → set projectId = "COMPANY"
@@ -48,13 +57,13 @@ function migrateTbData() {
     }
   });
 
-  // Phase 2 (Bonus): Gộp record trùng (projectId + ten + tinhtrang)
-  // Chỉ gộp record chưa bị xóa
+  // Phase 2 (Bonus): Gộp record trùng (projectId + ten + tinhtrang + Thông Tin Máy)
+  // Chỉ gộp record chưa bị xóa. Khác Thông Tin Máy → giữ 2 dòng riêng.
   const dedup = new Map();
   const toRemove = new Set();
   tbData.forEach((r, idx) => {
     if (r.deletedAt) return;
-    const key = (r.projectId || r.ct || '') + '||' + (r.ten || '') + '||' + (r.tinhtrang || '');
+    const key = (r.projectId || r.ct || '') + '||' + (r.ten || '') + '||' + (r.tinhtrang || '') + '||' + _tbGhiKey(r.ghichu);
     if (dedup.has(key)) {
       const primary = dedup.get(key);
       // Cộng dồn số lượng vào record đầu tiên
@@ -64,7 +73,6 @@ function migrateTbData() {
         primary.updatedAt = r.updatedAt;
         primary.ngay = r.ngay || primary.ngay;
       }
-      if (r.ghichu && !primary.ghichu) primary.ghichu = r.ghichu;
       // Soft-delete record trùng
       r.deletedAt = Date.now();
       r.updatedAt = Date.now();
@@ -307,19 +315,20 @@ function tbSave() {
     return;
   }
 
-  // Chuẩn hóa: cộng dồn nếu đã tồn tại record cùng (projectId + ten + tinhtrang)
+  // Chuẩn hóa: cộng dồn nếu đã tồn tại record cùng (projectId + ten + tinhtrang + Thông Tin Máy)
+  // Khác Thông Tin Máy → tạo dòng riêng (vd: 2 "Máy Hơi Nhỏ" ghi chú khác nhau = 2 dòng)
   // QUAN TRỌNG: chỉ tìm record CHƯA bị xóa — tránh update deleted record
   // KHO TỔNG luôn có projectId = "COMPANY", KHÔNG BAO GIỜ null
   const savePid = ct === TB_KHO_TONG ? 'COMPANY' : (ctPid || null);
   rows.forEach(row => {
     const exist = tbData.find(rec => !rec.deletedAt && rec.ten === row.ten && rec.tinhtrang === row.tinhtrang &&
+      _tbGhiKey(rec.ghichu) === _tbGhiKey(row.ghichu) &&
       (savePid ? (rec.projectId === savePid) : rec.ct === ct));
     if (exist) {
       exist.soluong = (exist.soluong || 0) + row.soluong;
       exist.ngay = ngay;
       exist.updatedAt = Date.now();
       exist.deviceId  = DEVICE_ID;
-      if (row.ghichu) exist.ghichu = row.ghichu;
       if (savePid) { exist.projectId = savePid; }
       if (savePid === 'COMPANY') { exist.ct = TB_KHO_TONG; }
       else { const n = _getProjectNameById(savePid); if (n) exist.ct = n; }
@@ -418,7 +427,8 @@ function tbRenderList() {
           ${ttOpts}
         </select>
       </td>
-      <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
+      <td class="text-secondary tb-ghichu-cell" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+        title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditGhichu(this,'${r.id}')">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
@@ -452,6 +462,77 @@ function tbUpdateField(id, field, val) {
   tbRenderThongKeVon();
   renderKhoTong();
   toast('✅ Đã cập nhật tình trạng', 'success');
+}
+
+// ── Sửa trực tiếp ô "Thông Tin Máy" (bảng Danh Sách tại CT + Kho Tổng) ──
+// Bấm vào ô → hiện ô nhập. Enter hoặc bấm ra ngoài (blur) → lưu + khóa lại. Esc → hủy.
+// Lưu bằng save('tb_v1') → tự đồng bộ lên Firebase như các thao tác khác.
+function tbEditGhichu(td, id) {
+  if (td.querySelector('input')) return; // đang sửa rồi → bỏ qua
+  const r = tbData.find(rec => rec.id === id && !rec.deletedAt);
+  if (!r) return;
+
+  const oldVal = r.ghichu || '';
+  td.innerHTML = '';
+  td.style.padding = '2px 4px';
+  // Ô hiển thị bị giới hạn 140px + overflow:hidden → mở rộng khi sửa để ô nhập không bị cắt
+  td.style.maxWidth = 'none';
+  td.style.overflow = 'visible';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = oldVal;
+  inp.placeholder = 'Thông tin máy...';
+  inp.className = 'form-control form-control-sm';
+  inp.style.cssText = 'font-size:12px;min-width:160px';
+  inp.onclick = e => e.stopPropagation(); // bấm trong ô nhập không mở lại ô sửa
+  td.appendChild(inp);
+  inp.focus();
+  inp.select();
+
+  let done = false; // chặn lưu 2 lần (Enter rồi blur do bảng vẽ lại)
+  const finish = (doSave) => {
+    if (done) return;
+    done = true;
+    if (doSave) _tbSaveGhichu(id, inp.value);
+    else { tbRenderList(); renderKhoTong(); } // hủy → vẽ lại như cũ
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+}
+
+function _tbSaveGhichu(id, val) {
+  const r = tbData.find(rec => rec.id === id && !rec.deletedAt);
+  const newVal = String(val || '').trim().replace(/\s+/g, ' ');
+  // Không đổi gì → chỉ khóa ô lại, không ghi dữ liệu / không đồng bộ thừa
+  if (!r || newVal === (r.ghichu || '')) {
+    tbRenderList(); renderKhoTong();
+    return;
+  }
+
+  // Theo quy tắc gộp nhóm: nếu ở CÙNG NƠI đã có dòng trùng Tên + Tình trạng + Thông Tin Máy mới
+  // → cộng số lượng vào dòng đó và xóa mềm dòng đang sửa (tránh 2 dòng giống hệt nhau)
+  const twin = tbData.find(rec => rec !== r && !rec.deletedAt && rec.ten === r.ten && rec.tinhtrang === r.tinhtrang &&
+    _tbGhiKey(rec.ghichu) === _tbGhiKey(newVal) &&
+    (r.projectId ? rec.projectId === r.projectId : rec.ct === r.ct));
+
+  if (twin) {
+    twin.soluong   = (twin.soluong || 0) + (r.soluong || 0);
+    twin.updatedAt = Date.now();
+    twin.deviceId  = DEVICE_ID;
+    tbData = softDeleteRecord(tbData, id);
+  } else {
+    r.ghichu    = newVal;
+    r.updatedAt = Date.now();
+    r.deviceId  = DEVICE_ID;
+  }
+
+  save('tb_v1', tbData);
+  tbRenderList();
+  renderKhoTong();
+  toast(twin ? '✅ Đã cập nhật — gộp vào dòng có cùng Thông Tin Máy' : '✅ Đã cập nhật thông tin máy', 'success');
 }
 
 // ── Xóa thiết bị (chỉ áp dụng cho KHO TỔNG) ─────────────────────
@@ -562,13 +643,14 @@ function tbSaveEdit(id) {
   tbData = softDeleteRecord(tbData, id);
 
   // Thêm/cộng dồn số lượng chuyển đi vào newCT
+  // Chỉ cộng dồn khi trùng cả Thông Tin Máy; khác → tạo dòng riêng tại nơi nhận
   const destExist = tbData.find(rec => !rec.deletedAt && rec.ten === r.ten && rec.tinhtrang === newTT &&
+    _tbGhiKey(rec.ghichu) === _tbGhiKey(newGhichu) &&
     (newCtPid ? (rec.projectId === newCtPid) : rec.ct === newCT)); // [MODIFIED] match by projectId
   if (destExist) {
     destExist.soluong  = (destExist.soluong || 0) + newSL;
     destExist.updatedAt = Date.now();
     destExist.deviceId  = DEVICE_ID;
-    if (newGhichu) destExist.ghichu = newGhichu;
     destExist.ngay = ngay;
   } else {
     tbData.push(mkRecord({
@@ -581,6 +663,7 @@ function tbSaveEdit(id) {
   // Phần còn lại → giữ lại tại nguồn (r.ct)
   if (remaining > 0) {
     const srcExist = tbData.find(rec => !rec.deletedAt && rec.ten === r.ten && rec.tinhtrang === r.tinhtrang &&
+      _tbGhiKey(rec.ghichu) === _tbGhiKey(r.ghichu) &&
       (r.projectId ? (rec.projectId === r.projectId) : rec.ct === srcCt)); // [MODIFIED] match by projectId
     if (srcExist) {
       srcExist.soluong   = (srcExist.soluong || 0) + remaining;
@@ -664,7 +747,8 @@ function renderKhoTong() {
       <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(recCatName(r,'tb','ten'))}</span></td>
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
-      <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
+      <td class="text-secondary tb-ghichu-cell" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+        title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditGhichu(this,'${r.id}')">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
