@@ -162,6 +162,66 @@ function _ctTongChi(p, c) {
   return { tongChi, ungTp, ungNcc, tongHopDongNcc };
 }
 
+// ══ TÀI CHÍNH CỐT LÕI CỦA 1 CÔNG TRÌNH (single source of truth) ══════
+// Dùng CHUNG cho modal chi tiết công trình (openCTDetail) và tab QUYẾT TOÁN
+// (quyettoan.congtrinh.js) → 2 nơi luôn cùng số. Theo NĂM ĐANG LỌC như modal:
+//   Doanh thu       = max(HĐ chính, Đã thu) + Quyết toán (±)  — _dtCalcRevenue()
+//   Chi phí dự toán = hóa đơn + HĐ thầu phụ + chi phí chung chia tỉ trọng
+//   Chi thực tế     = tổng chi trực tiếp (_ctTongChi) + chi phí chung chia tỉ trọng
+//   Lãi hiện tại    = Đã thu − Chi thực tế         (dòng tiền tới thời điểm hiện tại)
+//   Lãi dự kiến     = Doanh thu − Chi phí dự toán  (khi hoàn thành)
+//   Hiệu quả        = đang thi công/kế hoạch → Lãi hiện tại; đã xong → Lãi dự kiến (lãi/lỗ cuối)
+// opts.qtExcludeId / opts.qtExtra: bỏ 1 quyết toán / thêm 1 quyết toán giả định
+//   → dùng để xem trước "doanh thu SAU quyết toán" khi đang nhập form.
+// @returns {{ c, tc, X, Y, qtSum, tongThu, soDotThu, tongHDTP, chiChung, doanhThu,
+//             chiPhiTong, loiNhuan, chiThucTe, laiHienTai, hieuQua, isActive, conPhaiThu }}
+function ctTaiChinh(p, opts) {
+  opts = opts || {};
+  const c  = _ctGetCosts(p);
+  const tc = _ctTongChi(p, c);
+  const _match = r => r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
+
+  // (X) HĐ chính (giaTri + giaTriphu + phatSinh) — như modal: không lọc năm
+  const hdct = (typeof _hdLookup === 'function')
+    ? _hdLookup(p.id) || _hdLookup(p.name)
+    : ((typeof hopDongData !== 'undefined' && hopDongData[p.name] && !hopDongData[p.name].deletedAt) ? hopDongData[p.name] : null);
+  const X = hdct ? (hdct.giaTri || 0) + (hdct.giaTriphu || 0) + (hdct.phatSinh || 0) : 0;
+
+  // Đã thu (năm đang lọc) + số đợt
+  const thuList = (typeof thuRecords !== 'undefined')
+    ? thuRecords.filter(r => !r.deletedAt && inActiveYear(r.ngay) && _match(r)) : [];
+  const tongThu = thuList.reduce((s, r) => s + (r.tien || 0), 0);
+
+  // (B) tổng HĐ thầu phụ
+  const tongHDTP = (typeof thauPhuContracts !== 'undefined')
+    ? thauPhuContracts.filter(r => !r.deletedAt && _match(r)).reduce((s, r) => s + (r.giaTri || 0) + (r.phatSinh || 0), 0) : 0;
+
+  // (C) chi phí chung CÔNG TY chia tỉ trọng
+  const _alloc = (p.id !== 'COMPANY' && p.startDate && typeof allocateCompanyCost === 'function')
+    ? allocateCompanyCost().find(a => a.p.id === p.id) : null;
+  const chiChung = _alloc ? _alloc.allocated : 0;
+
+  // (Y) quyết toán đã quy đổi delta (tăng/giảm/thay thế) trong năm đang lọc — quyettoan.core.js
+  const qtSum = (typeof qtTongQuyetToan === 'function')
+    ? qtTongQuyetToan(p, ngay => _dtInYear(ngay), { excludeId: opts.qtExcludeId, extra: opts.qtExtra })
+    : { qt: 0, coThayThe: false };
+  const Y = qtSum.qt;
+
+  const doanhThu   = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, tongThu, Y, qtSum.coThayThe) : X + Y;
+  const chiPhiTong = (c.total || 0) + tongHDTP + chiChung;
+  const loiNhuan   = doanhThu - chiPhiTong;
+  const chiThucTe  = tc.tongChi + chiChung;
+  const laiHienTai = tongThu - chiThucTe;
+  const isActive   = (p.status === 'active' || p.status === 'planning');
+  return {
+    c, tc, X, Y, qtSum, tongThu, soDotThu: thuList.length, tongHDTP, chiChung,
+    doanhThu, chiPhiTong, loiNhuan, chiThucTe, laiHienTai, isActive,
+    hieuQua: isActive ? laiHienTai : loiNhuan,
+    conPhaiThu: doanhThu - tongThu,
+  };
+}
+window.ctTaiChinh = ctTaiChinh;
+
 // ── Tính thời gian thi công ─────────────────────────────────────────
 function _ptDuration(p) {
   if (!p.startDate) return '';
@@ -707,20 +767,18 @@ function openCTDetail(id) {
   //   Chi phí   = A(hóa đơn/vật tư) + B(HĐ thầu phụ) + C(chi phí chung phân bổ)
   //   Doanh thu = X(HĐ chính)       + Y(quyết toán, có dấu ±)
   //   Lợi nhuận = Doanh thu − Chi phí  → khớp tuyệt đối với tab Doanh Thu → Lợi Nhuận
+  // Số liệu cốt lõi lấy từ ctTaiChinh() — DÙNG CHUNG với tab QUYẾT TOÁN (cùng công thức, cùng số)
+  const _fin = ctTaiChinh(p);
   const _A = c.total;            // (A) hóa đơn/vật tư của CT
   const _B = tongHDTP;           // (B) tổng giá trị HĐ thầu phụ
   const _C = _chiPhiChungFixed;  // (C) chi phí chung CÔNG TY phân bổ cho CT
   const _X = tongGiaTriHD;       // (X) HĐ chính (giaTri + giaTriphu + phatSinh)
-  // (Y) quyết toán đã quy đổi delta (tăng/giảm/thay thế) trong năm đang lọc — quyettoan.core.js
-  const _qtSum = (typeof qtTongQuyetToan === 'function')
-    ? qtTongQuyetToan(p, ngay => _dtInYear(ngay))
-    : { qt: 0, coThayThe: false };
-  const _Y = _qtSum.qt;
+  const _Y = _fin.Y;             // (Y) quyết toán đã quy đổi delta trong năm đang lọc
 
   // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán; đã có "thay thế" thì bỏ max — xem _dtCalcRevenue()
-  const doanhThu    = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(_X, tongThu, _Y, _qtSum.coThayThe) : _X + _Y;
-  const chiPhiTong  = _A + _B + _C;             // tổng chi phí (dự toán/ước tính)
-  const loiNhuan    = doanhThu - chiPhiTong;    // lãi (≥0) / lỗ (<0)
+  const doanhThu    = _fin.doanhThu;
+  const chiPhiTong  = _fin.chiPhiTong;          // tổng chi phí (dự toán/ước tính)
+  const loiNhuan    = _fin.loiNhuan;            // lãi (≥0) / lỗ (<0)
   const conPhaiThuCT = doanhThu - tongThu;      // còn phải thu từ chủ đầu tư
   const pctThu = doanhThu   > 0 ? Math.round(tongThu / doanhThu * 100) : 0;          // % đã thu
   const pctChi = chiPhiTong > 0 ? Math.round(tongChiCongTrinh / chiPhiTong * 100) : 0; // % đã chi / dự toán

@@ -7,8 +7,11 @@
 //   • NGUỒN ĐỐI TÁC chỉ gồm 2 nhóm: (1) đã có ≥ 1 phiếu Ứng TP/NCC, (2) đã có HĐ thầu phụ
 //     (dù chưa ứng lần nào). Đối tác vãng lai chỉ có hóa đơn → "tiền trao cháo múc",
 //     coi như đã trả đứt lúc mua → không bao giờ hiện ở đây.
-//   • Danh sách = các cặp (Đối tác × Công trình) còn nợ > CN_DONE_TOLERANCE (100.000đ),
-//     số dư tính TOÀN VÒNG ĐỜI (không lọc năm) — cùng nguồn với tab Công Nợ:
+//   • THEO NĂM ĐANG LỌC: chỉ hiện các cặp (Đối tác × Công trình) có CÔNG TRÌNH thuộc năm đang chọn
+//     (qtCtInYear) và còn nợ > CN_DONE_TOLERANCE (100.000đ). KHÔNG tự tải các năm khác.
+//     Số dư của mỗi cặp cộng MỌI phát sinh đang có trong máy (không cắt theo năm) để tránh
+//     tất toán TRẢ DƯ khi HĐ ký năm trước nhưng ứng năm nay; popup cảnh báo nếu máy thiếu năm nào.
+//     Nguồn số liệu (giống tab Công Nợ):
 //       Thầu phụ: Giá trị = Σ HĐ thầu phụ (giaTri + phatSinh) · Đã ứng = Σ phiếu ứng loai='thauphu'
 //       NCC     : Giá trị = Σ hóa đơn có NCC đó             · Đã ứng = Σ phiếu ứng loai='nhacungcap'
 //   • Bấm "Tất toán toàn bộ" (1 dòng) hoặc tick checkbox nhiều dòng → "Tất toán các dòng đã chọn"
@@ -107,6 +110,8 @@ function _ttBuildRows() {
   const tol = _ttTolerance();
   return Object.values(map)
     .filter(r => tracked.has(r.group + '|||' + r.partner.toLowerCase()))
+    // Chỉ công trình thuộc năm đang lọc (CÔNG TY luôn có mặt)
+    .filter(r => r.pid === 'COMPANY' || qtCtInYear(r.ctName))
     .map(r => ({ ...r, con: (r.value || 0) - (r.daUng || 0) }))
     .filter(r => r.con > tol);    // chỉ giữ dòng còn nợ THẬT: Giá trị > Đã ứng (bỏ dòng đã xong / ứng dư)
 }
@@ -182,15 +187,12 @@ function ttRender() {
   const chkAll = document.getElementById('tt-chk-all');
   if (chkAll) chkAll.checked = false;
 
-  // Chưa tải đủ dữ liệu mọi năm → số dư có thể sai → KHÓA nút tất toán
-  const ready = _qtAllYearsReady;
-
   if (!rows.length) {
-    tbody.innerHTML = ready ? '' : `<tr><td colspan="7" class="text-center text-secondary py-4">⏳ Đang tải dữ liệu các năm để tính số dư...</td></tr>`;
-    if (empty) empty.style.display = ready ? '' : 'none';
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
   } else {
     if (empty) empty.style.display = 'none';
-    const canEdit = _qtCanEdit() && ready;
+    const canEdit = _qtCanEdit();
     let tot = 0;
     tbody.innerHTML = rows.map((r, i) => {
       tot += r.con;
@@ -270,11 +272,6 @@ function _ttOpenConfirm(idxs) {
   const rows = idxs.map(i => _ttRowsCache[i]).filter(Boolean);
   if (!rows.length) return;
   if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được tất toán', 'error'); return; }
-  if (!_qtAllYearsReady) {
-    toast('Chưa tải đủ dữ liệu các năm — chưa thể tất toán (tránh trả dư tiền)', 'error');
-    qtEnsureAllYears(() => ttRender());
-    return;
-  }
   _ttPending = { keys: rows.map(r => r.key), idxs };
   const total = rows.reduce((s, r) => s + r.con, 0);
   const m = _ttEnsureModal();
@@ -294,6 +291,11 @@ function _ttOpenConfirm(idxs) {
     m.querySelector('#tt-cm-detail').innerHTML =
       `<ul class="mb-0 ps-3">${list}</ul>` + (rows.length > 8 ? `<div class="mt-1">+${rows.length - 8} dòng khác</div>` : '');
   }
+  // Máy chưa có dữ liệu năm nào đó → số dư có thể thiếu (phiếu ứng / hóa đơn năm đó chưa tải)
+  const miss = (typeof qtMissingYears === 'function') ? qtMissingYears() : [];
+  m.querySelector('#tt-cm-warn').innerHTML = miss.length
+    ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:12px">⚠ Máy chưa tải dữ liệu năm <strong>${miss.join(', ')}</strong>. Nếu đối tác có phát sinh ở năm đó, số còn phải trả có thể chưa đúng — hãy chọn năm đó (hoặc "Tất cả năm") ở thanh trên để tải trước khi tất toán.</div>`
+    : '';
   m.querySelector('#tt-cm-ngay').value = today();
   bootstrap.Modal.getOrCreateInstance(m).show();
 }
@@ -317,6 +319,7 @@ function _ttEnsureModal() {
         <div class="modal-body">
           <p id="tt-cm-msg" class="mb-2" style="font-size:14px"></p>
           <div id="tt-cm-detail" class="text-secondary mb-3" style="font-size:12px"></div>
+          <div id="tt-cm-warn"></div>
           <label for="tt-cm-ngay" class="form-label mb-1" style="font-size:12px;font-weight:600">Ngày phiếu chi</label>
           <input type="date" id="tt-cm-ngay" class="form-control form-control-sm" style="max-width:180px">
           <div class="text-secondary mt-2" style="font-size:11px">Phiếu tự sinh nằm ở tab Ứng TP/NCC. Có thể Hoàn tác ngay sau khi tạo.</div>

@@ -2068,3 +2068,5 @@ td.action-col > div {
 .qt-sum-main { background: var(--bs-primary-bg-subtle); border-color: var(--bs-primary-border-subtle); }
 .qt-sum-lb  { font-size: 10.5px; font-weight: 700; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: .4px; }
 .qt-sum-val { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Dòng phụ nhỏ dưới mỗi ô chi tiết công trình (tab Quyết Toán) */
+.qt-sum-sub { font-size: 10.5px; color: var(--bs-secondary-color); margin-top: 2px; line-height: 1.35; }

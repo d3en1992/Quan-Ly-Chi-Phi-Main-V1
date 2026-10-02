@@ -14,7 +14,7 @@
         </div>
 
         <!-- ══ SUB TAB 1: QUYẾT TOÁN CÔNG TRÌNH (2A) ══════════════════
-             Laptop/PC (≥1200px, col-xl): 2 cột — TRÁI: chọn CT + chi tiết 2x2 · PHẢI: form.
+             Laptop/PC (≥992px, col-lg): 2 cột — TRÁI: chọn CT + chi tiết công trình · PHẢI: form.
              Tablet / màn nhỏ: tự xếp dọc (cột trái lên trên, cột phải xuống dưới).
              Dưới cùng: lịch sử quyết toán trải rộng cả 2 cột.
              Class .qt-compact (style.css) thu nhỏ font + control cho đồng bộ design system. -->
@@ -22,7 +22,7 @@
           <div class="row g-3 mb-3">
 
             <!-- ══ CỘT TRÁI: CHỌN CÔNG TRÌNH + CHI TIẾT ══ -->
-            <div class="col-12 col-xl-5 d-flex flex-column gap-3">
+            <div class="col-12 col-lg-5 d-flex flex-column gap-3">
               <!-- Chọn công trình — LUÔN hiển thị -->
               <div class="card shadow-sm border-0">
                 <div class="card-body">
@@ -35,7 +35,9 @@
                 </div>
               </div>
 
-              <!-- Chi tiết công trình — lưới 2x2 (luôn hiển thị, chưa chọn CT thì hiện "—") -->
+              <!-- Chi tiết công trình (luôn hiển thị, chưa chọn CT thì hiện "—").
+                   Hàng 1–2: số liệu LẤY TỪ TAB CÔNG TRÌNH (ctTaiChinh — cùng số với modal chi tiết CT).
+                   Hàng 3  : tự nhảy số NGAY khi gõ số tiền ở form "Thêm Quyết Toán". -->
               <div id="qt-blk-summary" class="card shadow-sm border-0 flex-fill">
                 <div class="card-body">
                   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
@@ -43,16 +45,32 @@
                     <span id="qt-sum-status"></span>
                   </div>
                   <div id="qt-sum-name" class="fw-semibold mb-2 text-truncate" style="font-size:13px"></div>
-                  <div id="qt-sum-loading" class="alert alert-secondary py-1 px-2 mb-2" style="font-size:11px;display:none">⏳ Đang tải dữ liệu các năm cũ — số liệu có thể chưa đầy đủ.</div>
                   <div class="row g-2">
-                    <!-- Hàng 1: HĐ gốc | Quyết toán đã có -->
-                    <div class="col-6"><div class="qt-sum-cell h-100"><div class="qt-sum-lb">Giá trị HĐ gốc</div><div id="qt-sum-hd" class="qt-sum-val">—</div></div></div>
-                    <div class="col-6"><div class="qt-sum-cell h-100"><div class="qt-sum-lb">Quyết toán đã có</div><div id="qt-sum-qt" class="qt-sum-val">—</div></div></div>
-                    <!-- Hàng 2: Đã thu | Doanh thu hiện tại -->
-                    <div class="col-6"><div class="qt-sum-cell h-100"><div class="qt-sum-lb">Đã thu</div><div id="qt-sum-thu" class="qt-sum-val text-success">—</div></div></div>
+                    <!-- Hàng 1: HĐ gốc | Chi phí thực tế đã chi -->
+                    <div class="col-6"><div class="qt-sum-cell h-100">
+                      <div class="qt-sum-lb">Giá trị HĐ gốc</div><div id="qt-sum-hd" class="qt-sum-val">—</div>
+                    </div></div>
+                    <div class="col-6"><div class="qt-sum-cell h-100">
+                      <div class="qt-sum-lb">Chi phí thực tế đã chi</div><div id="qt-sum-chi" class="qt-sum-val text-danger">—</div>
+                      <div id="qt-sum-chi-sub" class="qt-sum-sub"></div>
+                    </div></div>
+                    <!-- Hàng 2: Doanh thu hiện tại (tiền đã thu) | Hiệu quả lãi/lỗ hiện tại -->
+                    <div class="col-6"><div class="qt-sum-cell h-100">
+                      <div class="qt-sum-lb">Doanh thu hiện tại</div><div id="qt-sum-thu" class="qt-sum-val text-success">—</div>
+                      <div id="qt-sum-thu-sub" class="qt-sum-sub"></div>
+                    </div></div>
+                    <div class="col-6"><div id="qt-sum-hq-cell" class="qt-sum-cell h-100">
+                      <div class="qt-sum-lb">Hiệu quả lãi / lỗ hiện tại</div><div id="qt-sum-hq" class="qt-sum-val">—</div>
+                      <div id="qt-sum-hq-sub" class="qt-sum-sub"></div>
+                    </div></div>
+                    <!-- Hàng 3 (REAL-TIME): Doanh thu sau QT | Lợi nhuận sau QT = DT sau QT − Chi phí thực tế đã chi -->
                     <div class="col-6"><div class="qt-sum-cell qt-sum-main h-100">
-                      <div class="qt-sum-lb">Doanh thu hiện tại</div><div id="qt-sum-dt" class="qt-sum-val text-primary">—</div>
-                      <div id="qt-sum-con" class="text-secondary" style="font-size:11px"></div>
+                      <div class="qt-sum-lb">Doanh thu sau quyết toán</div><div id="qt-sum-dtsau" class="qt-sum-val text-primary">—</div>
+                      <div id="qt-sum-dtsau-sub" class="qt-sum-sub"></div>
+                    </div></div>
+                    <div class="col-6"><div id="qt-sum-lnsau-cell" class="qt-sum-cell qt-sum-main h-100">
+                      <div class="qt-sum-lb">Lợi nhuận sau quyết toán</div><div id="qt-sum-lnsau" class="qt-sum-val">—</div>
+                      <div id="qt-sum-lnsau-sub" class="qt-sum-sub"></div>
                     </div></div>
                   </div>
                   <div id="qt-sum-note" class="text-secondary mt-2" style="font-size:11px;font-style:italic"></div>
@@ -61,7 +79,7 @@
             </div>
 
             <!-- ══ CỘT PHẢI: FORM THÊM QUYẾT TOÁN ══ -->
-            <div class="col-12 col-xl-7">
+            <div class="col-12 col-lg-7">
               <!-- Chưa chọn công trình → thẻ hướng dẫn (ẩn khi đã chọn) -->
               <div id="qt-blk-empty" class="card shadow-sm border-0 h-100">
                 <div class="card-body d-flex flex-column align-items-center justify-content-center text-secondary text-center" style="min-height:220px;font-size:13px">

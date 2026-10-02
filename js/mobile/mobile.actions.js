@@ -379,12 +379,13 @@ Object.assign(MB_ACTS, {
   // ══════════════════════════════
   ttSettleMb: (key) => {
     if (!['admin', 'giamdoc'].includes(mbRole())) { mbToast('Chỉ Quản trị viên hoặc Giám đốc được tất toán', 'error'); return; }
-    if (typeof _qtAllYearsReady !== 'undefined' && !_qtAllYearsReady) { mbToast('Chưa tải đủ dữ liệu các năm — chưa thể tất toán', 'error'); return; }
     // Tính lại số dư ngay lúc bấm (không dùng số cũ trên màn hình)
     const r = ttBuildRows().find(x => x.key === key);
     if (!r) { mbToast('Dòng này đã hết nợ', 'info'); mbRender(); return; }
     const ngay = mbToday();
-    if (!confirm(`Tất toán ${r.partner} — ${r.ctName || 'không gắn CT'}?\n\nTạo phiếu ứng ${mbFull(r.con)} ngày ${mbDate(ngay)}.`)) return;
+    const miss = (typeof qtMissingYears === 'function') ? qtMissingYears() : [];
+    const warn = miss.length ? `\n\n⚠ Máy chưa tải dữ liệu năm ${miss.join(', ')} — số dư có thể chưa đủ.` : '';
+    if (!confirm(`Tất toán ${r.partner} — ${r.ctName || 'không gắn CT'}?\n\nTạo phiếu ứng ${mbFull(r.con)} ngày ${mbDate(ngay)}.${warn}`)) return;
     const id = ttCreatePhieu([r], ngay);
     MB.ttLast = { id, msg: '✅ Đã tất toán ' + r.partner + ' · ' + mbFull(r.con) };
     mbToast('✅ Đã tất toán ' + r.partner, 'success');
@@ -410,11 +411,6 @@ Object.assign(MB_ACTS, {
     if (MB.ttLast && MB.ttLast.id === id) MB.ttLast = null;
     mbToast('Đã hủy lần tất toán', 'success');
     mbAfterWrite();
-  },
-
-  // Thử tải lại dữ liệu các năm (khi lần tự tải trước bị lỗi mạng)
-  qtReloadYears: () => {
-    if (typeof qtEnsureAllYears === 'function') qtEnsureAllYears(() => mbAfterWrite());
   },
 
   // ══════════════════════════════

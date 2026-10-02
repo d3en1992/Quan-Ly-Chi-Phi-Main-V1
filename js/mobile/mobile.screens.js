@@ -1322,25 +1322,9 @@ function mbScrThungRac() {
 //        calcTongDoanhThu() · qtLoaiOf() · ttBuildRows() · ttBatches()
 //        Quyết toán CT chỉ XEM (nhập/sửa trên máy tính); Tất toán TP/NCC bấm được.
 // ══════════════════════════════════════════════════════════════
-let _mbQtLoadTried = false;   // chỉ tự tải bù các năm 1 lần/phiên (tránh vòng lặp khi lỗi mạng)
-
+// THEO NĂM ĐANG LỌC như các màn khác — KHÔNG tự tải toàn bộ các năm (02/10/2026).
 function mbScrQuyetToan() {
-  // Số liệu quyết toán/tất toán tính TOÀN VÒNG ĐỜI → cần đủ dữ liệu mọi năm
-  if (typeof _qtAllYearsReady !== 'undefined' && !_qtAllYearsReady && !_mbQtLoadTried
-      && typeof qtEnsureAllYears === 'function') {
-    _mbQtLoadTried = true;
-    qtEnsureAllYears(() => { if (typeof mbAfterWrite === 'function') mbAfterWrite(); else mbRender(); });
-  }
   return MB.seg.quyettoan === 'tattoan' ? mbQtTatToan() : mbQtCongTrinh();
-}
-
-/** Thẻ báo "đang tải / chưa đủ dữ liệu" dùng chung cho 2 tab con */
-function mbQtLoadingCard() {
-  if (typeof _qtAllYearsReady === 'undefined' || _qtAllYearsReady) return '';
-  return `<div class="mb-card mb-card-sm" style="font-size:12px;color:var(--mb-muted)">
-    ⏳ Đang tải dữ liệu các năm cũ — số liệu có thể chưa đầy đủ.
-    <span class="mb-link" data-act="qtReloadYears">Tải lại</span>
-  </div>`;
 }
 
 // ── Tab con 1: QUYẾT TOÁN CÔNG TRÌNH (chỉ xem) ──
@@ -1348,24 +1332,24 @@ function mbQtCongTrinh() {
   const q = (MB.search || '').toLowerCase();
   const rows = mbProjects()
     .filter(p => (p.name || '').toLowerCase().includes(q))
-    .map(p => ({ p, d: calcTongDoanhThu(p, { allYears: true }) }))
+    .filter(p => typeof qtCtInYear !== 'function' || qtCtInYear(p.name))   // chỉ CT thuộc năm đang lọc
+    .map(p => ({ p, d: calcTongDoanhThu(p) }))                            // số liệu theo năm đang lọc
     .filter(r => r.d.hdGoc || r.d.qt || r.d.daThu)
     .sort((a, b) => b.d.conPhaiThu - a.d.conPhaiThu);
 
-  // 15 quyết toán mới nhất (mọi năm)
+  // 15 quyết toán mới nhất trong năm đang lọc
   const recent = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
-    .filter(r => !r.deletedAt)
+    .filter(r => !r.deletedAt && (typeof _dtInYear !== 'function' || _dtInYear(r.ngay)))
     .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || ((b.createdAt || 0) - (a.createdAt || 0)))
     .slice(0, 15);
   const _loaiTag = { tang: ['Tăng', 'green'], giam: ['Giảm', 'red'], thaythe: ['Thay thế', 'blue'] };
 
   return `<div class="mb-pad">
-    ${mbQtLoadingCard()}
     <div class="mb-search">
       ${mbSearchIcon()}
       <input id="mb-in-search" data-in="search" data-live="1" value="${mbX(MB.search)}" placeholder="Tìm công trình..."/>
     </div>
-    <div style="font-size:11px;color:var(--mb-muted-2)">Số liệu toàn vòng đời công trình. Nhập / sửa quyết toán trên máy tính (tab Quyết Toán).</div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">Số liệu theo năm đang chọn. Nhập / sửa quyết toán trên máy tính (tab Quyết Toán).</div>
 
     <div class="mb-col" style="gap:9px">
       ${rows.length ? rows.map(({ p, d }) => {
@@ -1407,9 +1391,8 @@ function mbQtCongTrinh() {
 
 // ── Tab con 2: TẤT TOÁN TP/NCC (bấm được — chỉ Admin + Giám đốc) ──
 function mbQtTatToan() {
-  const ready   = (typeof _qtAllYearsReady === 'undefined') || _qtAllYearsReady;
-  const canEdit = ready && ['admin', 'giamdoc'].includes(mbRole());
-  const all  = (ready && typeof ttBuildRows === 'function') ? ttBuildRows() : [];
+  const canEdit = ['admin', 'giamdoc'].includes(mbRole());
+  const all  = (typeof ttBuildRows === 'function') ? ttBuildRows() : [];
   const rows = all.filter(r => MB.cnGroup === 'all' || r.group === MB.cnGroup)
                   .sort((a, b) => b.con - a.con);
   const sum = (g) => all.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
@@ -1417,7 +1400,6 @@ function mbQtTatToan() {
   const chips = [['all', 'Tất cả'], ['thauphu', 'Thầu phụ'], ['nhacungcap', 'Nhà cung cấp']];
 
   return `<div class="mb-pad">
-    ${mbQtLoadingCard()}
     ${MB.ttLast ? `<div class="mb-card mb-card-sm mb-row-between" style="background:#F0FDF4">
         <span style="font-size:12.5px;font-weight:600;color:var(--mb-green)">${mbX(MB.ttLast.msg)}</span>
         <span class="mb-link" data-act="ttUndoMb">Hoàn tác</span>
@@ -1432,8 +1414,7 @@ function mbQtTatToan() {
     </div>
 
     <div class="mb-col" style="gap:9px">
-      ${!ready ? '<div class="mb-empty">Đang tải dữ liệu để tính số dư...</div>'
-        : rows.length ? rows.map(r => `<div class="mb-card" style="padding:13px">
+      ${rows.length ? rows.map(r => `<div class="mb-card" style="padding:13px">
           <div class="mb-row-between" style="margin-bottom:4px">
             <span style="font-size:13.5px;font-weight:700">${mbX(r.partner)}</span>
             <span style="font-size:13.5px;font-weight:800;color:var(--mb-red);flex-shrink:0">${mbFmt(r.con)}</span>
