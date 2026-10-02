@@ -4,6 +4,8 @@
 // Mục tiêu: dọn nhanh các khoản nợ treo với đối tác mà KHÔNG cần sang tab Ứng TP/NCC gõ phiếu.
 //
 // CÁCH HOẠT ĐỘNG:
+//   • CHỈ đối tác đã có trong tab Ứng TP/NCC (có ≥ 1 phiếu ứng) mới được theo dõi. Đối tác
+//     vãng lai chỉ có hóa đơn → coi như "tiền trao cháo múc", không bao giờ hiện ở đây.
 //   • Danh sách = các cặp (Đối tác × Công trình) còn nợ > CN_DONE_TOLERANCE (100.000đ),
 //     số dư tính TOÀN VÒNG ĐỜI (không lọc năm) — cùng nguồn với tab Công Nợ:
 //       Thầu phụ: Giá trị = Σ HĐ thầu phụ (giaTri + phatSinh) · Đã ứng = Σ phiếu ứng loai='thauphu'
@@ -78,10 +80,25 @@ function _ttBuildRows() {
       if (!row.partnerId && r.tpId) row.partnerId = r.tpId;
     });
 
+  // ── QUY TẮC "CHỈ THEO DÕI ĐỐI TÁC CÓ TRONG TAB ỨNG TP/NCC" (02/10/2026) ──
+  // • Đối tác ĐÃ có ít nhất 1 phiếu ứng (bất kỳ công trình, bất kỳ năm) → coi là đối tác có
+  //   hợp đồng/giao kèo, thanh toán nhiều đợt → theo dõi công nợ & cho tất toán.
+  // • Đối tác CHƯA từng có phiếu ứng (hóa đơn mua lẻ, xe ba gác, quang đá...) → mặc định
+  //   "tiền trao cháo múc": hóa đơn coi như đã trả đứt lúc mua → KHÔNG BAO GIỜ hiện ở đây.
+  // Khóa so khớp = nhóm + tên đối tác (không phân biệt hoa/thường).
+  const tracked = new Set();
+  (typeof ungRecords !== 'undefined' ? ungRecords : [])
+    .filter(r => !r.deletedAt && (r.loai === 'thauphu' || r.loai === 'nhacungcap'))
+    .forEach(r => {
+      const partner = (recCatName(r, 'ung', 'tp') || '').trim().toLowerCase();
+      if (partner) tracked.add(r.loai + '|||' + partner);
+    });
+
   const tol = _ttTolerance();
   return Object.values(map)
+    .filter(r => tracked.has(r.group + '|||' + r.partner.toLowerCase()))
     .map(r => ({ ...r, con: (r.value || 0) - (r.daUng || 0) }))
-    .filter(r => r.con > tol);    // chỉ giữ dòng còn nợ THẬT (bỏ dòng đã xong / ứng dư)
+    .filter(r => r.con > tol);    // chỉ giữ dòng còn nợ THẬT: Giá trị > Đã ứng (bỏ dòng đã xong / ứng dư)
 }
 
 // ── Các phiếu ứng do tất toán sinh ra, gom theo từng LẦN tất toán (settleId) ──
@@ -263,6 +280,23 @@ function _ttSettle(rows, idxs) {
     : `Tất toán ${rows.length} dòng, tổng ${fmtM(total)}?\n\nMỗi dòng tạo 1 phiếu ứng ngày ${fmtISODate(ngay)}.`;
   if (!confirm(msg)) return;
 
+  const settleId = ttCreatePhieu(rows, ngay);
+
+  // Hiệu ứng: dòng đã tất toán chuyển xanh rồi mờ dần trước khi biến mất
+  idxs.forEach(i => {
+    const tr = document.getElementById('tt-row-' + i);
+    if (tr) { tr.style.background = 'var(--bs-success-bg-subtle)'; tr.style.opacity = '0'; }
+  });
+  setTimeout(() => { ttRender(); _ttRefreshOtherTabs(); }, 400);
+
+  toast(`✅ Đã tất toán ${rows.length} dòng — ${fmtM(total)}`, 'success');
+  _ttShowUndo(settleId, `✅ Đã tất toán ${rows.length} dòng · ${fmtM(total)}`);
+}
+
+// ── LÕI: tạo phiếu ứng tất toán cho các dòng (KHÔNG hỏi, KHÔNG đụng giao diện) ──
+// Dùng chung cho desktop (_ttSettle) và điện thoại (mobile.actions.js → ttSettleMb).
+// Trả về settleId của lần tất toán (để Hoàn tác).
+function ttCreatePhieu(rows, ngay) {
   const user = getCurrentUser()?.username || 'Không rõ';
   const settleId = 'tt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   rows.forEach(r => {
@@ -284,16 +318,7 @@ function _ttSettle(rows, idxs) {
     ungRecords.unshift(mkRecord(rec));
   });
   save('ung_v1', ungRecords);
-
-  // Hiệu ứng: dòng đã tất toán chuyển xanh rồi mờ dần trước khi biến mất
-  idxs.forEach(i => {
-    const tr = document.getElementById('tt-row-' + i);
-    if (tr) { tr.style.background = 'var(--bs-success-bg-subtle)'; tr.style.opacity = '0'; }
-  });
-  setTimeout(() => { ttRender(); _ttRefreshOtherTabs(); }, 400);
-
-  toast(`✅ Đã tất toán ${rows.length} dòng — ${fmtM(total)}`, 'success');
-  _ttShowUndo(settleId, `✅ Đã tất toán ${rows.length} dòng · ${fmtM(total)}`);
+  return settleId;
 }
 
 // ── Thanh Hoàn tác (15 giây) ──
@@ -330,6 +355,7 @@ function ttCancelBatch(settleId) {
 }
 
 // Xóa mềm mọi phiếu ứng thuộc 1 lần tất toán (vào thùng rác như phiếu thường)
+// (Điện thoại cũng gọi hàm này qua ttRemoveBatch.)
 function _ttRemoveBatch(settleId) {
   const now = Date.now();
   const user = getCurrentUser()?.username || 'Không rõ';
@@ -360,3 +386,7 @@ window.ttSettleOne       = ttSettleOne;
 window.ttSettleSelected  = ttSettleSelected;
 window.ttUndoLast        = ttUndoLast;
 window.ttCancelBatch     = ttCancelBatch;
+window.ttCreatePhieu     = ttCreatePhieu;
+window.ttBuildRows       = _ttBuildRows;
+window.ttBatches         = _ttBatches;
+window.ttRemoveBatch     = _ttRemoveBatch;

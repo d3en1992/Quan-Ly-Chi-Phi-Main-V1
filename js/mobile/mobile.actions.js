@@ -317,9 +317,10 @@ Object.assign(MB_ACTS, {
   // ══════════════════════════════
   //  DOANH THU (HĐ chính · HĐ thầu phụ · Thu tiền)
   // ══════════════════════════════
-  saveDt: () => {
+  // arg = loại từ nút Lưu ('hdc' | 'thu' | 'hdtp') — HĐ thầu phụ lưu từ màn Công nợ
+  saveDt: (arg) => {
     const f    = MB.dtForm;
-    const kind = MB.dtKind;
+    const kind = arg || MB.dtKind;
     const tien = mbMoney(f.tien);
     if (!f.ct)  { mbToast('Chọn công trình', 'error'); return; }
     if (!tien)  { mbToast('Nhập số tiền', 'error'); return; }
@@ -370,6 +371,50 @@ Object.assign(MB_ACTS, {
 
     Object.assign(MB.dtForm, { tien: '', nd: '' });
     mbAfterWrite();
+  },
+
+  // ══════════════════════════════
+  //  QUYẾT TOÁN · TẤT TOÁN TP/NCC — gọi lõi desktop (quyettoan.thauphu.js)
+  //  ttBuildRows() / ttCreatePhieu() / ttRemoveBatch() → cùng 1 logic với máy tính
+  // ══════════════════════════════
+  ttSettleMb: (key) => {
+    if (!['admin', 'giamdoc'].includes(mbRole())) { mbToast('Chỉ Quản trị viên hoặc Giám đốc được tất toán', 'error'); return; }
+    if (typeof _qtAllYearsReady !== 'undefined' && !_qtAllYearsReady) { mbToast('Chưa tải đủ dữ liệu các năm — chưa thể tất toán', 'error'); return; }
+    // Tính lại số dư ngay lúc bấm (không dùng số cũ trên màn hình)
+    const r = ttBuildRows().find(x => x.key === key);
+    if (!r) { mbToast('Dòng này đã hết nợ', 'info'); mbRender(); return; }
+    const ngay = mbToday();
+    if (!confirm(`Tất toán ${r.partner} — ${r.ctName || 'không gắn CT'}?\n\nTạo phiếu ứng ${mbFull(r.con)} ngày ${mbDate(ngay)}.`)) return;
+    const id = ttCreatePhieu([r], ngay);
+    MB.ttLast = { id, msg: '✅ Đã tất toán ' + r.partner + ' · ' + mbFull(r.con) };
+    mbToast('✅ Đã tất toán ' + r.partner, 'success');
+    mbAfterWrite();
+  },
+
+  // Hoàn tác lần tất toán vừa làm trên điện thoại
+  ttUndoMb: () => {
+    if (!MB.ttLast) return;
+    ttRemoveBatch(MB.ttLast.id);
+    MB.ttLast = null;
+    mbToast('↩ Đã hoàn tác', 'success');
+    mbAfterWrite();
+  },
+
+  // Hủy 1 lần tất toán trong danh sách "Tất toán gần đây"
+  ttCancelMb: (id) => {
+    if (!['admin', 'giamdoc'].includes(mbRole())) { mbToast('Chỉ Quản trị viên hoặc Giám đốc được hủy tất toán', 'error'); return; }
+    const b = ttBatches().find(x => x.id === id);
+    if (!b) return;
+    if (!confirm(`Hủy lần tất toán ngày ${mbDate(b.ngay)} (${b.recs.length} phiếu, ${mbFull(b.total)})?\nCác phiếu ứng tự sinh sẽ bị xóa → công nợ quay lại như trước.`)) return;
+    ttRemoveBatch(id);
+    if (MB.ttLast && MB.ttLast.id === id) MB.ttLast = null;
+    mbToast('Đã hủy lần tất toán', 'success');
+    mbAfterWrite();
+  },
+
+  // Thử tải lại dữ liệu các năm (khi lần tự tải trước bị lỗi mạng)
+  qtReloadYears: () => {
+    if (typeof qtEnsureAllYears === 'function') qtEnsureAllYears(() => mbAfterWrite());
   },
 
   // ══════════════════════════════

@@ -37,9 +37,10 @@ function openExportModal() {
       <span class="material-symbols-outlined msi-gap">build</span>${tbCount} thiết bị &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">payments</span>${thuCount} lần thu &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">handshake</span>${tpCount} HĐ thầu phụ &nbsp;·&nbsp; <span class="material-symbols-outlined msi-gap">list_alt</span>${hdCount} HĐ chính
     </div>
     <div style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11.5px;color:#444;line-height:1.8">
-      <strong>10 sheets:</strong>
+      <strong>12 sheets:</strong>
       1_HoaDonNhanh · 2_HoaDonChiTiet · 3_ChamCong · 4_TienUng · 5_ThietBi ·
-      6_DanhMuc · 7_HopDongChinh · 8_ThuTien · 9_HopDongThauPhu · 10_HuongDan<br>
+      6_DanhMuc · 7_HopDongChinh · 8_ThuTien · 9_HopDongThauPhu · 10_HuongDan ·
+      11_QuyetToan · 12_DoanhThuCongTrinh <span style="color:#888">(11–12 chỉ để xem)</span><br>
       <span style="color:#888">Ngày: yyyy-mm-dd · Số: không ký hiệu tiền · Có thể chỉnh sửa → import lại</span>
     </div>
     <div style="display:flex;gap:8px">
@@ -385,6 +386,85 @@ function buildHopDongThauPhu() {
   return _buildSheet(hdrs, rows);
 }
 
+// ── Sheet 11: QuyetToan (CHỈ XUẤT ĐỂ XEM — không import lại) ──
+// Mỗi dòng = 1 bản ghi quyết toán. ẢNH HƯỞNG DT = mức doanh thu thay đổi
+// (bản "thay thế" được quy đổi thành chênh lệch) — tính bằng qtTinhDelta() (quyettoan.core.js).
+// Tên sheet "11_QuyetToan" KHÔNG khớp quy tắc nhận dạng của _detectSheetType → import tự bỏ qua.
+function buildQuyetToan() {
+  const hdrs = [
+    { label: 'NGÀY',            w: 13 },
+    { label: 'CÔNG TRÌNH',      w: 36 },
+    { label: 'LOẠI',            w: 18 },
+    { label: 'SỐ TIỀN NHẬP',    w: 18, num: true },
+    { label: 'ẢNH HƯỞNG DT',    w: 18, num: true },
+    { label: 'DT SAU QT',       w: 18, num: true },
+    { label: 'QT CUỐI CÙNG',    w: 13 },
+    { label: 'NGƯỜI TH',        w: 18 },
+    { label: 'NỘI DUNG',        w: 44 },
+    { label: 'ID',              w: 36 },
+  ];
+  const list = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : []).filter(r => !r.deletedAt);
+  // Delta + doanh thu cộng dồn theo từng công trình (tính 1 lần / công trình)
+  const cache = new Map();
+  const calcFor = (r) => {
+    const p = (typeof _qtResolveProj === 'function') ? (_qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh)) : null;
+    if (!p || typeof qtTinhDelta !== 'function') return null;
+    if (!cache.has(p.id)) {
+      const { recs, deltas } = qtTinhDelta(p);
+      let dt = qtHdGocCuaCT(p);
+      const run = new Map();
+      recs.forEach(x => { dt += deltas.get(x.id) || 0; run.set(x.id, dt); });
+      cache.set(p.id, { deltas, run });
+    }
+    return cache.get(p.id);
+  };
+  const rows = list
+    .sort((a, b) => (a.ngay || '').localeCompare(b.ngay || '') || ((a.createdAt || 0) - (b.createdAt || 0)))
+    .map(r => {
+      const c = calcFor(r);
+      return [
+        r.ngay || '',
+        (typeof _resolveCtName === 'function' ? _resolveCtName(r) : '') || r.congtrinh || '',
+        (typeof QT_LOAI !== 'undefined' && typeof qtLoaiOf === 'function') ? QT_LOAI[qtLoaiOf(r)].label : '',
+        Math.abs(r.giaTri || 0),
+        c ? (c.deltas.get(r.id) || 0) : (r.giaTri || 0),
+        c ? (c.run.get(r.id) || 0) : '',
+        r.chot ? 'Có' : '',
+        r.nguoi || '',
+        r.nd || '',
+        r.id || '',
+      ];
+    });
+  return _buildSheet(hdrs, rows);
+}
+
+// ── Sheet 12: DoanhThuCongTrinh (CHỈ XUẤT ĐỂ XEM) ─────────────
+// Tổng hợp doanh thu sau quyết toán + tiến độ thu tiền của từng công trình,
+// TOÀN VÒNG ĐỜI — calcTongDoanhThu(p, {allYears:true}) (quyettoan.core.js).
+function buildDoanhThuCongTrinh() {
+  const hdrs = [
+    { label: 'CÔNG TRÌNH',      w: 36 },
+    { label: 'CHỦ ĐẦU TƯ',      w: 26 },
+    { label: 'TRẠNG THÁI',      w: 15 },
+    { label: 'HĐ GỐC',          w: 18, num: true },
+    { label: 'QUYẾT TOÁN (±)',  w: 18, num: true },
+    { label: 'TỔNG DOANH THU',  w: 18, num: true },
+    { label: 'ĐÃ THU',          w: 18, num: true },
+    { label: 'CÒN PHẢI THU',    w: 18, num: true },
+  ];
+  const _stLabel = { planning: 'Kế hoạch', active: 'Đang thi công', completed: 'Hoàn thành', closed: 'Đã quyết toán' };
+  const rows = ((typeof getAllProjects === 'function') ? getAllProjects() : [])
+    .filter(p => p && p.id !== 'COMPANY' && !p.deletedAt)
+    .map(p => ({ p, d: (typeof calcTongDoanhThu === 'function') ? calcTongDoanhThu(p, { allYears: true }) : null }))
+    .filter(x => x.d && (x.d.hdGoc || x.d.qt || x.d.daThu))
+    .sort((a, b) => (a.p.name || '').localeCompare(b.p.name || '', 'vi'))
+    .map(({ p, d }) => [
+      p.name || '', p.chuDauTu || '', _stLabel[p.status] || '',
+      d.hdGoc, d.qt, d.tongDT, d.daThu, d.conPhaiThu,
+    ]);
+  return _buildSheet(hdrs, rows);
+}
+
 // ── Sheet 10: HuongDan ──────────────────────────────────────
 function buildHuongDan() {
   const hdrs = [{ label: 'HƯỚNG DẪN SỬ DỤNG FILE EXCEL', w: 90 }];
@@ -401,6 +481,11 @@ function buildHuongDan() {
     ['7_HopDongChinh  — Hợp đồng chính theo công trình'],
     ['8_ThuTien        — Lịch sử thu tiền'],
     ['9_HopDongThauPhu — Hợp đồng thầu phụ'],
+    ['11_QuyetToan     — Lịch sử quyết toán công trình (tăng / giảm / thay thế) — CHỈ ĐỂ XEM'],
+    ['12_DoanhThuCongTrinh — Doanh thu sau quyết toán + đã thu + còn phải thu theo công trình — CHỈ ĐỂ XEM'],
+    [''],
+    ['• Sheet 11 và 12 KHÔNG được nhập lại (import tự bỏ qua). Quyết toán nhập ở tab QUYẾT TOÁN.'],
+    ['• Phiếu ứng tự sinh khi Tất toán TP/NCC nằm trong sheet 4_TienUng (nội dung "Tất toán công nợ ...").'],
     [''],
     ['━━━ QUY TẮC IMPORT LẠI ━━━'],
     ['• Không xóa hoặc đổi tên dòng header (hàng đầu tiên của mỗi sheet)'],
@@ -435,6 +520,9 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb, buildThuTien(),        '8_ThuTien');
   XLSX.utils.book_append_sheet(wb, buildHopDongThauPhu(), '9_HopDongThauPhu');
   XLSX.utils.book_append_sheet(wb, buildHuongDan(),       '10_HuongDan');
+  // (02/10/2026) 2 sheet chỉ để xem — đặt SAU HuongDan để import (nhận theo tên/vị trí 1..9) không đụng tới
+  XLSX.utils.book_append_sheet(wb, buildQuyetToan(),         '11_QuyetToan');
+  XLSX.utils.book_append_sheet(wb, buildDoanhThuCongTrinh(), '12_DoanhThuCongTrinh');
 
   XLSX.writeFile(wb, 'export_full_data.xlsx');
 

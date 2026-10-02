@@ -31,8 +31,10 @@ function mbInvMap() {
 
 /**
  * Chỉ số tài chính của một công trình — DÙNG ĐÚNG công thức của bản desktop.
- * @returns {{ hd, chi, thu, invs, hoaDon, ungTp, ungNcc }}
+ * @returns {{ hd, dt, qt, conThu, chi, thu, invs, hoaDon, ungTp, ungNcc }}
  *   hd     — tổng giá trị hợp đồng chính (giaTri + giaTriphu + phatSinh)
+ *   dt     — DOANH THU SAU QUYẾT TOÁN (năm đang chọn) — calcTongDoanhThu() của desktop
+ *   qt     — tổng ảnh hưởng quyết toán (±) · conThu — còn phải thu = dt − đã thu
  *   chi    — TỔNG CHI công trình (_ctTongChi: HĐ + ứng TP + ứng NCC − công nợ NCC)
  *   thu    — tổng tiền đã thu trong năm
  *   hoaDon — tổng tiền hóa đơn thuần (c.total)
@@ -54,7 +56,11 @@ function mbProjStats(p, invMap) {
     return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
   }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
 
-  return { hd, chi: tc.tongChi, thu, invs: c.invs, hoaDon: c.total, ungTp: tc.ungTp, ungNcc: tc.ungNcc };
+  // Doanh thu sau quyết toán — cùng công thức với tab Doanh Thu / Quyết Toán bản desktop
+  const d = (typeof calcTongDoanhThu === 'function') ? calcTongDoanhThu(p) : { tongDT: hd, qt: 0 };
+
+  return { hd, dt: d.tongDT, qt: d.qt, conThu: d.tongDT - thu,
+           chi: tc.tongChi, thu, invs: c.invs, hoaDon: c.total, ungTp: tc.ungTp, ungNcc: tc.ungNcc };
 }
 
 /** Bản ghi (hóa đơn/ứng/thu...) có thuộc công trình p không */
@@ -88,6 +94,7 @@ function mbScreen(tab) {
     case 'chamcong':  return mbScrChamCong();
     case 'tienung':   return mbScrTienUng();
     case 'doanhthu':  return mbScrDoanhThu();
+    case 'quyettoan': return mbScrQuyetToan();
     case 'congno':    return mbScrCongNo();
     case 'thietbi':   return mbScrThietBi();
     case 'danhmuc':   return mbScrDanhMuc();
@@ -108,10 +115,10 @@ function mbScrDashboard() {
 
   const totChi = invs.reduce((s, i) => s + mbInvAmount(i), 0);
 
-  let totHd = 0, totThu = 0;
+  let totHd = 0, totThu = 0;   // totHd = tổng DOANH THU sau quyết toán
   const rows = P.map(p => {
     const st = mbProjStats(p, invMap);
-    totHd  += st.hd;
+    totHd  += st.dt;
     totThu += st.thu;
     return { p, st };
   });
@@ -132,8 +139,8 @@ function mbScrDashboard() {
 
   const kpis = [
     { cls: '',      label: 'Tổng chi phí',       value: mbFmt(totChi),          hint: invs.length + ' hóa đơn' },
-    { cls: '',      label: 'Giá trị hợp đồng',   value: mbFmt(totHd),           hint: P.length + ' công trình' },
-    { cls: 'green', label: 'Đã thu',             value: mbFmt(totThu),          hint: mbPct(totThu, totHd) + '% hợp đồng' },
+    { cls: '',      label: 'Doanh thu (sau QT)', value: mbFmt(totHd),           hint: P.length + ' công trình' },
+    { cls: 'green', label: 'Đã thu',             value: mbFmt(totThu),          hint: mbPct(totThu, totHd) + '% doanh thu' },
     { cls: 'blue',  label: 'Lợi nhuận tạm tính', value: mbFmtSigned(totThu - totChi), hint: 'Đã thu − chi phí' },
   ];
 
@@ -257,10 +264,13 @@ function mbScrProjectDetail() {
   const rows = [
     ['Trạng thái',        stLabel,                 ''],
     ['Giá trị hợp đồng',  mbFull(st.hd),           ''],
+    ['Quyết toán (±)',    st.qt ? (st.qt > 0 ? '+' : '-') + mbFull(Math.abs(st.qt)) : '0 đ', st.qt < 0 ? 'var(--mb-red)' : (st.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)')],
+    ['Doanh thu sau QT',  mbFull(st.dt),           'var(--mb-primary)'],
     ['Tổng chi phí',      mbFull(st.chi),          ''],
     ['— trong đó hóa đơn', mbFull(st.hoaDon),      'var(--mb-muted)'],
     ['— ứng thầu phụ',    mbFull(st.ungTp),        'var(--mb-muted)'],
     ['Đã thu',            mbFull(st.thu),          'var(--mb-green)'],
+    ['Còn phải thu',      mbFull(st.conThu),       st.conThu < 0 ? 'var(--mb-red)' : 'var(--mb-amber)'],
     ['Lãi/lỗ tạm tính',   mbFull(lai),             lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)'],
     ['Số ngày thi công',  days + ' ngày · k=' + k, ''],
   ];
@@ -918,12 +928,16 @@ function mbScrDoanhThu() {
   return mbDtKhaiBao();
 }
 
-const MB_DT_KINDS = [['hdc', 'HĐ chính'], ['hdtp', 'Thầu phụ'], ['thu', 'Thu tiền']];
+// (02/10/2026) Doanh thu chỉ còn 2 thao tác nhập: HĐ chính + Thu tiền.
+// HĐ thầu phụ (chi phí) chuyển sang màn Công nợ → tab con "HĐ thầu phụ" (dùng lại form này).
+const MB_DT_KINDS = [['hdc', 'HĐ chính'], ['thu', 'Thu tiền']];
 const MB_DT_TITLE = { hdc: 'Hợp đồng chính', hdtp: 'Hợp đồng thầu phụ', thu: 'Thu tiền' };
 
-function mbDtKhaiBao() {
+// forceKind: 'hdtp' khi gọi từ màn Công nợ (ẩn chip chọn loại)
+function mbDtKhaiBao(forceKind) {
   const f = MB.dtForm;
-  const kind = MB.dtKind;
+  let kind = forceKind || MB.dtKind;
+  if (!forceKind && kind === 'hdtp') kind = MB.dtKind = 'hdc';   // state cũ còn 'hdtp' → về HĐ chính
 
   // Danh sách khai báo gần đây theo loại
   let rows = [];
@@ -946,9 +960,9 @@ function mbDtKhaiBao() {
   rows = rows.sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '')).slice(0, 20);
 
   return `<div class="mb-pad">
-    <div class="mb-chips even">
+    ${forceKind ? '' : `<div class="mb-chips even">
       ${MB_DT_KINDS.map(([k, l]) => `<div class="mb-chip${kind === k ? ' on' : ''}" data-act="setFilter" data-arg="dtKind|${k}">${l}</div>`).join('')}
-    </div>
+    </div>`}
 
     <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
       <div class="mb-sec-title">${MB_DT_TITLE[kind]}</div>
@@ -970,7 +984,7 @@ function mbDtKhaiBao() {
       <div><div class="mb-label">${kind === 'thu' ? 'Người thu / nội dung' : 'Nội dung'}</div>
         <input id="mb-dt-nd" class="mb-input" data-in="dtForm.nd" value="${mbX(f.nd)}" placeholder="Ghi chú"/></div>
 
-      <button class="mb-btn" data-act="saveDt">Lưu ${MB_DT_TITLE[kind].toLowerCase()}</button>
+      <button class="mb-btn" data-act="saveDt" data-arg="${kind}">Lưu ${MB_DT_TITLE[kind].toLowerCase()}</button>
     </div>
 
     <div class="mb-col">
@@ -987,18 +1001,17 @@ function mbDtKhaiBao() {
 
 function mbDtThongKe() {
   const invMap = mbInvMap();
-  const rows = mbProjects().map(p => ({ p, st: mbProjStats(p, invMap) })).filter(r => r.st.hd > 0);
-  const totHd  = rows.reduce((s, r) => s + r.st.hd, 0);
+  // Doanh thu = sau quyết toán (st.dt) — khớp tab Doanh Thu bản desktop
+  const rows = mbProjects().map(p => ({ p, st: mbProjStats(p, invMap) })).filter(r => r.st.dt > 0 || r.st.thu > 0);
+  const totDt  = rows.reduce((s, r) => s + r.st.dt, 0);
   const totThu = rows.reduce((s, r) => s + r.st.thu, 0);
-  const totTp  = (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
-    .filter(r => !r.deletedAt && inActiveYear(r.ngay))
-    .reduce((s, r) => s + (r.giaTri || 0) + (r.phatSinh || 0), 0);
+  const totQt  = rows.reduce((s, r) => s + r.st.qt, 0);
 
   const kpis = [
-    ['Tổng giá trị HĐ', mbFmt(totHd),          ''],
-    ['Đã thu',          mbFmt(totThu),         'green'],
-    ['Còn phải thu',    mbFmt(totHd - totThu), 'red'],
-    ['HĐ thầu phụ',     mbFmt(totTp),          ''],
+    ['Tổng doanh thu', mbFmt(totDt),          ''],
+    ['Đã thu',         mbFmt(totThu),         'green'],
+    ['Còn phải thu',   mbFmt(totDt - totThu), 'red'],
+    ['Quyết toán (±)', mbFmtSigned(totQt),    ''],
   ];
 
   return `<div class="mb-pad">
@@ -1010,14 +1023,14 @@ function mbDtThongKe() {
     </div>
     <div class="mb-sec-title">Thu tiền theo công trình</div>
     <div class="mb-col">
-      ${rows.length ? rows.sort((a, b) => b.st.hd - a.st.hd).map(({ p, st }) => `
+      ${rows.length ? rows.sort((a, b) => b.st.dt - a.st.dt).map(({ p, st }) => `
         <div class="mb-card mb-card-sm">
           <div class="mb-row-between" style="margin-bottom:6px">
             <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(p.name)}</span>
-            <span style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(st.thu)} / ${mbFmt(st.hd)}</span>
+            <span style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(st.thu)} / ${mbFmt(st.dt)}</span>
           </div>
-          <div class="mb-bar thin"><i style="width:${mbBarW(st.thu, st.hd)};background:var(--mb-green)"></i></div>
-          <div style="font-size:10.5px;color:var(--mb-muted-2);margin-top:5px">Đã thu ${mbPct(st.thu, st.hd)}% · còn ${mbFmt(Math.max(0, st.hd - st.thu))}</div>
+          <div class="mb-bar thin"><i style="width:${mbBarW(st.thu, st.dt)};background:var(--mb-green)"></i></div>
+          <div style="font-size:10.5px;color:var(--mb-muted-2);margin-top:5px">Đã thu ${mbPct(st.thu, st.dt)}% · còn ${mbFmt(Math.max(0, st.dt - st.thu))}${st.qt ? ' · QT ' + mbFmtSigned(st.qt) : ''}</div>
         </div>`).join('') : '<div class="mb-empty">Chưa khai báo hợp đồng</div>'}
     </div>
   </div>`;
@@ -1025,9 +1038,10 @@ function mbDtThongKe() {
 
 function mbDtLoiNhuan() {
   const invMap = mbInvMap();
-  const rows = mbProjects().map(p => ({ p, st: mbProjStats(p, invMap) })).filter(r => r.st.hd > 0);
+  const rows = mbProjects().map(p => ({ p, st: mbProjStats(p, invMap) })).filter(r => r.st.dt > 0);
 
-  const totHd  = rows.reduce((s, r) => s + r.st.hd, 0);
+  // totHd = tổng DOANH THU SAU QUYẾT TOÁN (HĐ gốc ± quyết toán / thay thế)
+  const totHd  = rows.reduce((s, r) => s + r.st.dt, 0);
   const totInv = mbInvoices().filter(i => i.projectId !== 'COMPANY').reduce((s, i) => s + mbInvAmount(i), 0);
   const totTp  = (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
     .filter(r => !r.deletedAt && inActiveYear(r.ngay))
@@ -1036,7 +1050,7 @@ function mbDtLoiNhuan() {
   const loi    = totHd - totInv - totTp - chung;
 
   const breakdown = [
-    ['X · Doanh thu HĐ gốc',        totHd,  'var(--mb-primary)'],
+    ['X · Doanh thu (sau quyết toán)', totHd, 'var(--mb-primary)'],
     ['A · Chi phí hóa đơn',         totInv, 'var(--mb-red)'],
     ['B · Chi phí thầu phụ',        totTp,  'var(--mb-amber)'],
     ['C · Phân bổ chi phí chung',   chung,  'var(--mb-purple)'],
@@ -1060,15 +1074,15 @@ function mbDtLoiNhuan() {
     <div class="mb-sec-title">Lãi/lỗ theo công trình</div>
     <div class="mb-col">
       ${rows.length ? rows.map(({ p, st }) => {
-        const lai = st.hd - st.chi;
-        const pct = mbPct(Math.abs(lai), st.hd);
+        const lai = st.dt - st.chi;
+        const pct = mbPct(Math.abs(lai), st.dt);
         return `<div class="mb-card mb-card-sm tap" data-act="openProject" data-arg="${mbX(p.id)}">
           <div class="mb-row-between" style="margin-bottom:5px">
             <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(p.name)}</span>
             <span class="mb-tag ${lai >= 0 ? 'green' : 'red'}">${lai >= 0 ? 'Lãi' : 'Lỗ'} ${pct}%</span>
           </div>
           <div class="mb-row-between" style="font-size:11.5px;color:var(--mb-muted)">
-            <span>HĐ ${mbFmt(st.hd)} · Chi ${mbFmt(st.chi)}</span>
+            <span>DT ${mbFmt(st.dt)} · Chi ${mbFmt(st.chi)}</span>
             <span style="font-weight:800;color:${lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)'}">${mbFmtSigned(lai)}</span>
           </div>
         </div>`;
@@ -1081,6 +1095,8 @@ function mbDtLoiNhuan() {
 //  8 · CÔNG NỢ — dùng lại _cnBuildRows() của bản desktop
 // ══════════════════════════════════════════════════════════════
 function mbScrCongNo() {
+  // Tab con "HĐ thầu phụ" — form khai báo HĐ thầu phụ (chuyển từ Doanh thu sang)
+  if (MB.seg.congno === 'hdtp') return mbDtKhaiBao('hdtp');
   const all = (typeof _cnBuildRows === 'function') ? _cnBuildRows() : [];
   const rows = all.filter(r => MB.cnGroup === 'all' || r.group === MB.cnGroup);
 
@@ -1302,6 +1318,146 @@ function mbScrThungRac() {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  12b · QUYẾT TOÁN (02/10/2026) — dùng lại lõi desktop:
+//        calcTongDoanhThu() · qtLoaiOf() · ttBuildRows() · ttBatches()
+//        Quyết toán CT chỉ XEM (nhập/sửa trên máy tính); Tất toán TP/NCC bấm được.
+// ══════════════════════════════════════════════════════════════
+let _mbQtLoadTried = false;   // chỉ tự tải bù các năm 1 lần/phiên (tránh vòng lặp khi lỗi mạng)
+
+function mbScrQuyetToan() {
+  // Số liệu quyết toán/tất toán tính TOÀN VÒNG ĐỜI → cần đủ dữ liệu mọi năm
+  if (typeof _qtAllYearsReady !== 'undefined' && !_qtAllYearsReady && !_mbQtLoadTried
+      && typeof qtEnsureAllYears === 'function') {
+    _mbQtLoadTried = true;
+    qtEnsureAllYears(() => { if (typeof mbAfterWrite === 'function') mbAfterWrite(); else mbRender(); });
+  }
+  return MB.seg.quyettoan === 'tattoan' ? mbQtTatToan() : mbQtCongTrinh();
+}
+
+/** Thẻ báo "đang tải / chưa đủ dữ liệu" dùng chung cho 2 tab con */
+function mbQtLoadingCard() {
+  if (typeof _qtAllYearsReady === 'undefined' || _qtAllYearsReady) return '';
+  return `<div class="mb-card mb-card-sm" style="font-size:12px;color:var(--mb-muted)">
+    ⏳ Đang tải dữ liệu các năm cũ — số liệu có thể chưa đầy đủ.
+    <span class="mb-link" data-act="qtReloadYears">Tải lại</span>
+  </div>`;
+}
+
+// ── Tab con 1: QUYẾT TOÁN CÔNG TRÌNH (chỉ xem) ──
+function mbQtCongTrinh() {
+  const q = (MB.search || '').toLowerCase();
+  const rows = mbProjects()
+    .filter(p => (p.name || '').toLowerCase().includes(q))
+    .map(p => ({ p, d: calcTongDoanhThu(p, { allYears: true }) }))
+    .filter(r => r.d.hdGoc || r.d.qt || r.d.daThu)
+    .sort((a, b) => b.d.conPhaiThu - a.d.conPhaiThu);
+
+  // 15 quyết toán mới nhất (mọi năm)
+  const recent = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
+    .filter(r => !r.deletedAt)
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || ((b.createdAt || 0) - (a.createdAt || 0)))
+    .slice(0, 15);
+  const _loaiTag = { tang: ['Tăng', 'green'], giam: ['Giảm', 'red'], thaythe: ['Thay thế', 'blue'] };
+
+  return `<div class="mb-pad">
+    ${mbQtLoadingCard()}
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-search" data-in="search" data-live="1" value="${mbX(MB.search)}" placeholder="Tìm công trình..."/>
+    </div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">Số liệu toàn vòng đời công trình. Nhập / sửa quyết toán trên máy tính (tab Quyết Toán).</div>
+
+    <div class="mb-col" style="gap:9px">
+      ${rows.length ? rows.map(({ p, d }) => {
+        const [stLabel, stCls] = MB_STATUS[p.status] || ['—', 'gray'];
+        return `<div class="mb-card" style="padding:13px">
+          <div class="mb-row-between" style="margin-bottom:8px">
+            <span style="font-size:13.5px;font-weight:700">${mbX(p.name)}</span>
+            <span class="mb-tag ${stCls}">${stLabel}</span>
+          </div>
+          <div class="mb-grid3" style="margin-bottom:9px">
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">HĐ gốc</div><div style="font-size:12px;font-weight:700">${mbFmt(d.hdGoc)}</div></div>
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">Quyết toán</div><div style="font-size:12px;font-weight:700;color:${d.qt < 0 ? 'var(--mb-red)' : d.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'}">${d.qt ? mbFmtSigned(d.qt) : '0'}</div></div>
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">Doanh thu</div><div style="font-size:12px;font-weight:800;color:var(--mb-primary)">${mbFmt(d.tongDT)}</div></div>
+          </div>
+          <div class="mb-bar"><i style="width:${mbBarW(d.daThu, d.tongDT)};background:var(--mb-green)"></i></div>
+          <div class="mb-row-between" style="margin-top:5px;font-size:10.5px;color:var(--mb-muted-2)">
+            <span>Đã thu ${mbFmt(d.daThu)} (${mbPct(d.daThu, d.tongDT)}%)</span>
+            <span style="font-weight:700;color:${d.conPhaiThu < 0 ? 'var(--mb-red)' : 'var(--mb-text-2)'}">Còn ${mbFmtSigned(d.conPhaiThu)}</span>
+          </div>
+        </div>`;
+      }).join('') : '<div class="mb-empty">Chưa có hợp đồng / quyết toán</div>'}
+    </div>
+
+    <div class="mb-sec-title">Quyết toán gần đây</div>
+    <div class="mb-col">
+      ${recent.length ? recent.map(r => {
+        const [lb, cls] = _loaiTag[qtLoaiOf(r)] || ['—', 'gray'];
+        return `<div class="mb-card mb-card-sm">
+          <div class="mb-row-between" style="margin-bottom:4px">
+            <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(_resolveCtName(r) || r.congtrinh || '—')}</span>
+            <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbX(qtSoTienTxt(r, mbFmt))}</span>
+          </div>
+          <div style="font-size:11px;color:var(--mb-muted-2)"><span class="mb-tag ${cls}">${lb}</span>${r.chot ? ' 🔒' : ''} · ${mbDate(r.ngay)} · ${mbX(r.nd || '')}</div>
+        </div>`;
+      }).join('') : '<div class="mb-empty">Chưa có quyết toán nào</div>'}
+    </div>
+  </div>`;
+}
+
+// ── Tab con 2: TẤT TOÁN TP/NCC (bấm được — chỉ Admin + Giám đốc) ──
+function mbQtTatToan() {
+  const ready   = (typeof _qtAllYearsReady === 'undefined') || _qtAllYearsReady;
+  const canEdit = ready && ['admin', 'giamdoc'].includes(mbRole());
+  const all  = (ready && typeof ttBuildRows === 'function') ? ttBuildRows() : [];
+  const rows = all.filter(r => MB.cnGroup === 'all' || r.group === MB.cnGroup)
+                  .sort((a, b) => b.con - a.con);
+  const sum = (g) => all.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
+  const batches = (typeof ttBatches === 'function') ? ttBatches().slice(0, 5) : [];
+  const chips = [['all', 'Tất cả'], ['thauphu', 'Thầu phụ'], ['nhacungcap', 'Nhà cung cấp']];
+
+  return `<div class="mb-pad">
+    ${mbQtLoadingCard()}
+    ${MB.ttLast ? `<div class="mb-card mb-card-sm mb-row-between" style="background:#F0FDF4">
+        <span style="font-size:12.5px;font-weight:600;color:var(--mb-green)">${mbX(MB.ttLast.msg)}</span>
+        <span class="mb-link" data-act="ttUndoMb">Hoàn tác</span>
+      </div>` : ''}
+    <div class="mb-grid2">
+      <div class="mb-kpi red" style="border-radius:13px"><div class="mb-kpi-label">Nợ thầu phụ</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('thauphu'))}</div></div>
+      <div class="mb-kpi" style="border-radius:13px"><div class="mb-kpi-label">Nợ nhà cung cấp</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('nhacungcap'))}</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">Chỉ đối tác đã có trong Tiền ứng và còn nợ. Tất toán → tự tạo phiếu ứng đúng số còn nợ (ngày hôm nay).</div>
+    <div class="mb-chips">
+      ${chips.map(([k, l]) => `<div class="mb-chip${MB.cnGroup === k ? ' on' : ''}" data-act="setFilter" data-arg="cnGroup|${k}">${l}</div>`).join('')}
+    </div>
+
+    <div class="mb-col" style="gap:9px">
+      ${!ready ? '<div class="mb-empty">Đang tải dữ liệu để tính số dư...</div>'
+        : rows.length ? rows.map(r => `<div class="mb-card" style="padding:13px">
+          <div class="mb-row-between" style="margin-bottom:4px">
+            <span style="font-size:13.5px;font-weight:700">${mbX(r.partner)}</span>
+            <span style="font-size:13.5px;font-weight:800;color:var(--mb-red);flex-shrink:0">${mbFmt(r.con)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:9px">${mbX(MB_UNG_LABEL[r.group] || r.group)} · ${mbX(r.ctName || '—')} · Giá trị ${mbFmt(r.value)} · Đã ứng ${mbFmt(r.daUng)}</div>
+          ${canEdit ? `<button class="mb-btn" style="padding:9px" data-act="ttSettleMb" data-arg="${mbX(r.key)}">Tất toán toàn bộ</button>` : ''}
+        </div>`).join('')
+        : '<div class="mb-empty">🎉 Không còn đối tác nào nợ</div>'}
+    </div>
+
+    ${batches.length ? `<div class="mb-sec-title">Tất toán gần đây</div>
+    <div class="mb-col">
+      ${batches.map(b => `<div class="mb-card mb-card-sm mb-row-between">
+        <div style="min-width:0">
+          <div style="font-size:12.5px;font-weight:700">${mbFull(b.total)} · ${b.recs.length} phiếu</div>
+          <div style="font-size:11px;color:var(--mb-muted-2)">${mbDate(b.ngay)} · ${mbX(b.by || '—')}</div>
+        </div>
+        ${canEdit ? `<span class="mb-link" style="color:var(--mb-red)" data-act="ttCancelMb" data-arg="${mbX(b.id)}">Hủy</span>` : ''}
+      </div>`).join('')}
+    </div>` : ''}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
 //  13 · THÊM (menu)
 // ══════════════════════════════════════════════════════════════
 function mbScrMore() {
@@ -1317,6 +1473,7 @@ function mbScrMore() {
   const rows = [
     ['dashboard', 'Tổng Quan',     'Dashboard chi phí ' + mbYearLabel(), 'T', '#EFF6FF', '#2563EB'],
     ['doanhthu', 'Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận', 'D', '#F0FDF4', '#16A34A'],
+    ['quyettoan','Quyết Toán',     'Quyết toán CT · Tất toán TP/NCC', 'Q', '#FFFBEB', '#D97706'],
     ['congno',   'Công Nợ TP/NCC',      'Còn phải trả theo đối tác',      'N', '#FEF2F2', '#DC2626'],
     ['thietbi',  'Thiết Bị',       'Kho tổng & tại công trình',      'B', '#EFF6FF', '#2563EB'],
     ['thongke',  'Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí',       'K', '#F5F3FF', '#7C3AED'],

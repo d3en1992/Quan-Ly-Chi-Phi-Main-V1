@@ -49,6 +49,8 @@ const MB = {
     chamcong: 'so',       // so | baocao | ung
     tienung:  'nhap',     // nhap | thongke
     doanhthu: 'khaibao',  // khaibao | thongke | loinhuan
+    congno:   'congno',   // congno | hdtp  (HĐ thầu phụ chuyển từ Doanh thu sang — 02/10/2026)
+    quyettoan:'congtrinh',// congtrinh | tattoan
   },
 
   // Bộ lọc / tìm kiếm
@@ -62,7 +64,8 @@ const MB = {
   // vì mbScrDanhMuc() đọc thẳng cats[MB.dmType].
   dmType:       'loaiChiPhi',
   trashType:    'hoadon', // loại bản ghi trong thùng rác
-  dtKind:       'hdc',    // khai báo doanh thu: hdc | hdtp | thu
+  dtKind:       'hdc',    // khai báo doanh thu: hdc | thu  (hdtp nay nằm ở Công nợ → HĐ thầu phụ)
+  ttLast:       null,     // { id, msg } lần tất toán vừa làm trên điện thoại (cho nút Hoàn tác)
   // Loại phiếu ứng — CHỈ thầu phụ / nhà cung cấp.
   // Ứng công nhân cố ý không nằm ở đây: nó là sổ nợ riêng (ung_v1 với
   // loai='congnhan' + cnKind), nhập tại tab Chấm công → "Ứng CN", đúng như
@@ -131,10 +134,10 @@ function mbRole() {
   return u ? (u.role || '') : '';
 }
 
-/** Kế toán không được xem Tổng quan / Doanh thu (khớp applyRoleUI của desktop).
+/** Kế toán không được xem Tổng quan / Doanh thu / Quyết toán (khớp applyRoleUI của desktop).
  *  (02/10/2026) Đã mở tab Công nợ TP/NCC cho Kế toán. */
 function mbCanSee(tab) {
-  if (mbRole() === 'ketoan' && ['dashboard', 'doanhthu'].includes(tab)) return false;
+  if (mbRole() === 'ketoan' && ['dashboard', 'doanhthu', 'quyettoan'].includes(tab)) return false;
   return true;
 }
 
@@ -228,6 +231,7 @@ function mbTitles() {
     chamcong:  ['Chấm Công',      'Sổ công & lương tuần'],
     tienung:   ['Tiền Ứng',       'Thầu phụ · NCC · Công nhân'],
     doanhthu:  ['Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận'],
+    quyettoan: ['Quyết Toán',     'Quyết toán công trình · Tất toán TP/NCC'],
     congno:    ['Công Nợ TP/NCC',      'Đối tác còn phải trả / thu'],
     thietbi:   ['Thiết Bị',       'Kho tổng & tại công trình'],
     danhmuc:   ['Danh Mục',       'Loại CP · NCC · Người · Thầu phụ'],
@@ -240,7 +244,7 @@ function mbTitles() {
 // Các màn hình nằm trong tab "Thêm" (có nút Back về 'more').
 // Tiền ứng đã lên bottom nav nên KHÔNG còn ở đây; đổi lại Tổng quan rời nav
 // xuống đây để vẫn xem được.
-const MB_MORE_TABS = ['dashboard', 'doanhthu', 'congno', 'thietbi', 'danhmuc', 'thongke', 'thungrac'];
+const MB_MORE_TABS = ['dashboard', 'doanhthu', 'quyettoan', 'congno', 'thietbi', 'danhmuc', 'thongke', 'thungrac'];
 
 // Bottom nav: [id, nhãn, ký tự icon] — 5 mục, "Nhập" đặt giữa cho dễ bấm
 const MB_NAV = [
@@ -258,6 +262,8 @@ const MB_SEGS = {
   chamcong: ['chamcong', [['so', 'Sổ chấm công'], ['baocao', 'Tổng lương'], ['ung', 'Ứng CN']]],
   tienung:  ['tienung',  [['nhap', 'Nhập ứng'], ['thongke', 'Thống kê ứng']]],
   doanhthu: ['doanhthu', [['khaibao', 'Khai báo'], ['thongke', 'Thống kê'], ['loinhuan', 'Lợi nhuận']]],
+  congno:   ['congno',   [['congno', 'Công nợ'], ['hdtp', 'HĐ thầu phụ']]],
+  quyettoan:['quyettoan',[['congtrinh', 'Quyết toán CT'], ['tattoan', 'Tất toán TP/NCC']]],
 };
 
 /** Chuyển màn hình */
@@ -579,7 +585,7 @@ async function initMobile() {
 const MB_TO_DESKTOP = {
   dashboard: 'dashboard', congtrinh: 'congtrinh', detail: 'congtrinh',
   nhap: 'nhap', chamcong: 'chamcong', tienung: 'nhapung',
-  doanhthu: 'doanhthu', congno: 'congno', thietbi: 'thietbi',
+  doanhthu: 'doanhthu', quyettoan: 'quyettoan', congno: 'congno', thietbi: 'thietbi',
   danhmuc: 'danhmuc', thongke: 'thongkecphd', thungrac: 'thungrac',
   more: 'congtrinh',
 };
