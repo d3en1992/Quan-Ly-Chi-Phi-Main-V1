@@ -56,7 +56,8 @@
                   <th class="tb-name-col">Tên Thiết Bị</th>
                   <th style="text-align: center; width: 70px">SL</th>
                   <th style="width: 130px">Tình Trạng</th>
-                  <th>Ghi Chú</th>
+                  <th>Thông Tin Máy</th>
+                  <th style="width: 130px">Ngày Luân Chuyển</th>
                   <th style="width: 120px"></th>
                 </tr>
               </thead>
@@ -78,7 +79,10 @@
                 type="text"
                 id="kho-search"
                 placeholder="Tìm thiết bị..."
-                oninput="filterKhoTable()"
+                oninput="
+                  khoPage = 1;
+                  renderKhoTong();
+                "
               />
             </div>
             <select
@@ -123,8 +127,8 @@
                   <th class="tb-name-col">Tên Thiết Bị</th>
                   <th style="text-align: center; width: 70px">SL</th>
                   <th style="width: 130px">Tình Trạng</th>
-                  <th style="width: 110px">Ghi Chú</th>
-                  <th style="width: 70px">Cập Nhật</th>
+                  <th style="width: 110px">Thông Tin Máy</th>
+                  <th style="width: 130px">Ngày Luân Chuyển</th>
                   <th style="width: 160px"></th>
                 </tr>
               </thead>
@@ -154,12 +158,19 @@
         </div>
 
         <div id="thietbi-form">
-          <div class="entry-date-bar" style="flex-wrap: wrap; gap: 10px">
+          <!-- Header: Ngày Luân Chuyển · Công Trình (ô CT có gõ để tìm — giống tab Hóa Đơn Chi Tiết) -->
+          <div class="entry-date-bar">
+            <span class="bar-label">Ngày Luân Chuyển</span>
+            <input
+              type="date"
+              id="tb-ngay"
+              class="form-control form-control-sm w-auto"
+            />
             <span class="bar-label">Công Trình</span>
             <select
               id="tb-ct-sel"
               class="form-select form-select-sm w-auto"
-              style="min-width: 260px; font-size: 13px"
+              style="min-width: 260px; max-width: 100%"
             >
               <option value="">-- Chọn công trình --</option>
             </select>
@@ -167,19 +178,14 @@
 
           <div class="entry-table-wrap">
             <div class="table-scroll">
-              <table
-                class="entry-table tb-entry-table"
-                style="min-width: 680px"
-              >
+              <table class="entry-table" style="min-width: 720px">
                 <thead>
                   <tr>
                     <th class="col-num">#</th>
-                    <th class="tb-name-col" style="min-width: 224px">
-                      Tên Máy/TB/GG
-                    </th>
-                    <th style="width: 80px; text-align: center">Số Lượng</th>
-                    <th style="width: 150px">Tình Trạng</th>
-                    <th style="min-width: 140px">Ghi Chú</th>
+                    <th style="min-width: 240px">Tên Máy/TB/GG *</th>
+                    <th style="width: 100px; text-align: center">Số Lượng</th>
+                    <th style="width: 170px">Tình Trạng</th>
+                    <th style="min-width: 200px">Thông Tin Máy</th>
                     <th class="col-del"></th>
                   </tr>
                 </thead>
@@ -193,9 +199,12 @@
               <button class="btn btn-outline-secondary btn-sm" onclick="tbAddRows(5)">
                 + 5 dòng
               </button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="tbAddRows(10)">
+                + 10 dòng
+              </button>
               <span
                 class="text-secondary" style="font-size: 11px; margin-left: 8px"
-                >Mặc định tình trạng: Đang hoạt động</span
+                >Tab để di chuyển giữa các ô · Mặc định tình trạng: Đang hoạt động</span
               >
             </div>
           </div>

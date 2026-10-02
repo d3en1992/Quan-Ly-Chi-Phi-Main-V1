@@ -135,11 +135,20 @@ function tbPopulateSels() {
   const sel = document.getElementById('tb-ct-sel');
   const cur = sel.value;
   // Entry select: KHO TỔNG (= COMPANY) + projects thuộc năm đang chọn
+  // Tab nhập liệu → ẩn CT đã quyết toán (giống tab Hóa Đơn Chi Tiết); CT đang chọn thì vẫn giữ
   const _entryProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
+    .filter(p => p.name === cur || p.status !== 'closed')
     .filter(p => activeYear === 0 || p.name === cur || _ctInActiveYear(p.name));
   sel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
     `<option value="${TB_KHO_TONG}" data-pid="COMPANY"${cur===TB_KHO_TONG?' selected':''}>${TB_KHO_TONG}</option>` +
     _entryProjs.map(p=>`<option value="${x(p.name)}" data-pid="${p.id}"${p.name===cur?' selected':''}>${x(p.name)}</option>`).join('');
+  // Biến <select> CT thành ô chọn có GÕ ĐỂ TÌM — dùng chung _ssEnhance của tab Hóa Đơn Chi Tiết
+  // (idempotent: gọi lại nhiều lần không tạo trùng; option dựng lại vẫn tự cập nhật)
+  if (typeof _ssEnhance === 'function') _ssEnhance(sel);
+
+  // Ô "Ngày Luân Chuyển" của form nhập: trống thì mặc định hôm nay
+  const ngayInp = document.getElementById('tb-ngay');
+  if (ngayInp && !ngayInp.value) ngayInp.value = today();
 
   // Filter select: KHO TỔNG + projects thuộc năm đang chọn
   const fSel = document.getElementById('tb-filter-ct');
@@ -178,6 +187,28 @@ function tbBuildRows(n=5) {
   const tbody = document.getElementById('tb-tbody');
   tbody.innerHTML = '';
   for (let i=0; i<n; i++) tbAddRow(null, i+1);
+  _initTbSheetGrid();
+}
+
+// Gắn lưới kiểu Excel (dùng chung engine với tab Nhập Nhanh):
+// Tab/Enter/mũi tên di chuyển ô, gõ để hiện gợi ý, dán nhiều ô từ Excel, Enter ở dòng cuối tự thêm dòng
+function _initTbSheetGrid() {
+  if (typeof initSheetGrid !== 'function') return;
+  initSheetGrid({
+    name: 'thietbi',
+    tbody: '#tb-tbody',
+    rowSelector: 'tr',
+    cellSelector: 'input',
+    addRow: () => tbAddRow(),
+    columns: [
+      // Tên thiết bị: bắt buộc chọn trong danh mục (gõ sai → ô đỏ)
+      { field: 'ten',       type: 'autocomplete', source: () => tbGetNames() },
+      { field: 'soluong',   type: 'number' },
+      // Tình trạng: chỉ 3 giá trị cố định
+      { field: 'tinhtrang', type: 'autocomplete', source: () => [...TB_TINH_TRANG], copyFromAbove: true },
+      { field: 'ghichu',    type: 'text' }
+    ]
+  });
 }
 
 function tbAddRows(n) {
@@ -186,58 +217,27 @@ function tbAddRows(n) {
   for (let i=0; i<n; i++) tbAddRow(null, cur+i+1);
 }
 
-// Rebuild options trong các select tên thiết bị đang hiển thị trong bảng nhập
-function tbRefreshTenSel() {
-  const names = tbGetNames();
-  document.querySelectorAll('#tb-tbody [data-tb="ten"]').forEach(sel => {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">-- Chọn --</option>' +
-      names.map(n => `<option value="${x(n)}" ${n===cur?'selected':''}>${x(n)}</option>`).join('');
-    sel.value = cur;
-  });
-}
+// (02/10/2026) Bảng nhập đã đổi sang ô gõ có gợi ý (lấy danh mục mới nhất mỗi lần gõ)
+// → không cần dựng lại option nữa. Giữ hàm rỗng để code cũ gọi tới không bị lỗi.
+function tbRefreshTenSel() {}
 
 function tbAddRow(data, num) {
   const tbody = document.getElementById('tb-tbody');
   const idx = num || (tbody.querySelectorAll('tr').length + 1);
   const tr = document.createElement('tr');
+  // Tình trạng mặc định: Đang hoạt động
+  const tt = (data && data.tinhtrang) || 'Đang hoạt động';
 
-  const ttOpts = TB_TINH_TRANG.map(v =>
-    `<option value="${v}" ${data&&data.tinhtrang===v?'selected':v==='Đang hoạt động'&&!data?'selected':''}>${v}</option>`
-  ).join('');
-
-  // Tên thiết bị: CHỈ chọn từ cats.tbTen (không nhập tự do)
-  const names = tbGetNames();
-  const tenOpts = '<option value="">-- Chọn --</option>' +
-    names.map(n => `<option value="${x(n)}" ${data&&data.ten===n?'selected':''}>${x(n)}</option>`).join('');
-
+  // Các ô nhập dạng .cell-input giống tab Nhập Nhanh (data-f = tên trường cho sheet-grid đọc)
   tr.innerHTML = `
     <td class="row-num">${idx}</td>
-    <td class="tb-name-col" style="padding:0">
-      <select data-tb="ten"
-        style="width:100%;border:none;background:transparent;padding:7px 10px;font-size:13px;font-family:'IBM Plex Sans',sans-serif;outline:none;color:var(--ink);cursor:pointer">
-        ${tenOpts}
-      </select>
-    </td>
-    <td style="padding:0">
-      <input type="number" data-tb="soluong" class="np-num-input" min="0" step="1" inputmode="decimal"
-        value="${data?.soluong||''}" placeholder="0"
-        style="width:100%;border:none;background:transparent;padding:7px 8px;text-align:center;font-size:13px;font-family:'IBM Plex Mono',monospace;outline:none;color:var(--ink)">
-    </td>
-    <td style="padding:0">
-      <select data-tb="tinhtrang"
-        style="width:100%;border:none;background:transparent;padding:7px 8px;font-size:12px;font-family:'IBM Plex Sans',sans-serif;outline:none;color:var(--ink);cursor:pointer">
-        ${ttOpts}
-      </select>
-    </td>
-    <td style="padding:0">
-      <input class="cc-name-input" data-tb="ghichu"
-        value="${x(data?.ghichu||'')}" placeholder="—"
-        style="width:100%;border:none;background:transparent;padding:7px 8px;font-size:12px;font-family:'IBM Plex Sans',sans-serif;outline:none;color:var(--ink)">
-    </td>
-    <td style="padding:3px 4px;text-align:center">
-      <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();tbRenum()" title="Xóa dòng"><span class="material-symbols-outlined">close</span></button>
-    </td>`;
+    <td><input class="cell-input" data-f="ten" autocomplete="off" placeholder="Tên máy/thiết bị..." value="${x(data?.ten||'')}"></td>
+    <td style="padding:0"><input data-f="soluong" type="number" class="np-num-input" min="0" step="1" inputmode="decimal"
+      value="${data?.soluong||''}" placeholder="0"
+      style="width:100%;text-align:center;border:none;background:transparent;padding:7px 4px;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;color:var(--ink);-moz-appearance:textfield;-webkit-appearance:textfield;appearance:textfield"></td>
+    <td><input class="cell-input" data-f="tinhtrang" autocomplete="off" placeholder="Tình trạng..." value="${x(tt)}"></td>
+    <td><input class="cell-input" data-f="ghichu" placeholder="Thông tin máy..." value="${x(data?.ghichu||'')}"></td>
+    <td><button class="del-btn" onclick="this.closest('tr').remove();tbRenum()" title="Xóa dòng"><span class="material-symbols-outlined">close</span></button></td>`;
   tbody.appendChild(tr);
 }
 
@@ -268,14 +268,38 @@ function tbSave() {
   }
 
   const rows = [];
-  const ngay = today();
-  document.querySelectorAll('#tb-tbody tr').forEach(tr => {
-    const ten    = tr.querySelector('[data-tb="ten"]')?.value || '';
-    const sl     = parseFloat(tr.querySelector('[data-tb="soluong"]')?.value) || 0;
-    const tt     = tr.querySelector('[data-tb="tinhtrang"]')?.value || 'Đang hoạt động';
-    const ghichu = tr.querySelector('[data-tb="ghichu"]')?.value?.trim() || '';
-    if (ten) rows.push({ ten, soluong: sl, tinhtrang: tt, ghichu });
+  // Ngày luân chuyển do người dùng chọn (trống → hôm nay)
+  const ngay = document.getElementById('tb-ngay')?.value || today();
+  const names = tbGetNames();
+  // So khớp không phân biệt hoa thường / dấu → trả về tên chuẩn trong danh mục
+  const _pick = (list, v) => list.find(n => _tbNormQ(n) === _tbNormQ(v)) || '';
+  let invalid = 0;
+  document.querySelectorAll('#tb-tbody tr').forEach((tr, i) => {
+    const tenEl  = tr.querySelector('[data-f="ten"]');
+    const ttEl   = tr.querySelector('[data-f="tinhtrang"]');
+    const tenRaw = (tenEl?.value || '').trim();
+    const sl     = parseFloat(tr.querySelector('[data-f="soluong"]')?.value) || 0;
+    const ttRaw  = (ttEl?.value || '').trim();
+    const ghichu = tr.querySelector('[data-f="ghichu"]')?.value?.trim() || '';
+    // Dòng trống (chỉ có tình trạng mặc định) → bỏ qua
+    if (!tenRaw && !sl && !ghichu) {
+      if (typeof clearCellInvalid === 'function') { clearCellInvalid(tenEl); clearCellInvalid(ttEl); }
+      return;
+    }
+    const ten = _pick(names, tenRaw);
+    const tt  = ttRaw ? _pick(TB_TINH_TRANG, ttRaw) : 'Đang hoạt động';
+    if (!ten) { invalid++; if (typeof markCellInvalid === 'function') markCellInvalid(tenEl, `Dòng ${i+1} — Tên thiết bị ${tenRaw ? 'không có trong danh mục' : 'là bắt buộc'}`); }
+    else if (typeof clearCellInvalid === 'function') clearCellInvalid(tenEl);
+    if (!tt) { invalid++; if (typeof markCellInvalid === 'function') markCellInvalid(ttEl, `Dòng ${i+1} — Tình trạng không hợp lệ`); }
+    else if (typeof clearCellInvalid === 'function') clearCellInvalid(ttEl);
+    if (ten && tt) rows.push({ ten, soluong: sl, tinhtrang: tt, ghichu });
   });
+
+  if (invalid) {
+    toast(`Có ${invalid} ô không hợp lệ (tô đỏ) — chọn đúng tên thiết bị / tình trạng trong danh sách gợi ý!`, 'error');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu thiết bị'; }
+    return;
+  }
 
   if (!rows.length) {
     toast('Không có dữ liệu để lưu!', 'error');
@@ -309,7 +333,6 @@ function tbSave() {
   tbPage = 1;
   const _fSel = document.getElementById('tb-filter-ct');
   if (_fSel) _fSel.value = '';
-  tbRefreshTenSel();
   tbPopulateSels();
   tbRenderList();
   tbRenderThongKeVon();
@@ -325,10 +348,20 @@ function tbSave() {
 const TB_PG = 10;
 let tbPage = 1;
 
+// ── Tìm kiếm thiết bị: không phân biệt hoa thường / có dấu ("may cat" khớp "Máy Cắt")
+function _tbNormQ(s) {
+  return (typeof _normViStr === 'function' ? _normViStr(s || '') : String(s || '').toLowerCase()).trim();
+}
+// Khớp theo Tên thiết bị, Thông tin máy (ghichu), Người TH
+function _tbMatchQ(r, q) {
+  if (!q) return true;
+  return [recCatName(r,'tb','ten'), r.ghichu, r.nguoi].some(v => _tbNormQ(v).includes(q));
+}
+
 function tbRenderList() {
   const fCt = document.getElementById('tb-filter-ct')?.value || '';
   const fTt = document.getElementById('tb-filter-tt')?.value || '';
-  const fQ  = (document.getElementById('tb-search')?.value || '').toLowerCase().trim();
+  const fQ  = _tbNormQ(document.getElementById('tb-search')?.value);
   let filtered = tbData.filter(r => {
     // Bảng này chỉ hiển thị thiết bị tại công trình, không gồm KHO TỔNG
     if (r.deletedAt) return false;
@@ -336,7 +369,7 @@ function tbRenderList() {
     // [MODIFIED] — filter by projectId or ct
     if (fCt && !(r.projectId === fCt || r.ct === fCt)) return false;
     if (fTt && r.tinhtrang !== fTt) return false;
-    if (fQ && !recCatName(r,'tb','ten').toLowerCase().includes(fQ) && !(r.nguoi||'').toLowerCase().includes(fQ) && !(r.ghichu||'').toLowerCase().includes(fQ)) return false;
+    if (fQ && !_tbMatchQ(r, fQ)) return false;
     if (typeof activeYears !== 'undefined' ? activeYears.size > 0 : activeYear !== 0) {
       const ctActive = _entityInYear(r.ct, 'ct') || inActiveYear(r.ngay);
       const isRunning = r.tinhtrang === 'Đang hoạt động';
@@ -364,7 +397,7 @@ function tbRenderList() {
   const paged = filtered.slice(start, start+TB_PG);
 
   if (!paged.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Chưa có thiết bị nào${fCt?' tại '+fCt:''}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Chưa có thiết bị nào${fCt?' tại '+fCt:''}</td></tr>`;
     document.getElementById('tb-pagination').innerHTML = '';
     return;
   }
@@ -386,6 +419,7 @@ function tbRenderList() {
         </select>
       </td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
+      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(r.ngay||'')}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
           <button class="btn btn-outline-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="white-space:nowrap"><i class="bi bi-arrow-left-right"></i> Luân chuyển</button>
@@ -480,7 +514,10 @@ function tbLuanChuyen(id) {
         <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Tình Trạng</label>
           <select id="tb-ei-tt" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none">${ttOpts}</select></div>
       </div>
-      <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Ghi Chú</label>
+      <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Ngày Luân Chuyển</label>
+        <input id="tb-ei-ngay" type="date" value="${today()}"
+          style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Thông Tin Máy</label>
         <input id="tb-ei-ghichu" type="text" value="${x(r.ghichu||'')}"
           style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none"></div>
       <div style="background:#f0f7ff;border-radius:8px;padding:10px;font-size:12px;color:#1565c0">
@@ -509,7 +546,8 @@ function tbSaveEdit(id) {
   const newTT     = document.getElementById('tb-ei-tt').value;
   const newGhichu = document.getElementById('tb-ei-ghichu').value.trim();
   const oldSL     = r.soluong || 0;
-  const ngay      = today();
+  // Ngày luân chuyển người dùng chọn trong popup (trống → hôm nay)
+  const ngay      = document.getElementById('tb-ei-ngay')?.value || today();
 
   if (!newCT) { toast('Vui lòng chọn công trình!', 'error'); return; }
   if (newSL <= 0 || newSL > oldSL) {
@@ -548,12 +586,12 @@ function tbSaveEdit(id) {
       srcExist.soluong   = (srcExist.soluong || 0) + remaining;
       srcExist.updatedAt = Date.now();
       srcExist.deviceId  = DEVICE_ID;
-      srcExist.ngay = ngay;
     } else {
+      // Phần còn lại không bị chuyển đi → giữ nguyên ngày luân chuyển cũ của record nguồn
       tbData.push(mkRecord({
         ct: srcCt, projectId: srcCt === TB_KHO_TONG ? 'COMPANY' : (r.projectId || null),
         ten: r.ten, soluong: remaining,
-        tinhtrang: r.tinhtrang, ghichu: r.ghichu || '', ngay
+        tinhtrang: r.tinhtrang, ghichu: r.ghichu || '', ngay: r.ngay || ngay
       }));
     }
   }
@@ -577,7 +615,7 @@ function tbExportCSV() {
     if(fTt && r.tinhtrang!==fTt) return false;
     return true;
   });
-  const rows = [['Công Trình','Tên Thiết Bị','Số Lượng','Tình Trạng','Người TH','Ghi Chú','Cập Nhật']];
+  const rows = [['Công Trình','Tên Thiết Bị','Số Lượng','Tình Trạng','Người TH','Thông Tin Máy','Ngày Luân Chuyển']];
   data.forEach(r=>rows.push([_resolveCtName(r),recCatName(r,'tb','ten'),r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',r.ngay||''])); // [MODIFIED]
   dlCSV(rows, 'thiet_bi_'+today()+'.csv');
 }
@@ -593,21 +631,29 @@ function renderKhoTong() {
 
   const fTen = document.getElementById('kho-filter-ten')?.value || '';
   const fTt = document.getElementById('kho-filter-tt')?.value || '';
+  // [FIX 02/10/2026] Ô tìm kiếm trước đây chỉ ẩn/hiện dòng của TRANG ĐANG XEM (7 dòng)
+  // → thiết bị nằm ở trang khác không tìm ra, số đếm & phân trang sai.
+  // Nay lọc thẳng trên toàn bộ dữ liệu rồi mới phân trang.
+  const fQ  = _tbNormQ(document.getElementById('kho-search')?.value);
   let filtered = tbData.filter(r => {
     if (r.deletedAt) return false;
     if (!isKhoTong(r)) return false;
     if (fTen && recCatName(r,'tb','ten') !== fTen) return false;
     if (fTt && r.tinhtrang !== fTt) return false;
+    if (fQ && !_tbMatchQ(r, fQ)) return false;
     return true;
   });
 
   filtered.sort((a,b) => recCatName(a,'tb','ten').localeCompare(recCatName(b,'tb','ten'),'vi'));
 
+  // Trang hiện tại vượt quá số trang (vd: sau khi lọc / xóa) → về trang cuối hợp lệ
+  const _khoTp = Math.max(1, Math.ceil(filtered.length/KHO_PG));
+  if (khoPage > _khoTp) khoPage = _khoTp;
   const start = (khoPage-1)*KHO_PG;
   const paged = filtered.slice(start, start+KHO_PG);
 
   if (!paged.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Kho tổng trống</td></tr>';
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${fQ || fTen || fTt ? 'Không tìm thấy thiết bị phù hợp' : 'Kho tổng trống'}</td></tr>`;
     document.getElementById('kho-pagination').innerHTML = '';
     return;
   }
@@ -619,7 +665,7 @@ function renderKhoTong() {
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
-      <td class="text-secondary" style="font-size:10px;white-space:nowrap">${r.ngay||''}</td>
+      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(r.ngay||'')}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
           <button class="btn btn-outline-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="white-space:nowrap"><i class="bi bi-arrow-left-right"></i> Luân chuyển</button>
@@ -679,17 +725,9 @@ function tbRenderThongKeVon() {
 // ── Init TB khi load trang ────────────────────────────────────────
 // (tbData đã load ở trên, tbBuildRows gọi khi goPage)
 
-// Filter realtime DOM cho bảng Kho Tổng Thiết Bị
+// Ô tìm kiếm Kho Tổng: lọc trên toàn bộ dữ liệu (xem renderKhoTong).
+// Giữ tên hàm cũ để HTML/bản cache cũ gọi tới vẫn chạy đúng.
 function filterKhoTable() {
-  const query = document.getElementById('kho-search').value.toLowerCase().trim();
-  const rows = document.querySelectorAll('#kho-list-tbody tr');
-  
-  rows.forEach(row => {
-    if (row.classList.contains('empty-row')) return;
-    const nameCell = row.querySelector('.tb-name-col');
-    if (!nameCell) return;
-    
-    const nameText = nameCell.textContent.toLowerCase();
-    row.style.display = nameText.includes(query) ? '' : 'none';
-  });
+  khoPage = 1;
+  renderKhoTong();
 }
