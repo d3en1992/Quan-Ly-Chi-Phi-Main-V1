@@ -309,7 +309,9 @@ function renderLaiLo() {
     </div>`;
 }
 
-// ══ SUBTAB: TỔNG QUAN LỢI NHUẬN ══════════════════════════════
+// ══ TAB CHÍNH: LỢI NHUẬN (pages/loinhuan.html) ═══════════════
+// (02/10/2026) Trước là sub-tab "TỔNG QUAN LỢI NHUẬN" trong tab Doanh Thu, nay tách
+// thành tab chính riêng (ngay dưới DOANH THU trên sidebar). Mở tab → initLoiNhuan().
 // Bức tranh Lời/Lỗ từng công trình:
 //   [1] Tổng Chi Phí   = (A) Hóa đơn/vật tư + (B) Thầu phụ + (C) Chi phí chung phân bổ
 //   [2] Doanh Thu Thực = (X) HĐ chính ban đầu + (Y) Quyết toán (cộng dồn dương/âm)
@@ -574,8 +576,19 @@ function initDoanhThu() {
   _hdtpResetForm();
 }
 
+// ── Init tab LỢI NHUẬN khi mở (02/10/2026 — tab chính riêng) ──
+// Nạp lại dữ liệu HĐ chính / thầu phụ / quyết toán mới nhất rồi vẽ dashboard + bảng.
+// (Trước đây phần nạp này nằm trong initDoanhThu vì Lợi nhuận là sub-tab của Doanh Thu.)
+function initLoiNhuan() {
+  hopDongData      = load('hopdong_v1', {});
+  thauPhuContracts = load('thauphu_v1', []);
+  quyetToanRecords = load('quyettoan_v1', []);
+  renderLoiNhuan();
+}
+
 // Cấp ra global theo yêu cầu
 window.initDoanhThu = initDoanhThu;
+window.initLoiNhuan = initLoiNhuan;
 window.dtGoSub = dtGoSub;
 
 // [ADDED COPY KLCT]

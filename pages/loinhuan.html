@@ -1,0 +1,21 @@
+<!-- Partial: page-loinhuan (02/10/2026) — tách từ sub-tab "TỔNG QUAN LỢI NHUẬN" của tab Doanh Thu
+     thành TAB CHÍNH riêng, nằm ngay dưới DOANH THU trên sidebar.
+     GIỮ NGUYÊN các ID cũ (dt-ln-toggle-btn, dt-ln-dashboard, dt-loinhuan-wrap) để
+     renderLoiNhuan() / toggleLoiNhuanDetail() trong doanhthu.reports-export.js chạy như trước.
+     Mở tab → initLoiNhuan() (gọi từ goPage trong main.js). -->
+
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span><span class="material-symbols-outlined msi-gap">trending_up</span>Tổng Quan Lợi Nhuận
+            <span class="text-secondary" style="font-size:11px;font-weight:400">(theo năm đang lọc — chọn "Tất cả năm" để xem toàn vòng đời)</span>
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" id="dt-ln-toggle-btn" onclick="toggleLoiNhuanDetail()">
+            <i class="bi bi-list-columns-reverse"></i> Hiện chi tiết
+          </button>
+        </div>
+        <!-- Mini dashboard: donut Doanh thu/Chi phí + Top 5 lãi / Top 5 lỗ -->
+        <div id="dt-ln-dashboard" class="mb-3"></div>
+        <!-- Bảng chi tiết Lợi Nhuận -->
+        <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+          <div id="dt-loinhuan-wrap"></div>
+        </div>

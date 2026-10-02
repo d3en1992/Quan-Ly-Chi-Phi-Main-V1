@@ -348,7 +348,7 @@ function renderThuTable(_page) { renderKhaiBaoTable(0); }
 // (HĐ thầu phụ là CHI PHÍ → thuộc tab Công Nợ, không còn ở tab Doanh Thu.)
 
 // ══ BẢNG GỘP CHUNG KHAI BÁO (30 ngày gần nhất) ═══════════════
-// Gộp HĐ Chính + Thu Tiền + Quyết Toán (chỉ xem) vào MỘT bảng, sắp theo ngày giảm dần.
+// Gộp HĐ Chính + Thu Tiền vào MỘT bảng, sắp theo ngày giảm dần.
 // Mỗi dòng có nhãn Loại + nút Sửa/Xóa gọi đúng hàm theo loại bản ghi.
 let _kbPage = 0;
 
@@ -417,27 +417,8 @@ function renderKhaiBaoTable(page) {
       });
     });
 
-  // ── Quyết Toán (chỉ HIỂN THỊ — sửa/xóa chuyển sang tab QUYẾT TOÁN) ──
-  quyetToanRecords
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtWithinRecent(r.ngay))
-    .forEach(r => {
-      items.push({
-        type: 'qt',
-        ngay: r.ngay,
-        sortTs: r.updatedAt || r.createdAt || 0,
-        ct: _resolveCtName(r) || '—',
-        doiTac: r.nguoi || '—',
-        nd: r.nd || '—',
-        tien: r.giaTri || 0,
-        // Màu + dấu theo loại: tăng "+", giảm "-", thay thế "=" (xem quyettoan.core.js)
-        tienCls: qtSoTienCls(r),
-        tienTxt: qtSoTienTxt(r),
-        loaiBadge: '<span class="badge bg-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán</span> ' + qtLoaiBadge(r),
-        // Tab Doanh Thu chỉ HIỂN THỊ kết quả — muốn sửa/xóa phải sang tab Quyết Toán
-        actions: `
-          <button class="btn btn-outline-secondary btn-sm" title="Mở ở tab Quyết Toán" onclick="qtOpenEdit('${r.id}')"><span class="material-symbols-outlined" style="font-size:16px">open_in_new</span></button>`,
-      });
-    });
+  // (02/10/2026) Đã BỎ dòng Quyết Toán khỏi bảng này — Quyết toán không còn thuộc luồng
+  // Doanh Thu, xem/sửa ở tab QUYẾT TOÁN (quyettoan.congtrinh.js → qtRenderHistory).
 
   // Sắp xếp: ngày mới nhất lên đầu (tie-break theo thời điểm cập nhật)
   items.sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || (b.sortTs - a.sortTs));
@@ -498,7 +479,8 @@ function renderHdcTableTk(page) {
     const q = _dtTkSearch;
     entries = entries.filter(([keyId, v]) =>
       (_resolveName(keyId) || '').toLowerCase().includes(q) ||
-      recCatName(v,'hopdong','nguoi').toLowerCase().includes(q)
+      recCatName(v,'hopdong','nguoi').toLowerCase().includes(q) ||
+      (v.nd || '').toLowerCase().includes(q)          // (02/10/2026) tìm cả theo Nội dung HĐ
     );
   }
 
@@ -518,14 +500,8 @@ function renderHdcTableTk(page) {
     const _proj = _allProjs.find(pr => !pr.deletedAt && (pr.id === keyId || pr.name === ctName));
     const _cdt = (_proj && _proj.chuDauTu) ? _proj.chuDauTu : (hd.khachHang || '');
     const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
-    // Tiến độ thu tiền của hợp đồng — TOÀN VÒNG ĐỜI công trình (thu/quyết toán có thể
-    // rơi vào năm khác năm ký HĐ). Công thức: calcTongDoanhThu() — quyettoan.core.js
-    const _dtP = _proj ? calcTongDoanhThu(_proj, { allYears: true }) : null;
-    const _dash = '<span class="text-body-secondary">—</span>';
-    const _qtCell = !_dtP || !_dtP.qt ? _dash
-      : `<span class="${_dtP.qt < 0 ? 'text-danger' : 'text-success'}">${_dtP.qt > 0 ? '+' : '-'}${fmtS(Math.abs(_dtP.qt))}</span>`;
-    const _con = _dtP ? _dtP.conPhaiThu : 0;
-    const _conCls = _con > 0 ? 'text-warning' : (_con < 0 ? 'text-danger' : 'text-success');
+    // (02/10/2026) Sub-tab THỐNG KÊ chỉ theo dõi thông tin HỢP ĐỒNG CHÍNH:
+    // đã bỏ 4 cột Quyết Toán / Tổng DT / Đã Thu / Còn Phải Thu, thay bằng cột Nội Dung HĐ.
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
       <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
@@ -534,10 +510,7 @@ function renderHdcTableTk(page) {
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${_qtCell}</td>
-      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${_dtP ? fmtS(_dtP.tongDT) : _dash}</td>
-      <td class="text-end font-monospace text-success" style="white-space:nowrap">${_dtP && _dtP.daThu ? fmtS(_dtP.daThu) : _dash}</td>
-      <td class="text-end font-monospace fw-bold ${_conCls}" style="white-space:nowrap">${_dtP ? (_con < 0 ? '-' : '') + fmtS(Math.abs(_con)) : _dash}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(hd.nd || '')}">${x(hd.nd || '—')}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
           <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"

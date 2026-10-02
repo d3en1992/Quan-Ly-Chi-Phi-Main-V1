@@ -425,12 +425,12 @@ function _dtRenderDashboardMini() {
   // Tổng Doanh Thu = Σ doanh thu SAU QUYẾT TOÁN của từng công trình (năm đang lọc)
   //   = HĐ gốc + quyết toán tăng − giảm (hoặc giá trị thay thế) — calcTongDoanhThu()
   // (Trước 02/10/2026 thẻ này chỉ cộng HĐ gốc, chưa tính quyết toán.)
-  let tongDT = 0, tongHD = 0, tongQT = 0;
+  let tongDT = 0;
   (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => p && p.id !== 'COMPANY')
     .forEach(p => {
       const d = calcTongDoanhThu(p);
-      tongDT += d.tongDT; tongHD += d.hdGoc; tongQT += d.qt;
+      tongDT += d.tongDT;
     });
   // Đã thu: cộng MỌI phiếu thu trong năm (kể cả phiếu cũ chưa gắn được công trình)
   let tongThu = 0;
@@ -440,10 +440,7 @@ function _dtRenderDashboardMini() {
   hdEl.textContent  = tongDT  ? fmtM(tongDT)  : '—';
   thuEl.textContent = tongThu  ? fmtM(tongThu)  : '—';
   conEl.textContent = tongDT  ? fmtM(conPhaiThu) : '—';
-  const subEl = document.getElementById('dt-mini-tonghd-sub');
-  if (subEl) subEl.textContent = tongDT
-    ? `HĐ gốc ${fmtS(tongHD)}` + (tongQT ? ` · Quyết toán ${tongQT > 0 ? '+' : '-'}${fmtS(Math.abs(tongQT))}` : '')
-    : '';
+  // (02/10/2026) Đã gỡ dòng phụ "HĐ gốc · Quyết toán ±" — Quyết toán không còn hiển thị ở tab Doanh Thu
   conEl.className = 'fw-bold ' + (conPhaiThu > 0 ? 'text-warning' : conPhaiThu < 0 ? 'text-danger' : 'text-success');
   conEl.style.fontSize = '20px';
 }
@@ -561,9 +558,8 @@ function dtGoSub(btn, id) {
     dtPopulateCtFilter();
     renderHdcTableTk(_hdcTkPage);
     renderThuTableTk(_thuTkPage);
-  } else if (id === 'dt-sub-loinhuan') {
-    if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
   }
+  // (02/10/2026) Sub-tab LỢI NHUẬN đã tách thành tab chính → initLoiNhuan() (doanhthu.reports-export.js)
 }
 
 // ── Populate selects trong tab Doanh Thu ─────────────────────

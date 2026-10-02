@@ -2,24 +2,31 @@
 <!-- Thứ tự (02/10/2026): Danh Sách tại CT → Kho Thiết Bị Công Ty → Kho Vật Tư Giàn Giáo → Nhập.
      Tiêu đề dùng icon thay cho chấm cam. 2 bảng kho dùng chung hàm _renderKho(code) — ID kho-tb-* / kho-gg-* -->
 
+        <!-- (02/10/2026) Ô TÌM KIẾM CHUNG — thay cho 3 ô tìm kiếm riêng của 3 bảng.
+             Gõ 1 lần → lọc đồng thời: Danh Sách Tại CT + Kho Thiết Bị + Kho Giàn Giáo.
+             Tìm theo Tên công trình + Tên thiết bị, không phân biệt hoa thường / có dấu
+             (gõ "may tron" vẫn ra "Máy Trộn") — xem tbGlobalSearch() trong thietbi.js -->
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+          <div class="search-box flex-grow-1" style="min-width: 220px; max-width: 520px">
+            <span class="ico"><span class="material-symbols-outlined">search</span></span>
+            <input
+              type="text"
+              id="tb-global-search"
+              placeholder="Tìm kiếm theo tên công trình hoặc tên thiết bị (gõ không dấu cũng được)..."
+              oninput="tbGlobalSearch()"
+            />
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" id="tb-global-search-clear" style="display:none" onclick="tbClearGlobalSearch()">
+            <span class="material-symbols-outlined msi-gap">close</span>Xóa tìm kiếm
+          </button>
+        </div>
+
         <!-- Bảng 1: Danh sách thiết bị tại công trình -->
         <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="material-symbols-outlined">construction</span>Danh Sách Thiết Bị Tại Công Trình
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
-            <div class="search-box" style="min-width: 140px">
-              <span class="ico"><span class="material-symbols-outlined">search</span></span>
-              <input
-                type="text"
-                id="tb-search"
-                placeholder="Tìm thiết bị..."
-                oninput="
-                  tbPage = 1;
-                  tbRenderList();
-                "
-              />
-            </div>
             <!-- Chỉ liệt kê công trình đang có thiết bị (_tbRefreshCtFilter) -->
             <select
               class="form-select form-select-sm w-auto"
@@ -76,10 +83,6 @@
             <span class="material-symbols-outlined">home_repair_service</span>Kho Thiết Bị Công Ty
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
-            <div class="search-box" style="min-width: 140px">
-              <span class="ico"><span class="material-symbols-outlined">search</span></span>
-              <input type="text" id="kho-tb-search" placeholder="Tìm thiết bị..." oninput="khoReset('TB')" />
-            </div>
             <select class="form-select form-select-sm w-auto" id="kho-tb-filter-ten" onchange="khoReset('TB')">
               <option value="">Tất cả thiết bị</option>
             </select>
@@ -119,10 +122,6 @@
             <span class="material-symbols-outlined">warehouse</span>Kho Vật Tư Giàn Giáo
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
-            <div class="search-box" style="min-width: 140px">
-              <span class="ico"><span class="material-symbols-outlined">search</span></span>
-              <input type="text" id="kho-gg-search" placeholder="Tìm thiết bị..." oninput="khoReset('GG')" />
-            </div>
             <select class="form-select form-select-sm w-auto" id="kho-gg-filter-ten" onchange="khoReset('GG')">
               <option value="">Tất cả thiết bị</option>
             </select>

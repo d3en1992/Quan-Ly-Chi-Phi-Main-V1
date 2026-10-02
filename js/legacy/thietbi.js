@@ -397,10 +397,36 @@ let tbPage = 1;
 function _tbNormQ(s) {
   return (typeof _normViStr === 'function' ? _normViStr(s || '') : String(s || '').toLowerCase()).trim();
 }
-// Khớp theo Tên thiết bị, Thông tin máy (ghichu), Người TH
+// Khớp theo Tên công trình, Tên thiết bị (+ Thông tin máy, Người TH như trước)
+// (02/10/2026) Thêm Tên công trình: với thiết bị trong kho, "công trình" chính là tên kho.
 function _tbMatchQ(r, q) {
   if (!q) return true;
-  return [recCatName(r,'tb','ten'), r.ghichu, r.nguoi].some(v => _tbNormQ(v).includes(q));
+  return [_resolveCtName(r), r.ct, recCatName(r,'tb','ten'), r.ghichu, r.nguoi]
+    .some(v => _tbNormQ(v).includes(q));
+}
+
+// ── Ô TÌM KIẾM CHUNG (02/10/2026) ───────────────────────────────
+// Một ô duy nhất ở đầu trang (#tb-global-search) thay cho 3 ô riêng của 3 bảng.
+// Từ khóa đã chuẩn hóa (bỏ dấu, chữ thường) — 3 bảng cùng đọc qua hàm này.
+function _tbGlobalQ() {
+  return _tbNormQ(document.getElementById('tb-global-search')?.value);
+}
+
+// Gõ vào ô tìm kiếm → đưa cả 3 bảng về trang 1 rồi vẽ lại đồng thời
+function tbGlobalSearch() {
+  const q = _tbGlobalQ();
+  const clr = document.getElementById('tb-global-search-clear');
+  if (clr) clr.style.display = q ? '' : 'none';   // chỉ hiện nút "Xóa tìm kiếm" khi đang tìm
+  tbPage = 1;
+  tbRenderList();
+  TB_KHO_CODES.forEach(code => khoReset(code));
+}
+
+// Nút "Xóa tìm kiếm": làm trống ô rồi hiện lại toàn bộ 3 bảng
+function tbClearGlobalSearch() {
+  const inp = document.getElementById('tb-global-search');
+  if (inp) { inp.value = ''; inp.focus(); }
+  tbGlobalSearch();
 }
 
 // Record có thuộc bảng "Danh Sách Thiết Bị Tại Công Trình" không (chưa tính bộ lọc người dùng):
@@ -446,7 +472,7 @@ function _tbRefreshCtFilter() {
 function tbRenderList() {
   const fCt = document.getElementById('tb-filter-ct')?.value || '';
   const fTt = document.getElementById('tb-filter-tt')?.value || '';
-  const fQ  = _tbNormQ(document.getElementById('tb-search')?.value);
+  const fQ  = _tbGlobalQ();   // ô tìm kiếm chung đầu trang
   let filtered = tbData.filter(r => {
     // Bảng này chỉ hiển thị thiết bị tại công trình, không gồm 2 KHO
     if (!_tbListVisible(r)) return false;
@@ -479,7 +505,7 @@ function tbRenderList() {
   const paged = filtered.slice(start, start+TB_PG);
 
   if (!paged.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Chưa có thiết bị nào${fCt?' tại '+fCt:''}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${fQ ? 'Không tìm thấy thiết bị phù hợp' : 'Chưa có thiết bị nào' + (fCt ? ' tại ' + x(fCt) : '')}</td></tr>`;
     document.getElementById('tb-pagination').innerHTML = '';
     return;
   }
@@ -844,7 +870,8 @@ function _renderKho(code) {
   const fTen = document.getElementById(_khoId(code, 'filter-ten'))?.value || '';
   const fTt  = document.getElementById(_khoId(code, 'filter-tt'))?.value || '';
   // [FIX 02/10/2026] Lọc ô tìm kiếm trên TOÀN BỘ dữ liệu kho rồi mới phân trang
-  const fQ   = _tbNormQ(document.getElementById(_khoId(code, 'search'))?.value);
+  // (02/10/2026) Từ khóa lấy từ ô tìm kiếm CHUNG đầu trang (không còn ô riêng mỗi kho)
+  const fQ   = _tbGlobalQ();
   let filtered = tbData.filter(r => {
     if (r.deletedAt) return false;
     if (!isKhoTong(r) || _tbKhoCode(r) !== code) return false;

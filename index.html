@@ -1006,6 +1006,14 @@
                     data-bs-dismiss="offcanvas">
               <span class="material-symbols-outlined msi-gap">attach_money</span>DOANH THU
             </button>
+            <!-- (02/10/2026) Tab LỢI NHUẬN — tách từ sub-tab của Doanh Thu, đặt ngay dưới DOANH THU
+                 (ẩn với Kế toán giống Doanh Thu, xem applyRoleUI trong auth.js) -->
+            <button class="nav-btn"
+                    data-page="loinhuan"
+                    onclick="goPage(this,'loinhuan')"
+                    data-bs-dismiss="offcanvas">
+              <span class="material-symbols-outlined msi-gap">trending_up</span>LỢI NHUẬN
+            </button>
             <!-- (02/10/2026) Tab QUYẾT TOÁN — trung tâm "chốt sổ" (ẩn với Kế toán, xem applyRoleUI) -->
             <button class="nav-btn"
                     data-page="quyettoan"
@@ -1178,6 +1186,9 @@
 
       <!-- PAGE: DOANH THU & CÔNG NỢ -->
       <div class="page" id="page-doanhthu" data-partial="pages/doanhthu.html"></div>
+
+      <!-- PAGE: LỢI NHUẬN (02/10/2026 — tab chính, tách từ sub-tab của Doanh Thu) -->
+      <div class="page" id="page-loinhuan" data-partial="pages/loinhuan.html"></div>
 
       <!-- PAGE: QUYẾT TOÁN (2A Quyết toán công trình · 2B Tất toán TP/NCC) -->
       <div class="page" id="page-quyettoan" data-partial="pages/quyettoan.html"></div>

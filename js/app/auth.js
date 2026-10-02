@@ -753,7 +753,8 @@ function applyRoleUI() {
     let visible = true;
     // (02/10/2026) Mở tab CÔNG NỢ TP/NCC (congno) cho Kế toán — chỉ còn ẩn Dashboard + Doanh Thu
     // + tab QUYẾT TOÁN (chỉ Admin + Giám đốc được chốt sổ / tất toán)
-    if (user.role === 'ketoan' && ['dashboard', 'doanhthu', 'quyettoan'].includes(page)) {
+    // + tab LỢI NHUẬN (02/10/2026 — tách từ Doanh Thu nên giữ cùng quyền: Kế toán không xem)
+    if (user.role === 'ketoan' && ['dashboard', 'doanhthu', 'loinhuan', 'quyettoan'].includes(page)) {
       visible = false;
     }
     btn.style.display = visible ? '' : 'none';

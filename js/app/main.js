@@ -196,7 +196,7 @@ function goPage(btn, id) {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
     thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
     nhapung: '💰 Ứng TP/NCC', thietbi: '🔧 Theo Dõi TB',
-    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', quyettoan: '🧾 Quyết Toán', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', loinhuan: '📈 Lợi Nhuận', quyettoan: '🧾 Quyết Toán', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
     thungrac: '🗑️ Thùng Rác'
   };
   _setTopbarTabTitle(_PAGE_LABELS[id] || '');
@@ -207,6 +207,7 @@ function goPage(btn, id) {
   if (id==='danhmuc') renderSettings();
   if (id==='dashboard') renderDashboard();
   if (id==='doanhthu') initDoanhThu();
+  if (id==='loinhuan') initLoiNhuan();   // (02/10/2026) tab chính Lợi Nhuận
   if (id==='quyettoan') initQuyetToan();
   if (id==='congno') initCongNo();
   if (id==='nhapung') { initUngTableIfEmpty(); buildUngFilters(); filterAndRenderUng(); }
@@ -230,7 +231,7 @@ function goPage(btn, id) {
 // Danh sách id tab hợp lệ — khớp với data-page trong index.html
 const _VALID_PAGES = new Set([
   'congtrinh', 'nhap', 'thongkecphd', 'chamcong', 'nhapung',
-  'thietbi', 'danhmuc', 'doanhthu', 'quyettoan', 'congno', 'dashboard', 'thungrac'
+  'thietbi', 'danhmuc', 'doanhthu', 'loinhuan', 'quyettoan', 'congno', 'dashboard', 'thungrac'
 ]);
 
 // Đọc id tab từ location.hash, vd '#/chamcong' → 'chamcong' (trả '' nếu không hợp lệ)
@@ -494,6 +495,10 @@ function renderActiveTab() {
     case 'doanhthu':
       // dtPopulateSels() gọi renderHdcTable + renderHdtpTable bên trong
       dtPopulateSels(); renderThuTable();
+      break;
+    case 'loinhuan':
+      // Đổi năm / sync xong → tính lại lợi nhuận theo năm đang lọc
+      initLoiNhuan();
       break;
     case 'quyettoan':
       // Đổi năm / sync xong → vẽ lại nhưng GIỮ nội dung form đang nhập
