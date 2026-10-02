@@ -2047,13 +2047,24 @@ td.action-col > div {
 .btn > .material-symbols-outlined:only-child,
 .close-btn > .material-symbols-outlined:only-child { vertical-align: middle; }
 
-/* ── Tab QUYẾT TOÁN · Block 2 "Tóm tắt trạng thái" (02/10/2026) ──
-   Card nằm ngang: [HĐ gốc] | [Quyết toán đã có] | [Đã thu] ➔ [DOANH THU HIỆN TẠI] */
+/* ── Tab QUYẾT TOÁN — chuẩn hóa cỡ chữ / control cho đồng bộ design system (02/10/2026) ──
+   .qt-compact bọc 2 sub-tab: font 13px, card-body gọn, control dùng size -sm. */
+.qt-compact { font-size: 13px; }
+.qt-compact .card-body { padding: 14px 16px; }
+.qt-compact .form-control-sm,
+.qt-compact .form-select-sm { font-size: 13px; }
+.qt-compact .btn-group-sm > .btn { font-size: 12.5px; padding: 5px 8px; }
+/* Tiêu đề card (VD: "Chọn Công Trình Cần Quyết Toán") */
+.qt-card-title { font-size: 14px; font-weight: 700; }
+/* Nhãn ô nhập */
+.qt-lb { font-size: 11px; font-weight: 700; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: .4px; }
+
+/* Chi tiết công trình — lưới 2x2: [HĐ gốc | QT đã có] / [Đã thu | Doanh thu hiện tại] */
 .qt-sum-cell {
-  min-width: 140px; padding: 10px 12px;
-  border: 1px solid var(--bs-border-color); border-radius: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--bs-border-color); border-radius: 8px;
   background: var(--bs-tertiary-bg);
 }
-.qt-sum-lb  { font-size: 11px; font-weight: 700; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: .4px; }
-.qt-sum-val { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; margin-top: 2px; white-space: nowrap; }
-@media (max-width: 576px) { .qt-sum-cell { min-width: calc(50% - 8px); } }
+.qt-sum-main { background: var(--bs-primary-bg-subtle); border-color: var(--bs-primary-border-subtle); }
+.qt-sum-lb  { font-size: 10.5px; font-weight: 700; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: .4px; }
+.qt-sum-val { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -11,8 +11,9 @@
 //     số dư tính TOÀN VÒNG ĐỜI (không lọc năm) — cùng nguồn với tab Công Nợ:
 //       Thầu phụ: Giá trị = Σ HĐ thầu phụ (giaTri + phatSinh) · Đã ứng = Σ phiếu ứng loai='thauphu'
 //       NCC     : Giá trị = Σ hóa đơn có NCC đó             · Đã ứng = Σ phiếu ứng loai='nhacungcap'
-//   • Bấm "Tất toán toàn bộ" → Bootstrap Modal xác nhận (chọn ngày phiếu) → OK → tạo 1 PHIẾU ỨNG
-//     thật (ung_v1) đúng bằng số còn phải trả → dòng mờ dần rồi bị xóa khỏi DOM.
+//   • Bấm "Tất toán toàn bộ" (1 dòng) hoặc tick checkbox nhiều dòng → "Tất toán các dòng đã chọn"
+//     → Bootstrap Modal xác nhận (chọn ngày phiếu) → OK → mỗi dòng tạo 1 PHIẾU ỨNG thật (ung_v1)
+//     đúng bằng số còn phải trả → các dòng mờ dần rồi bị xóa khỏi DOM.
 //     → Đã ứng = Giá trị, Còn phải TT = 0 → dòng tự biến mất; tab Công Nợ / Ứng TP/NCC tự nhảy số.
 //   • Phiếu tự sinh gắn cờ: autoSettle:true, settleId (mã của LẦN tất toán), settledBy.
 //     → Hoàn tác / Hủy = xóa mềm mọi phiếu cùng settleId (vào thùng rác như phiếu thường).
@@ -25,7 +26,7 @@ let _ttSearch = '';     // tìm theo tên đối tác (chữ thường)
 let _ttRowsCache = [];  // các dòng đang hiển thị (để tra cứu khi bấm nút theo chỉ số)
 let _ttLastSettleId = null;   // lần tất toán gần nhất (cho nút Hoàn tác)
 let _ttUndoTimer = null;
-let _ttPending = null;        // dòng đang chờ xác nhận trong modal: { row, idx }
+let _ttPending = null;        // các dòng đang chờ xác nhận trong modal: { keys: [...], idxs: [...] }
 
 // Ngưỡng "đã xong" dùng CHUNG với tab Công Nợ (doanh thu.congno.js) — fallback nếu chưa nạp
 function _ttTolerance() {
@@ -178,12 +179,14 @@ function ttRender() {
   const badge = document.getElementById('tt-count-badge');
   if (badge) badge.textContent = rows.length ? `(${rows.length} dòng)` : '';
   const empty = document.getElementById('tt-empty');
+  const chkAll = document.getElementById('tt-chk-all');
+  if (chkAll) chkAll.checked = false;
 
   // Chưa tải đủ dữ liệu mọi năm → số dư có thể sai → KHÓA nút tất toán
   const ready = _qtAllYearsReady;
 
   if (!rows.length) {
-    tbody.innerHTML = ready ? '' : `<tr><td colspan="6" class="text-center text-secondary py-4">⏳ Đang tải dữ liệu các năm để tính số dư...</td></tr>`;
+    tbody.innerHTML = ready ? '' : `<tr><td colspan="7" class="text-center text-secondary py-4">⏳ Đang tải dữ liệu các năm để tính số dư...</td></tr>`;
     if (empty) empty.style.display = ready ? '' : 'none';
   } else {
     if (empty) empty.style.display = 'none';
@@ -193,6 +196,7 @@ function ttRender() {
       tot += r.con;
       const pct = r.value > 0 ? Math.min(100, Math.round(r.daUng / r.value * 100)) : 0;
       return `<tr id="tt-row-${i}" style="transition:opacity .4s ease, background .4s ease">
+        <td style="text-align:center"><input type="checkbox" class="form-check-input tt-row-chk" data-i="${i}" onchange="ttUpdateBulkBtn()" ${canEdit ? '' : 'disabled'}></td>
         <td style="white-space:nowrap"><div style="font-weight:600">${x(r.partner)}</div>${_cnGroupBadge(r.group)}</td>
         <td style="white-space:nowrap">${x(r.ctName || '—')}</td>
         <td class="text-end font-monospace" style="white-space:nowrap">${r.value ? fmtS(r.value) : '<span class="text-secondary">—</span>'}</td>
@@ -203,10 +207,11 @@ function ttRender() {
         </td>
       </tr>`;
     }).join('') + `<tr id="tt-total-row" style="border-top:2px solid var(--bs-border-color);font-weight:700;background:var(--bs-tertiary-bg)">
-        <td colspan="4" class="text-secondary" style="padding:8px 12px">Tổng còn phải trả (${rows.length} dòng)</td>
+        <td colspan="5" class="text-secondary" style="padding:8px 12px">Tổng còn phải trả (${rows.length} dòng)</td>
         <td class="text-end font-monospace text-danger" style="white-space:nowrap">${fmtM(tot)}</td><td></td>
       </tr>`;
   }
+  ttUpdateBulkBtn();
   _ttRenderHistory(batches);
 }
 
@@ -233,24 +238,62 @@ function _ttRenderHistory(batches) {
   }).join('');
 }
 
-// ══ TẤT TOÁN (1 nút / dòng + Bootstrap Modal xác nhận) ═══════════════
-// Bấm "Tất toán toàn bộ" → mở modal hỏi xác nhận + chọn ngày phiếu chi.
-function ttSettleOne(i) {
-  const r = _ttRowsCache[i];
-  if (!r) return;
+// ══ TẤT TOÁN — 1 dòng (nút trên dòng) hoặc nhiều dòng (checkbox) + Bootstrap Modal ══
+
+// ── Checkbox: chọn tất cả / đếm dòng đã chọn / cập nhật nút tất toán hàng loạt ──
+function ttToggleAll(checked) {
+  document.querySelectorAll('.tt-row-chk:not(:disabled)').forEach(c => { c.checked = checked; });
+  ttUpdateBulkBtn();
+}
+function _ttCheckedIdx() {
+  return [...document.querySelectorAll('.tt-row-chk:checked')].map(c => +c.dataset.i).filter(i => _ttRowsCache[i]);
+}
+function ttUpdateBulkBtn() {
+  const btn = document.getElementById('tt-bulk-btn');
+  const lb  = document.getElementById('tt-bulk-label');
+  const idx = _ttCheckedIdx();
+  const tot = idx.reduce((s, i) => s + _ttRowsCache[i].con, 0);
+  if (btn) btn.disabled = !idx.length;
+  if (lb) lb.textContent = idx.length ? `Tất toán ${idx.length} dòng đã chọn — ${fmtM(tot)}` : 'Tất toán các dòng đã chọn';
+}
+
+// Nút "✔️ Tất toán toàn bộ" trên 1 dòng
+function ttSettleOne(i) { _ttOpenConfirm([i]); }
+// Nút "Tất toán các dòng đã chọn" (hàng loạt)
+function ttSettleSelected() {
+  const idx = _ttCheckedIdx();
+  if (idx.length) _ttOpenConfirm(idx);
+}
+
+// Mở modal xác nhận cho danh sách chỉ số dòng
+function _ttOpenConfirm(idxs) {
+  const rows = idxs.map(i => _ttRowsCache[i]).filter(Boolean);
+  if (!rows.length) return;
   if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được tất toán', 'error'); return; }
   if (!_qtAllYearsReady) {
     toast('Chưa tải đủ dữ liệu các năm — chưa thể tất toán (tránh trả dư tiền)', 'error');
     qtEnsureAllYears(() => ttRender());
     return;
   }
-  _ttPending = { row: r, idx: i };
+  _ttPending = { keys: rows.map(r => r.key), idxs };
+  const total = rows.reduce((s, r) => s + r.con, 0);
   const m = _ttEnsureModal();
-  m.querySelector('#tt-cm-msg').innerHTML =
-    `Xác nhận tạo phiếu chi thanh toán nốt <strong class="text-danger font-monospace">${fmtM(r.con)}</strong> cho <strong>${x(r.partner)}</strong>?`;
-  m.querySelector('#tt-cm-detail').innerHTML =
-    `Công trình: <strong>${x(r.ctName || 'không gắn công trình')}</strong><br>` +
-    `Giá trị ${fmtM(r.value)} · Đã ứng ${fmtM(r.daUng)} → sau khi tất toán: Còn phải TT = 0`;
+  if (rows.length === 1) {
+    const r = rows[0];
+    m.querySelector('#tt-cm-msg').innerHTML =
+      `Xác nhận tạo phiếu chi thanh toán nốt <strong class="text-danger font-monospace">${fmtM(r.con)}</strong> cho <strong>${x(r.partner)}</strong>?`;
+    m.querySelector('#tt-cm-detail').innerHTML =
+      `Công trình: <strong>${x(r.ctName || 'không gắn công trình')}</strong><br>` +
+      `Giá trị ${fmtM(r.value)} · Đã ứng ${fmtM(r.daUng)} → sau khi tất toán: Còn phải TT = 0`;
+  } else {
+    // Nhiều dòng: liệt kê tối đa 8 dòng, còn lại ghi "+N dòng khác"
+    const list = rows.slice(0, 8).map(r =>
+      `<li><strong>${x(r.partner)}</strong> — ${x(r.ctName || 'không gắn CT')}: <span class="font-monospace">${fmtM(r.con)}</span></li>`).join('');
+    m.querySelector('#tt-cm-msg').innerHTML =
+      `Xác nhận tạo <strong>${rows.length} phiếu chi</strong>, tổng <strong class="text-danger font-monospace">${fmtM(total)}</strong>?`;
+    m.querySelector('#tt-cm-detail').innerHTML =
+      `<ul class="mb-0 ps-3">${list}</ul>` + (rows.length > 8 ? `<div class="mt-1">+${rows.length - 8} dòng khác</div>` : '');
+  }
   m.querySelector('#tt-cm-ngay').value = today();
   bootstrap.Modal.getOrCreateInstance(m).show();
 }
@@ -290,7 +333,7 @@ function _ttEnsureModal() {
   return m;
 }
 
-// Bấm OK trong modal → tạo phiếu → dòng mờ dần rồi bị xóa khỏi DOM → vẽ lại tổng/KPI
+// Bấm OK trong modal → tạo phiếu → các dòng mờ dần rồi bị xóa khỏi DOM → vẽ lại tổng/KPI
 function _ttConfirmOk() {
   const pend = _ttPending;
   const m = document.getElementById('tt-confirm-modal');
@@ -298,23 +341,26 @@ function _ttConfirmOk() {
   const ngay = m?.querySelector('#tt-cm-ngay')?.value || '';
   if (!ngay) { toast('Vui lòng chọn Ngày phiếu chi!', 'error'); return; }
   // Tính lại số dư ngay lúc bấm OK (phòng dữ liệu vừa đổi do đồng bộ)
-  const fresh = _ttBuildRows().find(x => x.key === pend.row.key);
+  const keySet = new Set(pend.keys);
+  const fresh = _ttBuildRows().filter(r => keySet.has(r.key));
   bootstrap.Modal.getOrCreateInstance(m).hide();
-  if (!fresh) { toast('Dòng này đã hết nợ', 'info'); ttRender(); return; }
+  if (!fresh.length) { toast('Các dòng đã chọn đều đã hết nợ', 'info'); ttRender(); return; }
 
-  const settleId = ttCreatePhieu([fresh], ngay);
+  const settleId = ttCreatePhieu(fresh, ngay);
+  const total = fresh.reduce((s, r) => s + r.con, 0);
 
   // Hiệu ứng: dòng chuyển xanh → mờ dần → xóa khỏi DOM, sau đó vẽ lại tổng + KPI
-  const tr = document.getElementById('tt-row-' + pend.idx);
-  if (tr) { tr.style.background = 'var(--bs-success-bg-subtle)'; tr.style.opacity = '0'; }
+  const trs = pend.idxs.map(i => document.getElementById('tt-row-' + i)).filter(Boolean);
+  trs.forEach(tr => { tr.style.background = 'var(--bs-success-bg-subtle)'; tr.style.opacity = '0'; });
   setTimeout(() => {
-    if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+    trs.forEach(tr => { if (tr.parentNode) tr.parentNode.removeChild(tr); });
     ttRender();
     _ttRefreshOtherTabs();
   }, 450);
 
-  toast(`✅ Đã tất toán ${fresh.partner} — ${fmtM(fresh.con)}`, 'success');
-  _ttShowUndo(settleId, `✅ Đã tất toán ${fresh.partner} · ${fmtM(fresh.con)}`);
+  const label = fresh.length === 1 ? fresh[0].partner : `${fresh.length} dòng`;
+  toast(`✅ Đã tất toán ${label} — ${fmtM(total)}`, 'success');
+  _ttShowUndo(settleId, `✅ Đã tất toán ${label} · ${fmtM(total)}`);
 }
 
 // ── LÕI: tạo phiếu ứng tất toán cho các dòng (KHÔNG hỏi, KHÔNG đụng giao diện) ──
@@ -405,6 +451,9 @@ window.initTatToan       = initTatToan;
 window.ttRender          = ttRender;
 window.ttApplyFilters    = ttApplyFilters;
 window.ttSettleOne       = ttSettleOne;
+window.ttSettleSelected  = ttSettleSelected;
+window.ttToggleAll       = ttToggleAll;
+window.ttUpdateBulkBtn   = ttUpdateBulkBtn;
 window.ttUndoLast        = ttUndoLast;
 window.ttCancelBatch     = ttCancelBatch;
 window.ttCreatePhieu     = ttCreatePhieu;

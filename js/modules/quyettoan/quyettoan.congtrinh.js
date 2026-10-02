@@ -1,12 +1,14 @@
 // quyettoan.congtrinh.js — Tab QUYẾT TOÁN · Phân hệ 2A: Quyết Toán Công Trình (với Chủ Đầu Tư)
 // Load order: sau quyettoan.core.js, trước quyettoan.thauphu.js
 //
-// Giao diện: pages/quyettoan.html — LUỒNG CUỘN DỌC 4 BLOCK (02/10/2026):
-//   Block 1 #qtf-ct            : chọn công trình (điểm bắt đầu)
-//   Block 2 #qt-blk-summary    : tóm tắt [HĐ gốc] | [QT đã có] | [Đã thu] ➔ [DOANH THU HIỆN TẠI]
-//   Block 3 #qt-blk-form       : form 3 loại + dòng kết quả tức thì dưới ô số tiền (#qtf-sotien-hint)
-//   Block 4 #qt-blk-history    : lịch sử quyết toán CỦA RIÊNG công trình đang chọn
-//   Block 2–4 ẩn cho tới khi chọn công trình (_qtToggleBlocks).
+// Giao diện: pages/quyettoan.html — 2 CỘT trên Laptop/PC (≥1200px), tự xếp dọc trên tablet (02/10/2026):
+//   CỘT TRÁI  Block 1 #qtf-ct          : chọn công trình — LUÔN hiện
+//             Block 2 #qt-blk-summary  : chi tiết CT lưới 2x2 [HĐ gốc | QT đã có] / [Đã thu | DOANH THU HIỆN TẠI]
+//                                        — LUÔN hiện ("—" khi chưa chọn, _qtClearSummary)
+//   CỘT PHẢI  Block 3 #qt-blk-form     : form 3 loại + dòng kết quả tức thì dưới ô số tiền (#qtf-sotien-hint)
+//                     #qt-blk-empty    : thẻ hướng dẫn khi chưa chọn CT
+//   DƯỚI CÙNG Block 4 #qt-blk-history  : lịch sử quyết toán CỦA RIÊNG công trình đang chọn (trải rộng 2 cột)
+//   Form + lịch sử chỉ hiện khi đã chọn công trình (_qtToggleBlocks).
 // Dữ liệu  : ghi vào quyetToanRecords / kho 'quyettoan_v1' (khai báo ở doanhthu.core.js)
 // Công thức: MỌI con số doanh thu đều lấy từ calcTongDoanhThu() (quyettoan.core.js)
 //            → tab Doanh Thu / Lợi Nhuận / chi tiết Công Trình tự nhảy số, KHÔNG ghi 2 nơi.
@@ -61,12 +63,34 @@ function _qtApplyLoaiText(loai) {
   if (hint) hint.textContent = _QT_HINT[loai];
 }
 
-// ── Ẩn/hiện Block 2–4 theo việc đã chọn công trình chưa ──
+// ── Ẩn/hiện theo việc đã chọn công trình chưa ──
+// Khung "Chọn công trình" + "Chi tiết công trình" (cột trái) LUÔN hiện.
+// Đã chọn → hiện form (cột phải) + lịch sử; chưa chọn → hiện thẻ hướng dẫn #qt-blk-empty.
 function _qtToggleBlocks(show) {
-  ['qt-blk-summary', 'qt-blk-form', 'qt-blk-history'].forEach(id => {
+  ['qt-blk-form', 'qt-blk-history'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? '' : 'none';
   });
+  const empty = document.getElementById('qt-blk-empty');
+  if (empty) empty.style.display = show ? 'none' : '';
+}
+
+// ── Chi tiết công trình về trạng thái trống ("—") khi chưa chọn công trình ──
+function _qtClearSummary() {
+  ['qt-sum-hd', 'qt-sum-qt', 'qt-sum-thu', 'qt-sum-dt'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+  const qtEl = document.getElementById('qt-sum-qt');
+  if (qtEl) qtEl.className = 'qt-sum-val';
+  ['qt-sum-con', 'qt-sum-note', 'qt-sum-status'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  const nm = document.getElementById('qt-sum-name');
+  if (nm) { nm.textContent = 'Chưa chọn công trình'; nm.classList.add('text-secondary'); }
+  const load = document.getElementById('qt-sum-loading');
+  if (load) load.style.display = 'none';
 }
 
 // ══ KHỞI TẠO TAB ═════════════════════════════════════════════════
@@ -119,7 +143,7 @@ function qtPopulateSels() {
 
 // ── Reset form ──
 // keepCt = true : giữ công trình đang chọn (sau khi Lưu / Hủy sửa) → chỉ xóa các ô nhập
-// keepCt = false: về trạng thái ban đầu, bỏ chọn công trình → ẩn Block 2–4
+// keepCt = false: về trạng thái ban đầu, bỏ chọn công trình → ẩn form + lịch sử
 function qtResetForm(keepCt) {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('qtf-ngay', today());
@@ -156,7 +180,7 @@ function qtOnLoaiChange() {
   qtUpdatePreview();
 }
 
-// ── Block 1 đổi công trình → hiện/ẩn Block 2–4 + vẽ tóm tắt, preview, lịch sử ──
+// ── Block 1 đổi công trình → hiện/ẩn form + lịch sử, vẽ chi tiết, preview, lịch sử ──
 function qtOnCtChange() {
   const pid = document.getElementById('qtf-ct')?.value || '';
   _qtToggleBlocks(!!pid);
@@ -193,12 +217,13 @@ function _qtReadForm() {
 // ══ BLOCK 2 (tóm tắt) + BLOCK 3 (kết quả tức thì) ═══════════════════
 function qtUpdatePreview() {
   const f = _qtReadForm();
-  if (!f.proj) return;
+  if (!f.proj) { _qtClearSummary(); return; }
+  document.getElementById('qt-sum-name')?.classList.remove('text-secondary');
 
   // Trạng thái hiện tại (toàn vòng đời)
   const truoc = calcTongDoanhThu(f.proj, { allYears: true });
 
-  // ── Block 2: [HĐ gốc] | [QT đã có] | [Đã thu] ➔ [DOANH THU HIỆN TẠI] ──
+  // ── Block 2 (lưới 2x2): [HĐ gốc | QT đã có] / [Đã thu | DOANH THU HIỆN TẠI] ──
   const setTxt = (id, t, cls) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -239,7 +264,7 @@ function qtUpdatePreview() {
   const sau = calcTongDoanhThu(f.proj, { allYears: true, excludeId: f.editId || undefined, extra: f.fake });
   const chenh = sau.tongDT - truoc.tongDT;
   hint.className = 'mt-1 fw-semibold ' + (chenh < 0 ? 'text-danger' : 'text-success');
-  hint.style.fontSize = '13px';
+  hint.style.fontSize = '12.5px';
   hint.innerHTML = `💡 Doanh thu mới sẽ cập nhật thành: <span class="font-monospace">${fmtM(sau.tongDT)}</span>` +
     ` <span style="font-weight:400">(${chenh ? (chenh > 0 ? '▲ +' : '▼ -') + fmtM(Math.abs(chenh)) : 'không đổi'}` +
     ` · còn phải thu ${sau.conPhaiThu >= 0 ? fmtM(sau.conPhaiThu) : '−' + fmtM(-sau.conPhaiThu)})</span>`;
