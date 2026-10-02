@@ -1812,6 +1812,9 @@ Không đụng logic lưu: `addDraft`/lưu hóa đơn vẫn không bắt buộc 
 - **Sửa trực tiếp** `tbEditCell(td,id,field)` + `_tbApplyEdit()` (thay `_tbSaveGhichu`): `ghichu` (mọi bảng), `soluong` + `tinhtrang` (2 bảng kho, class `.tb-edit-cell`). SL phải > 0. Đổi tình trạng/ghi chú trùng khóa nhóm cùng nơi → gộp SL. `tbUpdateField` (select tình trạng bảng CT) cũng đi qua `_tbApplyEdit`. `_tbRerenderAll()` vẽ lại mọi bảng + bộ lọc CT.
 - **Lọc CT động:** `_tbRefreshCtFilter()` chỉ liệt kê CT có record hiển thị (`_tbListVisible`) với SL > 0, sắp theo thứ tự Master; bỏ option kho (bảng CT không chứa kho).
 - Cột "Ngày Luân Chuyển" → **"Ngày LC"** (3 bảng). Form nhập mặc định **3 dòng** (`tbBuildRows(n=3)`, `main.js` goPage). Thứ tự trang: Danh Sách tại CT → Kho Thiết Bị Công Ty → Kho Vật Tư Giàn Giáo → Nhập; bỏ chấm cam, thêm icon (`construction`, `home_repair_service`, `warehouse`, `add_box`).
+- **Tình trạng = dropdown ở mọi bảng:** 2 bảng kho dùng `<select class="tb-status">` luôn hiện → `tbUpdateField` (như bảng CT; `tbEditCell` vẫn hỗ trợ `tinhtrang` nhưng không còn ô nào gọi). Bảng nhập: `<select class="cell-input" data-f="tinhtrang">`, sheet-grid `cellSelector: 'input, select'`, cột `tinhtrang` không còn autocomplete.
+- **Popup Luân chuyển:** ẩn CT `status === 'closed'` khỏi nơi đến; `#tb-ei-ct` (class `form-select form-select-sm`) được `_ssEnhance` sau khi popup hiện, wrap kéo 100% ngang.
+- **Sắp xếp mặc định 3 bảng:** `_tbCmpNgayDesc` — Ngày LC mới nhất lên đầu, thiếu ngày xuống cuối; cùng ngày → bảng CT theo thứ tự Master rồi tên, bảng kho theo tên.
 - Dashboard `_dbTBByCT` (datatools.js): khối KHO TỔNG → 1 khối mỗi kho. Mobile `mbScrThietBi`: nhận kho theo `projectId === 'COMPANY'`, chip "Kho".
 
 **File đã sửa:** `pages/thietbi.html`, `js/legacy/thietbi.js`, `assets/css/style.css`, `js/app/main.js`, `js/modules/projects/projects.model.js`, `js/legacy/datatools.js`, `js/mobile/mobile.screens.js`.

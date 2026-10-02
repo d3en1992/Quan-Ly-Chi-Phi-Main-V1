@@ -242,14 +242,15 @@ function _initTbSheetGrid() {
     name: 'thietbi',
     tbody: '#tb-tbody',
     rowSelector: 'tr',
-    cellSelector: 'input',
+    // Có cả select (cột Tình trạng) → mũi tên trái/phải vẫn di chuyển qua được
+    cellSelector: 'input, select',
     addRow: () => tbAddRow(),
     columns: [
       // Tên thiết bị: bắt buộc chọn trong danh mục (gõ sai → ô đỏ)
       { field: 'ten',       type: 'autocomplete', source: () => tbGetNames() },
       { field: 'soluong',   type: 'number' },
-      // Tình trạng: chỉ 3 giá trị cố định
-      { field: 'tinhtrang', type: 'autocomplete', source: () => [...TB_TINH_TRANG], copyFromAbove: true },
+      // Tình trạng: dropdown 3 giá trị cố định (giống bảng Danh Sách tại CT)
+      { field: 'tinhtrang' },
       { field: 'ghichu',    type: 'text' }
     ]
   });
@@ -279,7 +280,7 @@ function tbAddRow(data, num) {
     <td style="padding:0"><input data-f="soluong" type="number" class="np-num-input" min="0" step="1" inputmode="decimal"
       value="${data?.soluong||''}" placeholder="0"
       style="width:100%;text-align:center;border:none;background:transparent;padding:7px 4px;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;color:var(--ink);-moz-appearance:textfield;-webkit-appearance:textfield;appearance:textfield"></td>
-    <td><input class="cell-input" data-f="tinhtrang" autocomplete="off" placeholder="Tình trạng..." value="${x(tt)}"></td>
+    <td><select class="cell-input" data-f="tinhtrang">${TB_TINH_TRANG.map(v => `<option value="${v}"${v === tt ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
     <td><input class="cell-input" data-f="ghichu" placeholder="Thông tin máy..." value="${x(data?.ghichu||'')}"></td>
     <td><button class="del-btn" onclick="this.closest('tr').remove();tbRenum()" title="Xóa dòng"><span class="material-symbols-outlined">close</span></button></td>`;
   tbody.appendChild(tr);
@@ -404,6 +405,16 @@ function _tbMatchQ(r, q) {
 
 // Record có thuộc bảng "Danh Sách Thiết Bị Tại Công Trình" không (chưa tính bộ lọc người dùng):
 // chưa xóa, KHÔNG thuộc 2 kho, và (khi lọc theo năm) CT hoạt động trong năm hoặc máy đang hoạt động
+// So sánh để sắp xếp: Ngày LC MỚI NHẤT lên đầu; thiếu ngày → cuối bảng.
+// Ngày lưu dạng YYYY-MM-DD nên so chuỗi là đúng thứ tự thời gian.
+function _tbCmpNgayDesc(a, b) {
+  const na = a.ngay || '', nb = b.ngay || '';
+  if (na === nb) return 0;
+  if (!na) return 1;
+  if (!nb) return -1;
+  return na < nb ? 1 : -1;
+}
+
 function _tbListVisible(r) {
   if (r.deletedAt) return false;
   if (isKhoTong(r) || _tbKhoByName(r.ct)) return false;
@@ -453,7 +464,10 @@ function tbRenderList() {
     return idx === -1 ? 999 : idx;
   };
 
+  // Mặc định: Ngày LC mới nhất lên đầu; cùng ngày → theo thứ tự CT (Master) rồi tên thiết bị
   filtered.sort((a,b) => {
+    const byNgay = _tbCmpNgayDesc(a, b);
+    if (byNgay) return byNgay;
     const ctA = _resolveCtName(a);
     const ctB = _resolveCtName(b);
     if (ctA !== ctB) return getProjIdx(ctA) - getProjIdx(ctB);
@@ -659,9 +673,9 @@ function tbLuanChuyen(id) {
   }
 
   const isKho = isKhoTong(r);
-  // Dropdown nơi đến: 2 KHO (bỏ kho đang đứng nếu nguồn là kho) + các công trình
+  // Dropdown nơi đến: 2 KHO (bỏ kho đang đứng nếu nguồn là kho) + các công trình CHƯA quyết toán
   const _editProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
-    .filter(p => p.id !== 'COMPANY');
+    .filter(p => p.id !== 'COMPANY' && p.status !== 'closed');
   const ctOpts = _tbKhoOpts('', isKho ? _tbKhoCode(r) : null) +
     _editProjs.map(p=>`<option value="${x(p.name)}" data-pid="${p.id}"${p.name===r.ct&&!isKho?' selected':''}>${x(p.name)}</option>`).join('');
   const ttOpts = TB_TINH_TRANG.map(v=>`<option value="${v}" ${r.tinhtrang===v?'selected':''}>${v}</option>`).join('');
@@ -681,8 +695,8 @@ function tbLuanChuyen(id) {
         <span style="color:#888">SL hiện tại:</span> <b>${r.soluong||0}</b>
       </div>
       <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Chuyển đến Công Trình / Kho</label>
-        <select id="tb-ei-ct" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none">
-          <option value="">-- Chọn --</option>${ctOpts}</select></div>
+        <select id="tb-ei-ct" class="form-select form-select-sm" style="width:100%">
+          <option value="">-- Chọn công trình / kho --</option>${ctOpts}</select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Số Lượng chuyển <span class="text-secondary" style="font-weight:400">(tối đa ${r.soluong||0})</span></label>
           <input id="tb-ei-sl" type="number" class="np-num-input" min="1" max="${r.soluong||0}" value="${r.soluong||0}" inputmode="decimal"
@@ -708,6 +722,14 @@ function tbLuanChuyen(id) {
     </div>
   </div>`;
   ov.style.display = 'flex';
+
+  // Ô nơi đến → ô chọn có GÕ ĐỂ TÌM, dùng lại y hệt _ssEnhance của ô "Công Trình / Kho" form nhập.
+  // Gọi SAU khi popup hiện để đo đúng độ rộng; ô chiếm hết chiều ngang popup.
+  const ctSel = document.getElementById('tb-ei-ct');
+  if (typeof _ssEnhance === 'function' && ctSel) {
+    _ssEnhance(ctSel);
+    if (ctSel._ss) { ctSel._ss.wrap.style.width = '100%'; ctSel._ss.wrap.style.display = 'block'; }
+  }
 }
 
 function tbSaveEdit(id) {
@@ -832,7 +854,8 @@ function _renderKho(code) {
     return true;
   });
 
-  filtered.sort((a,b) => recCatName(a,'tb','ten').localeCompare(recCatName(b,'tb','ten'),'vi'));
+  // Mặc định: Ngày LC mới nhất lên đầu; cùng ngày → theo tên thiết bị
+  filtered.sort((a,b) => _tbCmpNgayDesc(a, b) || recCatName(a,'tb','ten').localeCompare(recCatName(b,'tb','ten'),'vi'));
 
   // Trang hiện tại vượt quá số trang (vd: sau khi lọc / xóa) → về trang cuối hợp lệ
   const tp = Math.max(1, Math.ceil(filtered.length/KHO_PG));
@@ -850,12 +873,17 @@ function _renderKho(code) {
 
   tbody.innerHTML = paged.map(r => {
     const ttStyle = TB_STATUS_STYLE[r.tinhtrang] || '';
-    // SL, Tình trạng, Thông Tin Máy: bấm vào ô để sửa trực tiếp (tbEditCell)
+    // SL, Thông Tin Máy: bấm vào ô để sửa trực tiếp (tbEditCell); Tình trạng: dropdown đổi là lưu
     return `<tr data-tbid="${r.id}">
       <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(recCatName(r,'tb','ten'))}</span></td>
       <td class="text-warning text-center font-monospace fw-bold tb-edit-cell" style="font-size:14px"
         title="Bấm để sửa số lượng" onclick="tbEditCell(this,'${r.id}','soluong')">${r.soluong||0}</td>
-      <td class="tb-edit-cell" title="Bấm để đổi tình trạng" onclick="tbEditCell(this,'${r.id}','tinhtrang')"><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
+      <td>
+        <select onchange="tbUpdateField('${r.id}','tinhtrang',this.value)"
+          class="tb-status" style="cursor:pointer;border:1px solid var(--bs-border-color);${ttStyle}">
+          ${TB_TINH_TRANG.map(v => `<option value="${v}" ${r.tinhtrang===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </td>
       <td class="text-secondary tb-ghichu-cell" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
         title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditCell(this,'${r.id}','ghichu')">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
