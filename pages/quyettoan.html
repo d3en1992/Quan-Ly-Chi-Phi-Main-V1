@@ -54,13 +54,13 @@
                       <div class="qt-sum-lb">Chi phí thực tế đã chi</div><div id="qt-sum-chi" class="qt-sum-val text-danger">—</div>
                       <div id="qt-sum-chi-sub" class="qt-sum-sub"></div>
                     </div></div>
-                    <!-- Hàng 2: Doanh thu hiện tại (tiền đã thu) | Hiệu quả lãi/lỗ hiện tại -->
+                    <!-- Hàng 2: Doanh thu hiện tại (tiền đã thu) | Lợi nhuận hiện tại (= "Hiệu quả" ở modal Công Trình) -->
                     <div class="col-6"><div class="qt-sum-cell h-100">
                       <div class="qt-sum-lb">Doanh thu hiện tại</div><div id="qt-sum-thu" class="qt-sum-val text-success">—</div>
                       <div id="qt-sum-thu-sub" class="qt-sum-sub"></div>
                     </div></div>
                     <div class="col-6"><div id="qt-sum-hq-cell" class="qt-sum-cell h-100">
-                      <div class="qt-sum-lb">Hiệu quả lãi / lỗ hiện tại</div><div id="qt-sum-hq" class="qt-sum-val">—</div>
+                      <div class="qt-sum-lb">Lợi nhuận hiện tại</div><div id="qt-sum-hq" class="qt-sum-val">—</div>
                       <div id="qt-sum-hq-sub" class="qt-sum-sub"></div>
                     </div></div>
                     <!-- Hàng 3 (REAL-TIME): Doanh thu sau QT | Lợi nhuận sau QT = DT sau QT − Chi phí thực tế đã chi -->
@@ -93,6 +93,8 @@
                   <div class="qt-card-title mb-2">
                     <span class="material-symbols-outlined msi-gap">edit_note</span><span id="qtf-title">Thêm Quyết Toán</span>
                   </div>
+                  <!-- Quy tắc 1-1: ghi chú "đã có quyết toán" / cảnh báo dữ liệu cũ có nhiều bản -->
+                  <div id="qtf-dup"></div>
 
                   <!-- Loại quyết toán: Bootstrap Button Group dạng radio -->
                   <div class="qt-lb mb-1">Loại quyết toán *</div>
@@ -138,7 +140,7 @@
 
                   <input type="hidden" id="qtf-edit-id" />
                   <div class="d-flex justify-content-end gap-2 mt-2">
-                    <button class="btn btn-sm btn-outline-secondary" id="qtf-cancel-btn" style="display:none" onclick="qtResetForm(true)"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
+                    <button class="btn btn-sm btn-outline-secondary" id="qtf-cancel-btn" style="display:none" onclick="qtResetForm(true)" title="Bỏ các thay đổi chưa lưu, nạp lại bản quyết toán đã lưu"><span class="material-symbols-outlined msi-gap">undo</span>Hủy thay đổi</button>
                     <button class="btn btn-sm btn-warning fw-bold px-3" id="qtf-save-btn" onclick="qtSave()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Quyết Toán</button>
                   </div>
                 </div>
@@ -146,22 +148,23 @@
             </div>
           </div>
 
-          <!-- ══ DƯỚI CÙNG: LỊCH SỬ QUYẾT TOÁN (trải rộng 2 cột) — chỉ công trình đang chọn ══ -->
-          <div id="qt-blk-history" style="display:none">
+          <!-- ══ DƯỚI CÙNG: LỊCH SỬ QUYẾT TOÁN (trải rộng 2 cột) — TẤT CẢ công trình, 7 dòng/trang, luôn hiện ══ -->
+          <div id="qt-blk-history">
             <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
               <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2 me-2" style="white-space:nowrap;font-size:14px">
                 <span class="dot"></span><span class="material-symbols-outlined msi-gap">history</span>Lịch Sử Quyết Toán
                 <span id="qth-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
               </div>
-              <input type="text" id="qth-search" class="form-control form-control-sm" style="width:220px" placeholder="Tìm nội dung, người..." oninput="qtSetHistorySearch(this.value)">
+              <input type="text" id="qth-search" class="form-control form-control-sm" style="width:220px" placeholder="Tìm công trình, nội dung, người..." oninput="qtSetHistorySearch(this.value)">
             </div>
-            <div id="qth-hint" class="text-secondary mb-2" style="font-size:11px"></div>
+            <div class="text-secondary mb-2" style="font-size:11px">Toàn bộ quyết toán của các công trình trong năm đang lọc (mỗi công trình 01 bản). Dòng tô vàng = công trình đang chọn.</div>
             <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
               <div style="overflow-x:auto">
-                <table class="table table-sm table-hover align-middle mb-0" style="min-width:760px;font-size:12.5px">
+                <table class="table table-sm table-hover align-middle mb-0" style="min-width:900px;font-size:12.5px">
                   <thead class="table-light">
                     <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
                       <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
+                      <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
                       <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
                       <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Số Tiền Nhập</th>
                       <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap" title="Mức làm doanh thu thay đổi (thay thế được quy đổi thành chênh lệch)">Ảnh Hưởng DT</th>

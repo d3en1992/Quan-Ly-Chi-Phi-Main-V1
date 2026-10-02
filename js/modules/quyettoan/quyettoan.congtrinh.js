@@ -9,8 +9,12 @@
 //                 [DOANH THU SAU QT | LỢI NHUẬN SAU QT] → tự nhảy số khi gõ số tiền ở form
 //   CỘT PHẢI  Block 3 #qt-blk-form     : form 3 loại + dòng kết quả tức thì dưới ô số tiền (#qtf-sotien-hint)
 //                     #qt-blk-empty    : thẻ hướng dẫn khi chưa chọn CT
-//   DƯỚI CÙNG Block 4 #qt-blk-history  : lịch sử quyết toán CỦA RIÊNG công trình đang chọn (trải rộng 2 cột)
-//   Form + lịch sử chỉ hiện khi đã chọn công trình (_qtToggleBlocks).
+//   DƯỚI CÙNG Block 4 #qt-blk-history  : lịch sử quyết toán của TẤT CẢ công trình (năm đang lọc),
+//                                        7 dòng/trang — luôn hiện; dòng của CT đang chọn được tô sáng
+//   Form chỉ hiện khi đã chọn công trình (_qtToggleBlocks).
+// QUY TẮC 1-1 (02/10/2026): MỖI CÔNG TRÌNH CHỈ CÓ 01 BẢN QUYẾT TOÁN. Chọn CT đã có quyết toán →
+//   form tự chuyển sang "Sửa Quyết Toán" (nạp sẵn bản hiện có); sai sót thì sửa trên bản đó,
+//   KHÔNG tạo bản thứ hai (qtSave cũng tự chặn). Dữ liệu cũ lỡ có ≥ 2 bản → cảnh báo #qtf-dup.
 // Dữ liệu  : ghi vào quyetToanRecords / kho 'quyettoan_v1' (khai báo ở doanhthu.core.js)
 // Công thức: số tài chính lấy từ ctTaiChinh() (projects.ui.js) — THEO NĂM ĐANG LỌC, giống modal
 //            chi tiết công trình; quyết toán quy đổi delta ở quyettoan.core.js. KHÔNG ghi 2 nơi.
@@ -69,9 +73,9 @@ function _qtApplyLoaiText(loai) {
 
 // ── Ẩn/hiện theo việc đã chọn công trình chưa ──
 // Khung "Chọn công trình" + "Chi tiết công trình" (cột trái) LUÔN hiện.
-// Đã chọn → hiện form (cột phải) + lịch sử; chưa chọn → hiện thẻ hướng dẫn #qt-blk-empty.
+// Đã chọn → hiện form (cột phải); chưa chọn → hiện thẻ hướng dẫn #qt-blk-empty. Lịch sử LUÔN hiện.
 function _qtToggleBlocks(show) {
-  ['qt-blk-form', 'qt-blk-history'].forEach(id => {
+  ['qt-blk-form'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? '' : 'none';
   });
@@ -157,22 +161,31 @@ function qtPopulateSels() {
   }
 }
 
-// ── Reset form ──
-// keepCt = true : giữ công trình đang chọn (sau khi Lưu / Hủy sửa) → chỉ xóa các ô nhập
-// keepCt = false: về trạng thái ban đầu, bỏ chọn công trình → ẩn form + lịch sử
-function qtResetForm(keepCt) {
+// ── Bản quyết toán (còn hiệu lực) của 1 công trình — QUY TẮC 1-1 ──
+// preferId: ưu tiên đúng bản này (VD bấm Sửa ở bảng lịch sử khi dữ liệu cũ lỡ có nhiều bản).
+// Không có preferId → lấy bản MỚI NHẤT. Trả về { rec, count } (count = số bản đang có).
+function _qtRecordOfCt(pid, preferId) {
+  const p = _qtResolveProj(pid);
+  if (!p) return { rec: null, count: 0 };
+  const list = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
+    .filter(r => !r.deletedAt && _qtMatchProj(r, p))
+    .sort(_qtSortAsc);
+  const pref = preferId ? list.find(r => String(r.id) === String(preferId)) : null;
+  return { rec: pref || list[list.length - 1] || null, count: list.length };
+}
+
+// ── Xóa trắng các ô nhập (KHÔNG đụng ô chọn công trình) → chế độ "Thêm Quyết Toán" ──
+function _qtClearInputs() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('qtf-ngay', today());
   set('qtf-nguoi', '');
   set('qtf-nd', '');
   set('qtf-edit-id', '');
-  if (!keepCt) set('qtf-ct', '');
   const st = document.getElementById('qtf-sotien');
   if (st) { st.value = ''; st.dataset.raw = ''; }
   const chot = document.getElementById('qtf-chot');
   if (chot) chot.checked = false;
   _qtSetLoai('tang');
-
   const title = document.getElementById('qtf-title');
   if (title) title.textContent = 'Thêm Quyết Toán';
   const saveBtn = document.getElementById('qtf-save-btn');
@@ -181,7 +194,49 @@ function qtResetForm(keepCt) {
   if (cancelBtn) cancelBtn.style.display = 'none';
   const card = document.getElementById('qt-blk-form');
   if (card) card.style.outline = '';
+  const dup = document.getElementById('qtf-dup');
+  if (dup) dup.innerHTML = '';
+}
 
+// ── Nạp 1 bản quyết toán lên form → chế độ "Sửa Quyết Toán" ──
+function _qtFillForm(r, count) {
+  const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v; };
+  set('qtf-ngay', r.ngay || today());
+  set('qtf-nd', r.nd || '');
+  set('qtf-edit-id', r.id);
+  const nguoiSel = document.getElementById('qtf-nguoi');
+  if (nguoiSel) _setSelectFlexible(nguoiSel, r.nguoi || '');
+  const st = document.getElementById('qtf-sotien');
+  if (st) {
+    const v = qtSoTien(r);
+    st.dataset.raw = String(v);
+    st.value = v ? v.toLocaleString('vi-VN') : '';
+  }
+  _qtSetLoai(qtLoaiOf(r));
+  const chot = document.getElementById('qtf-chot');
+  if (chot) chot.checked = !!r.chot;
+
+  const title = document.getElementById('qtf-title');
+  if (title) title.textContent = 'Sửa Quyết Toán';
+  const saveBtn = document.getElementById('qtf-save-btn');
+  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật Quyết Toán';
+  const cancelBtn = document.getElementById('qtf-cancel-btn');
+  if (cancelBtn) cancelBtn.style.display = '';       // "Hủy thay đổi" → nạp lại bản đã lưu
+  const card = document.getElementById('qt-blk-form');
+  if (card) card.style.outline = '2px solid var(--bs-warning)';
+  // Dữ liệu cũ lỡ có nhiều bản cho cùng 1 CT → nhắc dọn về 1 bản
+  const dup = document.getElementById('qtf-dup');
+  if (dup) dup.innerHTML = count > 1
+    ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:12px">⚠ Công trình này đang có <strong>${count} bản quyết toán</strong> (dữ liệu cũ). Theo quy tắc mỗi công trình chỉ 01 bản — đang sửa bản ngày ${fmtISODate(r.ngay)}; hãy xóa các bản thừa ở bảng Lịch Sử Quyết Toán.</div>`
+    : `<div class="text-secondary mb-2" style="font-size:11px">Công trình đã có quyết toán — mỗi công trình chỉ 01 bản, mọi điều chỉnh được cập nhật trên bản này.</div>`;
+}
+
+// ── Reset form ──
+// keepCt = true : giữ công trình đang chọn (sau khi Lưu / Hủy thay đổi) → nạp lại bản quyết toán
+//                 của CT nếu có (chế độ Sửa), không có thì về form trống (chế độ Thêm)
+// keepCt = false: bỏ chọn công trình → ẩn form
+function qtResetForm(keepCt) {
+  if (!keepCt) { const ct = document.getElementById('qtf-ct'); if (ct) ct.value = ''; }
   qtOnCtChange();
 }
 
@@ -196,14 +251,18 @@ function qtOnLoaiChange() {
   qtUpdatePreview();
 }
 
-// ── Block 1 đổi công trình → hiện/ẩn form + lịch sử, vẽ chi tiết, preview, lịch sử ──
-function qtOnCtChange() {
+// ── Block 1 đổi công trình → QUY TẮC 1-1: CT đã có quyết toán thì tự chuyển sang "Sửa" ──
+// opts.preferId: ưu tiên nạp đúng bản này (bấm Sửa ở bảng lịch sử / từ tab Doanh Thu).
+function qtOnCtChange(opts) {
+  opts = opts || {};
   const pid = document.getElementById('qtf-ct')?.value || '';
   _qtToggleBlocks(!!pid);
   _qthCtFilter = pid;
-  _qthSearch = '';
-  const s = document.getElementById('qth-search');
-  if (s) s.value = '';
+  _qtClearInputs();
+  if (pid) {
+    const { rec, count } = _qtRecordOfCt(pid, opts.preferId);
+    if (rec) _qtFillForm(rec, count);
+  }
   qtUpdatePreview();
   qtRenderHistory(0);
 }
@@ -258,9 +317,9 @@ function qtUpdatePreview() {
   _set('qt-sum-chi', fmtM(truoc.chiThucTe));
   _set('qt-sum-chi-sub', truoc.chiChung > 0 ? `gồm ${fmtS(truoc.chiChung)} chi phí chia tỉ trọng` : '');
 
-  // ── Hàng 2: Doanh thu hiện tại (tiền đã thu) | Hiệu quả lãi/lỗ hiện tại (= modal Công Trình) ──
+  // ── Hàng 2: Doanh thu hiện tại (tiền đã thu) | Lợi nhuận hiện tại (= "Hiệu quả" ở modal Công Trình) ──
   _set('qt-sum-thu', fmtM(truoc.tongThu));
-  _set('qt-sum-thu-sub', `Đã thu${truoc.soDotThu ? ' · ' + truoc.soDotThu + ' đợt' : ''} · DT HĐ+QT ${fmtS(truoc.doanhThu)}`);
+  _set('qt-sum-thu-sub', `Đã thu${truoc.soDotThu ? ' · ' + truoc.soDotThu + ' đợt' : ''}`);
   _set('qt-sum-hq', _signed(truoc.hieuQua), truoc.hieuQua >= 0 ? CG : CR);
   _set('qt-sum-hq-sub', truoc.isActive
     ? 'Đang thi công — tính tới hiện tại (đã thu − chi thực tế)'
@@ -328,6 +387,14 @@ function qtSave() {
   if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được lưu quyết toán', 'error'); return; }
   const f = _qtReadForm();
   if (!f.proj)    { toast('Vui lòng chọn Công Trình!', 'error'); return; }
+  // QUY TẮC 1-1: CT đã có quyết toán mà form đang ở chế độ Thêm → chuyển thành CẬP NHẬT bản hiện có
+  if (!f.editId) {
+    const { rec } = _qtRecordOfCt(f.proj.id);
+    if (rec) {
+      f.editId = rec.id; f.orig = rec; f.fake.createdAt = rec.createdAt;
+      toast('Công trình đã có quyết toán — sẽ cập nhật trên bản hiện có (mỗi công trình chỉ 01 bản)', 'info');
+    }
+  }
   if (!f.ngay)    { toast('Vui lòng chọn Ngày thực hiện!', 'error'); return; }
   if (!(f.soTien > 0)) { toast('Vui lòng nhập Số tiền lớn hơn 0!', 'error'); return; }
   const nd = (document.getElementById('qtf-nd')?.value || '').trim();
@@ -369,51 +436,28 @@ function qtSave() {
   }
 
   qtPopulateSels();          // cập nhật nhãn "(đã QT)" nếu vừa đóng CT (giữ CT đang chọn)
-  qtResetForm(true);         // xóa các ô nhập, GIỮ công trình → Block 2 + 4 cập nhật số mới
+  qtResetForm(true);         // GIỮ công trình → form nạp lại bản vừa lưu (chế độ Sửa), số liệu cập nhật
   _qtRefreshOtherTabs();
 }
 
-// ── Sửa: nạp bản ghi lên form (gọi khi ĐANG ở tab Quyết Toán) ──
+// ── Sửa: chọn công trình của bản ghi → qtOnCtChange tự nạp bản đó (chế độ Sửa) ──
 function qtEdit(id) {
   const r = quyetToanRecords.find(r => String(r.id) === String(id));
   if (!r) return;
   qtPopulateSels();
-
-  // Công trình: ưu tiên projectId, bản ghi cũ thì tìm theo tên → chọn ở Block 1
   const p = _qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh);
   const ctSel = document.getElementById('qtf-ct');
-  if (ctSel) ctSel.value = p ? p.id : '';
-  qtOnCtChange();
-
-  const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v; };
-  set('qtf-ngay', r.ngay || today());
-  set('qtf-nd', r.nd || '');
-  set('qtf-edit-id', r.id);
-  const nguoiSel = document.getElementById('qtf-nguoi');
-  if (nguoiSel) _setSelectFlexible(nguoiSel, r.nguoi || '');
-
-  const st = document.getElementById('qtf-sotien');
-  if (st) {
-    const v = qtSoTien(r);
-    st.dataset.raw = String(v);
-    st.value = v ? v.toLocaleString('vi-VN') : '';
+  if (ctSel && p) {
+    // CT ngoài năm đang lọc → thêm tạm vào dropdown để vẫn chọn được
+    if (![...ctSel.options].some(o => o.value === p.id)) {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name;
+      ctSel.appendChild(o);
+    }
+    ctSel.value = p.id;
   }
-  _qtSetLoai(qtLoaiOf(r));
-  const chot = document.getElementById('qtf-chot');
-  if (chot) chot.checked = !!r.chot;
-
-  const title = document.getElementById('qtf-title');
-  if (title) title.textContent = 'Sửa Quyết Toán';
-  const saveBtn = document.getElementById('qtf-save-btn');
-  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
-  const cancelBtn = document.getElementById('qtf-cancel-btn');
-  if (cancelBtn) cancelBtn.style.display = '';
-  const card = document.getElementById('qt-blk-form');
-  if (card) {
-    card.style.outline = '2px solid var(--bs-warning)';
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  qtUpdatePreview();
+  qtOnCtChange({ preferId: r.id });
+  document.getElementById('qt-blk-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Sửa từ tab KHÁC (Doanh Thu...) → chuyển sang tab Quyết Toán rồi nạp form ──
@@ -442,7 +486,7 @@ function qtDelete(id) {
   };
   save('quyettoan_v1', quyetToanRecords);
 
-  // Đang sửa đúng bản vừa xóa → reset form (giữ công trình)
+  // Đang sửa đúng bản vừa xóa → nạp lại theo quy tắc 1-1 (hết bản → về chế độ Thêm)
   if (document.getElementById('qtf-edit-id')?.value === String(id)) qtResetForm(true);
   else { qtUpdatePreview(); qtRenderHistory(_qthPage); }
   _qtRefreshOtherTabs();
@@ -456,13 +500,9 @@ function _qtRefreshOtherTabs() {
   if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
 }
 
-// ══ BLOCK 4: LỊCH SỬ QUYẾT TOÁN CỦA CÔNG TRÌNH ĐANG CHỌN ══════════
-// Dòng thời gian TOÀN VÒNG ĐỜI: mới nhất ở trên, dòng cuối là HĐ gốc;
-// mỗi dòng có "Ảnh hưởng DT" và "DT sau QT" cộng dồn.
-function qtSetHistoryCt(pid) {
-  _qthCtFilter = pid || '';
-  qtRenderHistory(0);
-}
+// ══ BLOCK 4: LỊCH SỬ QUYẾT TOÁN — TẤT CẢ CÔNG TRÌNH (năm đang lọc), 7 dòng/trang ══
+// Mới nhất lên đầu. Cột "Ảnh hưởng DT" / "DT sau QT" tính theo dòng thời gian của từng CT.
+// Dòng của công trình đang chọn được tô sáng; dòng đang sửa có viền trái màu vàng.
 function qtSetHistorySearch(val) {
   _qthSearch = (val || '').trim().toLowerCase();
   qtRenderHistory(0);
@@ -474,49 +514,64 @@ function qtRenderHistory(page) {
   const tbody  = document.getElementById('qth-tbody');
   const badge  = document.getElementById('qth-count-badge');
   const pgWrap = document.getElementById('qth-pagination');
-  const hint   = document.getElementById('qth-hint');
   if (!tbody) return;
 
-  const proj = _qthCtFilter ? _qtResolveProj(_qthCtFilter) : null;
-  if (!proj) {               // chưa chọn công trình → Block 4 đang ẩn, dọn sạch
-    tbody.innerHTML = '';
-    if (badge) badge.textContent = '';
+  // Delta + doanh thu cộng dồn theo từng công trình (tính 1 lần / CT)
+  const cache = new Map();
+  const calcFor = (r) => {
+    const p = _qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh);
+    if (!p) return null;
+    if (!cache.has(p.id)) {
+      const { recs, deltas } = qtTinhDelta(p);
+      let run = qtHdGocCuaCT(p);
+      const runDT = new Map();
+      recs.forEach(x2 => { run += deltas.get(x2.id) || 0; runDT.set(x2.id, run); });
+      cache.set(p.id, { p, deltas, runDT });
+    }
+    return cache.get(p.id);
+  };
+
+  let list = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
+    .filter(r => !r.deletedAt && _dtInYear(r.ngay));
+  if (_qthSearch) {
+    const q = _qthSearch;
+    list = list.filter(r =>
+      (_resolveCtName(r) || r.congtrinh || '').toLowerCase().includes(q) ||
+      (r.nd || '').toLowerCase().includes(q) ||
+      (r.nguoi || '').toLowerCase().includes(q));
+  }
+  list.sort((a, b) => _qtSortAsc(b, a));   // mới nhất lên đầu
+
+  if (badge) badge.textContent = list.length ? `(${list.length} bản)` : '';
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-secondary py-4">Chưa có quyết toán nào${_qthSearch ? ' khớp tìm kiếm' : ''}</td></tr>`;
     if (pgWrap) pgWrap.innerHTML = '';
     return;
   }
 
-  // Delta + doanh thu cộng dồn của công trình
-  const { recs, deltas } = qtTinhDelta(proj);
-  const hdGoc = qtHdGocCuaCT(proj);
-  let run = hdGoc;
-  const runDT = new Map();
-  recs.forEach(r => { run += deltas.get(r.id) || 0; runDT.set(r.id, run); });
-
-  // Theo năm đang lọc (cột "DT sau QT" vẫn cộng dồn đúng thứ tự thời gian của mọi bản ghi)
-  let list = recs.filter(r => _dtInYear(r.ngay));
-  if (_qthSearch) {
-    const q = _qthSearch;
-    list = list.filter(r => (r.nd || '').toLowerCase().includes(q) || (r.nguoi || '').toLowerCase().includes(q));
-  }
-  list.sort((a, b) => _qtSortAsc(b, a));   // mới nhất lên đầu
-
-  if (badge) badge.textContent = `(${list.length} mục)`;
-  if (hint) hint.textContent = `Quyết toán của "${proj.name}" trong năm đang lọc. Dòng cuối bảng là HĐ gốc.`;
-
+  // Giới hạn 7 dòng/trang (DT_PG) — dữ liệu cũ hơn sang trang sau
   const total = list.length;
+  if (page * DT_PG >= total) { page = Math.max(0, Math.ceil(total / DT_PG) - 1); _qthPage = page; }
   const slice = list.slice(page * DT_PG, (page + 1) * DT_PG);
   const canEdit = _qtCanEdit();
+  const editingId = document.getElementById('qtf-edit-id')?.value || '';
 
-  let html = slice.map(r => {
-    const d = deltas.get(r.id) || 0;
+  tbody.innerHTML = slice.map(r => {
+    const c = calcFor(r);
+    const d = c ? (c.deltas.get(r.id) || 0) : 0;
     const dCls = d < 0 ? 'text-danger' : (d > 0 ? 'text-success' : 'text-secondary');
-    return `<tr>
+    const isSel  = c && _qthCtFilter && c.p.id === _qthCtFilter;
+    const isEdit = editingId && String(r.id) === String(editingId);
+    const rowSty = (isSel ? 'background:var(--bs-warning-bg-subtle);' : '') +
+                   (isEdit ? 'box-shadow:inset 3px 0 0 var(--bs-warning);' : '');
+    return `<tr style="${rowSty}">
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${x(_resolveCtName(r) || r.congtrinh || '')}">${x(_resolveCtName(r) || r.congtrinh || '—')}</td>
       <td style="white-space:nowrap">${qtLoaiBadge(r)}</td>
       <td class="text-end font-monospace fw-semibold ${qtSoTienCls(r)}" style="white-space:nowrap">${qtSoTienTxt(r, fmtS)}</td>
       <td class="text-end font-monospace ${dCls}" style="white-space:nowrap">${d ? (d > 0 ? '+' : '-') + fmtS(Math.abs(d)) : '0'}</td>
-      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${fmtS(runDT.get(r.id) || 0)}</td>
-      <td class="text-body-secondary" style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${c ? fmtS(c.runDT.get(r.id) || 0) : '—'}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
       <td class="action-col">
         ${canEdit ? `<div class="d-flex gap-1 justify-content-center">
@@ -526,21 +581,6 @@ function qtRenderHistory(page) {
       </td>
     </tr>`;
   }).join('');
-
-  // Trang cuối → thêm dòng "HĐ gốc" làm điểm xuất phát của dòng thời gian
-  if ((page + 1) * DT_PG >= total) {
-    html += `<tr style="background:var(--bs-tertiary-bg)">
-      <td class="text-secondary" style="font-size:12px">—</td>
-      <td><span class="badge bg-secondary" style="font-size:10px"><span class="material-symbols-outlined msi-gap">list_alt</span>HĐ gốc</span></td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${fmtS(hdGoc)}</td>
-      <td class="text-end text-secondary">—</td>
-      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${fmtS(hdGoc)}</td>
-      <td class="text-body-secondary" style="font-size:12px">${hdGoc ? 'Giá trị hợp đồng chính ban đầu' : 'Chưa khai báo HĐ chính'}</td>
-      <td></td><td class="action-col"></td>
-    </tr>`;
-  }
-
-  tbody.innerHTML = html;
   if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'qtRenderHistory');
 }
 
