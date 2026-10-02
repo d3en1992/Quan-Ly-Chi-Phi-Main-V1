@@ -419,7 +419,7 @@ function tbRenderList() {
         </select>
       </td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
-      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(r.ngay||'')}</td>
+      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
           <button class="btn btn-outline-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="white-space:nowrap"><i class="bi bi-arrow-left-right"></i> Luân chuyển</button>
@@ -616,7 +616,7 @@ function tbExportCSV() {
     return true;
   });
   const rows = [['Công Trình','Tên Thiết Bị','Số Lượng','Tình Trạng','Người TH','Thông Tin Máy','Ngày Luân Chuyển']];
-  data.forEach(r=>rows.push([_resolveCtName(r),recCatName(r,'tb','ten'),r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',r.ngay||''])); // [MODIFIED]
+  data.forEach(r=>rows.push([_resolveCtName(r),recCatName(r,'tb','ten'),r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',fmtISODate(r.ngay, '')])); // ngày dạng DD-MM-YYYY thống nhất toàn app
   dlCSV(rows, 'thiet_bi_'+today()+'.csv');
 }
 
@@ -665,7 +665,7 @@ function renderKhoTong() {
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
       <td class="text-secondary" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.ghichu)}">${x(r.ghichu||'—')}</td>
-      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(r.ngay||'')}</td>
+      <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
           <button class="btn btn-outline-primary btn-sm" onclick="tbLuanChuyen('${r.id}')" style="white-space:nowrap"><i class="bi bi-arrow-left-right"></i> Luân chuyển</button>
