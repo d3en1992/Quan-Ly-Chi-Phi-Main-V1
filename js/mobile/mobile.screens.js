@@ -1426,7 +1426,7 @@ function mbQtTatToan() {
       <div class="mb-kpi red" style="border-radius:13px"><div class="mb-kpi-label">Nợ thầu phụ</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('thauphu'))}</div></div>
       <div class="mb-kpi" style="border-radius:13px"><div class="mb-kpi-label">Nợ nhà cung cấp</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('nhacungcap'))}</div></div>
     </div>
-    <div style="font-size:11px;color:var(--mb-muted-2)">Chỉ đối tác đã có trong Tiền ứng và còn nợ. Tất toán → tự tạo phiếu ứng đúng số còn nợ (ngày hôm nay).</div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">Chỉ đối tác đã có phiếu ứng hoặc HĐ thầu phụ, và còn nợ. Tất toán → tự tạo phiếu ứng đúng số còn nợ (ngày hôm nay).</div>
     <div class="mb-chips">
       ${chips.map(([k, l]) => `<div class="mb-chip${MB.cnGroup === k ? ' on' : ''}" data-act="setFilter" data-arg="cnGroup|${k}">${l}</div>`).join('')}
     </div>

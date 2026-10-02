@@ -1,7 +1,12 @@
 // quyettoan.congtrinh.js — Tab QUYẾT TOÁN · Phân hệ 2A: Quyết Toán Công Trình (với Chủ Đầu Tư)
-// Load order: sau quyettoan.core.js, trước sync.js
+// Load order: sau quyettoan.core.js, trước quyettoan.thauphu.js
 //
-// Giao diện: pages/quyettoan.html (ID tiền tố qtf- = form, qth- = bảng lịch sử)
+// Giao diện: pages/quyettoan.html — LUỒNG CUỘN DỌC 4 BLOCK (02/10/2026):
+//   Block 1 #qtf-ct            : chọn công trình (điểm bắt đầu)
+//   Block 2 #qt-blk-summary    : tóm tắt [HĐ gốc] | [QT đã có] | [Đã thu] ➔ [DOANH THU HIỆN TẠI]
+//   Block 3 #qt-blk-form       : form 3 loại + dòng kết quả tức thì dưới ô số tiền (#qtf-sotien-hint)
+//   Block 4 #qt-blk-history    : lịch sử quyết toán CỦA RIÊNG công trình đang chọn
+//   Block 2–4 ẩn cho tới khi chọn công trình (_qtToggleBlocks).
 // Dữ liệu  : ghi vào quyetToanRecords / kho 'quyettoan_v1' (khai báo ở doanhthu.core.js)
 // Công thức: MỌI con số doanh thu đều lấy từ calcTongDoanhThu() (quyettoan.core.js)
 //            → tab Doanh Thu / Lợi Nhuận / chi tiết Công Trình tự nhảy số, KHÔNG ghi 2 nơi.
@@ -9,10 +14,10 @@
 
 // ─── State ─────────────────────────────────────────────────────
 let _qthPage     = 0;   // trang hiện tại của bảng lịch sử
-let _qthCtFilter = '';  // projectId đang lọc ở bảng lịch sử ('' = tất cả)
-let _qthSearch   = '';  // từ khóa tìm kiếm (chữ thường)
+let _qthCtFilter = '';  // projectId công trình đang chọn ở Block 1 ('' = chưa chọn)
+let _qthSearch   = '';  // từ khóa tìm kiếm trong lịch sử (chữ thường)
 
-// Chú thích từng loại hiển thị dưới 3 nút chọn loại
+// Chú thích từng loại hiển thị dưới nhóm nút chọn loại
 const _QT_HINT = {
   tang:    'Cộng thêm vào doanh thu (VD: phát sinh hạng mục ngoài hợp đồng).',
   giam:    'Trừ bớt khỏi doanh thu (VD: cắt giảm hạng mục không thi công).',
@@ -21,7 +26,7 @@ const _QT_HINT = {
 const _QT_SOTIEN_LABEL = {
   tang:    'Số tiền tăng thêm (đ) *',
   giam:    'Số tiền giảm trừ (đ) *',
-  thaythe: 'Tổng giá trị mới (đ) *',
+  thaythe: 'Tổng giá trị mới thay thế HĐ (đ) *',
 };
 
 // ── Quyền: chỉ Admin + Giám đốc được ghi dữ liệu quyết toán ──
@@ -31,15 +36,14 @@ function _qtCanEdit() {
 }
 
 // ── Danh sách công trình cho dropdown (bỏ CÔNG TY + CT đã xóa) ──
-// KHÔNG lọc theo năm: quyết toán là việc của TOÀN vòng đời công trình
-// (CT thi công năm trước có thể quyết toán năm nay).
+// KHÔNG lọc theo năm: quyết toán là việc của TOÀN vòng đời công trình.
 function _qtProjList() {
   return ((typeof getAllProjects === 'function') ? getAllProjects() : [])
     .filter(p => p && p.id !== 'COMPANY' && !p.deletedAt)
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
 }
 
-// ── Đọc loại đang chọn ở 3 nút radio ──
+// ── Đọc / đặt loại đang chọn ở nhóm nút radio ──
 function _qtGetLoai() {
   const el = document.querySelector('input[name="qtf-loai"]:checked');
   return (el && QT_LOAI[el.value]) ? el.value : 'tang';
@@ -57,18 +61,25 @@ function _qtApplyLoaiText(loai) {
   if (hint) hint.textContent = _QT_HINT[loai];
 }
 
+// ── Ẩn/hiện Block 2–4 theo việc đã chọn công trình chưa ──
+function _qtToggleBlocks(show) {
+  ['qt-blk-summary', 'qt-blk-form', 'qt-blk-history'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? '' : 'none';
+  });
+}
+
 // ══ KHỞI TẠO TAB ═════════════════════════════════════════════════
-// Gọi khi vào tab (goPage) — reset form về trạng thái nhập mới.
+// Gọi khi vào tab (goPage) — về trạng thái ban đầu (chưa chọn công trình).
 function initQuyetToan() {
   qtPopulateSels();
-  qtResetForm();
-  qtRenderHistory(0);
+  qtResetForm(false);
   if (typeof initTatToan === 'function') initTatToan();
   // Tải bù mọi năm còn thiếu (số liệu quyết toán/tất toán tính toàn vòng đời) → vẽ lại
   qtEnsureAllYears(() => qtRefresh());
 }
 
-// Gọi khi đổi năm / sync xong (renderActiveTab) — GIỮ NGUYÊN nội dung đang nhập.
+// Gọi khi đổi năm / sync xong (renderActiveTab) — GIỮ NGUYÊN công trình + nội dung đang nhập.
 function qtRefresh() {
   qtPopulateSels();
   qtUpdatePreview();
@@ -87,23 +98,15 @@ function qtGoSub(btn, id) {
   else qtRefresh();
 }
 
-// ── Nạp dropdown: Công trình (form + bộ lọc lịch sử) + Người TH ──
+// ── Nạp dropdown: Công trình (Block 1) + Người thực hiện ──
 function qtPopulateSels() {
-  const projs = _qtProjList();
-  const ctOpts = projs.map(p => `<option value="${x(p.id)}">${x(p.name)}${p.status === 'closed' ? ' (đã QT)' : ''}</option>`).join('');
-
   const ctSel = document.getElementById('qtf-ct');
   if (ctSel) {
     const cur = ctSel.value;
-    ctSel.innerHTML = '<option value="">-- Chọn công trình --</option>' + ctOpts;
+    ctSel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
+      _qtProjList().map(p => `<option value="${x(p.id)}">${x(p.name)}${p.status === 'closed' ? ' (đã QT)' : ''}</option>`).join('');
     if (cur) ctSel.value = cur;
   }
-  const fSel = document.getElementById('qth-ct-filter');
-  if (fSel) {
-    fSel.innerHTML = '<option value="">-- Tất cả công trình --</option>' + ctOpts;
-    fSel.value = _qthCtFilter;
-  }
-
   const nguoiSel = document.getElementById('qtf-nguoi');
   if (nguoiSel) {
     const cur = nguoiSel.value;
@@ -114,14 +117,16 @@ function qtPopulateSels() {
   }
 }
 
-// ── Reset form về trạng thái nhập mới ──
-function qtResetForm() {
+// ── Reset form ──
+// keepCt = true : giữ công trình đang chọn (sau khi Lưu / Hủy sửa) → chỉ xóa các ô nhập
+// keepCt = false: về trạng thái ban đầu, bỏ chọn công trình → ẩn Block 2–4
+function qtResetForm(keepCt) {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('qtf-ngay', today());
-  set('qtf-ct', '');
   set('qtf-nguoi', '');
   set('qtf-nd', '');
   set('qtf-edit-id', '');
+  if (!keepCt) set('qtf-ct', '');
   const st = document.getElementById('qtf-sotien');
   if (st) { st.value = ''; st.dataset.raw = ''; }
   const chot = document.getElementById('qtf-chot');
@@ -129,34 +134,38 @@ function qtResetForm() {
   _qtSetLoai('tang');
 
   const title = document.getElementById('qtf-title');
-  if (title) title.textContent = 'Quyết Toán Công Trình';
+  if (title) title.textContent = 'Thêm Quyết Toán';
   const saveBtn = document.getElementById('qtf-save-btn');
-  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu quyết toán';
+  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Quyết Toán';
   const cancelBtn = document.getElementById('qtf-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = 'none';
-  const card = document.getElementById('qtf-card');
+  const card = document.getElementById('qt-blk-form');
   if (card) card.style.outline = '';
 
-  qtUpdatePreview();
+  qtOnCtChange();
 }
 
 // ── Đổi loại quyết toán ──
 function qtOnLoaiChange() {
   const loai = _qtGetLoai();
   _qtApplyLoaiText(loai);
-  // Gợi ý: "Thay thế" thường là bản chốt cuối → tự tick ô đóng công trình (khi nhập MỚI).
-  // Người dùng vẫn bỏ tick được nếu chưa muốn đóng.
+  // Gợi ý: "Thay thế" thường là bản chốt cuối → tự tick ô Chốt sổ (khi nhập MỚI).
   const editing = !!document.getElementById('qtf-edit-id')?.value;
   const chot = document.getElementById('qtf-chot');
   if (chot && !editing) chot.checked = (loai === 'thaythe');
   qtUpdatePreview();
 }
 
-// ── Đổi công trình ở form → bảng lịch sử tự lọc theo CT đó (xem dòng thời gian) ──
+// ── Block 1 đổi công trình → hiện/ẩn Block 2–4 + vẽ tóm tắt, preview, lịch sử ──
 function qtOnCtChange() {
   const pid = document.getElementById('qtf-ct')?.value || '';
-  qtSetHistoryCt(pid);
+  _qtToggleBlocks(!!pid);
+  _qthCtFilter = pid;
+  _qthSearch = '';
+  const s = document.getElementById('qth-search');
+  if (s) s.value = '';
   qtUpdatePreview();
+  qtRenderHistory(0);
 }
 
 // ── Gom dữ liệu form thành 1 bản ghi giả định (phục vụ preview + lưu) ──
@@ -181,87 +190,76 @@ function _qtReadForm() {
   };
 }
 
-// ══ LIVE PREVIEW ═════════════════════════════════════════════════
-// Hiện ngay: Doanh thu hiện tại → Doanh thu sau quyết toán, Còn phải thu trước/sau,
-// kèm cảnh báo (thu vượt doanh thu, doanh thu âm, có bản thay thế khác...).
+// ══ BLOCK 2 (tóm tắt) + BLOCK 3 (kết quả tức thì) ═══════════════════
 function qtUpdatePreview() {
-  const box = document.getElementById('qtf-preview');
-  if (!box) return;
   const f = _qtReadForm();
-  if (!f.proj) {
-    box.innerHTML = '<div class="text-secondary text-center" style="padding:40px 10px;font-size:13px">Chọn công trình để xem doanh thu trước và sau quyết toán</div>';
+  if (!f.proj) return;
+
+  // Trạng thái hiện tại (toàn vòng đời)
+  const truoc = calcTongDoanhThu(f.proj, { allYears: true });
+
+  // ── Block 2: [HĐ gốc] | [QT đã có] | [Đã thu] ➔ [DOANH THU HIỆN TẠI] ──
+  const setTxt = (id, t, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = t;
+    if (cls !== undefined) el.className = cls;
+  };
+  setTxt('qt-sum-name', f.proj.name);
+  const stEl = document.getElementById('qt-sum-status');
+  if (stEl) stEl.innerHTML = f.proj.status === 'closed'
+    ? '<span class="badge bg-danger-subtle text-danger-emphasis"><span class="material-symbols-outlined msi-gap">lock</span>Đã quyết toán</span>' : '';
+  setTxt('qt-sum-hd', fmtM(truoc.hdGoc));
+  setTxt('qt-sum-qt', truoc.qt ? (truoc.qt > 0 ? '+' : '-') + fmtM(Math.abs(truoc.qt)) : '0 đ',
+    'qt-sum-val ' + (truoc.qt < 0 ? 'text-danger' : truoc.qt > 0 ? 'text-success' : ''));
+  setTxt('qt-sum-thu', fmtM(truoc.daThu));
+  setTxt('qt-sum-dt', fmtM(truoc.tongDT));
+  setTxt('qt-sum-con', truoc.conPhaiThu >= 0
+    ? 'Còn phải thu ' + fmtM(truoc.conPhaiThu)
+    : 'Đã thu vượt ' + fmtM(-truoc.conPhaiThu),
+    truoc.conPhaiThu < 0 ? 'text-danger' : 'text-secondary');
+  const load = document.getElementById('qt-sum-loading');
+  if (load) load.style.display = _qtAllYearsReady ? 'none' : '';
+  // Doanh thu ≠ HĐ gốc + QT → đang áp quy tắc max(HĐ, Đã thu) — giải thích cho người xem
+  setTxt('qt-sum-note', (truoc.tongDT !== truoc.hdGoc + truoc.qt)
+    ? 'Đã thu lớn hơn HĐ gốc → doanh thu hiện tại lấy theo số đã thu (quy tắc cũ, áp dụng khi chưa có quyết toán thay thế).' : '');
+
+  // ── Block 3: dòng kết quả tức thì ngay dưới ô số tiền ──
+  const hint  = document.getElementById('qtf-sotien-hint');
+  const warnB = document.getElementById('qtf-warns');
+  if (!hint) return;
+  if (!(f.soTien > 0)) {
+    hint.className = 'mt-1 text-secondary';
+    hint.style.fontSize = '12px';
+    hint.textContent = 'Gõ số tiền để xem doanh thu mới ngay tại đây.';
+    if (warnB) warnB.innerHTML = '';
     return;
   }
-
-  // Trước: trạng thái hiện tại (toàn vòng đời) — gồm cả bản đang sửa với giá trị CŨ
-  const truoc = calcTongDoanhThu(f.proj, { allYears: true });
-  // Sau: bỏ bản đang sửa (nếu có) + thêm bản giả định với giá trị MỚI
-  const sau = f.soTien > 0
-    ? calcTongDoanhThu(f.proj, { allYears: true, excludeId: f.editId || undefined, extra: f.fake })
-    : null;
-
-  const _row = (label, val, cls) =>
-    `<div class="d-flex justify-content-between" style="font-size:12px;padding:3px 0">
-       <span class="text-secondary">${label}</span><span class="font-monospace ${cls || ''}">${val}</span>
-     </div>`;
-  const _qtTxt = (v) => v ? (v > 0 ? '+' : '-') + fmtM(Math.abs(v)) : '0 đ';
-  const _conCls = (v) => v > 0 ? 'text-warning' : (v < 0 ? 'text-danger' : 'text-success');
-
-  let html = `<div class="fw-bold mb-2" style="font-size:14px">${x(f.proj.name)}</div>`;
-  if (!_qtAllYearsReady) {
-    html += `<div class="alert alert-secondary py-1 px-2 mb-2" style="font-size:11px">⏳ Đang tải dữ liệu các năm cũ — số liệu có thể chưa đầy đủ.</div>`;
-  }
-  html += _row('HĐ gốc', fmtM(truoc.hdGoc));
-  html += _row('Quyết toán đã có', _qtTxt(truoc.qt), truoc.qt < 0 ? 'text-danger' : (truoc.qt > 0 ? 'text-success' : ''));
-  html += _row('Đã thu', fmtM(truoc.daThu), 'text-success');
-  if (!truoc.coThayThe && truoc.daThu > truoc.hdGoc && truoc.hdGoc > 0) {
-    html += `<div class="text-secondary" style="font-size:10px;font-style:italic">Đã thu &gt; HĐ gốc → doanh thu hiện lấy theo số đã thu (quy tắc cũ).</div>`;
-  }
-
-  // Khối so sánh TRƯỚC → SAU
-  const dtSau = sau ? sau.tongDT : null;
-  const chenh = sau ? sau.tongDT - truoc.tongDT : 0;
-  html += `
-    <div style="margin-top:12px;padding:12px;border-radius:10px;background:var(--bs-body-bg);border:1.5px solid var(--bs-border-color)">
-      <div class="text-secondary" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Tổng doanh thu</div>
-      <div class="d-flex align-items-center flex-wrap gap-2 mt-1">
-        <span class="font-monospace" style="font-size:16px">${fmtM(truoc.tongDT)}</span>
-        <span class="material-symbols-outlined text-secondary">arrow_forward</span>
-        <span class="font-monospace fw-bold ${sau ? (chenh < 0 ? 'text-danger' : 'text-success') : 'text-secondary'}" style="font-size:20px">${sau ? fmtM(dtSau) : '—'}</span>
-      </div>
-      ${sau ? `<div style="font-size:12px" class="${chenh < 0 ? 'text-danger' : (chenh > 0 ? 'text-success' : 'text-secondary')}">${chenh ? (chenh > 0 ? '▲ +' : '▼ -') + fmtM(Math.abs(chenh)) : 'Không đổi'}</div>`
-            : '<div class="text-secondary" style="font-size:12px">Nhập số tiền để xem kết quả</div>'}
-      <hr class="my-2">
-      <div class="text-secondary" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Còn phải thu</div>
-      <div class="d-flex align-items-center flex-wrap gap-2 mt-1">
-        <span class="font-monospace ${_conCls(truoc.conPhaiThu)}">${fmtM(truoc.conPhaiThu)}</span>
-        <span class="material-symbols-outlined text-secondary">arrow_forward</span>
-        <span class="font-monospace fw-bold ${sau ? _conCls(sau.conPhaiThu) : 'text-secondary'}" style="font-size:16px">${sau ? fmtM(sau.conPhaiThu) : '—'}</span>
-      </div>
-    </div>`;
+  // Bỏ bản đang sửa (nếu có) + thêm bản giả định với giá trị MỚI
+  const sau = calcTongDoanhThu(f.proj, { allYears: true, excludeId: f.editId || undefined, extra: f.fake });
+  const chenh = sau.tongDT - truoc.tongDT;
+  hint.className = 'mt-1 fw-semibold ' + (chenh < 0 ? 'text-danger' : 'text-success');
+  hint.style.fontSize = '13px';
+  hint.innerHTML = `💡 Doanh thu mới sẽ cập nhật thành: <span class="font-monospace">${fmtM(sau.tongDT)}</span>` +
+    ` <span style="font-weight:400">(${chenh ? (chenh > 0 ? '▲ +' : '▼ -') + fmtM(Math.abs(chenh)) : 'không đổi'}` +
+    ` · còn phải thu ${sau.conPhaiThu >= 0 ? fmtM(sau.conPhaiThu) : '−' + fmtM(-sau.conPhaiThu)})</span>`;
 
   // ── Cảnh báo chống sai sót ──
   const warns = [];
-  if (sau && sau.tongDT < 0) {
+  if (sau.tongDT < 0) {
     warns.push(['danger', 'Doanh thu sau quyết toán bị ÂM — kiểm tra lại số tiền giảm trừ.']);
-  } else if (sau && sau.conPhaiThu < 0) {
+  } else if (sau.conPhaiThu < 0) {
     warns.push(['warning', `Đã thu VƯỢT doanh thu sau quyết toán ${fmtM(-sau.conPhaiThu)} — công ty đang thu dư, có thể phải hoàn trả Chủ Đầu Tư.`]);
   }
   if (f.loai === 'thaythe' && f.ngay) {
-    // Các bản ghi khác của CT có ngày SAU bản thay thế này
     const others = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
       .filter(r => !r.deletedAt && r.id !== f.editId && _qtMatchProj(r, f.proj) && (r.ngay || '') > f.ngay);
     const tt = others.filter(r => qtLoaiOf(r) === 'thaythe');
     if (tt.length) warns.push(['warning', `Đã có bản THAY THẾ ngày ${fmtISODate(tt[tt.length - 1].ngay)} mới hơn → bản mới hơn sẽ quyết định doanh thu, bản này không còn tác dụng.`]);
     else if (others.length) warns.push(['info', `Có ${others.length} phát sinh tăng/giảm sau ngày này — vẫn được cộng/trừ tiếp sau giá trị thay thế.`]);
   }
-  if (f.proj.status === 'closed') {
-    warns.push(['info', 'Công trình này đã ở trạng thái "Đã quyết toán".']);
-  }
-  html += warns.map(([t, m]) =>
-    `<div class="alert alert-${t} py-2 px-3 mt-2 mb-0" style="font-size:12px">${t === 'info' ? 'ℹ' : '⚠'} ${m}</div>`).join('');
-
-  box.innerHTML = html;
+  if (warnB) warnB.innerHTML = warns.map(([t, m]) =>
+    `<div class="alert alert-${t} py-1 px-2 mt-2 mb-0" style="font-size:12px">${t === 'info' ? 'ℹ' : '⚠'} ${m}</div>`).join('');
 }
 
 // ══ LƯU / SỬA / XÓA ══════════════════════════════════════════════
@@ -275,14 +273,14 @@ function qtSave() {
   }
   const f = _qtReadForm();
   if (!f.proj)    { toast('Vui lòng chọn Công Trình!', 'error'); return; }
-  if (!f.ngay)    { toast('Vui lòng chọn Ngày quyết toán!', 'error'); return; }
+  if (!f.ngay)    { toast('Vui lòng chọn Ngày thực hiện!', 'error'); return; }
   if (!(f.soTien > 0)) { toast('Vui lòng nhập Số tiền lớn hơn 0!', 'error'); return; }
   const nd = (document.getElementById('qtf-nd')?.value || '').trim();
   if (!nd) { toast('Vui lòng nhập Nội dung / lý do quyết toán!', 'error'); return; }
   const nguoi = (document.getElementById('qtf-nguoi')?.value || '').trim();
   const chot  = !!document.getElementById('qtf-chot')?.checked;
 
-  // Kiểm tra kết quả trước khi ghi (cùng công thức với Live Preview)
+  // Kiểm tra kết quả trước khi ghi (cùng công thức với preview)
   const sau = calcTongDoanhThu(f.proj, { allYears: true, excludeId: f.editId || undefined, extra: f.fake });
   if (sau.tongDT < 0) { toast('Doanh thu sau quyết toán bị âm — kiểm tra lại số tiền!', 'error'); return; }
   if (sau.conPhaiThu < 0 &&
@@ -315,10 +313,8 @@ function qtSave() {
     if (typeof renderProjectsPage === 'function') renderProjectsPage();
   }
 
-  const keepCt = f.proj.id;
-  qtResetForm();
-  qtPopulateSels();                 // cập nhật nhãn "(đã QT)" nếu vừa đóng CT
-  qtSetHistoryCt(keepCt);           // giữ bảng lịch sử ở CT vừa lưu để thấy dòng mới
+  qtPopulateSels();          // cập nhật nhãn "(đã QT)" nếu vừa đóng CT (giữ CT đang chọn)
+  qtResetForm(true);         // xóa các ô nhập, GIỮ công trình → Block 2 + 4 cập nhật số mới
   _qtRefreshOtherTabs();
 }
 
@@ -328,10 +324,11 @@ function qtEdit(id) {
   if (!r) return;
   qtPopulateSels();
 
-  // Công trình: ưu tiên projectId, bản ghi cũ thì tìm theo tên
+  // Công trình: ưu tiên projectId, bản ghi cũ thì tìm theo tên → chọn ở Block 1
   const p = _qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh);
   const ctSel = document.getElementById('qtf-ct');
   if (ctSel) ctSel.value = p ? p.id : '';
+  qtOnCtChange();
 
   const set = (elId, v) => { const el = document.getElementById(elId); if (el) el.value = v; };
   set('qtf-ngay', r.ngay || today());
@@ -356,13 +353,11 @@ function qtEdit(id) {
   if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
   const cancelBtn = document.getElementById('qtf-cancel-btn');
   if (cancelBtn) cancelBtn.style.display = '';
-  const card = document.getElementById('qtf-card');
+  const card = document.getElementById('qt-blk-form');
   if (card) {
     card.style.outline = '2px solid var(--bs-warning)';
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-
-  if (p) qtSetHistoryCt(p.id);
   qtUpdatePreview();
 }
 
@@ -392,10 +387,9 @@ function qtDelete(id) {
   };
   save('quyettoan_v1', quyetToanRecords);
 
-  // Đang sửa đúng bản vừa xóa → reset form
-  if (document.getElementById('qtf-edit-id')?.value === String(id)) qtResetForm();
-  else qtUpdatePreview();
-  qtRenderHistory(_qthPage);
+  // Đang sửa đúng bản vừa xóa → reset form (giữ công trình)
+  if (document.getElementById('qtf-edit-id')?.value === String(id)) qtResetForm(true);
+  else { qtUpdatePreview(); qtRenderHistory(_qthPage); }
   _qtRefreshOtherTabs();
   toast('Đã xóa quyết toán', 'success');
 }
@@ -407,14 +401,11 @@ function _qtRefreshOtherTabs() {
   if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
 }
 
-// ══ BẢNG LỊCH SỬ QUYẾT TOÁN ═════════════════════════════════════
-// • Không lọc CT  → mọi quyết toán trong NĂM đang lọc.
-// • Có lọc 1 CT   → DÒNG THỜI GIAN toàn vòng đời của CT đó: dòng đầu là HĐ gốc,
-//                   mỗi dòng sau có "Ảnh hưởng DT" và "DT sau QT" cộng dồn.
+// ══ BLOCK 4: LỊCH SỬ QUYẾT TOÁN CỦA CÔNG TRÌNH ĐANG CHỌN ══════════
+// Dòng thời gian TOÀN VÒNG ĐỜI: mới nhất ở trên, dòng cuối là HĐ gốc;
+// mỗi dòng có "Ảnh hưởng DT" và "DT sau QT" cộng dồn.
 function qtSetHistoryCt(pid) {
   _qthCtFilter = pid || '';
-  const fSel = document.getElementById('qth-ct-filter');
-  if (fSel && fSel.value !== _qthCtFilter) fSel.value = _qthCtFilter;
   qtRenderHistory(0);
 }
 function qtSetHistorySearch(val) {
@@ -426,74 +417,50 @@ function qtRenderHistory(page) {
   page = page || 0;
   _qthPage = page;
   const tbody  = document.getElementById('qth-tbody');
-  const empty  = document.getElementById('qth-empty');
   const badge  = document.getElementById('qth-count-badge');
   const pgWrap = document.getElementById('qth-pagination');
   const hint   = document.getElementById('qth-hint');
   if (!tbody) return;
 
-  const filterProj = _qthCtFilter ? _qtResolveProj(_qthCtFilter) : null;
-
-  // Tính delta + doanh thu cộng dồn theo từng công trình (cache để không tính lặp)
-  const _cache = new Map();   // projectKey → { deltas, runDT: Map(id → DT sau) }
-  const _calcFor = (r) => {
-    const p = _qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh);
-    if (!p) return null;
-    if (!_cache.has(p.id)) {
-      const { recs, deltas } = qtTinhDelta(p);
-      let dt = qtHdGocCuaCT(p);
-      const runDT = new Map();
-      recs.forEach(rr => { dt += deltas.get(rr.id) || 0; runDT.set(rr.id, dt); });
-      _cache.set(p.id, { deltas, runDT });
-    }
-    return _cache.get(p.id);
-  };
-
-  let list = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : []).filter(r => !r.deletedAt);
-  if (filterProj) list = list.filter(r => _qtMatchProj(r, filterProj));          // 1 CT: toàn vòng đời
-  else list = list.filter(r => _dtInYear(r.ngay));                               // tất cả: theo năm
-  if (_qthSearch) {
-    const q = _qthSearch;
-    list = list.filter(r =>
-      (_resolveCtName(r) || r.congtrinh || '').toLowerCase().includes(q) ||
-      (r.nd || '').toLowerCase().includes(q) ||
-      (r.nguoi || '').toLowerCase().includes(q));
-  }
-  // Mới nhất lên đầu
-  list.sort((a, b) => _qtSortAsc(b, a));
-
-  if (badge) badge.textContent = list.length ? `(${list.length} mục)` : '';
-  if (hint) {
-    hint.textContent = filterProj
-      ? `Đang xem toàn bộ dòng thời gian của "${filterProj.name}" (mọi năm). Dòng cuối bảng là HĐ gốc.`
-      : 'Đang xem quyết toán trong năm đang lọc. Chọn 1 công trình để xem dòng thời gian đầy đủ.';
-  }
-
-  if (!list.length && !filterProj) {
+  const proj = _qthCtFilter ? _qtResolveProj(_qthCtFilter) : null;
+  if (!proj) {               // chưa chọn công trình → Block 4 đang ẩn, dọn sạch
     tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
+    if (badge) badge.textContent = '';
     if (pgWrap) pgWrap.innerHTML = '';
     return;
   }
-  if (empty) empty.style.display = 'none';
+
+  // Delta + doanh thu cộng dồn của công trình
+  const { recs, deltas } = qtTinhDelta(proj);
+  const hdGoc = qtHdGocCuaCT(proj);
+  let run = hdGoc;
+  const runDT = new Map();
+  recs.forEach(r => { run += deltas.get(r.id) || 0; runDT.set(r.id, run); });
+
+  let list = recs.slice();
+  if (_qthSearch) {
+    const q = _qthSearch;
+    list = list.filter(r => (r.nd || '').toLowerCase().includes(q) || (r.nguoi || '').toLowerCase().includes(q));
+  }
+  list.sort((a, b) => _qtSortAsc(b, a));   // mới nhất lên đầu
+
+  if (badge) badge.textContent = `(${list.length} mục)`;
+  if (hint) hint.textContent = `Toàn bộ quyết toán của "${proj.name}" (mọi năm). Dòng cuối bảng là HĐ gốc.`;
 
   const total = list.length;
   const slice = list.slice(page * DT_PG, (page + 1) * DT_PG);
   const canEdit = _qtCanEdit();
 
   let html = slice.map(r => {
-    const c = _calcFor(r);
-    const d = c ? (c.deltas.get(r.id) || 0) : 0;
-    const dtSau = c ? c.runDT.get(r.id) : null;
+    const d = deltas.get(r.id) || 0;
     const dCls = d < 0 ? 'text-danger' : (d > 0 ? 'text-success' : 'text-secondary');
     return `<tr>
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r) || r.congtrinh || '—')}</td>
       <td style="white-space:nowrap">${qtLoaiBadge(r)}</td>
       <td class="text-end font-monospace fw-semibold ${qtSoTienCls(r)}" style="white-space:nowrap">${qtSoTienTxt(r, fmtS)}</td>
       <td class="text-end font-monospace ${dCls}" style="white-space:nowrap">${d ? (d > 0 ? '+' : '-') + fmtS(Math.abs(d)) : '0'}</td>
-      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${dtSau != null ? fmtS(dtSau) : '—'}</td>
-      <td class="text-body-secondary" style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${fmtS(runDT.get(r.id) || 0)}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
       <td class="action-col">
         ${canEdit ? `<div class="d-flex gap-1 justify-content-center">
@@ -504,18 +471,15 @@ function qtRenderHistory(page) {
     </tr>`;
   }).join('');
 
-  // Đang xem 1 CT + ở trang cuối → thêm dòng "HĐ gốc" làm điểm xuất phát của dòng thời gian
-  const isLastPage = (page + 1) * DT_PG >= total;
-  if (filterProj && isLastPage) {
-    const hd = qtHdGocCuaCT(filterProj);
+  // Trang cuối → thêm dòng "HĐ gốc" làm điểm xuất phát của dòng thời gian
+  if ((page + 1) * DT_PG >= total) {
     html += `<tr style="background:var(--bs-tertiary-bg)">
       <td class="text-secondary" style="font-size:12px">—</td>
-      <td style="font-weight:600;white-space:nowrap">${x(filterProj.name)}</td>
       <td><span class="badge bg-secondary" style="font-size:10px"><span class="material-symbols-outlined msi-gap">list_alt</span>HĐ gốc</span></td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${fmtS(hd)}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${fmtS(hdGoc)}</td>
       <td class="text-end text-secondary">—</td>
-      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${fmtS(hd)}</td>
-      <td class="text-body-secondary" style="font-size:12px">${hd ? 'Giá trị hợp đồng chính ban đầu' : 'Chưa khai báo HĐ chính'}</td>
+      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${fmtS(hdGoc)}</td>
+      <td class="text-body-secondary" style="font-size:12px">${hdGoc ? 'Giá trị hợp đồng chính ban đầu' : 'Chưa khai báo HĐ chính'}</td>
       <td></td><td class="action-col"></td>
     </tr>`;
   }

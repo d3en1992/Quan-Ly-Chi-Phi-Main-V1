@@ -2046,3 +2046,14 @@ td.action-col > div {
 /* Icon đứng một mình trong nút tròn/nút đóng (✕) — canh giữa tuyệt đối, bỏ lệch baseline */
 .btn > .material-symbols-outlined:only-child,
 .close-btn > .material-symbols-outlined:only-child { vertical-align: middle; }
+
+/* ── Tab QUYẾT TOÁN · Block 2 "Tóm tắt trạng thái" (02/10/2026) ──
+   Card nằm ngang: [HĐ gốc] | [Quyết toán đã có] | [Đã thu] ➔ [DOANH THU HIỆN TẠI] */
+.qt-sum-cell {
+  min-width: 140px; padding: 10px 12px;
+  border: 1px solid var(--bs-border-color); border-radius: 10px;
+  background: var(--bs-tertiary-bg);
+}
+.qt-sum-lb  { font-size: 11px; font-weight: 700; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: .4px; }
+.qt-sum-val { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; margin-top: 2px; white-space: nowrap; }
+@media (max-width: 576px) { .qt-sum-cell { min-width: calc(50% - 8px); } }
