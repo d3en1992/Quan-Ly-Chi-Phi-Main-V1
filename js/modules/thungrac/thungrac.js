@@ -6,13 +6,18 @@
 // ── Trạng thái ────────────────────────────────────────────────────────────────
 let _trashCurrentType = 'hoadon';
 
+// (03/10/2026) Tách tab "Hợp Đồng" cũ (gộp chung) thành 2 tab riêng: "Hợp Đồng chính" và
+// "Hợp Đồng TP"; thêm tab "Quyết Toán". id của tab = đúng loại dữ liệu dùng ở khôi phục /
+// xóa vĩnh viễn (hopdong-chinh, hopdong-tp, quyettoan) → không cần quy đổi qua lại nữa.
 const _TRASH_TABS = [
-  { id: 'hoadon',   label: 'Hóa Đơn'   },
-  { id: 'chamcong', label: 'Chấm Công'  },
-  { id: 'tienung',  label: 'Tiền Ứng'   },
-  { id: 'thietbi',  label: 'Thiết Bị'   },
-  { id: 'thutien',  label: 'Thu Tiền'   },
-  { id: 'hopdong',  label: 'Hợp Đồng'  },
+  { id: 'hoadon',        label: 'Hóa Đơn'        },
+  { id: 'chamcong',      label: 'Chấm Công'      },
+  { id: 'tienung',       label: 'Tiền Ứng'       },
+  { id: 'thietbi',       label: 'Thiết Bị'       },
+  { id: 'thutien',       label: 'Thu Tiền'       },
+  { id: 'hopdong-chinh', label: 'Hợp Đồng chính' },
+  { id: 'hopdong-tp',    label: 'Hợp Đồng TP'    },
+  { id: 'quyettoan',     label: 'Quyết Toán'     },
 ];
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -25,16 +30,13 @@ function renderThungRac() {
 
   const totalCount = _trashCountAll();
 
+  // (03/10/2026) Đã GỠ nút "Làm sạch thùng rác" (xóa toàn bộ mọi tab) — chỉ còn nút
+  // "Xóa tất cả trong tab này" ở từng tab để tránh lỡ tay xóa sạch mọi loại dữ liệu.
   page.innerHTML = `
     <div style="padding:12px 16px 0">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <div>
-          <span style="font-size:16px;font-weight:700"><span class="material-symbols-outlined msi-gap">delete</span>Thùng Rác</span>
-          <span class="text-secondary" style="font-size:12px;margin-left:8px">${totalCount ? totalCount + ' bản ghi' : 'Trống'}</span>
-        </div>
-        <button class="btn btn-outline-danger btn-sm" onclick="_trashEmptyAll()" ${!totalCount ? 'disabled' : ''}>
-          <span class="material-symbols-outlined msi-gap">cleaning_services</span>Làm sạch thùng rác
-        </button>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <span style="font-size:16px;font-weight:700"><span class="material-symbols-outlined msi-gap">delete</span>Thùng Rác</span>
+        <span class="text-secondary" style="font-size:12px">${totalCount ? totalCount + ' bản ghi' : 'Trống'}</span>
       </div>
 
       <!-- Sub-tab navigation -->
@@ -92,13 +94,15 @@ function _trashGetRecords(type) {
   if (type === 'tienung')  return _trashSort((ungRecords || []).filter(_trashIn));
   if (type === 'thietbi')  return _trashSort((tbData || []).filter(_trashIn));
   if (type === 'thutien')  return _trashSort((thuRecords || []).filter(_trashIn));
-  if (type === 'hopdong') {
-    const chinh = Object.entries(hopDongData || {})
+  // HĐ chính lưu dạng object { key công trình: hợp đồng } → gắn _trashKey để biết key khi khôi phục/xóa
+  if (type === 'hopdong-chinh') {
+    return _trashSort(Object.entries(hopDongData || {})
       .filter(([, v]) => _trashIn(v))
-      .map(([k, v]) => ({ ...v, _trashKey: k, _trashLoai: 'Chính' }));
-    const tp = (thauPhuContracts || []).filter(_trashIn)
-      .map(r => ({ ...r, _trashLoai: 'Thầu phụ' }));
-    return [...chinh, ...tp].sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+      .map(([k, v]) => ({ ...v, _trashKey: k })));
+  }
+  if (type === 'hopdong-tp') return _trashSort((thauPhuContracts || []).filter(_trashIn));
+  if (type === 'quyettoan') {
+    return _trashSort((typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : []).filter(_trashIn));
   }
   return [];
 }
@@ -121,10 +125,11 @@ function _trashRenderTable(type) {
   const headers = _trashGetHeaders(type);
   const rows    = recs.map(r => _trashBuildRow(type, r)).join('');
 
+  // Nút dọn dẹp CHÍNH của thùng rác: chỉ xóa vĩnh viễn bản ghi của tab đang chọn
   wrap.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-      <button class="btn btn-outline-danger btn-sm" onclick="_trashEmptyCurrentTab()">
-        <span class="material-symbols-outlined msi-gap">delete</span>Xóa tất cả trong tab này (${recs.length})
+      <button class="btn btn-danger btn-sm" onclick="_trashEmptyCurrentTab()">
+        <span class="material-symbols-outlined msi-gap">delete_forever</span>Xóa tất cả trong tab này (${recs.length})
       </button>
     </div>
     <div style="overflow-x:auto">
@@ -144,7 +149,14 @@ function _trashGetHeaders(type) {
   if (type === 'tienung')  return ['Ngày','Loại','Đối Tượng','Công Trình','Số Tiền','Ngày Xóa','Người Xóa'];
   if (type === 'thietbi')  return ['Ngày','Công Trình','Tên TB','SL','Tình Trạng','Ngày Xóa','Người Xóa'];
   if (type === 'thutien')  return ['Ngày','Công Trình','Số Tiền','Người Nộp','Nội Dung','Ngày Xóa','Người Xóa'];
-  if (type === 'hopdong')  return ['Loại','Công Trình','Giá Trị','Nội Dung','Ngày Xóa','Người Xóa'];
+  // (03/10/2026) Cột giống hệt bảng ngoài app:
+  //   HĐ chính  ↔ bảng Thống Kê HĐ Chính tab Doanh Thu (renderHdcTableTk)
+  //   HĐ TP     ↔ bảng Đối Soát HĐ Thầu Phụ tab Công Nợ (renderHdtpTableTk)
+  //   Quyết toán ↔ bảng Lịch Sử Quyết Toán (qtRenderHistory) — bỏ 2 cột "Ảnh hưởng DT" /
+  //                "DT sau QT" vì chỉ tính được cho bản ghi đang sống
+  if (type === 'hopdong-chinh') return ['Ngày','Công Trình','CĐT','HĐ Chính','HĐ Phụ','Tổng HĐ','Nội Dung','Ngày Xóa','Người Xóa'];
+  if (type === 'hopdong-tp')    return ['Ngày','Công Trình','Thầu Phụ','Nội Dung','Giá Trị HĐ','Ngày Xóa','Người Xóa'];
+  if (type === 'quyettoan')     return ['Ngày','Công Trình','Loại','Số Tiền','Nội Dung','Người QT','Ngày Xóa','Người Xóa'];
   return [];
 }
 
@@ -191,22 +203,45 @@ function _trashBuildRow(type, r) {
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${numFmt(r.tien || 0)}</td>
       <td class="text-secondary" style="font-size:12px">${x(recCatName(r,'thu','nguoi') || '—')}</td>
       <td class="text-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd || '—')}</td>`;
-  } else if (type === 'hopdong') {
-    const ctName = r._trashLoai === 'Chính'
-      ? (_getProjectNameById(r._trashKey) || r._trashKey || '—')
-      : x(resolveProjectName(r) || r.congtrinh || '—');
-    const giatri = r._trashLoai === 'Chính'
-      ? ((r.giaTri || 0) + (r.giaTriphu || 0))
-      : (r.giaTri || 0);
+  } else if (type === 'hopdong-chinh') {
+    // Giống renderHdcTableTk: key là projectId (chuẩn) hoặc tên CT (đời cũ); CĐT lấy từ công trình
+    const allProjs = (typeof projects !== 'undefined') ? projects : [];
+    const ctName = _getProjectNameById(r._trashKey) || r._trashKey || '—';
+    const proj   = allProjs.find(p => !p.deletedAt && (p.id === r._trashKey || p.name === ctName));
+    const cdt    = (proj && proj.chuDauTu) ? proj.chuDauTu : (r.khachHang || '');
+    const tong   = (r.giaTri || 0) + (r.giaTriphu || 0) + (r.phatSinh || 0);
+    const dash   = '<span class="text-body-secondary">—</span>';
     cells = `
-      <td><span class="badge ${r._trashLoai === 'Chính' ? 'bg-primary' : 'bg-warning text-dark'}" style="font-size:10px">${r._trashLoai}</span></td>
-      <td style="font-size:12px;font-weight:600;white-space:nowrap">${ctName}</td>
-      <td class="text-end font-monospace fw-semibold text-warning" style="white-space:nowrap">${giatri ? numFmt(giatri) : '—'}</td>
-      <td class="text-secondary" style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.nd || '—')}</td>`;
+      <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap">${x(ctName)}</td>
+      <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(cdt || '—')}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${r.giaTri ? fmtS(r.giaTri) : dash}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${r.giaTriphu ? fmtS(r.giaTriphu) : dash}</td>
+      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>`;
+  } else if (type === 'hopdong-tp') {
+    // Giống renderHdtpTableTk: Giá Trị HĐ = giaTri + phatSinh
+    const tong = (r.giaTri || 0) + (r.phatSinh || 0);
+    cells = `
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r) || '—')}</td>
+      <td style="white-space:nowrap">${x(recCatName(r,'thauphu','thauphu') || '—')}</td>
+      <td class="text-secondary" style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>`;
+  } else if (type === 'quyettoan') {
+    // Giống qtRenderHistory: badge loại (tăng/giảm/thay thế) + số tiền có dấu theo loại
+    const ctName = _resolveCtName(r) || '—';
+    cells = `
+      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
+      <td style="font-weight:600;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${x(ctName)}">${x(ctName)}</td>
+      <td style="white-space:nowrap">${qtLoaiBadge(r)}</td>
+      <td class="text-end font-monospace fw-semibold ${qtSoTienCls(r)}" style="white-space:nowrap">${qtSoTienTxt(r, fmtS)}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>`;
   }
 
   // Nhãn cảnh báo dữ liệu cũ thiếu trường (xem _trashCheck)
-  const chk = _trashCheck(type === 'hopdong' ? (r._trashLoai === 'Chính' ? 'hopdong-chinh' : 'hopdong-tp') : type, r);
+  const chk = _trashCheck(type, r);
   const probs = [...chk.errors, ...chk.fixNotes, ...chk.warns];
   if (probs.length) {
     const color = chk.errors.length ? 'bg-danger' : 'bg-warning text-dark';
@@ -224,19 +259,13 @@ function _trashBuildRow(type, r) {
 
 // ── Nút hành động ──────────────────────────────────────────────────────────────
 function _trashActionBtns(type, r) {
-  let restoreId, deleteId;
-  if (type === 'hopdong') {
-    restoreId = r._trashLoai === 'Chính' ? `hopdong-chinh||${r._trashKey}` : `hopdong-tp||${r.id}`;
-    deleteId  = restoreId;
-  } else {
-    restoreId = `${type}||${r.id}`;
-    deleteId  = `${type}||${r.id}`;
-  }
+  // HĐ chính định danh bằng key công trình (_trashKey), các loại khác bằng id
+  const compositeId = `${type}||${type === 'hopdong-chinh' ? r._trashKey : r.id}`;
   return `<div class="d-flex gap-1">
     <button class="btn btn-outline-secondary btn-sm" style="font-size:11px"
-      onclick="_trashRestore('${restoreId}')">↩ Khôi phục</button>
+      onclick="_trashRestore('${compositeId}')">↩ Khôi phục</button>
     <button class="btn btn-danger btn-sm" style="font-size:11px"
-      onclick="_trashHardDelete('${deleteId}')"><span class="material-symbols-outlined">close</span></button>
+      onclick="_trashHardDelete('${compositeId}')"><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 
@@ -253,7 +282,17 @@ const _TRASH_STORES = {
   thietbi:      { key: 'tb_v1',      get: () => tbData,           set: v => { tbData = v; } },
   thutien:      { key: 'thu_v1',     get: () => thuRecords,       set: v => { thuRecords = v; } },
   'hopdong-tp': { key: 'thauphu_v1', get: () => thauPhuContracts, set: v => { thauPhuContracts = v; } },
+  // (03/10/2026) Quyết toán — đồng bộ cloud qua doc meta_quyet_toan (gộp bằng mergeDatasets → bia mộ luôn thắng)
+  quyettoan:    { key: 'quyettoan_v1', get: () => quyetToanRecords, set: v => { quyetToanRecords = v; } },
 };
+
+// Quyết toán chỉ Quản trị viên / Giám đốc được sửa-xóa (xem _qtCanEdit ở quyettoan.congtrinh.js)
+// → khôi phục / xóa vĩnh viễn trong thùng rác cũng áp cùng quyền. Trả true nếu ĐƯỢC phép.
+function _trashCanTouch(type) {
+  if (type !== 'quyettoan' || typeof _qtCanEdit !== 'function' || _qtCanEdit()) return true;
+  toast('Chỉ Quản trị viên hoặc Giám đốc được khôi phục / xóa quyết toán', 'error');
+  return false;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // KIỂM TRA DỮ LIỆU TRƯỚC KHI KHÔI PHỤC (01/10/2026)
@@ -320,6 +359,11 @@ function _trashCheck(type, r) {
     if (!(Number(r.giaTri) > 0)) warns.push('Không có giá trị hợp đồng');
   } else if (type === 'hopdong-chinh') {
     if (!(Number(r.giaTri) > 0)) warns.push('Không có giá trị hợp đồng');
+  } else if (type === 'quyettoan') {
+    // Thiếu ngày → không xếp được vào dòng thời gian quyết toán của công trình (sai delta)
+    if (!_trashIsISO(r.ngay)) errors.push('Thiếu hoặc sai ngày (ngay)');
+    if (noProject('congtrinh')) errors.push('Thiếu công trình');
+    if (!(Math.abs(Number(r.giaTri) || 0) > 0)) warns.push('Không có số tiền quyết toán');
   }
   return { errors, warns, fixNotes, fixes };
 }
@@ -333,6 +377,7 @@ function _trashCheck(type, r) {
 function _trashRestore(compositeId) {
   const [type, id] = compositeId.split('||');
   const now = Date.now();
+  if (!_trashCanTouch(type)) return;
 
   // Tìm bản ghi
   let rec = null, idx = -1, store = null;
@@ -377,6 +422,11 @@ function _trashRestore(compositeId) {
       // Đồng bộ với trash_v1 cũ nếu còn tồn tại
       save('trash_v1', load('trash_v1', []).filter(i => String(i.id) !== String(id)));
     }
+  }
+
+  // Quyết toán khôi phục làm đổi doanh thu → vẽ lại các bảng đang dùng số quyết toán
+  if (type === 'quyettoan' && typeof _qtRefreshOtherTabs === 'function') {
+    try { _qtRefreshOtherTabs(); } catch (e) { console.warn('[Trash] Vẽ lại tab quyết toán lỗi:', e); }
   }
 
   if (typeof schedulePush === 'function') schedulePush();
@@ -431,9 +481,11 @@ function _trashPurgeIds(type, ids) {
   const arr = store.get().map(r => {
     if (!_trashIn(r) || !idSet.has(String(r.id))) return r;
     n++;
-    // Doc cloud chứa bản ghi: HĐ thầu phụ → meta_hop_dong; còn lại → doc năm theo ngày
-    const docId = type === 'hopdong-tp' ? 'meta_hop_dong'
-      : (typeof _recYearDoc === 'function' ? _recYearDoc(store.key, r) : null);
+    // Doc cloud chứa bản ghi: kho meta (HĐ thầu phụ → meta_hop_dong, quyết toán → meta_quyet_toan)
+    // tra theo bảng _META_KEY_DOC (core.storage.js); còn lại → doc năm theo ngày
+    const metaDoc = (typeof _META_KEY_DOC !== 'undefined') ? _META_KEY_DOC[store.key] : null;
+    const docId = metaDoc
+      || (typeof _recYearDoc === 'function' ? _recYearDoc(store.key, r) : null);
     if (docId) _trashPurgeLog.push({ type, id: String(r.id), docId });
     return _trashTomb(r, now);
   });
@@ -503,6 +555,7 @@ async function _trashVerifyCloud(log) {
       if (d) {
         if (it.type === 'hopdong-chinh')   rec = d.hopDong ? d.hopDong[it.id] : null;
         else if (it.type === 'hopdong-tp') rec = (d.thauPhu || []).find(r => r && String(r.id) === it.id);
+        else if (it.type === 'quyettoan')  rec = (d.quyetToan || []).find(r => r && String(r.id) === it.id);
         else                               rec = (d.records || []).find(r => r && String(r.id) === it.id);
       }
       // Doc không tồn tại / bản ghi không còn / đã là bia mộ → coi như đã xóa trên cloud
@@ -557,8 +610,9 @@ async function _trashPushPurge(count) {
 
 // ── Xóa vĩnh viễn 1 bản ghi ───────────────────────────────────────────────────
 function _trashHardDelete(compositeId) {
-  if (!confirm('⚠️ Xóa vĩnh viễn?\nDữ liệu sẽ KHÔNG THỂ khôi phục!')) return;
   const [type, id] = compositeId.split('||');
+  if (!_trashCanTouch(type)) return;
+  if (!confirm('⚠️ Xóa vĩnh viễn?\nDữ liệu sẽ KHÔNG THỂ khôi phục!')) return;
   const n = _trashPurgeIds(type, [id]);
   if (!n) { toast('Không tìm thấy bản ghi', 'error'); renderThungRac(); return; }
   _trashPushPurge(n);
@@ -566,36 +620,19 @@ function _trashHardDelete(compositeId) {
 }
 
 // ── Xóa tất cả trong tab hiện tại ─────────────────────────────────────────────
+// Nút dọn dẹp DUY NHẤT của thùng rác (03/10/2026 — đã gỡ "Làm sạch thùng rác" toàn bộ).
+// Chỉ xóa vĩnh viễn bản ghi thuộc tab (phân hệ) đang chọn, các tab khác giữ nguyên.
 function _trashEmptyCurrentTab() {
   const type  = _trashCurrentType;
   const recs  = _trashGetRecords(type);
   if (!recs.length) { toast('Thùng rác tab này đang trống!', ''); return; }
-  if (!confirm(`⚠️ Xóa vĩnh viễn ${recs.length} bản ghi trong tab này?\nKHÔNG THỂ KHÔI PHỤC!`)) return;
+  if (!_trashCanTouch(type)) return;
+  const tabLabel = (_TRASH_TABS.find(t => t.id === type) || {}).label || type;
+  if (!confirm(`⚠️ Xóa vĩnh viễn ${recs.length} bản ghi trong tab "${tabLabel}"?\nCác tab khác KHÔNG bị ảnh hưởng.\nKHÔNG THỂ KHÔI PHỤC!`)) return;
 
-  let n = 0;
-  if (type === 'hopdong') {
-    n += _trashPurgeIds('hopdong-chinh', recs.filter(r => r._trashLoai === 'Chính').map(r => r._trashKey));
-    n += _trashPurgeIds('hopdong-tp',    recs.filter(r => r._trashLoai === 'Thầu phụ').map(r => r.id));
-  } else {
-    n = _trashPurgeIds(type, recs.map(r => r.id));
-  }
-  _trashPushPurge(n);
-  renderThungRac();
-}
-
-// ── Làm sạch toàn bộ thùng rác ────────────────────────────────────────────────
-function _trashEmptyAll() {
-  const total = _trashCountAll();
-  if (!total) { toast('Thùng rác đang trống!', ''); return; }
-  if (!confirm(`⚠️ Xóa vĩnh viễn TOÀN BỘ ${total} bản ghi trong thùng rác?\nKHÔNG THỂ KHÔI PHỤC!`)) return;
-
-  let n = 0;
-  ['hoadon', 'chamcong', 'tienung', 'thietbi', 'thutien', 'hopdong-tp'].forEach(type => {
-    n += _trashPurgeIds(type, (_TRASH_STORES[type].get() || []).filter(_trashIn).map(r => r.id));
-  });
-  n += _trashPurgeIds('hopdong-chinh', Object.keys(hopDongData || {}).filter(k => _trashIn(hopDongData[k])));
-  if (load('trash_v1', []).length) save('trash_v1', []);
-
+  // HĐ chính định danh bằng key công trình, các loại khác bằng id
+  const ids = recs.map(r => type === 'hopdong-chinh' ? r._trashKey : r.id);
+  const n = _trashPurgeIds(type, ids);
   _trashPushPurge(n);
   renderThungRac();
 }
