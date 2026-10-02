@@ -344,147 +344,11 @@ function delThuRecord(id) {
 // ── [KHAI BÁO] render lịch sử thu cũ → delegate sang bảng GỘP CHUNG ──
 function renderThuTable(_page) { renderKhaiBaoTable(0); }
 
-// ══ PHẦN 3: HỢP ĐỒNG THẦU PHỤ ════════════════════════════════
-
-// ── Cập nhật hiển thị Tổng HĐ Thầu Phụ khi nhập ─────────────
-function hdtpUpdateTotal() {
-  const tong = _readMoneyInput('hdtp-giatri');
-  const el = document.getElementById('hdtp-tong-label');
-  if (el) el.textContent = tong ? 'Tổng: ' + fmtM(tong) : '';
-}
-
-// ── Lưu / Cập nhật Hợp Đồng Thầu Phụ ────────────────────────
-function saveHopDongThauPhu() {
-  const ct = document.getElementById('hdtp-ct-input')?.value.trim();
-  const tp = (document.getElementById('hdtp-thauphu')?.value || '').trim();
-  if (!ct) { toast('Vui lòng chọn Công Trình!', 'error'); return; }
-  if (!tp) { toast('Vui lòng chọn Thầu Phụ!', 'error'); return; }
-
-  // Chỉ cho phép CT đã tồn tại
-  const _hdtpProjExists = (typeof getAllProjects === 'function') &&
-    getAllProjects().some(p => p.id !== 'COMPANY' && p.name === ct);
-  if (!_hdtpProjExists) {
-    toast('Chỉ được tạo công trình tại tab Công Trình', 'error');
-    return;
-  }
-
-  const ngay     = document.getElementById('hdtp-ngay')?.value || today();
-  const nd       = document.getElementById('hdtp-nd')?.value.trim() || '';
-  const giaTri   = _hdtpItems.length > 0
-    ? calcHopDongValue({ items: _hdtpItems })
-    : _readMoneyInput('hdtp-giatri');
-  const editId   = document.getElementById('hdtp-edit-id')?.value || '';
-
-  _dtAddCT(ct);
-  _dtAddTP(tp);
-  const now = Date.now();
-  const _hdtpProj = projects.find(p => p.name === ct) || null;
-  const _hdtpPid  = _hdtpProj ? _hdtpProj.id : null;
-
-  if (editId) {
-    const idx = thauPhuContracts.findIndex(r => r.id === editId);
-    if (idx >= 0) {
-      thauPhuContracts[idx] = mkUpdate(thauPhuContracts[idx], { ngay, congtrinh: ct, projectId: _hdtpPid, thauphu: tp, giaTri, nd, items: [..._hdtpItems] });
-    }
-    toast('✅ Đã cập nhật HĐ thầu phụ', 'success');
-  } else {
-    thauPhuContracts.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _hdtpPid, thauphu: tp, giaTri, nd, items: [..._hdtpItems] }));
-    toast('✅ Đã lưu HĐ thầu phụ: ' + tp + ' — ' + ct, 'success');
-  }
-
-  save('thauphu_v1', thauPhuContracts);
-  _hdtpResetForm();
-  closeDtModal('hdtp');
-  renderHdtpTable(0);
-  renderHdtpTableTk(_hdtpTkPage);
-  _dtRenderDashboardMini();
-}
-
-function _hdtpResetForm() {
-  _hdtpItems = [];
-  if(typeof window.renderhdtpChiTiet === 'function') window.renderhdtpChiTiet();
-
-  ['hdtp-giatri','hdtp-nd'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.value = '';
-    if (el.dataset) el.dataset.raw = '';
-  });
-  const giaTriEl = document.getElementById('hdtp-giatri');
-  if (giaTriEl) { giaTriEl.readOnly = false; giaTriEl.style.background = ''; giaTriEl.style.pointerEvents = ''; }
-  const ctSel = document.getElementById('hdtp-ct-input');
-  if (ctSel) ctSel.value = '';
-  const tpSel = document.getElementById('hdtp-thauphu');
-  if (tpSel) tpSel.value = '';
-  const ngayEl = document.getElementById('hdtp-ngay');
-  if (ngayEl) ngayEl.value = today();
-  const editEl = document.getElementById('hdtp-edit-id');
-  if (editEl) editEl.value = '';
-  const btn = document.getElementById('hdtp-save-btn');
-  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu';
-  const tong = document.getElementById('hdtp-tong-label');
-  if (tong) tong.textContent = '';
-}
-
-// ── Sửa Hợp Đồng Thầu Phụ (mở modal) ────────────────────────
-function editHopDongThauPhu(id) {
-  const r = thauPhuContracts.find(r => r.id === id);
-  if (!r) return;
-
-  // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
-  if (typeof dtPopulateSels === 'function') dtPopulateSels();
-
-  const ctName = resolveProjectName(r) || r.congtrinh || '';
-  const ctSel = document.getElementById('hdtp-ct-input');
-  // _setSelectFlexible: tự thêm option nếu thiếu → không bao giờ trắng
-  if (ctSel) _setSelectFlexible(ctSel, ctName);
-  const tpSel = document.getElementById('hdtp-thauphu');
-  // Tên Thầu Phụ resolve theo ID (mới nhất), fallback text cũ
-  if (tpSel) _setSelectFlexible(tpSel, recCatName(r,'thauphu','thauphu'));
-  const ngayEl = document.getElementById('hdtp-ngay');
-  if (ngayEl) ngayEl.value = r.ngay || '';
-  const ndInput = document.getElementById('hdtp-nd');
-  if (ndInput) ndInput.value = r.nd || '';
-
-  function _setMoney(elemId, val) {
-    const el = document.getElementById(elemId);
-    if (!el) return;
-    el.dataset.raw = val || 0;
-    el.value = val ? parseInt(val).toLocaleString('vi-VN') : '';
-  }
-
-  _hdtpItems = Array.isArray(r.items) ? [...r.items] : [];
-  if(typeof window.renderhdtpChiTiet === 'function') window.renderhdtpChiTiet();
-  if(typeof window.hdtpCalcAuto === 'function') window.hdtpCalcAuto();
-  if (_hdtpItems.length === 0) _setMoney('hdtp-giatri', r.giaTri || 0);
-
-  const editEl = document.getElementById('hdtp-edit-id');
-  if (editEl) editEl.value = id;
-  const btn = document.getElementById('hdtp-save-btn');
-  if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
-
-  hdtpUpdateTotal();
-  openDtModal('hdtp');
-}
-
-// ── Xóa mềm Hợp Đồng Thầu Phụ ────────────────────────────────
-function delHopDongThauPhu(id) {
-  if (!confirm('Xóa hợp đồng thầu phụ này?')) return;
-  const idx = thauPhuContracts.findIndex(r => r.id === id);
-  if (idx < 0) return;
-  const now = Date.now();
-  thauPhuContracts[idx] = { ...thauPhuContracts[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
-  save('thauphu_v1', thauPhuContracts);
-  renderHdtpTable(_hdtpPage);
-  renderHdtpTableTk(_hdtpTkPage);
-  toast('Đã xóa hợp đồng thầu phụ', 'success');
-}
-
-// ── [KHAI BÁO] render HĐ Thầu Phụ cũ → delegate sang bảng GỘP CHUNG ──
-function renderHdtpTable(_page) { renderKhaiBaoTable(0); }
+// ══ PHẦN 3: HỢP ĐỒNG THẦU PHỤ — ĐÃ CHUYỂN sang js/modules/congno/congno.hdtp.js ══
+// (HĐ thầu phụ là CHI PHÍ → thuộc tab Công Nợ, không còn ở tab Doanh Thu.)
 
 // ══ BẢNG GỘP CHUNG KHAI BÁO (30 ngày gần nhất) ═══════════════
-// Gộp HĐ Chính + HĐ Thầu Phụ + Thu Tiền vào MỘT bảng, sắp theo ngày giảm dần.
+// Gộp HĐ Chính + Thu Tiền + Quyết Toán (chỉ xem) vào MỘT bảng, sắp theo ngày giảm dần.
 // Mỗi dòng có nhãn Loại + nút Sửa/Xóa gọi đúng hàm theo loại bản ghi.
 let _kbPage = 0;
 
@@ -529,26 +393,7 @@ function renderKhaiBaoTable(page) {
       });
     });
 
-  // ── HĐ Thầu Phụ ──
-  thauPhuContracts
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtWithinRecent(r.ngay))
-    .forEach(r => {
-      const tong = (r.giaTri || 0) + (r.phatSinh || 0);
-      items.push({
-        type: 'hdtp',
-        ngay: r.ngay,
-        sortTs: r.updatedAt || r.createdAt || 0,
-        ct: _resolveCtName(r) || '—',
-        doiTac: recCatName(r, 'thauphu', 'thauphu') || '—',
-        nd: r.nd || '—',
-        tien: tong,
-        tienCls: 'text-warning',
-        loaiBadge: '<span class="badge bg-warning text-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">handshake</span>HĐ Thầu Phụ</span>',
-        actions: `
-          <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongThauPhu('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongThauPhu('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
-      });
-    });
+  // (HĐ Thầu Phụ KHÔNG còn hiện ở đây — là chi phí, xem tab Công Nợ → THẦU PHỤ)
 
   // ── Thu Tiền ──
   thuRecords
@@ -588,9 +433,9 @@ function renderKhaiBaoTable(page) {
         tienCls: qtSoTienCls(r),
         tienTxt: qtSoTienTxt(r),
         loaiBadge: '<span class="badge bg-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán</span> ' + qtLoaiBadge(r),
+        // Tab Doanh Thu chỉ HIỂN THỊ kết quả — muốn sửa/xóa phải sang tab Quyết Toán
         actions: `
-          <button class="btn btn-outline-primary btn-sm" title="Sửa (mở tab Quyết Toán)" onclick="qtOpenEdit('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="qtDelete('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
+          <button class="btn btn-outline-secondary btn-sm" title="Mở ở tab Quyết Toán" onclick="qtOpenEdit('${r.id}')"><span class="material-symbols-outlined" style="font-size:16px">open_in_new</span></button>`,
       });
     });
 
@@ -673,6 +518,14 @@ function renderHdcTableTk(page) {
     const _proj = _allProjs.find(pr => !pr.deletedAt && (pr.id === keyId || pr.name === ctName));
     const _cdt = (_proj && _proj.chuDauTu) ? _proj.chuDauTu : (hd.khachHang || '');
     const tong = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
+    // Tiến độ thu tiền của hợp đồng — TOÀN VÒNG ĐỜI công trình (thu/quyết toán có thể
+    // rơi vào năm khác năm ký HĐ). Công thức: calcTongDoanhThu() — quyettoan.core.js
+    const _dtP = _proj ? calcTongDoanhThu(_proj, { allYears: true }) : null;
+    const _dash = '<span class="text-body-secondary">—</span>';
+    const _qtCell = !_dtP || !_dtP.qt ? _dash
+      : `<span class="${_dtP.qt < 0 ? 'text-danger' : 'text-success'}">${_dtP.qt > 0 ? '+' : '-'}${fmtS(Math.abs(_dtP.qt))}</span>`;
+    const _con = _dtP ? _dtP.conPhaiThu : 0;
+    const _conCls = _con > 0 ? 'text-warning' : (_con < 0 ? 'text-danger' : 'text-success');
     return `<tr>
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
       <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
@@ -681,6 +534,10 @@ function renderHdcTableTk(page) {
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${_qtCell}</td>
+      <td class="text-end font-monospace fw-bold" style="white-space:nowrap">${_dtP ? fmtS(_dtP.tongDT) : _dash}</td>
+      <td class="text-end font-monospace text-success" style="white-space:nowrap">${_dtP && _dtP.daThu ? fmtS(_dtP.daThu) : _dash}</td>
+      <td class="text-end font-monospace fw-bold ${_conCls}" style="white-space:nowrap">${_dtP ? (_con < 0 ? '-' : '') + fmtS(Math.abs(_con)) : _dash}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
           <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
@@ -693,64 +550,6 @@ function renderHdcTableTk(page) {
   }).join('');
 
   if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderHdcTableTk');
-}
-
-// ── Render bảng Hợp Đồng Thầu Phụ (toàn bộ) ──────────────────
-function renderHdtpTableTk(page) {
-  page = page || 0;
-  _hdtpTkPage = page;
-  const tbody  = document.getElementById('hdtptk-tbody');
-  const empty  = document.getElementById('hdtptk-empty');
-  const pgWrap = document.getElementById('hdtptk-pagination');
-  if (!tbody) return;
-
-  // Sắp xếp: ngày mới nhất lên đầu (DESC), tie-break theo thời điểm tạo
-  let filtered = thauPhuContracts
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTpProjFilter(r))
-    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '')
-      || ((b.createdAt || 0) - (a.createdAt || 0)));
-
-  if (_dtTpSearch) {
-    const q = _dtTpSearch;
-    filtered = filtered.filter(r =>
-      (_resolveCtName(r) || '').toLowerCase().includes(q) ||
-      (recCatName(r,'thauphu','thauphu') || '').toLowerCase().includes(q) ||
-      (r.nd || '').toLowerCase().includes(q)
-    );
-  }
-
-  if (!filtered.length) {
-    tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
-    if (pgWrap) pgWrap.innerHTML = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-
-  const total = filtered.length;
-  const slice = filtered.slice(page * DT_PG, (page + 1) * DT_PG);
-
-  tbody.innerHTML = slice.map(r => {
-    const tong = (r.giaTri || 0) + (r.phatSinh || 0);
-    return `<tr>
-      <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdtp-row-chk" data-id="${r.id}"></td>
-      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
-      <td style="white-space:nowrap">${x(recCatName(r,'thauphu','thauphu'))}</td>
-      <td class="text-secondary hdtp-nd-cell"><span class="hdtp-nd-clamp">${x(r.nd || '—')}</span></td>
-      <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtS(tong) : '—'}</td>
-      <td class="action-col">
-        <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
-            onclick="editHopDongThauPhu('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
-            onclick="delHopDongThauPhu('${r.id}')"><i class="bi bi-trash-fill"></i></button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderHdtpTableTk');
 }
 
 // ── Render bảng Lịch Sử Thu Tiền (toàn bộ) ───────────────────
@@ -817,69 +616,5 @@ function renderThuTableTk(page) {
   if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderThuTableTk');
 }
 
-// ══ PHẦN 5: QUYẾT TOÁN (chỉ còn bảng xem ở THỐNG KÊ) ══════════
-// Mỗi bản ghi có loại: tăng / giảm / thay thế (trường `loai`, xem quyettoan.core.js).
-// Doanh thu thực tế tính bằng calcTongDoanhThu() — KHÔNG cộng thẳng giaTri.
-let _qtTkPage = 0;
-
-// (Đã chuyển saveQuyetToan / _qtResetForm / editQuyetToan / delQuyetToan sang tab
-//  QUYẾT TOÁN riêng — xem js/modules/quyettoan/quyettoan.congtrinh.js:
-//  qtSave / qtResetForm / qtEdit (qtOpenEdit khi gọi từ tab khác) / qtDelete.)
-
-// ── Render bảng Quyết Toán (THỐNG KÊ — toàn bộ) ──────────────
-function renderQtTableTk(page) {
-  page = page || 0;
-  _qtTkPage = page;
-  const tbody  = document.getElementById('qttk-tbody');
-  const empty  = document.getElementById('qttk-empty');
-  const badge  = document.getElementById('qttk-count-badge');
-  const pgWrap = document.getElementById('qttk-pagination');
-  if (!tbody) return;
-
-  let filtered = quyetToanRecords
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtMatchTkProjFilter(r))
-    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || (b.createdAt - a.createdAt));
-
-  if (_dtTkSearch) {
-    const q = _dtTkSearch;
-    filtered = filtered.filter(r =>
-      (_resolveCtName(r) || '').toLowerCase().includes(q) ||
-      (r.nguoi || '').toLowerCase().includes(q) ||
-      (r.nd || '').toLowerCase().includes(q)
-    );
-  }
-
-  if (badge) badge.textContent = filtered.length ? `(${filtered.length} mục)` : '';
-
-  if (!filtered.length) {
-    tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
-    if (pgWrap) pgWrap.innerHTML = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-
-  const total = filtered.length;
-  const slice = filtered.slice(page * DT_PG, (page + 1) * DT_PG);
-
-  tbody.innerHTML = slice.map(r => {
-    // Dấu + màu theo loại quyết toán (tăng/giảm/thay thế) — helper ở quyettoan.core.js
-    return `<tr>
-      <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))} ${qtLoaiBadge(r)}</td>
-      <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
-      <td class="text-body-secondary" style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
-      <td class="text-end font-monospace fw-bold ${qtSoTienCls(r)}" style="white-space:nowrap">${r.giaTri ? qtSoTienTxt(r, fmtS) : '—'}</td>
-      <td class="action-col">
-        <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a (m&#7903; tab Quy&#7871;t To&#225;n)"
-            onclick="qtOpenEdit('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
-            onclick="qtDelete('${r.id}')"><i class="bi bi-trash-fill"></i></button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderQtTableTk');
-}
+// ══ PHẦN 5: QUYẾT TOÁN — bảng xem ở THỐNG KÊ đã gỡ (02/10/2026) ══
+// Lịch sử quyết toán xem/sửa ở tab QUYẾT TOÁN (quyettoan.congtrinh.js → qtRenderHistory).

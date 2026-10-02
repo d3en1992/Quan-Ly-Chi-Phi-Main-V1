@@ -33,8 +33,10 @@
             <div class="col-12 col-sm-4">
               <div class="card shadow-sm border-0 h-100" style="background:var(--bs-primary-bg-subtle)">
                 <div class="card-body text-center py-3">
-                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Giá Trị HĐ</div>
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Doanh Thu</div>
                   <div id="dt-mini-tonghd" class="fw-bold text-primary" style="font-size:20px">—</div>
+                  <!-- Dòng phụ: HĐ gốc + quyết toán (±) — để thấy doanh thu đến từ đâu -->
+                  <div id="dt-mini-tonghd-sub" class="text-secondary" style="font-size:11px;margin-top:2px"></div>
                 </div>
               </div>
             </div>
@@ -56,26 +58,21 @@
               </div>
             </div>
           </div>
-          <!-- Action buttons: 3 nút dàn đều 1 hàng ngang (HĐ Thầu Phụ đã dời sang sub-tab THẦU PHỤ) -->
+          <!-- Action buttons: tab Doanh Thu chỉ còn 2 thao tác nhập — HĐ Chính + Thu Tiền
+               (Quyết toán → tab QUYẾT TOÁN; HĐ Thầu Phụ → tab CÔNG NỢ) -->
           <div class="row g-2 mb-4">
-            <div class="col-4">
+            <div class="col-6">
               <button class="btn btn-primary w-100 h-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdcResetForm();openDtModal('hdc')">
                 <i class="bi bi-file-earmark-text me-1"></i>+ Khai Báo HĐ Chính
               </button>
             </div>
-            <div class="col-4">
+            <div class="col-6">
               <button class="btn btn-success w-100 h-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_thuResetForm();openDtModal('thu')">
                 <i class="bi bi-cash-coin me-1"></i>+ Ghi Nhận Thu Tiền
               </button>
             </div>
-            <div class="col-4">
-              <!-- Form Quyết Toán đã chuyển sang tab QUYẾT TOÁN riêng → nút này chỉ điều hướng -->
-              <button class="btn btn-dark w-100 h-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="goPage(null,'quyettoan')">
-                <i class="bi bi-clipboard-check me-1"></i>Quyết Toán →
-              </button>
-            </div>
           </div>
-          <!-- Bảng GỘP CHUNG: mọi khai báo 30 ngày gần nhất (HĐ Chính + HĐ Thầu Phụ + Thu Tiền) -->
+          <!-- Bảng GỘP CHUNG: mọi khai báo 30 ngày gần nhất (HĐ Chính + Thu Tiền + Quyết Toán chỉ xem) -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span><span class="material-symbols-outlined msi-gap">article</span>Khai Báo Gần Đây
@@ -122,12 +119,13 @@
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span><span class="material-symbols-outlined msi-gap">list_alt</span>Hợp Đồng Chính Công Ty
+              <span class="text-secondary" style="font-size:11px;font-weight:400">(tiến độ thu tính toàn vòng đời công trình)</span>
             </div>
             <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ Chính</button>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:560px">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:980px">
                 <thead class="table-light">
                   <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
                     <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"/></th>
@@ -137,6 +135,11 @@
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Chính</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Phụ</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ</th>
+                    <!-- 4 cột tiến độ thu tiền: tính toàn vòng đời công trình (calcTongDoanhThu) -->
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Quyết Toán</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Tổng DT</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Đã Thu</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Còn Phải Thu</th>
                     <th class="action-col"></th>
                   </tr>
                 </thead>
@@ -177,33 +180,7 @@
             <div id="thutk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
 
-          <!-- TK BẢNG 4: Quyết toán chi phí (toàn bộ) -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán Chi Phí
-              <span id="qttk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
-              <span class="text-secondary" style="font-size:11px;font-weight:400">(+ tăng · - giảm · = thay thế — nhập/sửa ở tab QUYẾT TOÁN)</span>
-            </div>
-          </div>
-          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
-            <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:560px">
-                <thead class="table-light">
-                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
-                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Người TH</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700">Giá Trị Phát Sinh</th>
-                    <th class="action-col"></th>
-                  </tr>
-                </thead>
-                <tbody id="qttk-tbody"></tbody>
-              </table>
-            </div>
-            <div id="qttk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có bản ghi quyết toán</div>
-            <div id="qttk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
-          </div>
+          <!-- (Bảng Quyết Toán đã chuyển sang tab QUYẾT TOÁN → Lịch Sử Quyết Toán) -->
         </div>
         <!-- /dt-sub-thongke -->
 

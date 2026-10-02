@@ -1,8 +1,20 @@
 <!-- Partial: page-quyettoan — Tab QUYẾT TOÁN (trung tâm "chốt sổ")
-     Phân hệ 2A: Quyết Toán Công Trình (với Chủ Đầu Tư) — js/modules/quyettoan/quyettoan.congtrinh.js
-     (Phân hệ 2B: Tất toán Thầu Phụ / NCC — sẽ thêm ở lần cập nhật sau)
-     Mọi ID trong trang dùng tiền tố qtf- (form) / qth- (lịch sử) để KHÔNG trùng ID với tab khác. -->
+     Sub-tab 1 (2A): Quyết Toán Công Trình (với Chủ Đầu Tư) — js/modules/quyettoan/quyettoan.congtrinh.js
+     Sub-tab 2 (2B): Tất Toán Thầu Phụ / NCC              — js/modules/quyettoan/quyettoan.thauphu.js
+     Tiền tố ID: qtf- (form 2A) · qth- (lịch sử 2A) · tt- (tất toán 2B) → KHÔNG trùng ID với tab khác. -->
 
+        <!-- Sub-nav: 2 phân hệ -->
+        <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="qt-sub-nav">
+          <button class="nav-link active" id="qt-sub-congtrinh-btn" onclick="qtGoSub(this, 'qt-sub-congtrinh')">
+            <span class="material-symbols-outlined msi-gap">receipt_long</span>QUYẾT TOÁN CÔNG TRÌNH
+          </button>
+          <button class="nav-link" id="qt-sub-tattoan-btn" onclick="qtGoSub(this, 'qt-sub-tattoan')">
+            <span class="material-symbols-outlined msi-gap">task_alt</span>TẤT TOÁN TP/NCC
+          </button>
+        </div>
+
+        <!-- ══ SUB TAB 1: QUYẾT TOÁN CÔNG TRÌNH (2A) ══════════════════ -->
+        <div class="sub-page active" id="qt-sub-congtrinh">
         <div class="row g-3 mb-4">
           <!-- ── CỘT TRÁI: FORM NHẬP QUYẾT TOÁN ─────────────────────── -->
           <div class="col-12 col-lg-7">
@@ -86,17 +98,18 @@
         </div>
 
         <!-- ── LỊCH SỬ QUYẾT TOÁN ─────────────────────────────────────── -->
-        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+        <!-- Tiêu đề + dropdown công trình + ô tìm kiếm nằm CÙNG 1 HÀNG, xếp từ trái sang
+             (điện thoại hẹp thì tự xuống dòng). Ô tìm kiếm đặt width cố định để không bị
+             form-control (width:100%) đẩy xuống dòng riêng. -->
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2 me-2" style="white-space:nowrap">
             <span class="dot"></span><span class="material-symbols-outlined msi-gap">history</span>Lịch Sử Quyết Toán
-            <span id="qth-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+            <span id="qth-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
           </div>
-          <div class="d-flex gap-2 flex-wrap align-items-center">
-            <select id="qth-ct-filter" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="qtSetHistoryCt(this.value)">
-              <option value="">-- Tất cả công trình --</option>
-            </select>
-            <input type="text" id="qth-search" class="form-control form-control-sm" style="max-width:200px" placeholder="Tìm nội dung, người..." oninput="qtSetHistorySearch(this.value)">
-          </div>
+          <select id="qth-ct-filter" class="form-select form-select-sm" style="width:auto;min-width:220px;max-width:340px" onchange="qtSetHistoryCt(this.value)">
+            <option value="">-- Tất cả công trình --</option>
+          </select>
+          <input type="text" id="qth-search" class="form-control form-control-sm" style="width:220px" placeholder="Tìm nội dung, người..." oninput="qtSetHistorySearch(this.value)">
         </div>
         <div id="qth-hint" class="text-secondary mb-2" style="font-size:11px"></div>
         <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
@@ -121,3 +134,121 @@
           <div id="qth-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có bản ghi quyết toán</div>
           <div id="qth-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
         </div>
+        </div>
+        <!-- /qt-sub-congtrinh -->
+
+        <!-- ══ SUB TAB 2: TẤT TOÁN THẦU PHỤ / NCC (2B) ═══════════════ -->
+        <div class="sub-page" id="qt-sub-tattoan">
+          <!-- Thẻ tổng quan -->
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-md-4">
+              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-danger-bg-subtle)">
+                <div class="card-body py-3">
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Còn phải trả Thầu Phụ</div>
+                  <div id="tt-kpi-tp" class="fw-bold text-danger" style="font-size:22px">—</div>
+                  <div id="tt-kpi-tp-sub" class="text-secondary" style="font-size:11px"></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-warning-bg-subtle)">
+                <div class="card-body py-3">
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Còn phải trả NCC</div>
+                  <div id="tt-kpi-ncc" class="fw-bold" style="font-size:22px;color:#fd7e14">—</div>
+                  <div id="tt-kpi-ncc-sub" class="text-secondary" style="font-size:11px"></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-success-bg-subtle)">
+                <div class="card-body py-3">
+                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Đã tất toán (tất cả)</div>
+                  <div id="tt-kpi-done" class="fw-bold text-success" style="font-size:22px">—</div>
+                  <div id="tt-kpi-done-sub" class="text-secondary" style="font-size:11px"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Thanh "Hoàn tác" — hiện khoảng 15 giây sau mỗi lần tất toán (ẩn/hiện bằng JS) -->
+          <div id="tt-undo-bar" class="alert alert-success align-items-center justify-content-between flex-wrap gap-2 py-2" style="display:none">
+            <span id="tt-undo-msg" style="font-size:13px"></span>
+            <button class="btn btn-sm btn-outline-success fw-bold" onclick="ttUndoLast()"><span class="material-symbols-outlined msi-gap">undo</span>Hoàn tác</button>
+          </div>
+
+          <!-- Hàng 1: tiêu đề + bộ lọc (cùng 1 hàng, xếp từ trái sang) -->
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2 me-2" style="white-space:nowrap">
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">pending_actions</span>Đối Tác Còn Nợ
+              <span id="tt-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
+            </div>
+            <select id="tt-filter-group" class="form-select form-select-sm" style="width:auto" onchange="ttApplyFilters()">
+              <option value="">Tất cả đối tác</option>
+              <option value="thauphu">Thầu Phụ</option>
+              <option value="nhacungcap">Nhà Cung Cấp</option>
+            </select>
+            <select id="tt-filter-ct" class="form-select form-select-sm" style="width:auto;min-width:200px;max-width:320px" onchange="ttApplyFilters()">
+              <option value="">-- Tất cả công trình --</option>
+            </select>
+            <input type="text" id="tt-filter-search" class="form-control form-control-sm" style="width:200px" placeholder="Tìm đối tác..." oninput="ttApplyFilters()">
+          </div>
+          <!-- Hàng 2: ngày tất toán + nút tất toán hàng loạt -->
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <label class="text-secondary" style="font-size:12px;font-weight:600" for="tt-ngay">Ngày tất toán:</label>
+            <input type="date" id="tt-ngay" class="form-control form-control-sm" style="width:160px">
+            <button class="btn btn-sm btn-success fw-bold ms-auto" id="tt-bulk-btn" onclick="ttSettleSelected()" disabled>
+              <span class="material-symbols-outlined msi-gap">done_all</span><span id="tt-bulk-label">Tất toán các dòng đã chọn</span>
+            </button>
+          </div>
+          <div class="text-secondary mb-2" style="font-size:11px">
+            Số dư tính trên <strong>toàn vòng đời</strong> (mọi năm) theo từng cặp Đối tác × Công trình. Bấm tất toán → hệ thống tự tạo
+            <strong>phiếu ứng</strong> đúng bằng số còn phải trả (xem ở tab Ứng TP/NCC). Dòng còn nợ ≤ 100.000 đ được coi là đã xong.
+          </div>
+
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:860px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="padding:8px 6px;text-align:center;width:34px"><input type="checkbox" id="tt-chk-all" onchange="ttToggleAll(this.checked)"></th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Đối Tác</th>
+                    <th style="text-align:center;padding:8px 10px;font-weight:700">Nhóm</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Giá Trị HĐ / Hóa Đơn</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Đã Ứng / Chi</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Còn Phải TT</th>
+                    <th style="text-align:center;padding:8px 10px;font-weight:700"></th>
+                  </tr>
+                </thead>
+                <tbody id="tt-tbody"></tbody>
+              </table>
+            </div>
+            <div id="tt-empty" style="text-align:center;padding:36px 12px;color:var(--bs-secondary-color);font-size:14px;display:none">
+              <span class="material-symbols-outlined text-success" style="font-size:40px">celebration</span><br>Không còn đối tác nào nợ — mọi khoản đã được tất toán!
+            </div>
+          </div>
+
+          <!-- Lịch sử các lần tất toán (để hủy nếu lỡ tay sau khi thanh Hoàn tác đã ẩn) -->
+          <div class="section-title fw-bold mb-2 d-flex align-items-center gap-2">
+            <span class="dot"></span><span class="material-symbols-outlined msi-gap">history</span>Lịch Sử Tất Toán
+            <span class="text-secondary" style="font-size:11px;font-weight:400">(10 lần gần nhất)</span>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm align-middle mb-0" style="min-width:640px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color)">
+                    <th style="padding:8px 10px;white-space:nowrap">Ngày TT</th>
+                    <th style="padding:8px 10px;white-space:nowrap">Người thực hiện</th>
+                    <th style="padding:8px 10px">Chi tiết</th>
+                    <th style="text-align:right;padding:8px 10px;white-space:nowrap">Tổng tiền</th>
+                    <th class="action-col"></th>
+                  </tr>
+                </thead>
+                <tbody id="tt-hist-tbody"></tbody>
+              </table>
+            </div>
+            <div id="tt-hist-empty" style="text-align:center;padding:20px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có lần tất toán nào</div>
+          </div>
+        </div>
+        <!-- /qt-sub-tattoan -->

@@ -198,6 +198,81 @@ function calcTongDoanhThu(pOrId, opts) {
   };
 }
 
+// ══ ĐẢM BẢO ĐÃ TẢI ĐỦ DỮ LIỆU MỌI NĂM ══════════════════════════════
+// Máy chỉ tải từ cloud các năm ĐANG CHỌN. Quyết toán & tất toán tính TOÀN VÒNG ĐỜI
+// → nếu thiếu năm cũ (phiếu thu / phiếu ứng / hóa đơn năm trước) sẽ tính SAI số dư,
+//   nguy hiểm nhất là tất toán TRẢ DƯ tiền. Hàm này tải bù mọi năm còn thiếu.
+//
+// Phạm vi năm: từ năm sớm nhất xuất hiện trong dữ liệu "meta" (HĐ chính, HĐ thầu phụ,
+// quyết toán, ngày bắt đầu công trình — các kho này luôn có đủ) và dữ liệu đang có
+// trong máy, tới năm hiện tại.
+let _qtAllYearsReady = false;   // true = đã tải đủ mọi năm trong phiên này
+let _qtAllYearsBusy  = false;   // đang tải
+const _qtAllYearsWaiters = [];  // callback chờ tải xong
+
+function _qtCandidateYears() {
+  const ys = new Set();
+  const add = (d) => { const y = parseInt(String(d || '').slice(0, 4)); if (y >= 2000 && y <= 2100) ys.add(y); };
+  Object.values(typeof hopDongData !== 'undefined' ? hopDongData : {}).forEach(h => add(h && h.ngay));
+  (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : []).forEach(r => add(r.ngay));
+  (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : []).forEach(r => add(r.ngay));
+  (typeof projects !== 'undefined' ? projects : []).forEach(p => { add(p.startDate); add(p.endDate); add(p.closedDate); });
+  Object.values((typeof cats !== 'undefined' && cats.congTrinhYears) || {}).forEach(add);
+  if (typeof _getAllLocalYears === 'function') _getAllLocalYears().forEach(add);
+  const now = new Date().getFullYear();
+  ys.add(now);
+  const min = Math.min(...ys), max = Math.max(...ys);
+  const out = [];
+  for (let y = min; y <= max; y++) out.push(String(y));
+  return out;
+}
+
+// Năm nào chưa được tải trong phiên này
+function _qtMissingYears() {
+  const pulled = (typeof _pulledYearsThisSession !== 'undefined') ? _pulledYearsThisSession : null;
+  if (!pulled) return [];
+  return _qtCandidateYears().filter(y => !pulled.has(y));
+}
+
+// Gọi cb(ok) khi đã tải đủ (ok=false nếu vẫn thiếu năm sau khi thử lại)
+function qtEnsureAllYears(cb) {
+  if (_qtAllYearsReady) { if (cb) cb(true); return; }
+  if (cb) _qtAllYearsWaiters.push(cb);
+  if (_qtAllYearsBusy) return;
+  // Không có cloud (chế độ cục bộ) → chỉ dùng dữ liệu trong máy
+  if (typeof fbReady !== 'function' || !fbReady() || typeof pullChanges !== 'function') {
+    _qtAllYearsReady = true; _qtFlushWaiters(true); return;
+  }
+  _qtAllYearsBusy = true;
+  let tries = 0;
+  const run = () => {
+    const missing = _qtMissingYears();
+    if (!missing.length) { _qtFinishPull(true); return; }
+    if (tries++ >= 3) { _qtFinishPull(false); return; }   // thử tối đa 3 vòng
+    if (typeof showSyncBanner === 'function') showSyncBanner('⏳ Đang tải dữ liệu các năm ' + missing.join(', ') + ' để quyết toán...');
+    let i = 0;
+    const next = () => {
+      if (i >= missing.length) { setTimeout(run, 300); return; }   // kiểm lại (pull có thể bị bỏ qua nếu đang bận)
+      pullChanges(missing[i++], next, { silent: true });
+    };
+    next();
+  };
+  run();
+}
+function _qtFinishPull(ok) {
+  _qtAllYearsBusy = false;
+  _qtAllYearsReady = ok;
+  if (typeof hideSyncBanner === 'function') hideSyncBanner();
+  if (typeof _reloadGlobals === 'function') _reloadGlobals();
+  if (typeof clearInvoiceCache === 'function') clearInvoiceCache();   // hóa đơn dựng lại từ dữ liệu mới
+  if (typeof buildYearSelect === 'function') buildYearSelect();
+  _qtFlushWaiters(ok);
+}
+function _qtFlushWaiters(ok) {
+  _qtAllYearsWaiters.splice(0).forEach(fn => { try { fn(ok); } catch (e) { console.error('[QT] waiter lỗi', e); } });
+}
+
 // Cấp ra global (để file khác / mobile gọi được)
 window.calcTongDoanhThu = calcTongDoanhThu;
+window.qtEnsureAllYears = qtEnsureAllYears;
 window.qtTongQuyetToan  = qtTongQuyetToan;

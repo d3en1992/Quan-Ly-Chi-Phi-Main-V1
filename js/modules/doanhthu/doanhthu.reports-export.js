@@ -568,7 +568,6 @@ function initDoanhThu() {
   renderHdcTableTk(0);
   renderHdtpTableTk(0);
   renderThuTableTk(0);
-  if (typeof renderQtTableTk === 'function') renderQtTableTk(0);
 
   // Reset edit state
   _hdcResetForm();

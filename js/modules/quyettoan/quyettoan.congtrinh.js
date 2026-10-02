@@ -63,6 +63,9 @@ function initQuyetToan() {
   qtPopulateSels();
   qtResetForm();
   qtRenderHistory(0);
+  if (typeof initTatToan === 'function') initTatToan();
+  // Tải bù mọi năm còn thiếu (số liệu quyết toán/tất toán tính toàn vòng đời) → vẽ lại
+  qtEnsureAllYears(() => qtRefresh());
 }
 
 // Gọi khi đổi năm / sync xong (renderActiveTab) — GIỮ NGUYÊN nội dung đang nhập.
@@ -70,6 +73,18 @@ function qtRefresh() {
   qtPopulateSels();
   qtUpdatePreview();
   qtRenderHistory(_qthPage);
+  if (typeof ttRender === 'function') ttRender();
+}
+
+// ── Chuyển sub-tab: QUYẾT TOÁN CÔNG TRÌNH (2A) · TẤT TOÁN TP/NCC (2B) ──
+function qtGoSub(btn, id) {
+  document.querySelectorAll('#page-quyettoan .sub-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#qt-sub-nav .nav-link').forEach(b => b.classList.remove('active'));
+  const page = document.getElementById(id);
+  if (page) page.classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'qt-sub-tattoan' && typeof ttRender === 'function') ttRender();
+  else qtRefresh();
 }
 
 // ── Nạp dropdown: Công trình (form + bộ lọc lịch sử) + Người TH ──
@@ -193,6 +208,9 @@ function qtUpdatePreview() {
   const _conCls = (v) => v > 0 ? 'text-warning' : (v < 0 ? 'text-danger' : 'text-success');
 
   let html = `<div class="fw-bold mb-2" style="font-size:14px">${x(f.proj.name)}</div>`;
+  if (!_qtAllYearsReady) {
+    html += `<div class="alert alert-secondary py-1 px-2 mb-2" style="font-size:11px">⏳ Đang tải dữ liệu các năm cũ — số liệu có thể chưa đầy đủ.</div>`;
+  }
   html += _row('HĐ gốc', fmtM(truoc.hdGoc));
   html += _row('Quyết toán đã có', _qtTxt(truoc.qt), truoc.qt < 0 ? 'text-danger' : (truoc.qt > 0 ? 'text-success' : ''));
   html += _row('Đã thu', fmtM(truoc.daThu), 'text-success');
@@ -249,6 +267,12 @@ function qtUpdatePreview() {
 // ══ LƯU / SỬA / XÓA ══════════════════════════════════════════════
 function qtSave() {
   if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được lưu quyết toán', 'error'); return; }
+  // Chưa tải đủ dữ liệu các năm → số "Đã thu" có thể thiếu → chưa cho lưu
+  if (!_qtAllYearsReady) {
+    toast('Đang tải dữ liệu các năm để tính chính xác — vui lòng đợi vài giây rồi bấm lại', 'info');
+    qtEnsureAllYears(() => qtRefresh());
+    return;
+  }
   const f = _qtReadForm();
   if (!f.proj)    { toast('Vui lòng chọn Công Trình!', 'error'); return; }
   if (!f.ngay)    { toast('Vui lòng chọn Ngày quyết toán!', 'error'); return; }
@@ -345,6 +369,8 @@ function qtEdit(id) {
 // ── Sửa từ tab KHÁC (Doanh Thu...) → chuyển sang tab Quyết Toán rồi nạp form ──
 function qtOpenEdit(id) {
   if (typeof goPage === 'function') goPage(null, 'quyettoan');
+  // Đảm bảo đang ở sub-tab QUYẾT TOÁN CÔNG TRÌNH (có thể lần trước đang ở Tất Toán)
+  qtGoSub(document.getElementById('qt-sub-congtrinh-btn'), 'qt-sub-congtrinh');
   qtEdit(id);
 }
 
@@ -377,7 +403,6 @@ function qtDelete(id) {
 // ── Vẽ lại các bảng ở tab khác đang dùng số quyết toán (an toàn nếu tab chưa mở) ──
 function _qtRefreshOtherTabs() {
   if (typeof renderKhaiBaoTable === 'function') renderKhaiBaoTable(0);
-  if (typeof renderQtTableTk === 'function' && typeof _qtTkPage !== 'undefined') renderQtTableTk(_qtTkPage);
   if (typeof _dtRenderDashboardMini === 'function') _dtRenderDashboardMini();
   if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
 }
@@ -502,5 +527,6 @@ function qtRenderHistory(page) {
 // Cấp ra global (gọi từ onclick trong HTML + main.js)
 window.initQuyetToan = initQuyetToan;
 window.qtRefresh     = qtRefresh;
+window.qtGoSub       = qtGoSub;
 window.qtOpenEdit    = qtOpenEdit;
 window.qtDelete      = qtDelete;
