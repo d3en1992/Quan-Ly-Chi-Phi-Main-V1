@@ -192,6 +192,7 @@ async function _doResetAll() {
         await fsSet(fbDocMetaCT(), fbMetaCTPayload());
         await fsSet(fbDocMetaDM(), fbMetaDMPayload());
         await fsSet(fbDocMetaHD(), fbMetaHDPayload());
+        await fsSet(fbDocMetaQT(), fbMetaQTPayload());   // (03/10/2026) doc quyết toán riêng
 
         // 4c. Dọn doc rác cấu trúc cũ (y2025/y2026 gộp, cats, V2 lạc...)
         const nDel = (typeof _wipeOrphanCloudDocs === 'function')

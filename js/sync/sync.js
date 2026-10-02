@@ -4,9 +4,10 @@
 // KIẾN TRÚC (B) — chia theo HẠNG MỤC cho dễ đọc trên Firebase Console:
 //   • Mỗi HẠNG MỤC theo NĂM = 1 document (tên field đầy đủ, không nén):
 //       cpct_data/y{NĂM}_hoa_don · _tien_ung · _cham_cong · _thiet_bi · _thu_tien
-//   • 5 document DANH MỤC dùng chung:
+//   • 6 document DANH MỤC dùng chung:
 //       meta_cong_trinh (projects) · meta_khach_hang (customers) · meta_danh_muc (cat/role/năm-CT)
-//       meta_tai_khoan (users)     · meta_hop_dong (HĐ chính + thầu phụ + quyết toán)
+//       meta_tai_khoan (users)     · meta_hop_dong (HĐ chính + thầu phụ)
+//       meta_quyet_toan (quyết toán công trình — tách riêng từ 03/10/2026)
 //   → Đổi lại để dễ nhìn; cái giá là đọc/ghi nhiều hơn (mỗi hạng mục 1 lượt).
 //
 //   • CLOUD LÀ DUY NHẤT ĐÚNG (online 100%):
@@ -15,7 +16,7 @@
 //       - SAVE  = ghi xuống IndexedDB (đọc nhanh) RỒI đẩy cloud gần như tức thì.
 //   • IndexedDB chỉ còn là "bộ nhớ đệm để mở app cho nhanh", không phải nguồn chính.
 //     Khi pull, slice năm đó trong IndexedDB bị cloud ghi đè hoàn toàn.
-//   • 5 doc danh mục cũng được THAY THẾ theo cloud (riêng users giữ mật khẩu local).
+//   • 6 doc danh mục cũng được THAY THẾ theo cloud (riêng users giữ mật khẩu local).
 //
 //   • OUTBOX (từ GĐ1 gia cố đồng bộ — xem core.storage.js):
 //       - save() so "bảng bóng" → ghi vào outbox (IDB, sống qua F5) đúng các doc bị đổi.
@@ -408,8 +409,10 @@ function _parseYearDocId(docId) {
   return c ? { docId, yr: m[1], cat: c.cat, key: c.key, dateField: c.dateField } : null;
 }
 
-// ── 5 doc meta dùng chung ──
-const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong'];
+// ── 6 doc meta dùng chung ──
+// ⚠️ THỨ TỰ: meta_hop_dong PHẢI đứng TRƯỚC meta_quyet_toan — khi đọc meta_hop_dong còn field
+//    quyetToan đời cũ, dữ liệu đó được gộp vào local trước, rồi mới xử lý doc quyết toán riêng.
+const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong', 'meta_quyet_toan'];
 
 function _metaPayload(docId) {
   switch (docId) {
@@ -418,8 +421,30 @@ function _metaPayload(docId) {
     case 'meta_danh_muc':   return fbMetaDMPayload();
     case 'meta_tai_khoan':  return fbMetaTKPayload();
     case 'meta_hop_dong':   return fbMetaHDPayload();
+    case 'meta_quyet_toan': return fbMetaQTPayload();
   }
   return null;
+}
+
+// ── CHUYỂN DỮ LIỆU QUYẾT TOÁN ĐỜI CŨ (03/10/2026) ─────────────────
+// Trước 03/10/2026 quyết toán nằm trong meta_hop_dong.quyetToan. Nay có doc riêng meta_quyet_toan.
+// Khi còn gặp field cũ (cloud chưa được máy bản mới ghi lại, hoặc máy chạy code cũ vừa ghi vào):
+//   1. GỘP vào local quyettoan_v1 (mergeDatasets: bản sửa sau thắng, giữ dấu xóa mềm)
+//   2. Đánh dấu outbox CẢ 2 doc: meta_quyet_toan (đẩy dữ liệu sang doc mới) +
+//      meta_hop_dong (ghi lại doc HĐ KHÔNG còn field quyetToan → dọn field cũ trên cloud).
+// Hàm an toàn khi gọi nhiều lần — gộp theo id nên không nhân đôi bản ghi.
+function _qtMigrateLegacy(legacyArr, purge) {
+  if (!Array.isArray(legacyArr) || !legacyArr.length) return false;
+  const v = _purgeArr(mergeDatasets(load('quyettoan_v1', []), legacyArr), 'quyettoan_v1', purge);
+  _memSet('quyettoan_v1', v);
+  _refreshGlobal('quyettoan_v1');
+  if (typeof _outboxMark === 'function') {
+    _outboxMark('meta_quyet_toan');
+    _outboxMark('meta_hop_dong');
+  }
+  if (typeof schedulePush === 'function') schedulePush();
+  console.log(`[Sync] ↪ Chuyển ${legacyArr.length} bản quyết toán từ meta_hop_dong sang meta_quyet_toan`);
+  return true;
 }
 
 // Loại các record có purgeId dạng "key:id" khỏi 1 mảng meta
@@ -434,6 +459,7 @@ function _purgeArr(arr, key, purge) {
 //                    → GỘP cloud + local, giữ cả 2, rồi loại purgeIds
 // Kiểu gộp theo từng loại dữ liệu:
 //   - projects, customers, thauPhu, quyetToan : mảng có id → mergeDatasets() (tombstone + LWW)
+//     (quyetToan nằm ở doc riêng meta_quyet_toan; field cũ trong meta_hop_dong → _qtMigrateLegacy)
 //   - hopDong   : object map theo key CT → _mergeHopDong() (LWW)
 //   - catItems  : per-item theo updatedAt → _mergeCatItems() + dựng lại mảng tên
 //   - cnRoles, ctYears : object không có timestamp → gộp nông, local đè cloud
@@ -511,11 +537,16 @@ function _metaApply(docId, d, mode, purge) {
         _memSet('thauphu_v1', v);
         _refreshGlobal('thauphu_v1');
       }
-      if (Array.isArray(d.quyetToan)) {
-        const v = merge ? _purgeArr(mergeDatasets(load('quyettoan_v1', []), d.quyetToan), 'quyettoan_v1', purge) : d.quyetToan;
-        _memSet('quyettoan_v1', v);
-        _refreshGlobal('quyettoan_v1');
-      }
+      // Field quyetToan ĐỜI CŨ (trước 03/10/2026) → luôn GỘP sang local + đánh dấu chuyển doc.
+      // purge của doc HĐ dùng dạng "quyettoan_v1:id" chỉ khi bản ghi bị xóa cứng trước lúc tách.
+      if (Array.isArray(d.quyetToan)) _qtMigrateLegacy(d.quyetToan, purge);
+      return true;
+    }
+    case 'meta_quyet_toan': {
+      if (!Array.isArray(d.quyetToan)) return false;
+      const v = merge ? _purgeArr(mergeDatasets(load('quyettoan_v1', []), d.quyetToan), 'quyettoan_v1', purge) : d.quyetToan;
+      _memSet('quyettoan_v1', v);
+      _refreshGlobal('quyettoan_v1');
       return true;
     }
   }
@@ -527,7 +558,7 @@ function _metaApply(docId, d, mode, purge) {
 // ══════════════════════════════════════════════════════════════
 // Nguyên tắc an toàn (GĐ1 + GĐ2 — gia cố đồng bộ):
 //   • Push ngầm (silent) chỉ đẩy ĐÚNG các doc đang nằm trong outbox (doc bẩn).
-//     Push thủ công (nút 🔄) và opts.allYears = đẩy đủ mọi năm × hạng mục + 5 meta.
+//     Push thủ công (nút 🔄) và opts.allYears = đẩy đủ mọi năm × hạng mục + 6 meta.
 //   • Mỗi doc: ĐỌC cloud (kèm updateTime) → GỘP vào local (loại purgeIds) → GHI CÓ
 //     ĐIỀU KIỆN (khóa lạc quan). Máy khác ghi chen → đọc-gộp-ghi lại (tối đa 3 lần).
 //     Đọc cloud lỗi (mạng, 403, 429, 500...) → doc đó FAIL, TUYỆT ĐỐI KHÔNG ghi đè.
@@ -636,6 +667,12 @@ async function _pushMetaDoc(docId) {
       if (docId === 'meta_khach_hang') {
         const ct = fsUnwrap(await fsGet(fbDocMetaCT()));
         if (ct && Array.isArray(ct.customers)) _metaApply(docId, { customers: ct.customers }, 'merge', purge);
+      }
+      // meta_quyet_toan chưa tồn tại (lần đầu tách doc) → gộp quyết toán đời cũ trong meta_hop_dong
+      // để KHÔNG ghi một doc rỗng/thiếu lên cloud
+      if (docId === 'meta_quyet_toan') {
+        const hd = fsUnwrap(await fsGet(fbDocMetaHD()));
+        if (hd && Array.isArray(hd.quyetToan)) _metaApply(docId, { quyetToan: hd.quyetToan }, 'merge', purge);
       }
     },
     () => _metaPayload(docId)
@@ -766,8 +803,8 @@ async function pushChanges(opts = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// [10] PULL META — đọc 5 doc danh mục dùng chung
-//   meta_cong_trinh · meta_khach_hang · meta_danh_muc · meta_tai_khoan · meta_hop_dong
+// [10] PULL META — đọc 6 doc danh mục dùng chung
+//   meta_cong_trinh · meta_khach_hang · meta_danh_muc · meta_tai_khoan · meta_hop_dong · meta_quyet_toan
 //   • Doc KHÔNG bẩn  → THAY THẾ local bằng cloud (cloud là chuẩn)
 //   • Doc CÒN bẩn    → GỘP (không thay thế) + loại purgeIds, GIỮ outbox để push sau
 //   • Đọc lỗi (mạng/403/500...) → giữ nguyên local doc đó
@@ -783,6 +820,8 @@ async function _pullMeta() {
       if (!d && docId === 'meta_khach_hang' && ctDoc && Array.isArray(ctDoc.customers)) {
         d = { customers: ctDoc.customers };
       }
+      // meta_quyet_toan chưa tồn tại → dữ liệu cũ (nếu có) đã được gộp khi đọc meta_hop_dong
+      // ngay trước đó (_qtMigrateLegacy) → KHÔNG thay local bằng rỗng, chỉ bỏ qua.
       if (!d) continue;
       if (_outboxIsOverwrite(docId)) {
         console.log(`[Sync] ▼ ${docId} đang chờ ghi đè sau khôi phục → giữ nguyên local`);
@@ -838,7 +877,7 @@ async function pullChanges(yr, callback, opts = {}) {
   if (!silent) showSyncBanner('⬇ Đang tải (pull)...');
 
   try {
-    // ── Danh mục dùng chung (5 doc meta) ──
+    // ── Danh mục dùng chung (6 doc meta) ──
     let _catsChanged = false;
     try { _catsChanged = await _pullMeta(); }
     catch (e) { console.warn('[Sync] meta pull lỗi:', e.message || e); }
@@ -988,7 +1027,7 @@ async function manualSync() {
     if (typeof _reloadGlobals === 'function') _reloadGlobals();
     else if (typeof clearAllCache === 'function') clearAllCache();
 
-    // B3: Push (đẩy đủ mọi năm × hạng mục + 5 meta, có đọc-gộp)
+    // B3: Push (đẩy đủ mọi năm × hạng mục + 6 meta, có đọc-gộp)
     await pushChanges({ silent: false });
 
     if (typeof resetCatNamesMigrated === 'function') resetCatNamesMigrated();

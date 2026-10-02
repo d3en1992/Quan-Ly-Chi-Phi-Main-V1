@@ -5,7 +5,7 @@
 // TRIẾT LÝ (theo bản thiết kế "QLCP Mobile App"):
 //   - Cùng dữ liệu Firebase, cùng logic nghiệp vụ — CHỈ đổi tầng hiển thị.
 //   - KHÔNG viết lại logic: đọc thẳng các global (invoices/projects/ccData/...)
-//     và các helper sẵn có (getInvoicesCached, _ctTongChi, _hdLookup, _cnBuildRows...).
+//     và các helper sẵn có (getInvoicesCached, _ctTongChi, _hdLookup, ttBuildRows...).
 //   - Ghi dữ liệu đi qua đúng đường cũ: mkRecord() + save() → sync.js tự đẩy cloud.
 //
 // KIẾN TRÚC:
@@ -50,7 +50,7 @@ const MB = {
     tienung:  'nhap',     // nhap | thongke
     doanhthu: 'khaibao',  // khaibao | thongke | loinhuan
     congno:   'congno',   // congno | hdtp  (HĐ thầu phụ chuyển từ Doanh thu sang — 02/10/2026)
-    quyettoan:'congtrinh',// congtrinh | tattoan
+    quyettoan:'congtrinh',// chỉ còn congtrinh (03/10/2026 — tất toán chuyển sang Công nợ)
   },
 
   // Bộ lọc / tìm kiếm
@@ -58,6 +58,7 @@ const MB = {
   invSearch:    '',       // tìm hóa đơn
   statusFilter: 'all',    // trạng thái công trình
   cnGroup:      'all',    // nhóm đối tác công nợ
+  cnShowDone:   '0',      // công nợ: '1' = hiện cả đối tác đã xong (03/10/2026)
   tbView:       'ct',     // thiết bị: ct | kho
   // Danh mục đang xem — PHẢI là một khóa có thật trong `cats`
   // (loaiChiPhi | nhaCungCap | nguoiTH | thauPhu | congNhan | tbTen),
@@ -231,8 +232,8 @@ function mbTitles() {
     chamcong:  ['Chấm Công',      'Sổ công & lương tuần'],
     tienung:   ['Tiền Ứng',       'Thầu phụ · NCC · Công nhân'],
     doanhthu:  ['Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận'],
-    quyettoan: ['Quyết Toán',     'Quyết toán công trình · Tất toán TP/NCC'],
-    congno:    ['Công Nợ TP/NCC',      'Đối tác còn phải trả / thu'],
+    quyettoan: ['Quyết Toán',     'Quyết toán công trình'],
+    congno:    ['Công Nợ TP/NCC',      'Công nợ & tất toán · HĐ thầu phụ'],
     thietbi:   ['Thiết Bị',       'Kho tổng & tại công trình'],
     danhmuc:   ['Danh Mục',       'Loại CP · NCC · Người · Thầu phụ'],
     thongke:   ['Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí'],
@@ -263,7 +264,7 @@ const MB_SEGS = {
   tienung:  ['tienung',  [['nhap', 'Nhập ứng'], ['thongke', 'Thống kê ứng']]],
   doanhthu: ['doanhthu', [['khaibao', 'Khai báo'], ['thongke', 'Thống kê'], ['loinhuan', 'Lợi nhuận']]],
   congno:   ['congno',   [['congno', 'Công nợ'], ['hdtp', 'HĐ thầu phụ']]],
-  quyettoan:['quyettoan',[['congtrinh', 'Quyết toán CT'], ['tattoan', 'Tất toán TP/NCC']]],
+  // (03/10/2026) quyettoan không còn tab con — Tất toán TP/NCC đã gộp vào Công nợ
 };
 
 /** Chuyển màn hình */

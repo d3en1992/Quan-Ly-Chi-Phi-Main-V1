@@ -177,14 +177,14 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
 }
 
 // ── Cột thao tác của 1 phiếu ứng ──
-// Phiếu TỰ SINH từ "Tất toán TP/NCC" (autoSettle) → CHỈ XEM: ẩn nút Sửa/Xóa, hiện nhãn khóa.
-// Muốn hủy phải vào tab Quyết Toán → Tất toán TP/NCC → Lịch sử tất toán (hủy cả lô cho đúng sổ).
+// Phiếu TỰ SINH từ Tất toán (tab Công Nợ TP/NCC, autoSettle) → CHỈ XEM: ẩn nút Sửa/Xóa, hiện nhãn khóa.
+// Muốn hủy phải vào tab Công Nợ TP/NCC → Công Nợ → Lịch sử tất toán (hủy cả lô cho đúng sổ).
 // Dùng chung cho bảng Thầu Phụ / NCC (sub-tab Thống kê ứng) và bảng "Phiếu Ứng Gần Đây".
 function _ungActionsHtml(r) {
   if (r.autoSettle) {
     return `<div style="display:flex;justify-content:flex-end">
       <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:10px;cursor:help"
-        title="Phiếu tự sinh từ Tất toán${r.settledBy ? ' (' + x(r.settledBy) + ')' : ''} — chỉ xem. Muốn hủy: tab Quyết Toán → Tất toán TP/NCC → Lịch sử tất toán.">
+        title="Phiếu tự sinh từ Tất toán${r.settledBy ? ' (' + x(r.settledBy) + ')' : ''} — chỉ xem. Muốn hủy: tab Công Nợ TP/NCC → Công Nợ → Lịch sử tất toán.">
         <span class="material-symbols-outlined" style="font-size:12px;vertical-align:-2px">lock</span> Tất toán</span>
     </div>`;
   }
@@ -292,7 +292,7 @@ function delUngRecord(id) {
   const idx = ungRecords.findIndex(r => String(r.id) === String(id));
   if (idx < 0) return;
   // Phiếu tự sinh từ Tất toán → chỉ xem, không xóa lẻ ở đây
-  if (ungRecords[idx].autoSettle) { toast('Phiếu tự sinh từ Tất toán — chỉ xem. Muốn hủy: tab Quyết Toán → Tất toán TP/NCC → Lịch sử tất toán', 'error'); return; }
+  if (ungRecords[idx].autoSettle) { toast('Phiếu tự sinh từ Tất toán — chỉ xem. Muốn hủy: tab Công Nợ TP/NCC → Công Nợ → Lịch sử tất toán', 'error'); return; }
   if (!confirm('Xóa bản ghi tiền ứng này?')) return;
   const now = Date.now();
   ungRecords[idx] = { ...ungRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };

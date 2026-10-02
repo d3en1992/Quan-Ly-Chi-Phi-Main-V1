@@ -1,9 +1,9 @@
 // quyettoan.core.js — Lõi tính toán Quyết Toán + Doanh Thu (nguồn DUY NHẤT của công thức)
-// Load order: sau doanhthu.congno.js, trước quyettoan.congtrinh.js
+// Load order: sau doanhthu.reports-export.js, trước quyettoan.congtrinh.js
 //
 // NGUYÊN TẮC: "tách code, KHÔNG tách dữ liệu"
 //   • Dữ liệu vẫn nằm ở kho cũ `quyettoan_v1` (biến global quyetToanRecords khai báo
-//     trong doanhthu.core.js) → đồng bộ cloud qua doc meta_hop_dong như trước.
+//     trong doanhthu.core.js) → đồng bộ cloud qua doc riêng meta_quyet_toan (từ 03/10/2026).
 //   • File này KHÔNG ghi dữ liệu, chỉ ĐỌC và TÍNH. Tab Doanh Thu, Lợi Nhuận, chi tiết
 //     Công Trình và tab Quyết Toán đều gọi các hàm ở đây → không bao giờ lệch số.
 //

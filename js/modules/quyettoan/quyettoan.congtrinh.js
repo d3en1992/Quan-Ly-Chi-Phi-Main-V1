@@ -1,5 +1,5 @@
 // quyettoan.congtrinh.js — Tab QUYẾT TOÁN · Phân hệ 2A: Quyết Toán Công Trình (với Chủ Đầu Tư)
-// Load order: sau quyettoan.core.js, trước quyettoan.thauphu.js
+// Load order: sau quyettoan.core.js, trước congno.tattoan.js
 //
 // Giao diện: pages/quyettoan.html — 2 CỘT trên Laptop/PC (≥992px), tự xếp dọc trên tablet (02/10/2026):
 //   CỘT TRÁI  Block 1 #qtf-ct          : chọn công trình — LUÔN hiện
@@ -120,7 +120,6 @@ function _qtFin(f) {
 function initQuyetToan() {
   qtPopulateSels();
   qtResetForm(false);
-  if (typeof initTatToan === 'function') initTatToan();
 }
 
 // Gọi khi đổi năm / sync xong (renderActiveTab) — GIỮ NGUYÊN công trình + nội dung đang nhập.
@@ -128,19 +127,9 @@ function qtRefresh() {
   qtPopulateSels();
   qtUpdatePreview();
   qtRenderHistory(_qthPage);
-  if (typeof ttRender === 'function') ttRender();
 }
-
-// ── Chuyển sub-tab: QUYẾT TOÁN CÔNG TRÌNH (2A) · TẤT TOÁN TP/NCC (2B) ──
-function qtGoSub(btn, id) {
-  document.querySelectorAll('#page-quyettoan .sub-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('#qt-sub-nav .nav-link').forEach(b => b.classList.remove('active'));
-  const page = document.getElementById(id);
-  if (page) page.classList.add('active');
-  if (btn) btn.classList.add('active');
-  if (id === 'qt-sub-tattoan' && typeof ttRender === 'function') ttRender();
-  else qtRefresh();
-}
+// (03/10/2026) Đã bỏ qtGoSub — tab chỉ còn Quyết toán công trình; Tất toán TP/NCC chuyển sang
+// tab CÔNG NỢ TP/NCC (js/modules/congno/congno.tattoan.js).
 
 // ── Nạp dropdown: Công trình (Block 1) + Người thực hiện ──
 function qtPopulateSels() {
@@ -465,8 +454,6 @@ function qtEdit(id) {
 // ── Sửa từ tab KHÁC (Doanh Thu...) → chuyển sang tab Quyết Toán rồi nạp form ──
 function qtOpenEdit(id) {
   if (typeof goPage === 'function') goPage(null, 'quyettoan');
-  // Đảm bảo đang ở sub-tab QUYẾT TOÁN CÔNG TRÌNH (có thể lần trước đang ở Tất Toán)
-  qtGoSub(document.getElementById('qt-sub-congtrinh-btn'), 'qt-sub-congtrinh');
   qtEdit(id);
 }
 
@@ -589,6 +576,5 @@ function qtRenderHistory(page) {
 // Cấp ra global (gọi từ onclick trong HTML + main.js)
 window.initQuyetToan = initQuyetToan;
 window.qtRefresh     = qtRefresh;
-window.qtGoSub       = qtGoSub;
 window.qtOpenEdit    = qtOpenEdit;
 window.qtDelete      = qtDelete;

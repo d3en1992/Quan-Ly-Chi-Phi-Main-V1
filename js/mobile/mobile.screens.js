@@ -6,7 +6,7 @@
 //   - File này CHỈ ĐỌC dữ liệu, không ghi. Mọi hành động ghi nằm ở mobile.actions.js.
 //   - Số liệu phải trùng khít với bản desktop → luôn dùng lại helper sẵn có:
 //       getInvoicesCached() · inActiveYear() · _buildInvoiceMap() ·
-//       _ctGetCostsFromMap() · _ctTongChi() · _hdLookup() · _cnBuildRows() ·
+//       _ctGetCostsFromMap() · _ctTongChi() · _hdLookup() · ttBuildRows() ·
 //       allocateCompanyCost() · ccSundayISO() / ccSaturdayISO() ...
 //   - Mỗi hàm trả về chuỗi HTML.
 // ══════════════════════════════════════════════════════════════
@@ -1092,60 +1092,13 @@ function mbDtLoiNhuan() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  8 · CÔNG NỢ — dùng lại _cnBuildRows() của bản desktop
+//  8 · CÔNG NỢ (03/10/2026) — = màn Tất toán TP/NCC cũ (mbCnCongNo), thay bảng công nợ cũ.
+//      Dùng lại lõi desktop congno.tattoan.js: ttBuildRows() · ttBatches()
 // ══════════════════════════════════════════════════════════════
 function mbScrCongNo() {
   // Tab con "HĐ thầu phụ" — form khai báo HĐ thầu phụ (chuyển từ Doanh thu sang)
   if (MB.seg.congno === 'hdtp') return mbDtKhaiBao('hdtp');
-  const all = (typeof _cnBuildRows === 'function') ? _cnBuildRows() : [];
-  const rows = all.filter(r => MB.cnGroup === 'all' || r.group === MB.cnGroup);
-
-  const totNo   = all.reduce((s, r) => s + (r.conPhaiTT || 0), 0);
-  const totUng  = all.reduce((s, r) => s + (r.daUng || 0), 0);
-  const totVal  = all.reduce((s, r) => s + (r.value || 0), 0);
-  const nDebtor = all.filter(r => (r.conPhaiTT || 0) > 0).length;
-
-  const kpis = [
-    ['Tổng còn nợ',       mbFmt(totNo),  'red'],
-    ['Đã ứng',            mbFmt(totUng), 'green'],
-    ['Đối tác còn nợ',    nDebtor + ' đối tác', ''],
-    ['Giá trị phát sinh', mbFmt(totVal), ''],
-  ];
-  const chips = [['all', 'Tất cả'], ['thauphu', 'Thầu phụ'], ['nhacungcap', 'Nhà cung cấp']];
-
-  return `<div class="mb-pad">
-    <div class="mb-grid2">
-      ${kpis.map(([l, v, c]) => `<div class="mb-kpi ${c}" style="border-radius:13px">
-        <div class="mb-kpi-label">${l}</div>
-        <div class="mb-kpi-value" style="font-size:15px">${v}</div>
-      </div>`).join('')}
-    </div>
-
-    <div class="mb-chips">
-      ${chips.map(([k, l]) => `<div class="mb-chip${MB.cnGroup === k ? ' on' : ''}" data-act="setFilter" data-arg="cnGroup|${k}">${l}</div>`).join('')}
-    </div>
-
-    <div class="mb-col" style="gap:9px">
-      ${rows.length ? rows.sort((a, b) => b.conPhaiTT - a.conPhaiTT).map(r => {
-        const pct = mbPct(r.daUng, r.value);
-        const [label, cls] = r.conPhaiTT <= 0 ? ['Đã tất toán', 'green']
-          : pct >= 50 ? ['Ứng ' + pct + '%', 'amber'] : ['Còn nợ nhiều', 'red'];
-        return `<div class="mb-card" style="padding:13px">
-          <div class="mb-row-between" style="margin-bottom:4px">
-            <span style="font-size:13.5px;font-weight:700">${mbX(r.partner)}</span>
-            <span class="mb-tag ${cls}">${label}</span>
-          </div>
-          <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:10px">${mbX(MB_UNG_LABEL[r.group] || r.group)} · ${mbX(r.congtrinh)}</div>
-          <div class="mb-grid3" style="margin-bottom:9px">
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">Giá trị</div><div style="font-size:12px;font-weight:700">${mbFmt(r.value)}</div></div>
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">Đã ứng</div><div style="font-size:12px;font-weight:700;color:var(--mb-green)">${mbFmt(r.daUng)}</div></div>
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">Còn nợ</div><div style="font-size:12px;font-weight:800;color:var(--mb-red)">${mbFmtSigned(r.conPhaiTT)}</div></div>
-          </div>
-          <div class="mb-bar"><i style="width:${Math.min(100, pct)}%;background:var(--mb-green)"></i></div>
-        </div>`;
-      }).join('') : '<div class="mb-empty">Không có công nợ phù hợp</div>'}
-    </div>
-  </div>`;
+  return mbCnCongNo();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1319,12 +1272,13 @@ function mbScrThungRac() {
 
 // ══════════════════════════════════════════════════════════════
 //  12b · QUYẾT TOÁN (02/10/2026) — dùng lại lõi desktop:
-//        calcTongDoanhThu() · qtLoaiOf() · ttBuildRows() · ttBatches()
-//        Quyết toán CT chỉ XEM (nhập/sửa trên máy tính); Tất toán TP/NCC bấm được.
+//        calcTongDoanhThu() · qtLoaiOf()
+//        Quyết toán CT chỉ XEM (nhập/sửa trên máy tính).
+//        (03/10/2026) Tất toán TP/NCC đã chuyển sang màn Công nợ (mbCnCongNo).
 // ══════════════════════════════════════════════════════════════
 // THEO NĂM ĐANG LỌC như các màn khác — KHÔNG tự tải toàn bộ các năm (02/10/2026).
 function mbScrQuyetToan() {
-  return MB.seg.quyettoan === 'tattoan' ? mbQtTatToan() : mbQtCongTrinh();
+  return mbQtCongTrinh();
 }
 
 // ── Tab con 1: QUYẾT TOÁN CÔNG TRÌNH (chỉ xem) ──
@@ -1389,13 +1343,16 @@ function mbQtCongTrinh() {
   </div>`;
 }
 
-// ── Tab con 2: TẤT TOÁN TP/NCC (bấm được — chỉ Admin + Giám đốc) ──
-function mbQtTatToan() {
-  const canEdit = ['admin', 'giamdoc'].includes(mbRole());
-  const all  = (typeof ttBuildRows === 'function') ? ttBuildRows() : [];
+// ── CÔNG NỢ = Tất toán TP/NCC (03/10/2026: chuyển từ tab Quyết toán; mọi vai trò được tất toán) ──
+function mbCnCongNo() {
+  const canEdit = true;    // Admin + Giám đốc + Kế toán đều được tất toán (giống desktop _ttCanEdit)
+  const tol  = (typeof CN_DONE_TOLERANCE !== 'undefined') ? CN_DONE_TOLERANCE : 100000;
+  const showDone = MB.cnShowDone === '1';
+  const all  = (typeof ttBuildRows === 'function') ? ttBuildRows({ includeDone: showDone }) : [];
+  const debt = all.filter(r => r.con > tol);     // thẻ tổng quan chỉ tính dòng còn nợ
   const rows = all.filter(r => MB.cnGroup === 'all' || r.group === MB.cnGroup)
                   .sort((a, b) => b.con - a.con);
-  const sum = (g) => all.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
+  const sum = (g) => debt.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
   const batches = (typeof ttBatches === 'function') ? ttBatches().slice(0, 5) : [];
   const chips = [['all', 'Tất cả'], ['thauphu', 'Thầu phụ'], ['nhacungcap', 'Nhà cung cấp']];
 
@@ -1408,21 +1365,29 @@ function mbQtTatToan() {
       <div class="mb-kpi red" style="border-radius:13px"><div class="mb-kpi-label">Nợ thầu phụ</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('thauphu'))}</div></div>
       <div class="mb-kpi" style="border-radius:13px"><div class="mb-kpi-label">Nợ nhà cung cấp</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('nhacungcap'))}</div></div>
     </div>
-    <div style="font-size:11px;color:var(--mb-muted-2)">Chỉ đối tác đã có phiếu ứng hoặc HĐ thầu phụ, và còn nợ. Tất toán → tự tạo phiếu ứng đúng số còn nợ (ngày hôm nay).</div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">Chỉ đối tác đã có phiếu ứng hoặc HĐ thầu phụ. Tất toán → tự tạo phiếu ứng đúng số còn nợ (ngày hôm nay).</div>
     <div class="mb-chips">
       ${chips.map(([k, l]) => `<div class="mb-chip${MB.cnGroup === k ? ' on' : ''}" data-act="setFilter" data-arg="cnGroup|${k}">${l}</div>`).join('')}
+      <div class="mb-chip${showDone ? ' on' : ''}" data-act="setFilter" data-arg="cnShowDone|${showDone ? '0' : '1'}">Hiện cả đã xong</div>
     </div>
 
     <div class="mb-col" style="gap:9px">
-      ${rows.length ? rows.map(r => `<div class="mb-card" style="padding:13px">
+      ${rows.length ? rows.map(r => {
+        const isDebt = r.con > tol;
+        // Còn nợ → số đỏ · |còn nợ| ≤ ngưỡng → "Đã xong" · âm → "Ứng dư"
+        const right = isDebt
+          ? `<span style="font-size:13.5px;font-weight:800;color:var(--mb-red);flex-shrink:0">${mbFmt(r.con)}</span>`
+          : (r.con < -tol ? `<span class="mb-tag blue">Ứng dư ${mbFmt(-r.con)}</span>` : '<span class="mb-tag green">Đã xong</span>');
+        return `<div class="mb-card" style="padding:13px${isDebt ? '' : ';opacity:.8'}">
           <div class="mb-row-between" style="margin-bottom:4px">
             <span style="font-size:13.5px;font-weight:700">${mbX(r.partner)}</span>
-            <span style="font-size:13.5px;font-weight:800;color:var(--mb-red);flex-shrink:0">${mbFmt(r.con)}</span>
+            ${right}
           </div>
           <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:9px">${mbX(MB_UNG_LABEL[r.group] || r.group)} · ${mbX(r.ctName || '—')} · Giá trị ${mbFmt(r.value)} · Đã ứng ${mbFmt(r.daUng)}</div>
-          ${canEdit ? `<button class="mb-btn" style="padding:9px" data-act="ttSettleMb" data-arg="${mbX(r.key)}">Tất toán toàn bộ</button>` : ''}
-        </div>`).join('')
-        : '<div class="mb-empty">🎉 Không còn đối tác nào nợ</div>'}
+          ${canEdit && isDebt ? `<button class="mb-btn" style="padding:9px" data-act="ttSettleMb" data-arg="${mbX(r.key)}">Tất toán toàn bộ</button>` : ''}
+        </div>`;
+      }).join('')
+        : (showDone ? '<div class="mb-empty">Không có đối tác phù hợp</div>' : '<div class="mb-empty">🎉 Không còn đối tác nào nợ</div>')}
     </div>
 
     ${batches.length ? `<div class="mb-sec-title">Tất toán gần đây</div>
@@ -1454,8 +1419,8 @@ function mbScrMore() {
   const rows = [
     ['dashboard', 'Tổng Quan',     'Dashboard chi phí ' + mbYearLabel(), 'T', '#EFF6FF', '#2563EB'],
     ['doanhthu', 'Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận', 'D', '#F0FDF4', '#16A34A'],
-    ['quyettoan','Quyết Toán',     'Quyết toán CT · Tất toán TP/NCC', 'Q', '#FFFBEB', '#D97706'],
-    ['congno',   'Công Nợ TP/NCC',      'Còn phải trả theo đối tác',      'N', '#FEF2F2', '#DC2626'],
+    ['quyettoan','Quyết Toán',     'Quyết toán công trình',          'Q', '#FFFBEB', '#D97706'],
+    ['congno',   'Công Nợ TP/NCC',      'Còn phải trả · Tất toán',        'N', '#FEF2F2', '#DC2626'],
     ['thietbi',  'Thiết Bị',       'Kho tổng & tại công trình',      'B', '#EFF6FF', '#2563EB'],
     ['thongke',  'Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí',       'K', '#F5F3FF', '#7C3AED'],
     ['danhmuc',  'Danh Mục',       'Loại CP · NCC · Người · Thầu phụ', 'M', '#F3F4F6', '#4B5563'],

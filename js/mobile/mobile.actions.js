@@ -374,11 +374,11 @@ Object.assign(MB_ACTS, {
   },
 
   // ══════════════════════════════
-  //  QUYẾT TOÁN · TẤT TOÁN TP/NCC — gọi lõi desktop (quyettoan.thauphu.js)
+  //  CÔNG NỢ · TẤT TOÁN TP/NCC — gọi lõi desktop (congno.tattoan.js)
+  //  (03/10/2026) Mọi vai trò đã đăng nhập (kể cả Kế toán) được tất toán / hủy tất toán
   //  ttBuildRows() / ttCreatePhieu() / ttRemoveBatch() → cùng 1 logic với máy tính
   // ══════════════════════════════
   ttSettleMb: (key) => {
-    if (!['admin', 'giamdoc'].includes(mbRole())) { mbToast('Chỉ Quản trị viên hoặc Giám đốc được tất toán', 'error'); return; }
     // Tính lại số dư ngay lúc bấm (không dùng số cũ trên màn hình)
     const r = ttBuildRows().find(x => x.key === key);
     if (!r) { mbToast('Dòng này đã hết nợ', 'info'); mbRender(); return; }
@@ -404,7 +404,6 @@ Object.assign(MB_ACTS, {
 
   // Hủy 1 lần tất toán trong danh sách "Tất toán gần đây"
   ttCancelMb: (id) => {
-    if (!['admin', 'giamdoc'].includes(mbRole())) { mbToast('Chỉ Quản trị viên hoặc Giám đốc được hủy tất toán', 'error'); return; }
     const b = ttBatches().find(x => x.id === id);
     if (!b) return;
     if (!confirm(`Hủy lần tất toán ngày ${mbDate(b.ngay)} (${b.recs.length} phiếu, ${mbFull(b.total)})?\nCác phiếu ứng tự sinh sẽ bị xóa → công nợ quay lại như trước.`)) return;

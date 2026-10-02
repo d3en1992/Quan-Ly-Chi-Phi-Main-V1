@@ -144,7 +144,7 @@ function delHopDongThauPhu(id) {
 
 // ── Hàm cũ (tên giữ nguyên để không vỡ lời gọi) → nay vẽ lại bảng CÔNG NỢ ──
 // HĐ thầu phụ không còn hiện ở bảng Khai Báo tab Doanh Thu.
-function renderHdtpTable(_page) { if (typeof cnRenderTable === 'function') cnRenderTable(); }
+function renderHdtpTable(_page) { if (typeof ttRender === 'function') ttRender(); } // (03/10/2026) bảng Công Nợ = tất toán
 
 // ══ BẢNG ĐỐI SOÁT HĐ THẦU PHỤ (toàn bộ) ══════════════════════
 // ── Render bảng Hợp Đồng Thầu Phụ (toàn bộ) ──────────────────

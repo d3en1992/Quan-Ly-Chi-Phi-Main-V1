@@ -485,7 +485,7 @@ function buildHuongDan() {
     ['12_DoanhThuCongTrinh — Doanh thu sau quyết toán + đã thu + còn phải thu theo công trình — CHỈ ĐỂ XEM'],
     [''],
     ['• Sheet 11 và 12 KHÔNG được nhập lại (import tự bỏ qua). Quyết toán nhập ở tab QUYẾT TOÁN.'],
-    ['• Phiếu ứng tự sinh khi Tất toán TP/NCC nằm trong sheet 4_TienUng (nội dung "Tất toán công nợ ...").'],
+    ['• Phiếu ứng tự sinh khi Tất toán (tab Công Nợ TP/NCC) nằm trong sheet 4_TienUng (nội dung "Tất toán công nợ ...").'],
     [''],
     ['━━━ QUY TẮC IMPORT LẠI ━━━'],
     ['• Không xóa hoặc đổi tên dòng header (hàng đầu tiên của mỗi sheet)'],

@@ -771,8 +771,8 @@ async function importJSONFull(data, opts) {
       } catch (e) {
         console.warn('[Import] Không liệt kê được doc cloud — chỉ ghi đè các năm có dữ liệu:', e.message || e);
       }
-      // (c) 5 doc meta
-      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong']
+      // (c) 6 doc meta (meta_quyet_toan tách riêng từ 03/10/2026)
+      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong','meta_quyet_toan']
         .forEach(id => docIds.add(id));
       // overwrite:true → nếu phải đẩy bù sau khi tải lại app, doc này vẫn được GHI ĐÈ
       // (không gộp dữ liệu cloud cũ vào — đúng ý nghĩa "khôi phục")
@@ -785,7 +785,7 @@ async function importJSONFull(data, opts) {
     // Step 5: Push to cloud — skip inner pull so we overwrite cloud cleanly.
     // ⚠️ GHI ĐÈ KHÔNG ĐIỀU KIỆN nhờ cờ overwrite đã đánh dấu ở Step 3b (thay cho
     //    skipPull cũ, đã bỏ ở GĐ2) — chỉ được phép ở khôi phục/reset (cố ý thay toàn bộ).
-    // pushChanges() ghi theo cấu trúc B (mỗi năm × hạng mục + 5 meta doc), gồm cả các
+    // pushChanges() ghi theo cấu trúc B (mỗi năm × hạng mục + 6 meta doc), gồm cả các
     // doc năm đã đánh dấu ở Step 3b dù trống.
     if (typeof fbReady === 'function' && fbReady()) {
       try {

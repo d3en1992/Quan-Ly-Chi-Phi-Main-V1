@@ -1190,7 +1190,7 @@
       <!-- PAGE: LỢI NHUẬN (02/10/2026 — tab chính, tách từ sub-tab của Doanh Thu) -->
       <div class="page" id="page-loinhuan" data-partial="pages/loinhuan.html"></div>
 
-      <!-- PAGE: QUYẾT TOÁN (2A Quyết toán công trình · 2B Tất toán TP/NCC) -->
+      <!-- PAGE: QUYẾT TOÁN (chỉ còn Quyết toán công trình — Tất toán TP/NCC đã chuyển sang tab CÔNG NỢ TP/NCC, 03/10/2026) -->
       <div class="page" id="page-quyettoan" data-partial="pages/quyettoan.html"></div>
 
       <!-- ════════════════════════════════════════════════════════════ -->
@@ -1334,11 +1334,12 @@
     <!-- HĐ Thầu Phụ (tab Công Nợ) — tách từ doanhthu.forms.js -->
     <script src="js/modules/congno/congno.hdtp.js"></script>
     <script src="js/modules/doanhthu/doanhthu.reports-export.js"></script>
-    <script src="js/modules/doanhthu/doanhthu.congno.js"></script>
     <!-- Tab QUYẾT TOÁN: core (hàm tính dùng chung) phải nạp trước congtrinh -->
     <script src="js/modules/quyettoan/quyettoan.core.js"></script>
     <script src="js/modules/quyettoan/quyettoan.congtrinh.js"></script>
-    <script src="js/modules/quyettoan/quyettoan.thauphu.js"></script>
+    <!-- (03/10/2026) Tab CÔNG NỢ TP/NCC → sub-tab CÔNG NỢ = Tất toán TP/NCC (thay bảng Công Nợ cũ
+         doanhthu.congno.js đã xóa). Nạp sau quyettoan.core.js vì dùng qtCtInYear / qtMissingYears. -->
+    <script src="js/modules/congno/congno.tattoan.js"></script>
     <script src="js/modules/thungrac/thungrac.js"></script>
     <script src="js/sync/sync.js"></script>
     <script src="js/sync/sync.backup.js"></script>

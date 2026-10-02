@@ -1,5 +1,14 @@
-// quyettoan.thauphu.js — Tab QUYẾT TOÁN · Phân hệ 2B: TẤT TOÁN Thầu Phụ / Nhà Cung Cấp
+// congno.tattoan.js — Tab CÔNG NỢ TP/NCC · Sub-tab "CÔNG NỢ" (Tất toán Thầu Phụ / Nhà Cung Cấp)
 // Load order: sau quyettoan.congtrinh.js, trước thungrac.js
+//
+// LỊCH SỬ (03/10/2026): file này trước là quyettoan.thauphu.js (tab QUYẾT TOÁN → sub-tab
+// "TẤT TOÁN TP/NCC"). Về nghiệp vụ, Tất toán và bảng Công Nợ cũ là MỘT nên đã:
+//   • Bỏ hẳn bảng Công Nợ cũ (doanhthu.congno.js — đã xóa file), đưa giao diện Tất toán vào thay,
+//     đổi tên hiển thị thành "CÔNG NỢ" (tab CÔNG NỢ TP/NCC, cạnh sub-tab THẦU PHỤ).
+//   • Bỏ tất toán HÀNG LOẠT (cột checkbox + nút "Tất toán các dòng đã chọn") — chỉ còn tất toán từng dòng.
+//   • Thêm công tắc "Hiện cả đối tác đã xong" (dòng đã trả đủ / ứng dư — mặc định ẩn).
+//   • Kế toán cũng được tất toán / hủy tất toán (_ttCanEdit).
+//   • Phần còn dùng của file cũ chuyển về đây: CN_DONE_TOLERANCE, _cnGroupBadge, cnGoSub, initCongNo.
 //
 // Mục tiêu: dọn nhanh các khoản nợ treo với đối tác mà KHÔNG cần sang tab Ứng TP/NCC gõ phiếu.
 //
@@ -8,20 +17,20 @@
 //     (dù chưa ứng lần nào). Đối tác vãng lai chỉ có hóa đơn → "tiền trao cháo múc",
 //     coi như đã trả đứt lúc mua → không bao giờ hiện ở đây.
 //   • THEO NĂM ĐANG LỌC: chỉ hiện các cặp (Đối tác × Công trình) có CÔNG TRÌNH thuộc năm đang chọn
-//     (qtCtInYear) và còn nợ > CN_DONE_TOLERANCE (100.000đ). KHÔNG tự tải các năm khác.
+//     (qtCtInYear). Mặc định chỉ hiện dòng còn nợ > CN_DONE_TOLERANCE (100.000đ); bật công tắc
+//     "Hiện cả đối tác đã xong" thì hiện thêm dòng đã xong / ứng dư. KHÔNG tự tải các năm khác.
 //     Số dư của mỗi cặp cộng MỌI phát sinh đang có trong máy (không cắt theo năm) để tránh
 //     tất toán TRẢ DƯ khi HĐ ký năm trước nhưng ứng năm nay; popup cảnh báo nếu máy thiếu năm nào.
-//     Nguồn số liệu (giống tab Công Nợ):
+//     Nguồn số liệu:
 //       Thầu phụ: Giá trị = Σ HĐ thầu phụ (giaTri + phatSinh) · Đã ứng = Σ phiếu ứng loai='thauphu'
 //       NCC     : Giá trị = Σ hóa đơn có NCC đó             · Đã ứng = Σ phiếu ứng loai='nhacungcap'
-//   • Bấm "Tất toán toàn bộ" (1 dòng) hoặc tick checkbox nhiều dòng → "Tất toán các dòng đã chọn"
-//     → Bootstrap Modal xác nhận (chọn ngày phiếu) → OK → mỗi dòng tạo 1 PHIẾU ỨNG thật (ung_v1)
-//     đúng bằng số còn phải trả → các dòng mờ dần rồi bị xóa khỏi DOM.
-//     → Đã ứng = Giá trị, Còn phải TT = 0 → dòng tự biến mất; tab Công Nợ / Ứng TP/NCC tự nhảy số.
+//   • Bấm "Tất toán toàn bộ" trên 1 dòng → Bootstrap Modal xác nhận (chọn ngày phiếu + Người TH)
+//     → OK → tạo 1 PHIẾU ỨNG thật (ung_v1) đúng bằng số còn phải trả → dòng mờ dần rồi biến mất.
+//     → Đã ứng = Giá trị, Còn phải TT = 0; tab Ứng TP/NCC tự nhảy số.
 //   • Phiếu tự sinh gắn cờ: autoSettle:true, settleId (mã của LẦN tất toán), settledBy (tài khoản),
 //     nguoi (Người TH chọn trong popup). Phiếu này CHỈ XEM ở tab Ứng TP/NCC (không sửa/xóa lẻ).
 //     → Hoàn tác / Hủy = xóa mềm mọi phiếu cùng settleId (vào thùng rác như phiếu thường).
-//   • Quyền: chỉ Admin + Giám đốc (_qtCanEdit — quyettoan.congtrinh.js).
+//   • Quyền: mọi vai trò đã đăng nhập (Admin, Giám đốc, Kế toán) — _ttCanEdit().
 
 // ─── State ─────────────────────────────────────────────────────
 let _ttGroup  = '';     // 'thauphu' | 'nhacungcap' | ''
@@ -30,16 +39,32 @@ let _ttSearch = '';     // tìm theo tên đối tác (chữ thường)
 let _ttRowsCache = [];  // các dòng đang hiển thị (để tra cứu khi bấm nút theo chỉ số)
 let _ttLastSettleId = null;   // lần tất toán gần nhất (cho nút Hoàn tác)
 let _ttUndoTimer = null;
-let _ttPending = null;        // các dòng đang chờ xác nhận trong modal: { keys: [...], idxs: [...] }
+let _ttPending = null;        // dòng đang chờ xác nhận trong modal: { key, i }
+let _ttShowDone = false;      // công tắc "Hiện cả đối tác đã xong" (mặc định tắt)
 
-// Ngưỡng "đã xong" dùng CHUNG với tab Công Nợ (doanh thu.congno.js) — fallback nếu chưa nạp
-function _ttTolerance() {
-  return (typeof CN_DONE_TOLERANCE !== 'undefined') ? CN_DONE_TOLERANCE : 100000;
+// Ngưỡng làm tròn "đã xong": |Còn phải TT| ≤ 100.000đ → coi như đã trả đủ
+// (chuyển từ doanhthu.congno.js cũ)
+const CN_DONE_TOLERANCE = 100000;
+function _ttTolerance() { return CN_DONE_TOLERANCE; }
+
+// Quyền tất toán / hủy tất toán: mọi vai trò đã đăng nhập (Admin, Giám đốc, Kế toán) — 03/10/2026
+function _ttCanEdit() {
+  return !!(typeof getCurrentUser === 'function' && getCurrentUser());
+}
+
+// Badge nhóm đối tác (Thầu Phụ / NCC) — chuyển từ doanhthu.congno.js cũ
+function _cnGroupBadge(group) {
+  return group === 'thauphu'
+    ? '<span class="badge bg-primary-subtle text-primary" style="font-size:10px">Thầu Phụ</span>'
+    : '<span class="badge bg-warning-subtle text-warning-emphasis" style="font-size:10px">NCC</span>';
 }
 
 // ── Dựng các dòng công nợ TOÀN VÒNG ĐỜI ──
 // Trả về [{ key, group, partner, partnerId, ctName, pid, ctKey, value, daUng, con }]
-function _ttBuildRows() {
+// opts.includeDone = true → giữ cả dòng đã xong / ứng dư (công tắc "Hiện cả đối tác đã xong").
+// Mặc định CHỈ dòng còn nợ — tất toán (desktop + điện thoại) luôn gọi dạng mặc định này.
+function _ttBuildRows(opts) {
+  const includeDone = !!(opts && opts.includeDone);
   const map = {};
   // Khóa công trình: ưu tiên projectId; bản ghi cũ chỉ có tên → 'name:<tên>'
   const _ctOf = (rec) => {
@@ -114,7 +139,8 @@ function _ttBuildRows() {
     // Chỉ công trình thuộc năm đang lọc (CÔNG TY luôn có mặt)
     .filter(r => r.pid === 'COMPANY' || qtCtInYear(r.ctName))
     .map(r => ({ ...r, con: (r.value || 0) - (r.daUng || 0) }))
-    .filter(r => r.con > tol);    // chỉ giữ dòng còn nợ THẬT: Giá trị > Đã ứng (bỏ dòng đã xong / ứng dư)
+    // Mặc định chỉ giữ dòng còn nợ THẬT: Giá trị > Đã ứng (bỏ dòng đã xong / ứng dư)
+    .filter(r => includeDone || r.con > tol);
 }
 
 // ── Các phiếu ứng do tất toán sinh ra, gom theo từng LẦN tất toán (settleId) ──
@@ -136,6 +162,12 @@ function initTatToan() {
   ttRender();
 }
 
+// Công tắc "Hiện cả đối tác đã xong"
+function ttToggleShowDone(on) {
+  _ttShowDone = !!on;
+  ttRender();
+}
+
 // Đọc bộ lọc từ giao diện rồi vẽ lại
 function ttApplyFilters() {
   _ttGroup  = document.getElementById('tt-filter-group')?.value || '';
@@ -147,11 +179,15 @@ function ttApplyFilters() {
 function ttRender() {
   const tbody = document.getElementById('tt-tbody');
   if (!tbody) return;
-  const all = _ttBuildRows();
+  const tol = _ttTolerance();
+  const all = _ttBuildRows({ includeDone: _ttShowDone });
+  const debt = all.filter(r => r.con > tol);   // chỉ dòng còn nợ — cho thẻ tổng quan
+  const sw = document.getElementById('tt-show-done');
+  if (sw) sw.checked = _ttShowDone;
 
-  // ── Thẻ tổng quan (không phụ thuộc bộ lọc) ──
-  const sum = (g) => all.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
-  const cnt = (g) => all.filter(r => r.group === g).length;
+  // ── Thẻ tổng quan (không phụ thuộc bộ lọc / công tắc) ──
+  const sum = (g) => debt.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
+  const cnt = (g) => debt.filter(r => r.group === g).length;
   const setTxt = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
   setTxt('tt-kpi-tp', fmtM(sum('thauphu')));
   setTxt('tt-kpi-tp-sub', cnt('thauphu') ? `${cnt('thauphu')} dòng còn nợ` : 'Không còn nợ');
@@ -162,7 +198,7 @@ function ttRender() {
   setTxt('tt-kpi-done', fmtM(doneTotal));
   setTxt('tt-kpi-done-sub', batches.length ? `${batches.length} lần tất toán` : 'Chưa tất toán lần nào');
 
-  // ── Dropdown công trình: chỉ CT đang có dòng nợ ──
+  // ── Dropdown công trình: chỉ CT đang có dòng hiển thị ──
   const ctSel = document.getElementById('tt-filter-ct');
   if (ctSel) {
     const cts = new Map();
@@ -178,43 +214,51 @@ function ttRender() {
   if (_ttGroup)  rows = rows.filter(r => r.group === _ttGroup);
   if (_ttCtKey)  rows = rows.filter(r => r.ctKey === _ttCtKey);
   if (_ttSearch) rows = rows.filter(r => r.partner.toLowerCase().includes(_ttSearch));
-  // Nợ nhiều nhất lên đầu
+  // Nợ nhiều nhất lên đầu (dòng đã xong / ứng dư tự xuống cuối vì số còn nợ nhỏ hơn)
   rows.sort((a, b) => b.con - a.con || a.partner.localeCompare(b.partner, 'vi'));
   _ttRowsCache = rows;
 
   const badge = document.getElementById('tt-count-badge');
   if (badge) badge.textContent = rows.length ? `(${rows.length} dòng)` : '';
   const empty = document.getElementById('tt-empty');
-  const chkAll = document.getElementById('tt-chk-all');
-  if (chkAll) chkAll.checked = false;
 
   if (!rows.length) {
     tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
+    if (empty) {
+      empty.innerHTML = _ttShowDone
+        ? 'Không có đối tác nào phù hợp bộ lọc'
+        : '<span class="material-symbols-outlined text-success" style="font-size:40px">celebration</span><br>Không còn đối tác nào nợ — mọi khoản đã được tất toán!';
+      empty.style.display = '';
+    }
   } else {
     if (empty) empty.style.display = 'none';
-    const canEdit = _qtCanEdit();
-    let tot = 0;
+    const canEdit = _ttCanEdit();
+    let tot = 0, nDebt = 0;
     tbody.innerHTML = rows.map((r, i) => {
-      tot += r.con;
+      const isDebt = r.con > tol;
+      if (isDebt) { tot += r.con; nDebt++; }
       const pct = r.value > 0 ? Math.min(100, Math.round(r.daUng / r.value * 100)) : 0;
-      return `<tr id="tt-row-${i}" style="transition:opacity .4s ease, background .4s ease">
-        <td style="text-align:center"><input type="checkbox" class="form-check-input tt-row-chk" data-i="${i}" onchange="ttUpdateBulkBtn()" ${canEdit ? '' : 'disabled'}></td>
+      // Cột Còn phải TT: còn nợ → số đỏ · |còn nợ| ≤ ngưỡng → "Đã xong" · âm → "Ứng dư"
+      const conCell = isDebt
+        ? `<td class="text-end font-monospace fw-bold text-danger" style="white-space:nowrap">${fmtM(r.con)}</td>`
+        : (r.con < -tol
+          ? `<td class="text-end font-monospace fw-semibold text-info" style="white-space:nowrap" title="Đã ứng nhiều hơn giá trị">Ứng dư ${fmtM(-r.con)}</td>`
+          : `<td class="text-end" style="white-space:nowrap"><span class="badge bg-success" style="font-size:11px">Đã xong</span></td>`);
+      return `<tr id="tt-row-${i}" style="transition:opacity .4s ease, background .4s ease${isDebt ? '' : ';opacity:.75'}">
         <td style="white-space:nowrap"><div style="font-weight:600">${x(r.partner)}</div>${_cnGroupBadge(r.group)}</td>
         <td style="white-space:nowrap">${x(r.ctName || '—')}</td>
         <td class="text-end font-monospace" style="white-space:nowrap">${r.value ? fmtS(r.value) : '<span class="text-secondary">—</span>'}</td>
         <td class="text-end font-monospace text-success" style="white-space:nowrap">${r.daUng ? fmtS(r.daUng) : '0'} <span class="text-secondary" style="font-size:10px">(${pct}%)</span></td>
-        <td class="text-end font-monospace fw-bold text-danger" style="white-space:nowrap">${fmtM(r.con)}</td>
+        ${conCell}
         <td style="text-align:center;white-space:nowrap">
-          ${canEdit ? `<button class="btn btn-sm btn-success fw-semibold" onclick="ttSettleOne(${i})">✔️ Tất toán toàn bộ</button>` : ''}
+          ${canEdit && isDebt ? `<button class="btn btn-sm btn-success fw-semibold" onclick="ttSettleOne(${i})">✔️ Tất toán toàn bộ</button>` : ''}
         </td>
       </tr>`;
     }).join('') + `<tr id="tt-total-row" style="border-top:2px solid var(--bs-border-color);font-weight:700;background:var(--bs-tertiary-bg)">
-        <td colspan="5" class="text-secondary" style="padding:8px 12px">Tổng còn phải trả (${rows.length} dòng)</td>
+        <td colspan="4" class="text-secondary" style="padding:8px 12px">Tổng còn phải trả (${nDebt} dòng còn nợ)</td>
         <td class="text-end font-monospace text-danger" style="white-space:nowrap">${fmtM(tot)}</td><td></td>
       </tr>`;
   }
-  ttUpdateBulkBtn();
   _ttRenderHistory(batches);
 }
 
@@ -226,7 +270,7 @@ function _ttRenderHistory(batches) {
   const list = (batches || _ttBatches()).slice(0, 10);
   if (!list.length) { tbody.innerHTML = ''; if (empty) empty.style.display = ''; return; }
   if (empty) empty.style.display = 'none';
-  const canEdit = _qtCanEdit();
+  const canEdit = _ttCanEdit();
   tbody.innerHTML = list.map(b => {
     // Chi tiết: tối đa 3 đối tác, còn lại ghi "+N"
     const names = b.recs.map(r => `${recCatName(r, 'ung', 'tp')} (${_resolveCtName(r) || '—'})`);
@@ -241,57 +285,22 @@ function _ttRenderHistory(batches) {
   }).join('');
 }
 
-// ══ TẤT TOÁN — 1 dòng (nút trên dòng) hoặc nhiều dòng (checkbox) + Bootstrap Modal ══
+// ══ TẤT TOÁN 1 DÒNG (nút trên dòng) + Bootstrap Modal ══
+// (03/10/2026) Đã BỎ tất toán hàng loạt: cột checkbox, nút "Tất toán các dòng đã chọn",
+// ttToggleAll / _ttCheckedIdx / ttUpdateBulkBtn / ttSettleSelected / _ttOpenConfirm nhiều dòng.
 
-// ── Checkbox: chọn tất cả / đếm dòng đã chọn / cập nhật nút tất toán hàng loạt ──
-function ttToggleAll(checked) {
-  document.querySelectorAll('.tt-row-chk:not(:disabled)').forEach(c => { c.checked = checked; });
-  ttUpdateBulkBtn();
-}
-function _ttCheckedIdx() {
-  return [...document.querySelectorAll('.tt-row-chk:checked')].map(c => +c.dataset.i).filter(i => _ttRowsCache[i]);
-}
-function ttUpdateBulkBtn() {
-  const btn = document.getElementById('tt-bulk-btn');
-  const lb  = document.getElementById('tt-bulk-label');
-  const idx = _ttCheckedIdx();
-  const tot = idx.reduce((s, i) => s + _ttRowsCache[i].con, 0);
-  if (btn) btn.disabled = !idx.length;
-  if (lb) lb.textContent = idx.length ? `Tất toán ${idx.length} dòng đã chọn — ${fmtM(tot)}` : 'Tất toán các dòng đã chọn';
-}
-
-// Nút "✔️ Tất toán toàn bộ" trên 1 dòng
-function ttSettleOne(i) { _ttOpenConfirm([i]); }
-// Nút "Tất toán các dòng đã chọn" (hàng loạt)
-function ttSettleSelected() {
-  const idx = _ttCheckedIdx();
-  if (idx.length) _ttOpenConfirm(idx);
-}
-
-// Mở modal xác nhận cho danh sách chỉ số dòng
-function _ttOpenConfirm(idxs) {
-  const rows = idxs.map(i => _ttRowsCache[i]).filter(Boolean);
-  if (!rows.length) return;
-  if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được tất toán', 'error'); return; }
-  _ttPending = { keys: rows.map(r => r.key), idxs };
-  const total = rows.reduce((s, r) => s + r.con, 0);
+// Nút "✔️ Tất toán toàn bộ" trên 1 dòng → mở modal xác nhận cho dòng đó
+function ttSettleOne(i) {
+  const r = _ttRowsCache[i];
+  if (!r || r.con <= _ttTolerance()) return;          // dòng đã xong → không có gì để tất toán
+  if (!_ttCanEdit()) { toast('Vui lòng đăng nhập để tất toán', 'error'); return; }
+  _ttPending = { key: r.key, i };
   const m = _ttEnsureModal();
-  if (rows.length === 1) {
-    const r = rows[0];
-    m.querySelector('#tt-cm-msg').innerHTML =
-      `Xác nhận tạo phiếu chi thanh toán nốt <strong class="text-danger font-monospace">${fmtM(r.con)}</strong> cho <strong>${x(r.partner)}</strong>?`;
-    m.querySelector('#tt-cm-detail').innerHTML =
-      `Công trình: <strong>${x(r.ctName || 'không gắn công trình')}</strong><br>` +
-      `Giá trị ${fmtM(r.value)} · Đã ứng ${fmtM(r.daUng)} → sau khi tất toán: Còn phải TT = 0`;
-  } else {
-    // Nhiều dòng: liệt kê tối đa 8 dòng, còn lại ghi "+N dòng khác"
-    const list = rows.slice(0, 8).map(r =>
-      `<li><strong>${x(r.partner)}</strong> — ${x(r.ctName || 'không gắn CT')}: <span class="font-monospace">${fmtM(r.con)}</span></li>`).join('');
-    m.querySelector('#tt-cm-msg').innerHTML =
-      `Xác nhận tạo <strong>${rows.length} phiếu chi</strong>, tổng <strong class="text-danger font-monospace">${fmtM(total)}</strong>?`;
-    m.querySelector('#tt-cm-detail').innerHTML =
-      `<ul class="mb-0 ps-3">${list}</ul>` + (rows.length > 8 ? `<div class="mt-1">+${rows.length - 8} dòng khác</div>` : '');
-  }
+  m.querySelector('#tt-cm-msg').innerHTML =
+    `Xác nhận tạo phiếu chi thanh toán nốt <strong class="text-danger font-monospace">${fmtM(r.con)}</strong> cho <strong>${x(r.partner)}</strong>?`;
+  m.querySelector('#tt-cm-detail').innerHTML =
+    `Công trình: <strong>${x(r.ctName || 'không gắn công trình')}</strong><br>` +
+    `Giá trị ${fmtM(r.value)} · Đã ứng ${fmtM(r.daUng)} → sau khi tất toán: Còn phải TT = 0`;
   // Máy chưa có dữ liệu năm nào đó → số dư có thể thiếu (phiếu ứng / hóa đơn năm đó chưa tải)
   const miss = (typeof qtMissingYears === 'function') ? qtMissingYears() : [];
   m.querySelector('#tt-cm-warn').innerHTML = miss.length
@@ -356,7 +365,7 @@ function _ttEnsureModal() {
   return m;
 }
 
-// Bấm OK trong modal → tạo phiếu → các dòng mờ dần rồi bị xóa khỏi DOM → vẽ lại tổng/KPI
+// Bấm OK trong modal → tạo phiếu → dòng mờ dần rồi bị xóa khỏi DOM → vẽ lại tổng/KPI
 function _ttConfirmOk() {
   const pend = _ttPending;
   const m = document.getElementById('tt-confirm-modal');
@@ -367,26 +376,22 @@ function _ttConfirmOk() {
   if (!nguoi) { toast('Vui lòng chọn Người TH!', 'error'); return; }
   try { localStorage.setItem('tt_last_nguoi', nguoi); } catch (e) {}
   // Tính lại số dư ngay lúc bấm OK (phòng dữ liệu vừa đổi do đồng bộ)
-  const keySet = new Set(pend.keys);
-  const fresh = _ttBuildRows().filter(r => keySet.has(r.key));
+  const fresh = _ttBuildRows().find(r => r.key === pend.key);
   bootstrap.Modal.getOrCreateInstance(m).hide();
-  if (!fresh.length) { toast('Các dòng đã chọn đều đã hết nợ', 'info'); ttRender(); return; }
+  if (!fresh) { toast('Dòng này đã hết nợ', 'info'); ttRender(); return; }
 
-  const settleId = ttCreatePhieu(fresh, ngay, nguoi);
-  const total = fresh.reduce((s, r) => s + r.con, 0);
+  const settleId = ttCreatePhieu([fresh], ngay, nguoi);
 
   // Hiệu ứng: dòng chuyển xanh → mờ dần → xóa khỏi DOM, sau đó vẽ lại tổng + KPI
-  const trs = pend.idxs.map(i => document.getElementById('tt-row-' + i)).filter(Boolean);
-  trs.forEach(tr => { tr.style.background = 'var(--bs-success-bg-subtle)'; tr.style.opacity = '0'; });
+  const tr = document.getElementById('tt-row-' + pend.i);
+  if (tr) { tr.style.background = 'var(--bs-success-bg-subtle)'; tr.style.opacity = '0'; }
   setTimeout(() => {
-    trs.forEach(tr => { if (tr.parentNode) tr.parentNode.removeChild(tr); });
+    if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
     ttRender();
-    _ttRefreshOtherTabs();
   }, 450);
 
-  const label = fresh.length === 1 ? fresh[0].partner : `${fresh.length} dòng`;
-  toast(`✅ Đã tất toán ${label} — ${fmtM(total)}`, 'success');
-  _ttShowUndo(settleId, `✅ Đã tất toán ${label} · ${fmtM(total)}`);
+  toast(`✅ Đã tất toán ${fresh.partner} — ${fmtM(fresh.con)}`, 'success');
+  _ttShowUndo(settleId, `✅ Đã tất toán ${fresh.partner} · ${fmtM(fresh.con)}`);
 }
 
 // ── LÕI: tạo phiếu ứng tất toán cho các dòng (KHÔNG hỏi, KHÔNG đụng giao diện) ──
@@ -444,7 +449,7 @@ function ttUndoLast() {
 
 // ── Hủy 1 lần tất toán từ bảng lịch sử ──
 function ttCancelBatch(settleId) {
-  if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được hủy tất toán', 'error'); return; }
+  if (!_ttCanEdit()) { toast('Vui lòng đăng nhập để hủy tất toán', 'error'); return; }
   const b = _ttBatches().find(x => x.id === settleId);
   if (!b) return;
   if (!confirm(`Hủy lần tất toán ngày ${fmtISODate(b.ngay)} (${b.recs.length} phiếu, ${fmtM(b.total)})?\n\nCác phiếu ứng tự sinh sẽ bị xóa → công nợ quay lại như trước.`)) return;
@@ -467,12 +472,38 @@ function _ttRemoveBatch(settleId) {
   });
   if (n) save('ung_v1', ungRecords);
   ttRender();
-  _ttRefreshOtherTabs();
 }
 
-// ── Vẽ lại tab Công Nợ (an toàn nếu tab chưa mở) ──
-function _ttRefreshOtherTabs() {
-  if (typeof cnRenderTable === 'function') cnRenderTable();
+// ══ ĐIỀU HƯỚNG PAGE CÔNG NỢ TP/NCC (chuyển từ doanhthu.congno.js cũ) ══════════
+
+// Sub-tab trong page-congno: CÔNG NỢ (tất toán) · THẦU PHỤ (khai báo HĐ thầu phụ)
+// THẦU PHỤ dùng lại renderHdtpTableTk() + bộ lọc dtSetTpCtFilter/dtSetTpSearch (doanhthu.core.js).
+function cnGoSub(btn, id) {
+  document.querySelectorAll('#page-congno .sub-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#page-congno .nav-link').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'cn-sub-congno') {
+    ttRender();
+  } else if (id === 'cn-sub-thauphu') {
+    if (typeof dtPopulateTpCtFilter === 'function') dtPopulateTpCtFilter();
+    if (typeof renderHdtpTableTk === 'function') renderHdtpTableTk(_hdtpTkPage);
+  }
+}
+
+// Init page Công Nợ (gọi từ goPage / renderActiveTab / sau khi nhập Excel)
+function initCongNo() {
+  // goPage()/renderActiveTab() đã gọi _reloadGlobals(); vẫn reload phòng khi gọi trực tiếp.
+  hopDongData      = load('hopdong_v1', {});
+  thauPhuContracts = load('thauphu_v1', []);
+
+  ttRender();   // sub-tab CÔNG NỢ (tất toán)
+  // Chuẩn bị sẵn dữ liệu sub-tab THẦU PHỤ (bảng ẩn — sẽ hiện khi bấm sub-tab)
+  // dtPopulateSels(): nạp dropdown CT + Thầu Phụ cho modal HĐ Thầu Phụ (global) —
+  // cần gọi ở đây vì modal có thể mở từ tab Công Nợ mà chưa hề vào tab Doanh Thu.
+  if (typeof dtPopulateSels === 'function') dtPopulateSels();
+  if (typeof dtPopulateTpCtFilter === 'function') dtPopulateTpCtFilter();
+  if (typeof renderHdtpTableTk === 'function') renderHdtpTableTk(0);
 }
 
 // Cấp ra global (gọi từ onclick trong HTML)
@@ -480,9 +511,7 @@ window.initTatToan       = initTatToan;
 window.ttRender          = ttRender;
 window.ttApplyFilters    = ttApplyFilters;
 window.ttSettleOne       = ttSettleOne;
-window.ttSettleSelected  = ttSettleSelected;
-window.ttToggleAll       = ttToggleAll;
-window.ttUpdateBulkBtn   = ttUpdateBulkBtn;
+window.ttToggleShowDone  = ttToggleShowDone;
 window.ttUndoLast        = ttUndoLast;
 window.ttCancelBatch     = ttCancelBatch;
 window.ttCreatePhieu     = ttCreatePhieu;
@@ -490,3 +519,5 @@ window.ttLastNguoi       = ttLastNguoi;
 window.ttBuildRows       = _ttBuildRows;
 window.ttBatches         = _ttBatches;
 window.ttRemoveBatch     = _ttRemoveBatch;
+window.initCongNo        = initCongNo;
+window.cnGoSub           = cnGoSub;

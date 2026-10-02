@@ -27,7 +27,9 @@ function fsUnwrap(doc) {
 //   cpct_data/meta_khach_hang  → { customers }   (CRM/Chủ đầu tư — tách riêng từ 19/06/2026)
 //   cpct_data/meta_danh_muc    → { cats, catItems, cnRoles, ctYears }
 //   cpct_data/meta_tai_khoan   → { users }
-//   cpct_data/meta_hop_dong    → { hopDong, thauPhu, quyetToan }
+//   cpct_data/meta_hop_dong    → { hopDong, thauPhu }
+//   cpct_data/meta_quyet_toan  → { quyetToan }   (tách riêng từ 03/10/2026 — trước nằm trong meta_hop_dong)
+//        mỗi bản ghi quyết toán luôn có createdAt / updatedAt / deletedAt (null = chưa xóa)
 //   cpct_data/y2025_hoa_don / _tien_ung / _cham_cong / _thiet_bi / _thu_tien → { records }
 function fbDocYearCat(yr, cat) { return `y${yr}_${cat}`; }
 function fbDocMetaCT() { return 'meta_cong_trinh'; }
@@ -35,6 +37,7 @@ function fbDocMetaKH() { return 'meta_khach_hang'; }
 function fbDocMetaDM() { return 'meta_danh_muc'; }
 function fbDocMetaTK() { return 'meta_tai_khoan'; }
 function fbDocMetaHD() { return 'meta_hop_dong'; }
+function fbDocMetaQT() { return 'meta_quyet_toan'; }
 
 // Bảng ánh xạ: hạng mục theo năm → key local + trường ngày để lọc theo năm
 const _YEAR_CATS = [
@@ -81,7 +84,24 @@ function fbMetaTKPayload() {
   return { v: 4, users: load('users_v1', []) };
 }
 function fbMetaHDPayload() {
-  return { v: 4, hopDong: load('hopdong_v1', {}), thauPhu: load('thauphu_v1', []), quyetToan: load('quyettoan_v1', []) };
+  // (03/10/2026) KHÔNG còn quyetToan — đã tách sang doc riêng meta_quyet_toan.
+  // Ghi doc này sẽ xóa luôn field quyetToan đời cũ trên cloud (doc được ghi nguyên khối).
+  return { v: 4, hopDong: load('hopdong_v1', {}), thauPhu: load('thauphu_v1', []) };
+}
+function fbMetaQTPayload() {
+  // Quyết toán công trình — doc riêng meta_quyet_toan. Đảm bảo đủ 3 trường lưu vết thời gian.
+  return { v: 4, quyetToan: _qtAuditFields(load('quyettoan_v1', [])) };
+}
+// Bổ sung createdAt / updatedAt / deletedAt cho bản ghi quyết toán đời cũ còn thiếu
+// (bản ghi mới đã có sẵn nhờ mkRecord / mkUpdate / xóa mềm). Không đổi giá trị đã có.
+function _qtAuditFields(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(r => {
+    if (!r || typeof r !== 'object') return r;
+    if (r.createdAt && r.updatedAt && r.deletedAt !== undefined) return r;
+    const c = r.createdAt || r.updatedAt || 0;
+    return { ...r, createdAt: c, updatedAt: r.updatedAt || c, deletedAt: r.deletedAt ?? null };
+  });
 }
 
 // ── Firestore quota counter ──────────────────────────────────

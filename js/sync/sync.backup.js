@@ -164,7 +164,7 @@ async function _bkCollectCloudData() {
   const data = { inv_v3: [], ung_v1: [], cc_v2: [], tb_v1: [], thu_v1: [] };
   const byCat = {};
   _YEAR_CATS.forEach(c => { byCat[c.cat] = c.key; });
-  let legacyCustomers = null, yearDocs = 0, metaDocs = 0;
+  let legacyCustomers = null, legacyQuyetToan = null, yearDocs = 0, metaDocs = 0;
 
   for (const doc of docs) {
     const id = String(doc.name || '').split('/').pop();
@@ -205,11 +205,17 @@ async function _bkCollectCloudData() {
       case 'meta_hop_dong':
         if (d.hopDong && typeof d.hopDong === 'object') data.hopdong_v1 = d.hopDong;
         if (Array.isArray(d.thauPhu))   data.thauphu_v1   = d.thauPhu;
+        // quyetToan đời cũ (trước 03/10/2026) — chỉ dùng khi chưa có doc meta_quyet_toan
+        if (Array.isArray(d.quyetToan)) legacyQuyetToan = d.quyetToan;
+        metaDocs++; break;
+      case 'meta_quyet_toan':
+        // (03/10/2026) Quyết toán công trình — doc riêng
         if (Array.isArray(d.quyetToan)) data.quyettoan_v1 = d.quyetToan;
         metaDocs++; break;
     }
   }
   if (!data.customers_v1 && legacyCustomers) data.customers_v1 = legacyCustomers;
+  if (!data.quyettoan_v1 && legacyQuyetToan) data.quyettoan_v1 = legacyQuyetToan;
   if (!yearDocs && !metaDocs) throw new Error('Cloud trống — bỏ qua sao lưu (không lưu bản rỗng)');
   return { data, docCount: yearDocs + metaDocs };
 }

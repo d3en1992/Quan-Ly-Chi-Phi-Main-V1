@@ -266,7 +266,7 @@ const _META_KEY_DOC = {
   users_v1:     'meta_tai_khoan',
   hopdong_v1:   'meta_hop_dong',
   thauphu_v1:   'meta_hop_dong',
-  quyettoan_v1: 'meta_hop_dong',
+  quyettoan_v1: 'meta_quyet_toan',  // (03/10/2026) tách khỏi meta_hop_dong → doc riêng, dễ xem trên Firebase Console
 };
 // Key có thuộc nhóm meta không (thay cho _META_TRIGGER_KEYS cục bộ cũ trong pushChanges)
 function _isMetaKey(k) { return Object.prototype.hasOwnProperty.call(_META_KEY_DOC, k); }
