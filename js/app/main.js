@@ -210,7 +210,7 @@ function goPage(btn, id) {
   if (id==='congno') initCongNo();
   if (id==='nhapung') { initUngTableIfEmpty(); buildUngFilters(); filterAndRenderUng(); }
   if (id==='chamcong') { populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); renderCCTLTMini(); if (typeof renderCCUngLedger==='function') renderCCUngLedger(); }
-  if (id==='thietbi') { tbPopulateSels(); tbBuildRows(5); tbRenderList(); renderKhoTong(); }
+  if (id==='thietbi') { tbPopulateSels(); tbBuildRows(3); tbRenderList(); renderKhoTong(); } // mặc định 3 dòng nhập
   if (id==='congtrinh') renderProjectsPage();
   if (id==='thungrac') renderThungRac();
   queueApplyRoleUI();

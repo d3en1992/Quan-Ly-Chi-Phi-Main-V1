@@ -1353,10 +1353,10 @@ function _dbTBByCT() {
   const wrap = document.getElementById('db-tb-ct');
   if (!wrap) return;
 
-  // Chỉ thiết bị chưa xóa, không phải KHO TỔNG
-  const allTB = tbData.filter(t => !t.deletedAt && t.ct !== TB_KHO_TONG);
-  // Thiết bị trong KHO TỔNG (chưa xóa)
-  const khoTB = tbData.filter(t => !t.deletedAt && t.ct === TB_KHO_TONG);
+  // Chỉ thiết bị chưa xóa, không thuộc 2 KHO (Kho Thiết Bị Công Ty + Kho Vật Tư Giàn Giáo)
+  const allTB = tbData.filter(t => !t.deletedAt && !isKhoTong(t));
+  // Thiết bị trong 2 KHO (chưa xóa)
+  const khoTB = tbData.filter(t => !t.deletedAt && isKhoTong(t));
 
   if (!allTB.length && !khoTB.length) {
     wrap.innerHTML = '<div class="db-empty">Chưa có thiết bị</div>';
@@ -1364,23 +1364,25 @@ function _dbTBByCT() {
   }
 
   if (!selectedCT) {
-    // Tổng KHO TỔNG
-    const khoTotal = khoTB.reduce((s, t) => s + (t.soluong||0), 0);
-    const khoHd = khoTB.filter(t=>t.tinhtrang==='Đang hoạt động').reduce((s,t)=>s+(t.soluong||0),0);
-    const khoLau = khoTB.filter(t=>t.tinhtrang==='Cần bảo trì').reduce((s,t)=>s+(t.soluong||0),0);
-    const khoSC = khoTB.filter(t=>t.tinhtrang==='Cần sửa chữa').reduce((s,t)=>s+(t.soluong||0),0);
-
-    const khoRow = khoTotal > 0
-      ? `<div style="padding:10px 0;border-bottom:2px solid var(--bs-warning);margin-bottom:4px">
-          <div style="font-weight:800;color:var(--bs-warning);margin-bottom:6px;font-size:13px"><span class="material-symbols-outlined msi-gap">storefront</span>KHO TỔNG</div>
+    // Tổng từng KHO (2 kho tách riêng — xem TB_KHO trong thietbi.js); kho trống thì không hiện
+    const sumSL = arr => arr.reduce((s, t) => s + (t.soluong||0), 0);
+    const khoRow = TB_KHO_CODES.map(code => {
+      const list = khoTB.filter(t => _tbKhoCode(t) === code);
+      const khoTotal = sumSL(list);
+      if (khoTotal <= 0) return '';
+      const khoHd  = sumSL(list.filter(t=>t.tinhtrang==='Đang hoạt động'));
+      const khoLau = sumSL(list.filter(t=>t.tinhtrang==='Cần bảo trì'));
+      const khoSC  = sumSL(list.filter(t=>t.tinhtrang==='Cần sửa chữa'));
+      return `<div style="padding:10px 0;border-bottom:2px solid var(--bs-warning);margin-bottom:4px">
+          <div style="font-weight:800;color:var(--bs-warning);margin-bottom:6px;font-size:13px"><span class="material-symbols-outlined msi-gap">${TB_KHO[code].icon}</span>${TB_KHO[code].name}</div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
             <span style="color:var(--bs-secondary-color)">Tổng: <b style="color:var(--bs-body-color);font-size:14px">${khoTotal}</b></span>
             <span style="color:var(--bs-success)">Đang hoạt động: <b>${khoHd}</b></span>
             <span style="color:var(--bs-warning)">Cần bảo trì: <b>${khoLau}</b></span>
             <span style="color:var(--bs-danger)">Cần sửa chữa: <b>${khoSC}</b></span>
           </div>
-        </div>`
-      : '';
+        </div>`;
+    }).join('');
 
     const byCT = {};
     allTB.forEach(t => {

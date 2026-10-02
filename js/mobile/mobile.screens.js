@@ -1137,10 +1137,11 @@ function mbScrCongNo() {
 // ══════════════════════════════════════════════════════════════
 function mbScrThietBi() {
   const all = (typeof tbData !== 'undefined' ? tbData : []).filter(t => !t.deletedAt && inActiveYear(t.ngay));
-  // Thiết bị lưu tên công trình ở field `ct` (xem schema tb_v1). Không có CT hoặc
-  // tên chứa chữ "kho" → coi là đang nằm ở Kho tổng.
-  const tbCt  = t => t.ct || t.congtrinh || '';
-  const isKho = t => !tbCt(t) || tbCt(t).toLowerCase().includes('kho');
+  // Thiết bị lưu tên công trình ở field `ct` (xem schema tb_v1). Record projectId = COMPANY
+  // (2 kho: Kho Thiết Bị Công Ty / Kho Vật Tư Giàn Giáo), không có CT hoặc tên chứa "kho" → ở kho.
+  // Tên nơi lấy qua _tbLocName (thietbi.js) để hiện đúng tên kho kể cả khi `ct` bị ghi đè.
+  const tbCt  = t => (typeof _tbLocName === 'function' ? _tbLocName(t) : '') || t.ct || t.congtrinh || '';
+  const isKho = t => t.projectId === 'COMPANY' || !tbCt(t) || tbCt(t).toLowerCase().includes('kho');
   const rows = all.filter(t => MB.tbView === 'kho' ? isKho(t) : !isKho(t));
 
   const stCls = s => {
@@ -1153,7 +1154,7 @@ function mbScrThietBi() {
 
   return `<div class="mb-pad">
     <div class="mb-chips even">
-      ${[['ct', 'Tại công trình'], ['kho', 'Kho tổng']].map(([k, l]) =>
+      ${[['ct', 'Tại công trình'], ['kho', 'Kho']].map(([k, l]) =>
         `<div class="mb-chip${MB.tbView === k ? ' on' : ''}" data-act="setFilter" data-arg="tbView|${k}">${l}</div>`).join('')}
     </div>
     <div class="mb-col">
@@ -1163,7 +1164,7 @@ function mbScrThietBi() {
           <span style="font-size:12.5px;font-weight:800;flex-shrink:0">SL ${t.soluong || 0}</span>
         </div>
         <div class="mb-row-between" style="align-items:center">
-          <span style="font-size:11px;color:var(--mb-muted-2)">${mbX(tbCt(t) || 'Kho tổng')} · ${mbX(t.nguoi || '—')}</span>
+          <span style="font-size:11px;color:var(--mb-muted-2)">${mbX(tbCt(t) || 'Kho')} · ${mbX(t.nguoi || '—')}</span>
           <span class="mb-tag ${stCls(t.tinhtrang)}">${mbX(t.tinhtrang || '—')}</span>
         </div>
       </div>`).join('') : '<div class="mb-empty">Không có thiết bị</div>'}

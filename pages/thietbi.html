@@ -1,9 +1,11 @@
 <!-- Partial: page-thietbi (tách từ index.html — Phase 2) -->
+<!-- Thứ tự (02/10/2026): Danh Sách tại CT → Kho Thiết Bị Công Ty → Kho Vật Tư Giàn Giáo → Nhập.
+     Tiêu đề dùng icon thay cho chấm cam. 2 bảng kho dùng chung hàm _renderKho(code) — ID kho-tb-* / kho-gg-* -->
 
-        <!-- Bảng 2: Danh sách thiết bị đã lưu -->
+        <!-- Bảng 1: Danh sách thiết bị tại công trình -->
         <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-            <span class="dot"></span>Danh Sách Thiết Bị Tại Công Trình
+            <span class="material-symbols-outlined">construction</span>Danh Sách Thiết Bị Tại Công Trình
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <div class="search-box" style="min-width: 140px">
@@ -18,6 +20,7 @@
                 "
               />
             </div>
+            <!-- Chỉ liệt kê công trình đang có thiết bị (_tbRefreshCtFilter) -->
             <select
               class="form-select form-select-sm w-auto"
               id="tb-filter-ct"
@@ -57,7 +60,7 @@
                   <th style="text-align: center; width: 70px">SL</th>
                   <th style="width: 130px">Tình Trạng</th>
                   <th>Thông Tin Máy</th>
-                  <th style="width: 130px">Ngày Luân Chuyển</th>
+                  <th style="width: 100px">Ngày LC</th>
                   <th style="width: 120px"></th>
                 </tr>
               </thead>
@@ -67,81 +70,96 @@
           <div class="app-pagination" id="tb-pagination"></div>
         </div>
 
-        <!-- Bảng 2b: Kho Tổng Thiết Bị -->
+        <!-- Bảng 2: Kho Thiết Bị Công Ty (kho = 'TB') -->
         <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-            <span class="dot"></span><span class="material-symbols-outlined msi-gap">inventory_2</span>Kho Tổng Thiết Bị
+            <span class="material-symbols-outlined">home_repair_service</span>Kho Thiết Bị Công Ty
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <div class="search-box" style="min-width: 140px">
               <span class="ico"><span class="material-symbols-outlined">search</span></span>
-              <input
-                type="text"
-                id="kho-search"
-                placeholder="Tìm thiết bị..."
-                oninput="
-                  khoPage = 1;
-                  renderKhoTong();
-                "
-              />
+              <input type="text" id="kho-tb-search" placeholder="Tìm thiết bị..." oninput="khoReset('TB')" />
             </div>
-            <select
-              class="form-select form-select-sm w-auto"
-              id="kho-filter-ten"
-              onchange="
-                khoPage = 1;
-                renderKhoTong();
-              "
-            >
+            <select class="form-select form-select-sm w-auto" id="kho-tb-filter-ten" onchange="khoReset('TB')">
               <option value="">Tất cả thiết bị</option>
             </select>
-            <select
-              class="form-select form-select-sm w-auto"
-              id="kho-filter-tt"
-              onchange="
-                khoPage = 1;
-                renderKhoTong();
-              "
-            >
+            <select class="form-select form-select-sm w-auto" id="kho-tb-filter-tt" onchange="khoReset('TB')">
               <option value="">Tất cả tình trạng</option>
               <option value="Đang hoạt động">Đang hoạt động</option>
               <option value="Cần bảo trì">Cần bảo trì</option>
               <option value="Cần sửa chữa">Cần sửa chữa</option>
             </select>
-            <button
-              class="btn btn-outline-secondary btn-sm"
-              onclick="
-                khoPage = 1;
-                renderKhoTong();
-              "
-            >
+            <button class="btn btn-outline-secondary btn-sm" onclick="khoReset('TB')">
               <span class="material-symbols-outlined msi-gap">refresh</span>Làm mới
             </button>
           </div>
         </div>
         <div class="records-wrap card shadow-sm overflow-hidden">
           <div style="overflow-x: auto">
-            <table class="table table-sm table-hover align-middle mb-0" id="kho-list-table">
+            <table class="table table-sm table-hover align-middle mb-0 kho-list-table" id="kho-tb-list-table">
               <thead class="table-light">
                 <tr>
                   <th class="tb-name-col">Tên Thiết Bị</th>
                   <th style="text-align: center; width: 70px">SL</th>
                   <th style="width: 130px">Tình Trạng</th>
                   <th style="width: 110px">Thông Tin Máy</th>
-                  <th style="width: 130px">Ngày Luân Chuyển</th>
+                  <th style="width: 100px">Ngày LC</th>
                   <th style="width: 160px"></th>
                 </tr>
               </thead>
-              <tbody id="kho-list-tbody"></tbody>
+              <tbody id="kho-tb-tbody"></tbody>
             </table>
           </div>
-          <div class="app-pagination" id="kho-pagination"></div>
+          <div class="app-pagination" id="kho-tb-pagination"></div>
         </div>
 
-        <!-- Bảng 1: Nhập thiết bị -->
+        <!-- Bảng 3: Kho Vật Tư Giàn Giáo (kho = 'GG' — dữ liệu "Kho Tổng" cũ chuyển vào đây) -->
         <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-            <span class="dot"></span>Nhập Máy Móc, Thiết Bị, Giàn Giáo
+            <span class="material-symbols-outlined">warehouse</span>Kho Vật Tư Giàn Giáo
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <div class="search-box" style="min-width: 140px">
+              <span class="ico"><span class="material-symbols-outlined">search</span></span>
+              <input type="text" id="kho-gg-search" placeholder="Tìm thiết bị..." oninput="khoReset('GG')" />
+            </div>
+            <select class="form-select form-select-sm w-auto" id="kho-gg-filter-ten" onchange="khoReset('GG')">
+              <option value="">Tất cả thiết bị</option>
+            </select>
+            <select class="form-select form-select-sm w-auto" id="kho-gg-filter-tt" onchange="khoReset('GG')">
+              <option value="">Tất cả tình trạng</option>
+              <option value="Đang hoạt động">Đang hoạt động</option>
+              <option value="Cần bảo trì">Cần bảo trì</option>
+              <option value="Cần sửa chữa">Cần sửa chữa</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm" onclick="khoReset('GG')">
+              <span class="material-symbols-outlined msi-gap">refresh</span>Làm mới
+            </button>
+          </div>
+        </div>
+        <div class="records-wrap card shadow-sm overflow-hidden">
+          <div style="overflow-x: auto">
+            <table class="table table-sm table-hover align-middle mb-0 kho-list-table" id="kho-gg-list-table">
+              <thead class="table-light">
+                <tr>
+                  <th class="tb-name-col">Tên Thiết Bị</th>
+                  <th style="text-align: center; width: 70px">SL</th>
+                  <th style="width: 130px">Tình Trạng</th>
+                  <th style="width: 110px">Thông Tin Máy</th>
+                  <th style="width: 100px">Ngày LC</th>
+                  <th style="width: 160px"></th>
+                </tr>
+              </thead>
+              <tbody id="kho-gg-tbody"></tbody>
+            </table>
+          </div>
+          <div class="app-pagination" id="kho-gg-pagination"></div>
+        </div>
+
+        <!-- Bảng 4: Nhập thiết bị -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top: 28px">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="material-symbols-outlined">add_box</span>Nhập Máy Móc, Thiết Bị, Giàn Giáo
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <button class="btn btn-outline-secondary btn-sm" onclick="tbClearRows()">
@@ -158,7 +176,7 @@
         </div>
 
         <div id="thietbi-form">
-          <!-- Header: Ngày Luân Chuyển · Công Trình (ô CT có gõ để tìm — giống tab Hóa Đơn Chi Tiết) -->
+          <!-- Header: Ngày Luân Chuyển · Công Trình / Kho (ô có gõ để tìm — giống tab Hóa Đơn Chi Tiết) -->
           <div class="entry-date-bar">
             <span class="bar-label">Ngày Luân Chuyển</span>
             <input
@@ -166,7 +184,7 @@
               id="tb-ngay"
               class="form-control form-control-sm w-auto"
             />
-            <span class="bar-label">Công Trình</span>
+            <span class="bar-label">Công Trình / Kho</span>
             <select
               id="tb-ct-sel"
               class="form-select form-select-sm w-auto"
@@ -209,4 +227,4 @@
             </div>
           </div>
         </div>
-      
+

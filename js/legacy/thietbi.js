@@ -9,7 +9,18 @@ const TB_TEN_MAY = [
   'Thước nhôm', 'Chân Dàn 1.7m', 'Chân Dàn 1.5m',
   'Chéo lớn', 'Chéo nhỏ', 'Kít tăng giàn giáo', 'Cây chống tăng'
 ];
-const TB_KHO_TONG = 'KHO TỔNG';
+// (02/10/2026) Tách "KHO TỔNG" thành 2 kho vật lý độc lập. Cả 2 kho vẫn có projectId = 'COMPANY'
+// (để các module khác coi là "công ty", không phải công trình), phân biệt bằng trường riêng `kho`:
+//   kho = 'TB' → KHO THIẾT BỊ CÔNG TY      kho = 'GG' → KHO VẬT TƯ GIÀN GIÁO
+// Lý do dùng trường riêng: code dự án (đổi tên CT, đồng bộ theo projectId) có thể ghi đè `ct`
+// của record COMPANY thành "CÔNG TY" → nếu chỉ dựa vào tên `ct` sẽ lẫn 2 kho. `kho` thì không ai đụng.
+const TB_KHO_TONG = 'KHO TỔNG'; // tên CŨ — chỉ còn dùng để nhận diện dữ liệu cũ
+const TB_KHO = {
+  TB: { code: 'TB', name: 'KHO THIẾT BỊ CÔNG TY',  title: 'Kho Thiết Bị Công Ty',  icon: 'home_repair_service' },
+  GG: { code: 'GG', name: 'KHO VẬT TƯ GIÀN GIÁO', title: 'Kho Vật Tư Giàn Giáo', icon: 'warehouse' },
+};
+const TB_KHO_CODES = ['TB', 'GG'];      // thứ tự hiển thị
+const TB_KHO_DEFAULT = 'GG';            // dữ liệu "KHO TỔNG" cũ → Kho Vật Tư Giàn Giáo
 const TB_STATUS_STYLE = {
   'Đang hoạt động': 'background:var(--bs-success-subtle);color:var(--bs-success);',
   'Cần bảo trì':  'background:var(--bs-warning-subtle);color:var(--bs-warning);',
@@ -18,9 +29,37 @@ const TB_STATUS_STYLE = {
 
 let tbData = load('tb_v1', []);
 
-// ── Helper: kiểm tra record thuộc KHO TỔNG ────────────────────────
+// ── Helper: record thuộc 1 trong 2 KHO (không phải công trình) ────
 function isKhoTong(r) {
   return r.projectId === 'COMPANY';
+}
+// Mã kho của record kho ('TB' | 'GG'); record thiếu `kho` (dữ liệu cũ) → kho mặc định
+function _tbKhoCode(r) {
+  return r && r.kho === 'TB' ? 'TB' : (r && r.kho === 'GG' ? 'GG' : TB_KHO_DEFAULT);
+}
+// Tên (value dropdown) → mã kho; "KHO TỔNG" cũ → kho mặc định; không phải kho → null
+function _tbKhoByName(name) {
+  if (name === TB_KHO_TONG) return TB_KHO_DEFAULT;
+  return TB_KHO_CODES.find(c => TB_KHO[c].name === name) || null;
+}
+// Khóa "NƠI" của record: 2 kho tách riêng, công trình theo projectId (thiếu thì theo tên)
+function _tbLocKey(r) {
+  return isKhoTong(r) ? 'KHO:' + _tbKhoCode(r) : (r.projectId || r.ct || '');
+}
+// Tên hiển thị NƠI của record (kho → tên kho chuẩn, CT → tên theo projectId)
+function _tbLocName(r) {
+  return isKhoTong(r) ? TB_KHO[_tbKhoCode(r)].name : _resolveCtName(r);
+}
+// Đọc NƠI từ giá trị dropdown (value = tên, data-pid) → { ct, projectId, kho, key }
+function _tbLocFromSel(name, pid) {
+  const k = _tbKhoByName(name);
+  if (k) return { ct: TB_KHO[k].name, projectId: 'COMPANY', kho: k, key: 'KHO:' + k };
+  return { ct: name, projectId: pid || null, kho: null, key: pid || name };
+}
+// <option> cho 2 kho (bỏ qua kho `exceptCode` nếu có)
+function _tbKhoOpts(cur, exceptCode) {
+  return TB_KHO_CODES.filter(c => c !== exceptCode).map(c =>
+    `<option value="${TB_KHO[c].name}" data-pid="COMPANY"${cur === TB_KHO[c].name ? ' selected' : ''}>${TB_KHO[c].name}</option>`).join('');
 }
 
 // ── Helper: khóa so khớp "Thông Tin Máy" (trường ghichu) khi gộp nhóm ──
@@ -34,26 +73,26 @@ function _tbGhiKey(s) {
 
 // ══════════════════════════════════════════════════════════════════
 // [MIGRATION] Chuẩn hóa dữ liệu cũ — chạy 1 lần khi load
-// - ct === "KHO TỔNG" mà thiếu projectId → set projectId = "COMPANY"
-// - projectId === "COMPANY" mà ct !== "KHO TỔNG" → set ct = "KHO TỔNG"
-// - Gộp record trùng (projectId + ten + tinhtrang) → cộng dồn số lượng
+// - ct là tên kho mà thiếu projectId → set projectId = "COMPANY"
+// - record COMPANY thiếu `kho` → gán kho (dữ liệu "KHO TỔNG" cũ → Kho Vật Tư Giàn Giáo); ct = tên kho chuẩn
+// - Gộp record trùng (Nơi + ten + tinhtrang + Thông Tin Máy) → cộng dồn số lượng
 // - KHÔNG xóa record, KHÔNG thay đổi lịch sử
 // ══════════════════════════════════════════════════════════════════
 function migrateTbData() {
   let changed = false;
 
-  // Phase 1: Fix projectId / ct cho KHO TỔNG
+  // Phase 1: Fix projectId / kho / ct cho record KHO
   tbData.forEach(r => {
     if (r.deletedAt) return;
-    // Case 1: ct là KHO TỔNG nhưng thiếu hoặc sai projectId
-    if (r.ct === TB_KHO_TONG && r.projectId !== 'COMPANY') {
-      r.projectId = 'COMPANY';
-      changed = true;
-    }
-    // Case 2: projectId là COMPANY nhưng ct không phải KHO TỔNG (bị normalize sai thành "CÔNG TY")
-    if (r.projectId === 'COMPANY' && r.ct !== TB_KHO_TONG) {
-      r.ct = TB_KHO_TONG;
-      changed = true;
+    const k = _tbKhoByName(r.ct);
+    // Case 1: ct là tên kho (cũ hoặc mới) nhưng thiếu hoặc sai projectId
+    if (k && r.projectId !== 'COMPANY') { r.projectId = 'COMPANY'; changed = true; }
+    if (r.projectId === 'COMPANY') {
+      // Case 2: record kho chưa có `kho` (dữ liệu "KHO TỔNG" cũ) → gán theo tên, mặc định Kho Vật Tư Giàn Giáo
+      if (r.kho !== 'TB' && r.kho !== 'GG') { r.kho = k || TB_KHO_DEFAULT; changed = true; }
+      // Case 3: ct bị normalize sai (vd thành "CÔNG TY") → trả về tên kho chuẩn theo `kho`
+      const want = TB_KHO[r.kho].name;
+      if (r.ct !== want) { r.ct = want; changed = true; }
     }
   });
 
@@ -63,7 +102,7 @@ function migrateTbData() {
   const toRemove = new Set();
   tbData.forEach((r, idx) => {
     if (r.deletedAt) return;
-    const key = (r.projectId || r.ct || '') + '||' + (r.ten || '') + '||' + (r.tinhtrang || '') + '||' + _tbGhiKey(r.ghichu);
+    const key = _tbLocKey(r) + '||' + (r.ten || '') + '||' + (r.tinhtrang || '') + '||' + _tbGhiKey(r.ghichu);
     if (dedup.has(key)) {
       const primary = dedup.get(key);
       // Cộng dồn số lượng vào record đầu tiên
@@ -84,7 +123,7 @@ function migrateTbData() {
 
   if (changed) {
     save('tb_v1', tbData);
-    console.log('[TB Migration] Đã chuẩn hóa dữ liệu thiết bị (KHO TỔNG projectId + dedup)');
+    console.log('[TB Migration] Đã chuẩn hóa dữ liệu thiết bị (2 kho + projectId + dedup)');
   }
 }
 
@@ -96,10 +135,12 @@ function _normalizeTbProjectIds() {
   let changed = false;
   tbData.forEach(r => {
     if (r.deletedAt) return;
-    // KHO TỔNG: đảm bảo projectId = "COMPANY" và ct = TB_KHO_TONG
-    if (r.ct === TB_KHO_TONG || r.projectId === 'COMPANY') {
+    // KHO: đảm bảo projectId = "COMPANY", có `kho`, ct = tên kho chuẩn
+    const k = _tbKhoByName(r.ct);
+    if (k || r.projectId === 'COMPANY') {
       if (r.projectId !== 'COMPANY') { r.projectId = 'COMPANY'; changed = true; }
-      if (r.ct !== TB_KHO_TONG) { r.ct = TB_KHO_TONG; changed = true; }
+      if (r.kho !== 'TB' && r.kho !== 'GG') { r.kho = k || TB_KHO_DEFAULT; changed = true; }
+      if (r.ct !== TB_KHO[r.kho].name) { r.ct = TB_KHO[r.kho].name; changed = true; }
       return;
     }
     // Công trình thực: normalize projectId từ ct
@@ -142,13 +183,13 @@ function tbRefreshNameDl() {
 function tbPopulateSels() {
   const sel = document.getElementById('tb-ct-sel');
   const cur = sel.value;
-  // Entry select: KHO TỔNG (= COMPANY) + projects thuộc năm đang chọn
+  // Entry select: 2 KHO (= COMPANY) + projects thuộc năm đang chọn
   // Tab nhập liệu → ẩn CT đã quyết toán (giống tab Hóa Đơn Chi Tiết); CT đang chọn thì vẫn giữ
   const _entryProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => p.name === cur || p.status !== 'closed')
     .filter(p => activeYear === 0 || p.name === cur || _ctInActiveYear(p.name));
   sel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
-    `<option value="${TB_KHO_TONG}" data-pid="COMPANY"${cur===TB_KHO_TONG?' selected':''}>${TB_KHO_TONG}</option>` +
+    _tbKhoOpts(cur) +
     _entryProjs.map(p=>`<option value="${x(p.name)}" data-pid="${p.id}"${p.name===cur?' selected':''}>${x(p.name)}</option>`).join('');
   // Biến <select> CT thành ô chọn có GÕ ĐỂ TÌM — dùng chung _ssEnhance của tab Hóa Đơn Chi Tiết
   // (idempotent: gọi lại nhiều lần không tạo trùng; option dựng lại vẫn tự cập nhật)
@@ -158,27 +199,22 @@ function tbPopulateSels() {
   const ngayInp = document.getElementById('tb-ngay');
   if (ngayInp && !ngayInp.value) ngayInp.value = today();
 
-  // Filter select: KHO TỔNG + projects thuộc năm đang chọn
-  const fSel = document.getElementById('tb-filter-ct');
-  const fCur = fSel.value;
-  const _filterProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
-    .filter(p => activeYear === 0 || _ctInActiveYear(p.name));
-  fSel.innerHTML = `<option value="">Tất cả công trình</option>` +
-    `<option value="${TB_KHO_TONG}"${fCur===TB_KHO_TONG?' selected':''}>${TB_KHO_TONG}</option>` +
-    _filterProjs.map(p=>`<option value="${x(p.name)}"${p.name===fCur?' selected':''}>${x(p.name)}</option>`).join('');
+  // Bộ lọc Công trình (bảng Danh Sách tại CT): chỉ CT đang có thiết bị
+  _tbRefreshCtFilter();
 
-  // Bộ lọc tên KHO: chỉ lấy tên thiết bị có trong cats.tbTen
+  // Bộ lọc tên của TỪNG KHO: chỉ lấy tên thiết bị đang có trong kho đó (và có trong cats.tbTen)
   const validNames = new Set((cats.tbTen || []).map(n => n.toLowerCase()));
-  const khoFSel = document.getElementById('kho-filter-ten');
-  if (khoFSel) {
+  TB_KHO_CODES.forEach(code => {
+    const khoFSel = document.getElementById(_khoId(code, 'filter-ten'));
+    if (!khoFSel) return;
     const khoNames = [...new Set(
-      tbData.filter(r => !r.deletedAt && isKhoTong(r) && recCatName(r,'tb','ten') && validNames.has(recCatName(r,'tb','ten').toLowerCase()))
+      tbData.filter(r => !r.deletedAt && isKhoTong(r) && _tbKhoCode(r) === code && recCatName(r,'tb','ten') && validNames.has(recCatName(r,'tb','ten').toLowerCase()))
             .map(r => recCatName(r,'tb','ten'))
     )].sort((a,b) => a.localeCompare(b,'vi'));
     const khoFCur = khoFSel.value;
     khoFSel.innerHTML = '<option value="">Tất cả thiết bị</option>' +
       khoNames.map(v=>`<option value="${x(v)}" ${v===khoFCur?'selected':''}>${x(v)}</option>`).join('');
-  }
+  });
 
   // Bộ lọc tên Thống Kê: chỉ lấy từ cats.tbTen
   const tkFSel = document.getElementById('tk-filter-ten');
@@ -191,7 +227,7 @@ function tbPopulateSels() {
 }
 
 // ── Build nhập bảng ───────────────────────────────────────────────
-function tbBuildRows(n=5) {
+function tbBuildRows(n=3) { // mặc định 3 dòng nhập
   const tbody = document.getElementById('tb-tbody');
   tbody.innerHTML = '';
   for (let i=0; i<n; i++) tbAddRow(null, i+1);
@@ -315,25 +351,24 @@ function tbSave() {
     return;
   }
 
-  // Chuẩn hóa: cộng dồn nếu đã tồn tại record cùng (projectId + ten + tinhtrang + Thông Tin Máy)
+  // Chuẩn hóa: cộng dồn nếu đã tồn tại record cùng (Nơi + ten + tinhtrang + Thông Tin Máy)
   // Khác Thông Tin Máy → tạo dòng riêng (vd: 2 "Máy Hơi Nhỏ" ghi chú khác nhau = 2 dòng)
   // QUAN TRỌNG: chỉ tìm record CHƯA bị xóa — tránh update deleted record
-  // KHO TỔNG luôn có projectId = "COMPANY", KHÔNG BAO GIỜ null
-  const savePid = ct === TB_KHO_TONG ? 'COMPANY' : (ctPid || null);
+  // 2 KHO luôn có projectId = "COMPANY" + `kho` riêng, KHÔNG BAO GIỜ null
+  const loc = _tbLocFromSel(ct, ctPid);
   rows.forEach(row => {
     const exist = tbData.find(rec => !rec.deletedAt && rec.ten === row.ten && rec.tinhtrang === row.tinhtrang &&
-      _tbGhiKey(rec.ghichu) === _tbGhiKey(row.ghichu) &&
-      (savePid ? (rec.projectId === savePid) : rec.ct === ct));
+      _tbGhiKey(rec.ghichu) === _tbGhiKey(row.ghichu) && _tbLocKey(rec) === loc.key);
     if (exist) {
       exist.soluong = (exist.soluong || 0) + row.soluong;
       exist.ngay = ngay;
       exist.updatedAt = Date.now();
       exist.deviceId  = DEVICE_ID;
-      if (savePid) { exist.projectId = savePid; }
-      if (savePid === 'COMPANY') { exist.ct = TB_KHO_TONG; }
-      else { const n = _getProjectNameById(savePid); if (n) exist.ct = n; }
+      if (loc.projectId) exist.projectId = loc.projectId;
+      if (loc.kho) { exist.kho = loc.kho; exist.ct = loc.ct; }
+      else { const n = _getProjectNameById(loc.projectId); if (n) exist.ct = n; }
     } else {
-      tbData.push(mkRecord({ ct, projectId: savePid, ...row, ngay }));
+      tbData.push(mkRecord({ ct: loc.ct, projectId: loc.projectId, ...(loc.kho ? { kho: loc.kho } : {}), ...row, ngay }));
     }
   });
 
@@ -347,7 +382,7 @@ function tbSave() {
   tbRenderThongKeVon();
   renderKhoTong();
   tbBuildRows();
-  toast(`✅ Đã lưu ${rows.length} thiết bị vào ${ct}`, 'success');
+  toast(`✅ Đã lưu ${rows.length} thiết bị vào ${loc.ct}`, 'success');
   setTimeout(() => {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu thiết bị'; }
   }, 1500);
@@ -367,23 +402,47 @@ function _tbMatchQ(r, q) {
   return [recCatName(r,'tb','ten'), r.ghichu, r.nguoi].some(v => _tbNormQ(v).includes(q));
 }
 
+// Record có thuộc bảng "Danh Sách Thiết Bị Tại Công Trình" không (chưa tính bộ lọc người dùng):
+// chưa xóa, KHÔNG thuộc 2 kho, và (khi lọc theo năm) CT hoạt động trong năm hoặc máy đang hoạt động
+function _tbListVisible(r) {
+  if (r.deletedAt) return false;
+  if (isKhoTong(r) || _tbKhoByName(r.ct)) return false;
+  if (typeof activeYears !== 'undefined' ? activeYears.size > 0 : activeYear !== 0) {
+    const ctActive = _entityInYear(r.ct, 'ct') || inActiveYear(r.ngay);
+    const isRunning = r.tinhtrang === 'Đang hoạt động';
+    if (!ctActive && !isRunning) return false;
+  }
+  return true;
+}
+
+// Bộ lọc Công trình ĐỘNG: chỉ liệt kê CT đang có thiết bị (SL > 0) trong bảng danh sách.
+// CT không còn thiết bị nào → ẩn cho gọn. CT đang chọn vẫn giữ để không mất bộ lọc.
+function _tbRefreshCtFilter() {
+  const fSel = document.getElementById('tb-filter-ct');
+  if (!fSel) return;
+  const fCur = fSel.value;
+  const has = new Set();
+  tbData.forEach(r => { if (_tbListVisible(r) && (r.soluong || 0) > 0) has.add(_resolveCtName(r)); });
+  if (fCur) has.add(fCur);
+  // Sắp theo thứ tự Master (như bảng danh sách); CT không có trong danh mục → cuối, theo ABC
+  const order = (typeof getAllProjects === 'function' ? getAllProjects() : []).map(p => p.name);
+  const idx = n => { const i = order.indexOf(n); return i === -1 ? 9999 : i; };
+  const names = [...has].filter(Boolean).sort((a, b) => (idx(a) - idx(b)) || a.localeCompare(b, 'vi'));
+  fSel.innerHTML = `<option value="">Tất cả công trình</option>` +
+    names.map(n => `<option value="${x(n)}"${n === fCur ? ' selected' : ''}>${x(n)}</option>`).join('');
+}
+
 function tbRenderList() {
   const fCt = document.getElementById('tb-filter-ct')?.value || '';
   const fTt = document.getElementById('tb-filter-tt')?.value || '';
   const fQ  = _tbNormQ(document.getElementById('tb-search')?.value);
   let filtered = tbData.filter(r => {
-    // Bảng này chỉ hiển thị thiết bị tại công trình, không gồm KHO TỔNG
-    if (r.deletedAt) return false;
-    if (isKhoTong(r) || r.ct === TB_KHO_TONG) return false;
+    // Bảng này chỉ hiển thị thiết bị tại công trình, không gồm 2 KHO
+    if (!_tbListVisible(r)) return false;
     // [MODIFIED] — filter by projectId or ct
-    if (fCt && !(r.projectId === fCt || r.ct === fCt)) return false;
+    if (fCt && !(r.projectId === fCt || r.ct === fCt || _resolveCtName(r) === fCt)) return false;
     if (fTt && r.tinhtrang !== fTt) return false;
     if (fQ && !_tbMatchQ(r, fQ)) return false;
-    if (typeof activeYears !== 'undefined' ? activeYears.size > 0 : activeYear !== 0) {
-      const ctActive = _entityInYear(r.ct, 'ct') || inActiveYear(r.ngay);
-      const isRunning = r.tinhtrang === 'Đang hoạt động';
-      if (!ctActive && !isRunning) return false;
-    }
     return true;
   });
 
@@ -422,13 +481,13 @@ function tbRenderList() {
       <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(recCatName(r,'tb','ten'))}</span></td>
       <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
       <td>
-        <select onchange="tbUpdateField('${r.id}','tinhtrang',this.value)"
+        <select onchange="tbUpdateField('${r.id}','tinhtrang',this.value)" onclick="event.stopPropagation()"
           class="tb-status" style="cursor:pointer;border:1px solid var(--bs-border-color);${ttStyle}">
           ${ttOpts}
         </select>
       </td>
       <td class="text-secondary tb-ghichu-cell" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-        title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditGhichu(this,'${r.id}')">${x(r.ghichu||'—')}</td>
+        title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditCell(this,'${r.id}','ghichu')">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
@@ -450,73 +509,110 @@ function tbRenderList() {
 
 function tbGoTo(p) { tbPage=p; tbRenderList(); }
 
-// ── Cập nhật tình trạng inline ────────────────────────────────────
+// ── Cập nhật tình trạng inline (select luôn hiện ở bảng Danh Sách tại CT) ──
 function tbUpdateField(id, field, val) {
-  const idx = tbData.findIndex(r=>r.id===id);
-  if (idx<0) return;
-  tbData[idx][field] = val;
-  tbData[idx].updatedAt = Date.now();
-  tbData[idx].deviceId  = DEVICE_ID;
-  save('tb_v1', tbData);
+  _tbApplyEdit(id, field, val);
+}
+
+// Vẽ lại mọi bảng thiết bị + bộ lọc CT (dùng sau mỗi lần sửa)
+function _tbRerenderAll() {
+  _tbRefreshCtFilter();
   tbRenderList();
   tbRenderThongKeVon();
   renderKhoTong();
-  toast('✅ Đã cập nhật tình trạng', 'success');
 }
 
-// ── Sửa trực tiếp ô "Thông Tin Máy" (bảng Danh Sách tại CT + Kho Tổng) ──
-// Bấm vào ô → hiện ô nhập. Enter hoặc bấm ra ngoài (blur) → lưu + khóa lại. Esc → hủy.
+// ── Sửa trực tiếp 1 ô trên bảng (bấm vào ô → hiện ô nhập) ────────
+// field = 'ghichu'    (Thông Tin Máy — cả bảng CT và 2 bảng Kho)
+//       = 'soluong'   (Số lượng — 2 bảng Kho)
+//       = 'tinhtrang' (Tình trạng — 2 bảng Kho)
+// Enter / chọn xong / bấm ra ngoài (blur) → lưu + khóa lại. Esc → hủy.
 // Lưu bằng save('tb_v1') → tự đồng bộ lên Firebase như các thao tác khác.
-function tbEditGhichu(td, id) {
-  if (td.querySelector('input')) return; // đang sửa rồi → bỏ qua
+function tbEditCell(td, id, field) {
+  if (td.querySelector('input,select')) return; // đang sửa rồi → bỏ qua
   const r = tbData.find(rec => rec.id === id && !rec.deletedAt);
   if (!r) return;
 
-  const oldVal = r.ghichu || '';
   td.innerHTML = '';
   td.style.padding = '2px 4px';
-  // Ô hiển thị bị giới hạn 140px + overflow:hidden → mở rộng khi sửa để ô nhập không bị cắt
+  // Ô hiển thị có thể bị giới hạn độ rộng + overflow:hidden → mở rộng khi sửa để ô nhập không bị cắt
   td.style.maxWidth = 'none';
   td.style.overflow = 'visible';
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.value = oldVal;
-  inp.placeholder = 'Thông tin máy...';
-  inp.className = 'form-control form-control-sm';
-  inp.style.cssText = 'font-size:12px;min-width:160px';
-  inp.onclick = e => e.stopPropagation(); // bấm trong ô nhập không mở lại ô sửa
-  td.appendChild(inp);
-  inp.focus();
-  inp.select();
+
+  let el;
+  if (field === 'tinhtrang') {
+    el = document.createElement('select');
+    el.className = 'form-select form-select-sm';
+    el.style.cssText = 'font-size:12px;min-width:140px';
+    el.innerHTML = TB_TINH_TRANG.map(v => `<option value="${v}"${r.tinhtrang === v ? ' selected' : ''}>${v}</option>`).join('');
+  } else {
+    el = document.createElement('input');
+    el.className = 'form-control form-control-sm';
+    if (field === 'soluong') {
+      el.type = 'number'; el.min = '1'; el.step = '1'; el.inputMode = 'decimal';
+      el.value = r.soluong || 0;
+      el.style.cssText = 'font-size:13px;width:80px;text-align:center;font-family:\'IBM Plex Mono\',monospace';
+    } else {
+      el.type = 'text';
+      el.value = r.ghichu || '';
+      el.placeholder = 'Thông tin máy...';
+      el.style.cssText = 'font-size:12px;min-width:160px';
+    }
+  }
+  el.onclick = e => e.stopPropagation(); // bấm trong ô nhập không mở lại ô sửa
+  td.appendChild(el);
+  el.focus();
+  if (el.select) el.select();
 
   let done = false; // chặn lưu 2 lần (Enter rồi blur do bảng vẽ lại)
   const finish = (doSave) => {
     if (done) return;
     done = true;
-    if (doSave) _tbSaveGhichu(id, inp.value);
-    else { tbRenderList(); renderKhoTong(); } // hủy → vẽ lại như cũ
+    if (doSave) _tbApplyEdit(id, field, el.value);
+    else _tbRerenderAll(); // hủy → vẽ lại như cũ
   };
-  inp.addEventListener('keydown', e => {
+  el.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }
     else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
   });
-  inp.addEventListener('blur', () => finish(true));
+  if (field === 'tinhtrang') el.addEventListener('change', () => finish(true)); // chọn xong là lưu luôn
+  el.addEventListener('blur', () => finish(true));
 }
+// Tên cũ — giữ để code/HTML cũ gọi tới vẫn chạy
+function tbEditGhichu(td, id) { tbEditCell(td, id, 'ghichu'); }
 
-function _tbSaveGhichu(id, val) {
+// Ghi 1 thay đổi xuống dữ liệu (+ gộp dòng nếu trùng khóa nhóm) rồi vẽ lại
+function _tbApplyEdit(id, field, rawVal) {
   const r = tbData.find(rec => rec.id === id && !rec.deletedAt);
-  const newVal = String(val || '').trim().replace(/\s+/g, ' ');
-  // Không đổi gì → chỉ khóa ô lại, không ghi dữ liệu / không đồng bộ thừa
-  if (!r || newVal === (r.ghichu || '')) {
-    tbRenderList(); renderKhoTong();
-    return;
+  if (!r) { _tbRerenderAll(); return; }
+  const LABEL = { ghichu: 'thông tin máy', soluong: 'số lượng', tinhtrang: 'tình trạng' };
+
+  let newVal;
+  if (field === 'soluong') {
+    newVal = parseFloat(rawVal);
+    if (!(newVal > 0)) {
+      toast('Số lượng phải lớn hơn 0 — muốn bỏ thiết bị khỏi kho thì dùng nút xóa', 'error');
+      _tbRerenderAll();
+      return;
+    }
+  } else if (field === 'tinhtrang') {
+    newVal = TB_TINH_TRANG.includes(rawVal) ? rawVal : r.tinhtrang;
+  } else {
+    newVal = String(rawVal || '').trim().replace(/\s+/g, ' ');
   }
 
-  // Theo quy tắc gộp nhóm: nếu ở CÙNG NƠI đã có dòng trùng Tên + Tình trạng + Thông Tin Máy mới
-  // → cộng số lượng vào dòng đó và xóa mềm dòng đang sửa (tránh 2 dòng giống hệt nhau)
-  const twin = tbData.find(rec => rec !== r && !rec.deletedAt && rec.ten === r.ten && rec.tinhtrang === r.tinhtrang &&
-    _tbGhiKey(rec.ghichu) === _tbGhiKey(newVal) &&
-    (r.projectId ? rec.projectId === r.projectId : rec.ct === r.ct));
+  // Không đổi gì → chỉ khóa ô lại, không ghi dữ liệu / không đồng bộ thừa
+  const curVal = field === 'soluong' ? (r.soluong || 0) : (r[field] || '');
+  if (newVal === curVal) { _tbRerenderAll(); return; }
+
+  // Đổi Tình trạng / Thông Tin Máy làm thay đổi khóa gộp nhóm → nếu CÙNG NƠI đã có dòng trùng
+  // Tên + Tình trạng + Thông Tin Máy mới → cộng SL vào dòng đó, xóa mềm dòng đang sửa
+  let twin = null;
+  if (field !== 'soluong') {
+    const next = { ...r, [field]: newVal };
+    twin = tbData.find(rec => rec !== r && !rec.deletedAt && _tbLocKey(rec) === _tbLocKey(r) &&
+      rec.ten === r.ten && rec.tinhtrang === next.tinhtrang && _tbGhiKey(rec.ghichu) === _tbGhiKey(next.ghichu));
+  }
 
   if (twin) {
     twin.soluong   = (twin.soluong || 0) + (r.soluong || 0);
@@ -524,29 +620,29 @@ function _tbSaveGhichu(id, val) {
     twin.deviceId  = DEVICE_ID;
     tbData = softDeleteRecord(tbData, id);
   } else {
-    r.ghichu    = newVal;
+    r[field]    = newVal;
     r.updatedAt = Date.now();
     r.deviceId  = DEVICE_ID;
   }
 
   save('tb_v1', tbData);
-  tbRenderList();
-  renderKhoTong();
-  toast(twin ? '✅ Đã cập nhật — gộp vào dòng có cùng Thông Tin Máy' : '✅ Đã cập nhật thông tin máy', 'success');
+  _tbRerenderAll();
+  toast(twin ? '✅ Đã cập nhật — gộp vào dòng trùng thiết bị' : `✅ Đã cập nhật ${LABEL[field] || ''}`, 'success');
 }
 
-// ── Xóa thiết bị (chỉ áp dụng cho KHO TỔNG) ─────────────────────
+// ── Xóa thiết bị (chỉ áp dụng cho 2 KHO) ─────────────────────────
 function tbDeleteRow(id) {
   const r = tbData.find(rec=>rec.id===id);
   if (!r) return;
   if (!isKhoTong(r)) { toast('Không thể xóa thiết bị ở công trình!', 'error'); return; }
-  if (!confirm('Xóa thiết bị này khỏi Kho Tổng?')) return;
+  const khoTitle = TB_KHO[_tbKhoCode(r)].title;
+  if (!confirm(`Xóa thiết bị này khỏi ${khoTitle}?`)) return;
   tbData = softDeleteRecord(tbData, id, { deletedBy: getCurrentUser()?.username || 'Không rõ' });
   save('tb_v1', tbData);
   tbRenderList();
   tbRenderThongKeVon();
   renderKhoTong();
-  toast('Đã xóa thiết bị khỏi Kho Tổng');
+  toast(`Đã xóa thiết bị khỏi ${khoTitle}`);
 }
 
 // ── Luân chuyển thiết bị (popup) ─────────────────────────────────
@@ -563,14 +659,13 @@ function tbLuanChuyen(id) {
   }
 
   const isKho = isKhoTong(r);
-  // CT dropdown: từ KHO → chỉ CT thực; từ CT → có KHO + CT khác
+  // Dropdown nơi đến: 2 KHO (bỏ kho đang đứng nếu nguồn là kho) + các công trình
   const _editProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => p.id !== 'COMPANY');
-  const ctOpts = (isKho ? [] : [`<option value="${TB_KHO_TONG}">${TB_KHO_TONG}</option>`])
-    .concat(_editProjs.map(p=>`<option value="${x(p.name)}" data-pid="${p.id}"${p.name===r.ct&&!isKho?' selected':''}>${x(p.name)}</option>`))
-    .join('');
+  const ctOpts = _tbKhoOpts('', isKho ? _tbKhoCode(r) : null) +
+    _editProjs.map(p=>`<option value="${x(p.name)}" data-pid="${p.id}"${p.name===r.ct&&!isKho?' selected':''}>${x(p.name)}</option>`).join('');
   const ttOpts = TB_TINH_TRANG.map(v=>`<option value="${v}" ${r.tinhtrang===v?'selected':''}>${v}</option>`).join('');
-  const srcLabel = isKho ? 'KHO TỔNG' : x(r.ct);
+  const srcLabel = x(_tbLocName(r));
   const hintText = `Phần còn lại (SL cũ − X) giữ lại tại <b>${srcLabel}</b>.`;
 
   ov.innerHTML = `
@@ -585,7 +680,7 @@ function tbLuanChuyen(id) {
         <span style="color:#888">Tên:</span> <b>${x(recCatName(r,'tb','ten'))}</b> &nbsp;·&nbsp;
         <span style="color:#888">SL hiện tại:</span> <b>${r.soluong||0}</b>
       </div>
-      <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Chuyển đến Công Trình</label>
+      <div><label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:3px">Chuyển đến Công Trình / Kho</label>
         <select id="tb-ei-ct" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-family:inherit;font-size:13px;outline:none">
           <option value="">-- Chọn --</option>${ctOpts}</select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -630,14 +725,16 @@ function tbSaveEdit(id) {
   // Ngày luân chuyển người dùng chọn trong popup (trống → hôm nay)
   const ngay      = document.getElementById('tb-ei-ngay')?.value || today();
 
-  if (!newCT) { toast('Vui lòng chọn công trình!', 'error'); return; }
+  if (!newCT) { toast('Vui lòng chọn công trình / kho!', 'error'); return; }
   if (newSL <= 0 || newSL > oldSL) {
     toast(`Số lượng không hợp lý (phải từ 1 đến ${oldSL})!`, 'error');
     return;
   }
 
   const remaining = oldSL - newSL;
-  const srcCt = r.ct; // lưu lại nguồn trước khi soft-delete
+  const dest   = _tbLocFromSel(newCT, newCtPid);   // nơi đến
+  const srcKey = _tbLocKey(r);                     // nơi đi (lưu trước khi soft-delete)
+  const srcCt  = isKhoTong(r) ? TB_KHO[_tbKhoCode(r)].name : r.ct;
 
   // Soft-delete record gốc (không xóa cứng để sync hoạt động đúng)
   tbData = softDeleteRecord(tbData, id);
@@ -645,8 +742,7 @@ function tbSaveEdit(id) {
   // Thêm/cộng dồn số lượng chuyển đi vào newCT
   // Chỉ cộng dồn khi trùng cả Thông Tin Máy; khác → tạo dòng riêng tại nơi nhận
   const destExist = tbData.find(rec => !rec.deletedAt && rec.ten === r.ten && rec.tinhtrang === newTT &&
-    _tbGhiKey(rec.ghichu) === _tbGhiKey(newGhichu) &&
-    (newCtPid ? (rec.projectId === newCtPid) : rec.ct === newCT)); // [MODIFIED] match by projectId
+    _tbGhiKey(rec.ghichu) === _tbGhiKey(newGhichu) && _tbLocKey(rec) === dest.key);
   if (destExist) {
     destExist.soluong  = (destExist.soluong || 0) + newSL;
     destExist.updatedAt = Date.now();
@@ -654,7 +750,7 @@ function tbSaveEdit(id) {
     destExist.ngay = ngay;
   } else {
     tbData.push(mkRecord({
-      ct: newCT, projectId: newCT === TB_KHO_TONG ? 'COMPANY' : (newCtPid || null),
+      ct: dest.ct, projectId: dest.projectId, ...(dest.kho ? { kho: dest.kho } : {}),
       ten: r.ten, soluong: newSL, tinhtrang: newTT,
       ghichu: newGhichu, ngay
     }));
@@ -663,8 +759,7 @@ function tbSaveEdit(id) {
   // Phần còn lại → giữ lại tại nguồn (r.ct)
   if (remaining > 0) {
     const srcExist = tbData.find(rec => !rec.deletedAt && rec.ten === r.ten && rec.tinhtrang === r.tinhtrang &&
-      _tbGhiKey(rec.ghichu) === _tbGhiKey(r.ghichu) &&
-      (r.projectId ? (rec.projectId === r.projectId) : rec.ct === srcCt)); // [MODIFIED] match by projectId
+      _tbGhiKey(rec.ghichu) === _tbGhiKey(r.ghichu) && _tbLocKey(rec) === srcKey);
     if (srcExist) {
       srcExist.soluong   = (srcExist.soluong || 0) + remaining;
       srcExist.updatedAt = Date.now();
@@ -672,7 +767,7 @@ function tbSaveEdit(id) {
     } else {
       // Phần còn lại không bị chuyển đi → giữ nguyên ngày luân chuyển cũ của record nguồn
       tbData.push(mkRecord({
-        ct: srcCt, projectId: srcCt === TB_KHO_TONG ? 'COMPANY' : (r.projectId || null),
+        ct: srcCt, projectId: r.projectId || null, ...(isKhoTong(r) ? { kho: _tbKhoCode(r) } : {}),
         ten: r.ten, soluong: remaining,
         tinhtrang: r.tinhtrang, ghichu: r.ghichu || '', ngay: r.ngay || ngay
       }));
@@ -694,33 +789,43 @@ function tbExportCSV() {
   const fTt = document.getElementById('tb-filter-tt')?.value||'';
   let data = tbData.filter(r=>{
     if(r.deletedAt) return false;
-    if(fCt && r.ct!==fCt) return false;
+    if(fCt && _tbLocName(r)!==fCt) return false;
     if(fTt && r.tinhtrang!==fTt) return false;
     return true;
   });
   const rows = [['Công Trình','Tên Thiết Bị','Số Lượng','Tình Trạng','Người TH','Thông Tin Máy','Ngày Luân Chuyển']];
-  data.forEach(r=>rows.push([_resolveCtName(r),recCatName(r,'tb','ten'),r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',fmtISODate(r.ngay, '')])); // ngày dạng DD-MM-YYYY thống nhất toàn app
+  data.forEach(r=>rows.push([_tbLocName(r),recCatName(r,'tb','ten'),r.soluong||0,r.tinhtrang||'',r.nguoi||'',r.ghichu||'',fmtISODate(r.ngay, '')])); // ngày dạng DD-MM-YYYY thống nhất toàn app
   dlCSV(rows, 'thiet_bi_'+today()+'.csv');
 }
 
 
-// ── Bảng Kho Tổng Thiết Bị ───────────────────────────────────────
+// ── 2 bảng KHO: Kho Thiết Bị Công Ty (TB) + Kho Vật Tư Giàn Giáo (GG) ──
+// Cùng 1 hàm vẽ, khác mã kho. ID phần tử: kho-tb-* / kho-gg-* (xem pages/thietbi.html)
 const KHO_PG = 7;
-let khoPage = 1;
+const _khoPage = { TB: 1, GG: 1 };   // trang hiện tại của từng kho
 
+function _khoId(code, suffix) { return `kho-${code.toLowerCase()}-${suffix}`; }
+
+// Vẽ cả 2 kho (tên cũ giữ nguyên vì nhiều nơi đang gọi renderKhoTong)
 function renderKhoTong() {
-  const tbody = document.getElementById('kho-list-tbody');
+  TB_KHO_CODES.forEach(_renderKho);
+}
+
+// Bộ lọc của 1 kho đổi → về trang 1 rồi vẽ lại kho đó
+function khoReset(code) { _khoPage[code] = 1; _renderKho(code); }
+function khoGoTo(code, p) { _khoPage[code] = p; _renderKho(code); }
+
+function _renderKho(code) {
+  const tbody = document.getElementById(_khoId(code, 'tbody'));
   if (!tbody) return;
 
-  const fTen = document.getElementById('kho-filter-ten')?.value || '';
-  const fTt = document.getElementById('kho-filter-tt')?.value || '';
-  // [FIX 02/10/2026] Ô tìm kiếm trước đây chỉ ẩn/hiện dòng của TRANG ĐANG XEM (7 dòng)
-  // → thiết bị nằm ở trang khác không tìm ra, số đếm & phân trang sai.
-  // Nay lọc thẳng trên toàn bộ dữ liệu rồi mới phân trang.
-  const fQ  = _tbNormQ(document.getElementById('kho-search')?.value);
+  const fTen = document.getElementById(_khoId(code, 'filter-ten'))?.value || '';
+  const fTt  = document.getElementById(_khoId(code, 'filter-tt'))?.value || '';
+  // [FIX 02/10/2026] Lọc ô tìm kiếm trên TOÀN BỘ dữ liệu kho rồi mới phân trang
+  const fQ   = _tbNormQ(document.getElementById(_khoId(code, 'search'))?.value);
   let filtered = tbData.filter(r => {
     if (r.deletedAt) return false;
-    if (!isKhoTong(r)) return false;
+    if (!isKhoTong(r) || _tbKhoCode(r) !== code) return false;
     if (fTen && recCatName(r,'tb','ten') !== fTen) return false;
     if (fTt && r.tinhtrang !== fTt) return false;
     if (fQ && !_tbMatchQ(r, fQ)) return false;
@@ -730,25 +835,29 @@ function renderKhoTong() {
   filtered.sort((a,b) => recCatName(a,'tb','ten').localeCompare(recCatName(b,'tb','ten'),'vi'));
 
   // Trang hiện tại vượt quá số trang (vd: sau khi lọc / xóa) → về trang cuối hợp lệ
-  const _khoTp = Math.max(1, Math.ceil(filtered.length/KHO_PG));
-  if (khoPage > _khoTp) khoPage = _khoTp;
-  const start = (khoPage-1)*KHO_PG;
+  const tp = Math.max(1, Math.ceil(filtered.length/KHO_PG));
+  if (_khoPage[code] > tp) _khoPage[code] = tp;
+  const page  = _khoPage[code];
+  const start = (page-1)*KHO_PG;
   const paged = filtered.slice(start, start+KHO_PG);
+  const pagEl = document.getElementById(_khoId(code, 'pagination'));
 
   if (!paged.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${fQ || fTen || fTt ? 'Không tìm thấy thiết bị phù hợp' : 'Kho tổng trống'}</td></tr>`;
-    document.getElementById('kho-pagination').innerHTML = '';
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${fQ || fTen || fTt ? 'Không tìm thấy thiết bị phù hợp' : TB_KHO[code].title + ' trống'}</td></tr>`;
+    if (pagEl) pagEl.innerHTML = '';
     return;
   }
 
   tbody.innerHTML = paged.map(r => {
     const ttStyle = TB_STATUS_STYLE[r.tinhtrang] || '';
+    // SL, Tình trạng, Thông Tin Máy: bấm vào ô để sửa trực tiếp (tbEditCell)
     return `<tr data-tbid="${r.id}">
       <td class="tb-name-col"><span class="tb-name-cell" style="font-weight:600;font-size:13px">${x(recCatName(r,'tb','ten'))}</span></td>
-      <td class="text-warning text-center font-monospace fw-bold" style="font-size:14px">${r.soluong||0}</td>
-      <td><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
+      <td class="text-warning text-center font-monospace fw-bold tb-edit-cell" style="font-size:14px"
+        title="Bấm để sửa số lượng" onclick="tbEditCell(this,'${r.id}','soluong')">${r.soluong||0}</td>
+      <td class="tb-edit-cell" title="Bấm để đổi tình trạng" onclick="tbEditCell(this,'${r.id}','tinhtrang')"><span class="tb-status" style="${ttStyle}">${x(r.tinhtrang||'')}</span></td>
       <td class="text-secondary tb-ghichu-cell" style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-        title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditGhichu(this,'${r.id}')">${x(r.ghichu||'—')}</td>
+        title="${x(r.ghichu ? r.ghichu + ' — bấm để sửa' : 'Bấm để nhập thông tin máy')}" onclick="tbEditCell(this,'${r.id}','ghichu')">${x(r.ghichu||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(fmtISODate(r.ngay))}</td>
       <td style="padding:6px 4px">
         <div class="d-flex justify-content-start align-items-center gap-2">
@@ -759,17 +868,14 @@ function renderKhoTong() {
     </tr>`;
   }).join('');
 
-  const tp = Math.ceil(filtered.length/KHO_PG);
   let pag = `<span>${filtered.length} thiết bị</span>`;
   if (tp>1) {
     pag += '<ul class="pagination pagination-sm mb-0">';
-    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===khoPage?'active':''}"><button class="page-link" onclick="khoGoTo(${p})">${p}</button></li>`;
+    for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===page?'active':''}"><button class="page-link" onclick="khoGoTo('${code}',${p})">${p}</button></li>`;
     pag += '</ul>';
   }
-  document.getElementById('kho-pagination').innerHTML = pag;
+  if (pagEl) pagEl.innerHTML = pag;
 }
-
-function khoGoTo(p) { khoPage=p; renderKhoTong(); }
 
 // ── Bảng Thống Kê Thiết Bị Theo Công Trình ───────────────────────
 function tbRenderThongKeVon() {
@@ -809,9 +915,9 @@ function tbRenderThongKeVon() {
 // ── Init TB khi load trang ────────────────────────────────────────
 // (tbData đã load ở trên, tbBuildRows gọi khi goPage)
 
-// Ô tìm kiếm Kho Tổng: lọc trên toàn bộ dữ liệu (xem renderKhoTong).
+// Ô tìm kiếm Kho: lọc trên toàn bộ dữ liệu (xem _renderKho).
 // Giữ tên hàm cũ để HTML/bản cache cũ gọi tới vẫn chạy đúng.
 function filterKhoTable() {
-  khoPage = 1;
+  TB_KHO_CODES.forEach(c => { _khoPage[c] = 1; });
   renderKhoTong();
 }

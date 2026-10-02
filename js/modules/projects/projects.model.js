@@ -450,7 +450,8 @@ function findProjectIdByName(name) {
   const n = name.trim();
   if (!n) return null;
   // Special constants
-  if (n === 'CÔNG TY' || n === 'KHO TỔNG') return 'COMPANY';
+  // 2 kho thiết bị (tách từ KHO TỔNG 02/10/2026) cũng thuộc COMPANY — phân biệt bằng trường `kho` (thietbi.js)
+  if (n === 'CÔNG TY' || n === 'KHO TỔNG' || n === 'KHO THIẾT BỊ CÔNG TY' || n === 'KHO VẬT TƯ GIÀN GIÁO') return 'COMPANY';
   if (PROJECT_COMPANY && n === PROJECT_COMPANY.name) return 'COMPANY';
   // Exact match
   const exact = projects.find(p => !p.deletedAt && p.name === n);
