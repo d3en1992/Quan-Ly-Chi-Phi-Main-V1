@@ -572,11 +572,10 @@ function renderKhaiBaoTable(page) {
       });
     });
 
-  // ── Quyết Toán Chi Phí ──
+  // ── Quyết Toán (chỉ HIỂN THỊ — sửa/xóa chuyển sang tab QUYẾT TOÁN) ──
   quyetToanRecords
     .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _dtWithinRecent(r.ngay))
     .forEach(r => {
-      const v = r.giaTri || 0;
       items.push({
         type: 'qt',
         ngay: r.ngay,
@@ -584,14 +583,14 @@ function renderKhaiBaoTable(page) {
         ct: _resolveCtName(r) || '—',
         doiTac: r.nguoi || '—',
         nd: r.nd || '—',
-        tien: v,
-        // Phát sinh giảm (âm) tô đỏ, tăng tô xanh
-        tienCls: v < 0 ? 'text-danger' : 'text-success',
-        tienTxt: v ? (v > 0 ? '+' : '') + fmtM(v) : '—',
-        loaiBadge: '<span class="badge bg-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán</span>',
+        tien: r.giaTri || 0,
+        // Màu + dấu theo loại: tăng "+", giảm "-", thay thế "=" (xem quyettoan.core.js)
+        tienCls: qtSoTienCls(r),
+        tienTxt: qtSoTienTxt(r),
+        loaiBadge: '<span class="badge bg-dark" style="font-size:10px"><span class="material-symbols-outlined msi-gap">receipt_long</span>Quyết Toán</span> ' + qtLoaiBadge(r),
         actions: `
-          <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editQuyetToan('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delQuyetToan('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
+          <button class="btn btn-outline-primary btn-sm" title="Sửa (mở tab Quyết Toán)" onclick="qtOpenEdit('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="qtDelete('${r.id}')"><i class="bi bi-trash-fill"></i></button>`,
       });
     });
 
@@ -818,137 +817,14 @@ function renderThuTableTk(page) {
   if (pgWrap) pgWrap.innerHTML = _dtPaginationHtml(total, page, 'renderThuTableTk');
 }
 
-// ══ PHẦN 5: QUYẾT TOÁN CHI PHÍ ═══════════════════════════════
-// Mỗi bản ghi là 1 lần phát sinh (tăng hoặc GIẢM — cho phép giá trị âm) kèm lý do.
-// Doanh thu thực tế = HĐ chính ban đầu + tổng cộng dồn các giá trị quyết toán.
+// ══ PHẦN 5: QUYẾT TOÁN (chỉ còn bảng xem ở THỐNG KÊ) ══════════
+// Mỗi bản ghi có loại: tăng / giảm / thay thế (trường `loai`, xem quyettoan.core.js).
+// Doanh thu thực tế tính bằng calcTongDoanhThu() — KHÔNG cộng thẳng giaTri.
 let _qtTkPage = 0;
 
-// ── Lưu / Cập nhật một bản ghi Quyết Toán ────────────────────
-function saveQuyetToan() {
-  const ct = document.getElementById('qt-ct-input')?.value.trim();
-  if (!ct) { toast('Vui lòng chọn Công Trình!', 'error'); return; }
-
-  // Chỉ cho phép CT đã tồn tại (tạo CT phải qua tab Công Trình)
-  const _qtProj = (typeof getAllProjects === 'function')
-    ? getAllProjects().find(p => p.id !== 'COMPANY' && p.name === ct)
-    : null;
-  if (!_qtProj) { toast('Chỉ được tạo công trình tại tab Công Trình', 'error'); return; }
-
-  const giaTri = _readMoneySigned('qt-giatri');          // CHO PHÉP ÂM (giảm trừ)
-  const nd     = document.getElementById('qt-nd')?.value.trim() || '';
-  if (!giaTri) { toast('Vui lòng nhập Giá Trị Phát Sinh (dương hoặc âm)!', 'error'); return; }
-  if (!nd)     { toast('Vui lòng nhập Nội Dung lý do phát sinh!', 'error'); return; }
-
-  const ngay   = document.getElementById('qt-ngay')?.value || today();
-  const nguoi  = (document.getElementById('qt-nguoi')?.value || '').trim();
-  const editId = document.getElementById('qt-edit-id')?.value || '';
-  const _qtPid = _qtProj.id;
-
-  if (editId) {
-    const idx = quyetToanRecords.findIndex(r => r.id === editId);
-    if (idx >= 0) {
-      quyetToanRecords[idx] = mkUpdate(quyetToanRecords[idx], { ngay, congtrinh: ct, projectId: _qtPid, giaTri, nd, nguoi });
-    }
-    toast('✅ Đã cập nhật quyết toán', 'success');
-  } else {
-    quyetToanRecords.unshift(mkRecord({ ngay, congtrinh: ct, projectId: _qtPid, giaTri, nd, nguoi }));
-    toast('✅ Đã lưu quyết toán: ' + ct, 'success');
-  }
-
-  save('quyettoan_v1', quyetToanRecords);
-
-  // Lưu Quyết Toán Chi Phí → tự động đóng công trình: chuyển trạng thái sang
-  // "Đã quyết toán" (closed) + cập nhật ngày quyết toán theo ngày vừa nhập.
-  if (typeof updateProject === 'function') {
-    updateProject(_qtPid, { status: 'closed', closedDate: ngay });
-    if (typeof renderProjectsPage === 'function') renderProjectsPage();
-  }
-
-  _qtResetForm();
-  closeDtModal('qt');
-  renderKhaiBaoTable(0);
-  renderQtTableTk(_qtTkPage);
-  _dtRenderDashboardMini();
-  if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
-}
-
-// ── Reset form Quyết Toán ────────────────────────────────────
-function _qtResetForm() {
-  ['qt-giatri','qt-nd'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.value = '';
-    if (el.dataset) el.dataset.raw = '';
-  });
-  const ctSel = document.getElementById('qt-ct-input');
-  if (ctSel) ctSel.value = '';
-  const nguoiSel = document.getElementById('qt-nguoi');
-  if (nguoiSel) nguoiSel.value = '';
-  const ngayEl = document.getElementById('qt-ngay');
-  if (ngayEl) ngayEl.value = today();
-  const progInfo = document.getElementById('qt-progress-info');
-  if (progInfo) progInfo.style.display = 'none';
-  const editEl = document.getElementById('qt-edit-id');
-  if (editEl) editEl.value = '';
-  const saveBtn = document.getElementById('qt-save-btn');
-  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu';
-  const cancelBtn = document.getElementById('qt-cancel-btn');
-  if (cancelBtn) cancelBtn.style.display = 'none';
-}
-
-// ── Sửa Quyết Toán (mở modal) ────────────────────────────────
-function editQuyetToan(id) {
-  const r = quyetToanRecords.find(r => String(r.id) === String(id));
-  if (!r) return;
-
-  // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
-  if (typeof dtPopulateSels === 'function') dtPopulateSels();
-
-  const ctName = resolveProjectName(r) || r.congtrinh || '';
-  const ctSel = document.getElementById('qt-ct-input');
-  // _setSelectFlexible: tự thêm option nếu thiếu → không bao giờ trắng
-  if (ctSel) _setSelectFlexible(ctSel, ctName);
-  const ngayEl = document.getElementById('qt-ngay');
-  if (ngayEl) ngayEl.value = r.ngay || today();
-  const nguoiSel = document.getElementById('qt-nguoi');
-  // QT lưu nguoi dạng text (không gắn id) — dùng _setSelectFlexible để không trắng dropdown
-  if (nguoiSel) _setSelectFlexible(nguoiSel, r.nguoi);
-  const ndEl = document.getElementById('qt-nd');
-  if (ndEl) ndEl.value = r.nd || '';
-
-  // Set giá trị có dấu (giữ dấu trừ nếu âm)
-  const giaEl = document.getElementById('qt-giatri');
-  if (giaEl) {
-    const v = r.giaTri || 0;
-    giaEl.dataset.raw = String(v);
-    giaEl.value = v ? v.toLocaleString('vi-VN') : '';
-  }
-
-  const editEl = document.getElementById('qt-edit-id');
-  if (editEl) editEl.value = id;
-  const saveBtn = document.getElementById('qt-save-btn');
-  if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật';
-  const cancelBtn = document.getElementById('qt-cancel-btn');
-  if (cancelBtn) cancelBtn.style.display = '';
-
-  _qtOnCtChange(ctName);
-  openDtModal('qt');
-}
-
-// ── Xóa mềm Quyết Toán ───────────────────────────────────────
-function delQuyetToan(id) {
-  if (!confirm('Xóa bản ghi quyết toán này?')) return;
-  const idx = quyetToanRecords.findIndex(r => String(r.id) === String(id));
-  if (idx < 0) return;
-  const now = Date.now();
-  quyetToanRecords[idx] = { ...quyetToanRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
-  save('quyettoan_v1', quyetToanRecords);
-  renderKhaiBaoTable(0);
-  renderQtTableTk(_qtTkPage);
-  _dtRenderDashboardMini();
-  if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
-  toast('Đã xóa quyết toán', 'success');
-}
+// (Đã chuyển saveQuyetToan / _qtResetForm / editQuyetToan / delQuyetToan sang tab
+//  QUYẾT TOÁN riêng — xem js/modules/quyettoan/quyettoan.congtrinh.js:
+//  qtSave / qtResetForm / qtEdit (qtOpenEdit khi gọi từ tab khác) / qtDelete.)
 
 // ── Render bảng Quyết Toán (THỐNG KÊ — toàn bộ) ──────────────
 function renderQtTableTk(page) {
@@ -987,21 +863,19 @@ function renderQtTableTk(page) {
   const slice = filtered.slice(page * DT_PG, (page + 1) * DT_PG);
 
   tbody.innerHTML = slice.map(r => {
-    const v = r.giaTri || 0;
-    const cls = v < 0 ? 'text-danger' : 'text-success';
-    const txt = (v > 0 ? '+' : '') + fmtS(v);
+    // Dấu + màu theo loại quyết toán (tăng/giảm/thay thế) — helper ở quyettoan.core.js
     return `<tr>
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
+      <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))} ${qtLoaiBadge(r)}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>
       <td class="text-body-secondary" style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
-      <td class="text-end font-monospace fw-bold ${cls}" style="white-space:nowrap">${v ? txt : '—'}</td>
+      <td class="text-end font-monospace fw-bold ${qtSoTienCls(r)}" style="white-space:nowrap">${r.giaTri ? qtSoTienTxt(r, fmtS) : '—'}</td>
       <td class="action-col">
         <div class="d-flex gap-1 justify-content-center">
-          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a"
-            onclick="editQuyetToan('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-outline-primary btn-sm" title="S&#7917;a (m&#7903; tab Quy&#7871;t To&#225;n)"
+            onclick="qtOpenEdit('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn btn-outline-danger btn-sm" title="X&#243;a"
-            onclick="delQuyetToan('${r.id}')"><i class="bi bi-trash-fill"></i></button>
+            onclick="qtDelete('${r.id}')"><i class="bi bi-trash-fill"></i></button>
         </div>
       </td>
     </tr>`;

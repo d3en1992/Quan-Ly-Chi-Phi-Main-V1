@@ -711,14 +711,14 @@ function openCTDetail(id) {
   const _B = tongHDTP;           // (B) tổng giá trị HĐ thầu phụ
   const _C = _chiPhiChungFixed;  // (C) chi phí chung CÔNG TY phân bổ cho CT
   const _X = tongGiaTriHD;       // (X) HĐ chính (giaTri + giaTriphu + phatSinh)
-  const _Y = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])   // (Y) quyết toán
-    .filter(r => !r.deletedAt && _dtInYear(r.ngay) &&
-      (r.projectId ? r.projectId === p.id
-                   : (resolveProjectName(r) === p.name || r.congtrinh === p.name)))
-    .reduce((s, r) => s + (r.giaTri || 0), 0);
+  // (Y) quyết toán đã quy đổi delta (tăng/giảm/thay thế) trong năm đang lọc — quyettoan.core.js
+  const _qtSum = (typeof qtTongQuyetToan === 'function')
+    ? qtTongQuyetToan(p, ngay => _dtInYear(ngay))
+    : { qt: 0, coThayThe: false };
+  const _Y = _qtSum.qt;
 
-  // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán — xem _dtCalcRevenue() (doanhthu.core.js)
-  const doanhThu    = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(_X, tongThu, _Y) : _X + _Y;
+  // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán; đã có "thay thế" thì bỏ max — xem _dtCalcRevenue()
+  const doanhThu    = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(_X, tongThu, _Y, _qtSum.coThayThe) : _X + _Y;
   const chiPhiTong  = _A + _B + _C;             // tổng chi phí (dự toán/ước tính)
   const loiNhuan    = doanhThu - chiPhiTong;    // lãi (≥0) / lỗ (<0)
   const conPhaiThuCT = doanhThu - tongThu;      // còn phải thu từ chủ đầu tư

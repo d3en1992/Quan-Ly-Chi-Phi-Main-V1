@@ -1006,6 +1006,13 @@
                     data-bs-dismiss="offcanvas">
               <span class="material-symbols-outlined msi-gap">attach_money</span>DOANH THU
             </button>
+            <!-- (02/10/2026) Tab QUYẾT TOÁN — trung tâm "chốt sổ" (ẩn với Kế toán, xem applyRoleUI) -->
+            <button class="nav-btn"
+                    data-page="quyettoan"
+                    onclick="goPage(this,'quyettoan')"
+                    data-bs-dismiss="offcanvas">
+              <span class="material-symbols-outlined msi-gap">fact_check</span>QUYẾT TOÁN
+            </button>
             <button class="nav-btn"
                     data-page="dashboard"
                     onclick="goPage(this,'dashboard')"
@@ -1172,6 +1179,9 @@
       <!-- PAGE: DOANH THU & CÔNG NỢ -->
       <div class="page" id="page-doanhthu" data-partial="pages/doanhthu.html"></div>
 
+      <!-- PAGE: QUYẾT TOÁN (2A Quyết toán công trình · 2B Tất toán TP/NCC) -->
+      <div class="page" id="page-quyettoan" data-partial="pages/quyettoan.html"></div>
+
       <!-- ════════════════════════════════════════════════════════════ -->
       <!-- PAGE: CÔNG NỢ (tab chính độc lập)                              -->
       <!-- ════════════════════════════════════════════════════════════ -->
@@ -1312,6 +1322,9 @@
     <script src="js/modules/doanhthu/doanhthu.forms.js"></script>
     <script src="js/modules/doanhthu/doanhthu.reports-export.js"></script>
     <script src="js/modules/doanhthu/doanhthu.congno.js"></script>
+    <!-- Tab QUYẾT TOÁN: core (hàm tính dùng chung) phải nạp trước congtrinh -->
+    <script src="js/modules/quyettoan/quyettoan.core.js"></script>
+    <script src="js/modules/quyettoan/quyettoan.congtrinh.js"></script>
     <script src="js/modules/thungrac/thungrac.js"></script>
     <script src="js/sync/sync.js"></script>
     <script src="js/sync/sync.backup.js"></script>

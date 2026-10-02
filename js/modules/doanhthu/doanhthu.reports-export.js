@@ -439,16 +439,13 @@ function renderLoiNhuan() {
       .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);   // (A) hóa đơn
     const B = _lnContractsB(p);                                  // (B) thầu phụ
     const C = allocMap[p.id] || 0;                              // (C) chi phí chung phân bổ
-    const X = _lnRevenueX(p);                                    // (X) HĐ chính ban đầu
-    const Y = quyetToanRecords                                   // (Y) quyết toán (có dấu)
-      .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _matchProj(r, p))
-      .reduce((s, r) => s + (r.giaTri || 0), 0);
-    const Thu = thuRecords                                       // (Đã thu) — dùng cho công thức max(X, Thu)
-      .filter(r => !r.deletedAt && _dtInYear(r.ngay) && _matchProj(r, p))
-      .reduce((s, r) => s + (r.tien || 0), 0);
+    // (X) HĐ gốc · (Y) quyết toán đã quy đổi delta (tăng/giảm/thay thế) · Đã thu · Doanh thu
+    // → tất cả lấy từ calcTongDoanhThu() (quyettoan.core.js) — nguồn duy nhất của công thức
+    const _dt = calcTongDoanhThu(p);
+    const X = _dt.hdGoc;
+    const Y = _dt.qt;
     const chi = A + B + C;
-    // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán — xem _dtCalcRevenue() (doanhthu.core.js)
-    const dt = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, Thu, Y) : X + Y;
+    const dt = _dt.tongDT;
     return { name: p.name, A, B, C, X, Y, chi, dt, ln: dt - chi };
   }).filter(r => r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
 
@@ -466,7 +463,10 @@ function renderLoiNhuan() {
   const tC = rowsData.reduce((s, r) => s + r.C, 0);
   const tX = rowsData.reduce((s, r) => s + r.X, 0);
   const tY = rowsData.reduce((s, r) => s + r.Y, 0);
-  const tChi = tA + tB + tC, tDt = tX + tY, tLN = tDt - tChi;
+  // Tổng doanh thu = cộng doanh thu TỪNG DÒNG (trước đây là tX + tY nên lệch với tổng
+  // các dòng khi có công trình áp quy tắc max(HĐ, Đã thu)).
+  const tDt = rowsData.reduce((s, r) => s + r.dt, 0);
+  const tChi = tA + tB + tC, tLN = tDt - tChi;
 
   // ── Mini dashboard (donut + bar) ──
   if (dash) dash.innerHTML = _lnBuildDashboard(rowsData, tChi, tDt, tLN);
