@@ -1106,6 +1106,53 @@ body.auth-guest #jb-btn {
 .ll-pos { color: var(--bs-success); font-weight: 700; }
 .ll-neg { color: var(--bs-danger); font-weight: 700; }
 .ll-zero { color: var(--bs-secondary-color); }
+
+/* ── Bảng Lợi Nhuận (tab LỢI NHUẬN) — 03/10/2026 ──────────────
+   Phân cấp thị giác: số CHI TIẾT mờ + nhỏ (làm "nền"), số TỔNG đậm + to (mắt bắt vào trước).
+   Tiêu đề 2 tầng: CÔNG TRÌNH | DOANH THU | CHI PHÍ | HIỆU QUẢ, ngăn bằng đường kẻ dọc nhẹ. */
+.ln-table { font-variant-numeric: tabular-nums; }           /* số cùng độ rộng → dóng cột thẳng hàng */
+.ln-table th, .ln-table td { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+/* Nền tiêu đề theo biến theme (không dùng .table-light vì nó luôn sáng, lệch nếu sau này có dark mode) */
+.ln-table thead th { background-color: var(--bs-tertiary-bg); }
+/* Tầng 1: tiêu đề nhóm — chữ in hoa nhỏ, màu xám */
+.ln-table thead .ln-grp > th {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--bs-secondary-color); text-align: center; padding-top: 8px; padding-bottom: 4px;
+}
+/* Tầng 2: tiêu đề cột */
+.ln-table thead .ln-col > th { font-size: 11px; font-weight: 600; color: var(--bs-secondary-color); }
+.ln-table thead .ln-col > th.ln-th-total { color: var(--bs-body-color); font-weight: 700; }
+/* Đường kẻ dọc chia 4 khu vực (đặt ở ô ĐẦU mỗi nhóm) */
+.ln-table .ln-sep { border-left: 1px solid var(--bs-border-color); }
+/* Cột thành phần (HĐ gốc, Quyết toán, Hóa đơn, Thầu phụ, CP chung): mờ, nhỏ, chữ mảnh */
+.ln-table td.ln-sub { font-size: 13px; font-weight: 400; color: var(--bs-secondary-color); }
+/* Cột tổng (Tổng thu, Tổng chi): đậm, to, màu chữ chính */
+.ln-table td.ln-total { font-size: 14.5px; font-weight: 700; color: var(--bs-body-color); }
+/* Dấu "—" mờ thay cho số 0 / không có */
+.ln-table .ln-dash { color: var(--bs-secondary-color); opacity: .45; }
+/* Badge % chi phí / doanh thu — khung xám nhạt, đặt cạnh số Tổng chi */
+.ln-pct {
+  display: inline-block; min-width: 40px; margin-left: 6px; padding: 1px 6px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 600; text-align: center; vertical-align: 1px;
+  background: var(--bs-tertiary-bg); color: var(--bs-secondary-color); border: 1px solid var(--bs-border-color-translucent);
+}
+/* Badge Lợi nhuận — nơi DUY NHẤT dùng màu xanh/đỏ trong bảng */
+.ln-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 7px; font-size: 14.5px; font-weight: 700;
+}
+.ln-badge.is-pos { background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+.ln-badge.is-neg { background: var(--bs-danger-bg-subtle);  color: var(--bs-danger-text-emphasis); }
+/* Cột tên công trình dính bên trái khi cuộn ngang (bảng rộng vì hiện đủ số tiền) */
+.ln-table .ln-name {
+  position: sticky; left: 0; z-index: 1; text-align: left; min-width: 180px; max-width: 280px; white-space: normal;
+  /* Kẻ dọc mép phải bằng background-image (border thường bị "trôi" theo khi cột sticky + border-collapse) */
+  background-image: linear-gradient(to left, var(--bs-border-color) 1px, transparent 1px);
+}
+.ln-table td.ln-name { font-weight: 600; font-size: 13px; }
+/* Dòng TỔNG CỘNG */
+.ln-table tfoot td { border-top: 2px solid var(--bs-border-color); background-color: var(--bs-tertiary-bg); }
+.ln-table tfoot td.ln-sub { font-weight: 600; }
+.ln-table tfoot td.ln-total { font-size: 15px; }
 @media (max-width: 768px) {
   .dt-form-grid { grid-template-columns: 1fr; }
 

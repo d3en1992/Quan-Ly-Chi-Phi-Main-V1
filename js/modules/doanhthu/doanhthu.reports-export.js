@@ -134,7 +134,9 @@ function renderLaiLo() {
 // CẢNH BÁO trùng tính: nếu 1 khoản thầu phụ (B) cũng được nhập như hóa đơn (A) thì
 // có thể bị cộng 2 lần — cần đối soát khi nhập liệu.
 // Trạng thái toggle: ẩn/hiện các cột bóc tách (Hóa đơn/Thầu phụ/CP chung/HĐ gốc/Quyết toán)
-let _lnShowDetail = false;
+// (03/10/2026) Mặc định HIỆN ĐỦ chi tiết ngay khi mở tab; nút chuyển thành "Thu gọn"
+// để khi cần (màn hình hẹp) vẫn rút về 4 cột: Công trình | Tổng thu | Tổng chi | Lợi nhuận.
+let _lnShowDetail = true;
 
 function toggleLoiNhuanDetail() {
   _lnShowDetail = !_lnShowDetail;
@@ -145,24 +147,39 @@ function toggleLoiNhuanDetail() {
   renderLoiNhuan();
 }
 
-// ── Badge nền màu cho con số lời/lỗ (xanh dương / đỏ âm) ──────
-function _lnBadge(val, bold) {
-  if (!val) return '<span class="text-secondary">—</span>';
-  const pos = val > 0;
-  const bg  = pos ? 'var(--bs-success-bg-subtle)' : 'var(--bs-danger-bg-subtle)';
-  const fg  = pos ? 'var(--bs-success-text-emphasis)' : 'var(--bs-danger-text-emphasis)';
-  return `<span style="display:inline-block;padding:2px 9px;border-radius:7px;font-weight:${bold ? 800 : 700};background:${bg};color:${fg}">${pos ? '+' : ''}${fmtS(Math.round(val))}</span>`;
+// ── Định dạng số tiền ĐẦY ĐỦ cho bảng (vd 728.400.000) — KHÔNG kèm "đ" vì tiêu đề đã ghi (VNĐ) ──
+// Giá trị 0 / không có → dấu "—" mờ. sign=true → luôn hiện dấu +/− (dùng cho Quyết toán, Lợi nhuận).
+const _LN_DASH = '<span class="ln-dash">—</span>';
+function _lnNum(v, sign) {
+  const n = Math.round(v || 0);
+  if (!n) return _LN_DASH;
+  const s = Math.abs(n).toLocaleString('vi-VN');
+  if (!sign) return n < 0 ? '−' + s : s;
+  return (n > 0 ? '+' : '−') + ' ' + s;   // khoảng trắng mảnh giữa dấu và số cho dễ đọc
 }
 
-// ── Ô Tổng Chi có thanh tỷ lệ nền (chi chiếm bao nhiêu % doanh thu) ──
-function _lnChiCell(chi, dt, bold) {
-  if (!chi) return '<td class="text-end">—</td>';
-  const pct = dt > 0 ? Math.min((chi / dt) * 100, 100) : 100;
-  const w   = bold ? 'fw-bold' : 'fw-semibold';
-  return `<td class="text-end ${w}" style="background:linear-gradient(to right, var(--bs-danger-bg-subtle) ${pct}%, transparent ${pct}%)">
-    <span class="text-danger">${fmtS(Math.round(chi))}</span>
-    <span style="display:block;font-size:9px;color:var(--bs-secondary-color);font-weight:400">${Math.round(pct)}% DT</span>
-  </td>`;
+// ── Badge Lợi nhuận: nền xanh (lời) / đỏ (lỗ) — nơi DUY NHẤT trong bảng dùng màu xanh/đỏ ──
+function _lnBadge(val) {
+  const n = Math.round(val || 0);
+  if (!n) return _LN_DASH;
+  return `<span class="ln-badge ${n > 0 ? 'is-pos' : 'is-neg'}">${_lnNum(n, true)}</span>`;
+}
+
+// ── Ô Tổng Chi: số đậm + badge xám nhỏ "% doanh thu" đặt BÊN CẠNH (không ép xuống dòng dưới) ──
+// Không tô nền đỏ cả ô nữa (03/10/2026) — tránh 1 cột đỏ chạy dọc hút mắt sai chỗ.
+function _lnChiCell(chi, dt, sepCls) {
+  if (!chi) return `<td class="text-end ln-total ${sepCls || ''}">${_LN_DASH}</td>`;
+  const pct = dt > 0 ? `${Math.round((chi / dt) * 100)}%` : '—';
+  const tip = dt > 0 ? 'Chi phí chiếm ' + pct + ' doanh thu' : 'Chưa có doanh thu';
+  return `<td class="text-end ln-total ${sepCls || ''}">${_lnNum(chi)}<span class="ln-pct" title="${tip}">${pct}</span></td>`;
+}
+
+// ── Số lời/lỗ dạng RÚT GỌN có dấu cho dashboard (vd "+190 tr", "−128.2 tr") ──
+// fmtS() chỉ rút gọn số DƯƠNG (số âm bị in đủ "-128168075") → rút gọn trị tuyệt đối rồi gắn dấu.
+function _lnShort(v) {
+  const n = Math.round(v || 0);
+  if (!n) return '0';
+  return (n > 0 ? '+' : '−') + fmtS(Math.abs(n));
 }
 
 // ── Mini dashboard: donut Doanh thu vs Chi phí + Top 5 lãi / Top 5 lỗ ──
@@ -179,7 +196,7 @@ function _lnBuildDashboard(rowsData, tChi, tDt, tLN) {
       <div style="position:relative;width:130px;height:130px;border-radius:50%;background:conic-gradient(var(--bs-success) 0 ${dtEnd}%, var(--bs-danger) ${dtEnd}% 100%)">
         <div style="position:absolute;inset:17px;background:var(--bs-body-bg);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center">
           <span style="font-size:9px;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.3px">Lợi nhuận</span>
-          <span class="${lnClass}" style="font-size:15px">${tLN >= 0 ? '+' : ''}${fmtS(Math.round(tLN))}</span>
+          <span class="${lnClass}" style="font-size:15px">${_lnShort(tLN)}</span>
         </div>
       </div>
       <div class="mt-3" style="font-size:11px;line-height:1.8">
@@ -197,7 +214,7 @@ function _lnBuildDashboard(rowsData, tChi, tDt, tLN) {
       return `<div style="margin-bottom:9px">
         <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-bottom:3px">
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.name)}">${x(r.name)}</span>
-          <span class="fw-bold" style="color:${color};white-space:nowrap">${r.ln > 0 ? '+' : ''}${fmtS(Math.round(r.ln))}</span>
+          <span class="fw-bold" style="color:${color};white-space:nowrap">${_lnShort(r.ln)}</span>
         </div>
         <div style="height:8px;background:var(--bs-tertiary-bg);border-radius:4px;overflow:hidden">
           <div style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>
@@ -286,42 +303,55 @@ function renderLoiNhuan() {
   // ── Mini dashboard (donut + bar) ──
   if (dash) dash.innerHTML = _lnBuildDashboard(rowsData, tChi, tDt, tLN);
 
-  // ── Bảng chi tiết (toggle cột bóc tách) ──
+  // ── Bảng chi tiết (03/10/2026 — thiết kế lại theo "phân cấp thị giác") ──
+  // Bố cục 4 khu vực, ngăn bằng kẻ dọc nhẹ:
+  //   CÔNG TRÌNH | CHI TIẾT DOANH THU: HĐ gốc · Quyết toán · TỔNG THU
+  //              | CHI TIẾT CHI PHÍ:   Hóa đơn · Thầu phụ · CP chung · TỔNG CHI (+ badge % DT)
+  //              | HIỆU QUẢ:           LỢI NHUẬN (badge xanh/đỏ)
+  // Cột thành phần (ln-sub) mờ + nhỏ; cột tổng (ln-total) đậm + to. Số hiện ĐẦY ĐỦ, căn phải.
+  // det=false (bấm "Thu gọn") → chỉ còn Công trình | Tổng thu | Tổng chi | Lợi nhuận.
   const det = _lnShowDetail;
-  const _money = (v) => v ? fmtS(Math.round(v)) : '<span class="text-secondary">—</span>';
-  const _moneyY = (v) => v ? (v > 0 ? '+' : '') + fmtS(Math.round(v)) : '<span class="text-secondary">—</span>';
+  const SEP = 'ln-sep';   // class kẻ dọc ở ô ĐẦU mỗi khu vực (khu Doanh thu đã có kẻ ở mép cột tên)
+
+  // 1 dòng dữ liệu (dùng chung cho từng công trình và dòng TỔNG CỘNG)
+  const _rowCells = (r) => `
+      ${det ? `<td class="text-end ln-sub">${_lnNum(r.X)}</td>
+               <td class="text-end ln-sub">${_lnNum(r.Y, true)}</td>` : ''}
+      <td class="text-end ln-total">${_lnNum(r.dt)}</td>
+      ${det ? `<td class="text-end ln-sub ${SEP}">${_lnNum(r.A)}</td>
+               <td class="text-end ln-sub">${_lnNum(r.B)}</td>
+               <td class="text-end ln-sub">${_lnNum(r.C)}</td>` : ''}
+      ${_lnChiCell(r.chi, r.dt, det ? '' : SEP)}
+      <td class="text-end ${SEP}">${_lnBadge(r.ln)}</td>`;
 
   const rows = rowsData.map(r => `<tr>
-      <td style="text-align:left;font-weight:600">${x(r.name)}</td>
-      ${det ? `<td class="text-end text-danger">${_money(r.A)}</td><td class="text-end text-danger">${_money(r.B)}</td><td class="text-end text-danger">${_money(r.C)}</td>` : ''}
-      ${_lnChiCell(r.chi, r.dt)}
-      ${det ? `<td class="text-end">${_money(r.X)}</td><td class="text-end">${_moneyY(r.Y)}</td>` : ''}
-      <td class="text-end fw-semibold">${r.dt ? fmtS(Math.round(r.dt)) : '—'}</td>
-      <td class="text-end">${_lnBadge(r.ln)}</td>
+      <td class="ln-name">${x(r.name)}</td>${_rowCells(r)}
     </tr>`).join('');
+
+  const totalRow = { X: tX, Y: tY, dt: tDt, A: tA, B: tB, C: tC, chi: tChi, ln: tLN };
 
   wrap.innerHTML = `
     <div style="overflow-x:auto">
-      <table class="table table-sm table-hover align-middle mb-0" style="min-width:${det ? 820 : 460}px">
-        <thead class="table-light">
-          <tr style="font-size:11px">
-            <th style="text-align:left;min-width:130px">Công Trình</th>
-            ${det ? '<th class="text-end">Hóa đơn</th><th class="text-end">Thầu phụ</th><th class="text-end">CP chung</th>' : ''}
-            <th class="text-end">Tổng Chi</th>
+      <table class="table table-sm table-striped table-hover align-middle mb-0 ln-table" style="min-width:${det ? 1080 : 560}px">
+        <thead>
+          <tr class="ln-grp">
+            <th class="ln-name" rowspan="2" style="text-align:left;vertical-align:bottom">Công trình</th>
+            <th colspan="${det ? 3 : 1}">${det ? 'Chi tiết doanh thu' : 'Doanh thu'} (VNĐ)</th>
+            <th colspan="${det ? 4 : 1}" class="${SEP}">${det ? 'Chi tiết chi phí' : 'Chi phí'} (VNĐ)</th>
+            <th class="${SEP}">Hiệu quả</th>
+          </tr>
+          <tr class="ln-col">
             ${det ? '<th class="text-end">HĐ gốc</th><th class="text-end">Quyết toán</th>' : ''}
-            <th class="text-end">Doanh Thu</th>
-            <th class="text-end">Lợi Nhuận</th>
+            <th class="text-end ln-th-total">TỔNG THU</th>
+            ${det ? `<th class="text-end ${SEP}">Hóa đơn</th><th class="text-end">Thầu phụ</th><th class="text-end">CP chung</th>` : ''}
+            <th class="text-end ln-th-total ${det ? '' : SEP}" title="Badge xám = chi phí chiếm bao nhiêu % doanh thu">TỔNG CHI <span class="fw-normal">(% DT)</span></th>
+            <th class="text-end ln-th-total ${SEP}">LỢI NHUẬN</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
-          <tr style="border-top:2px solid var(--bs-border-color)">
-            <td style="text-align:left;font-weight:700">TỔNG CỘNG</td>
-            ${det ? `<td class="text-end text-danger fw-bold">${fmtS(tA)}</td><td class="text-end text-danger fw-bold">${fmtS(tB)}</td><td class="text-end text-danger fw-bold">${fmtS(Math.round(tC))}</td>` : ''}
-            ${_lnChiCell(tChi, tDt, true)}
-            ${det ? `<td class="text-end fw-bold">${fmtS(tX)}</td><td class="text-end fw-bold">${tY ? (tY > 0 ? '+' : '') + fmtS(tY) : '0'}</td>` : ''}
-            <td class="text-end fw-bold">${fmtS(Math.round(tDt))}</td>
-            <td class="text-end">${_lnBadge(tLN, true)}</td>
+          <tr>
+            <td class="ln-name" style="font-weight:700">TỔNG CỘNG</td>${_rowCells(totalRow)}
           </tr>
         </tfoot>
       </table>
