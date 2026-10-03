@@ -11,18 +11,16 @@
 //     [2] Lịch Sử Thu Tiền (sổ quỹ) ... renderThuTableTk()  — tìm theo số tiền, ngày, CT...
 //     [3] Tiến Độ Thu Theo Công Trình . renderThuTienDo()   — bấm dòng để xổ chi tiết các đợt thu
 
-// ── Định dạng thời điểm tạo/sửa (timestamp) → "Hôm nay 14:05" / "02/10/2026 09:30" ──
+// ── Định dạng thời điểm tạo/sửa (timestamp) → "dd-mm-yyyy hh:mm" (VD "01-10-2026 16:29") ──
+// (03/10/2026) Đồng bộ dấu gạch ngang với các cột ngày khác (fmtISODate mặc định "dd-mm-yyyy");
+// bỏ cách ghi "Hôm nay / Hôm qua" — dòng vừa lưu đã có nhãn "Vừa lưu" riêng.
 function _dtFmtTs(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
   if (isNaN(d.getTime())) return '—';
   const p2 = n => String(n).padStart(2, '0');
-  const hm = p2(d.getHours()) + ':' + p2(d.getMinutes());
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return 'Hôm nay ' + hm;
-  const homQua = new Date(now); homQua.setDate(now.getDate() - 1);
-  if (d.toDateString() === homQua.toDateString()) return 'Hôm qua ' + hm;
-  return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + hm;
+  return p2(d.getDate()) + '-' + p2(d.getMonth() + 1) + '-' + d.getFullYear() + ' ' +
+         p2(d.getHours()) + ':' + p2(d.getMinutes());
 }
 
 // ── Tên công trình từ key của hopDongData (key = projectId, đời cũ = tên CT) ──
@@ -52,19 +50,48 @@ function _dtHdcActions(keyId) {
   </div>`;
 }
 
-// ── 2 nút Sửa / Xóa phiếu thu ──
-function _dtThuActions(id) {
+// ── 2 nút Sửa / Xóa phiếu thu (truyền cả bản ghi) ──
+// Phiếu TỰ ĐỘNG từ quyết toán → KHÔNG có nút, chỉ hiện biểu tượng khóa (03/10/2026).
+function _dtThuActions(r) {
+  if (_dtIsAutoThu(r)) {
+    return `<div class="text-center text-secondary" title="Phiếu thu tự động từ quyết toán — không sửa/xóa được.&#10;Muốn thay đổi: sửa bản quyết toán ở tab QUYẾT TOÁN (bỏ tick &quot;Ghi nhận phiếu thu tiền còn lại&quot; để gỡ phiếu).">
+      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">lock</span>
+    </div>`;
+  }
+  const id = r.id;
   return `<div class="d-flex gap-1 justify-content-center">
     <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editThuRecord('${x(id)}')"><i class="bi bi-pencil-fill"></i></button>
     <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delThuRecord('${x(id)}')"><i class="bi bi-trash-fill"></i></button>
   </div>`;
 }
 
-// ── Badge Loại khoản thu (Tạm ứng / Giai đoạn / Quyết toán) ──
-function _dtLoaiThuBadge(loaiThu, fontSize) {
-  const lb = DT_LOAI_THU[loaiThu];
-  if (!lb) return '<span class="text-body-secondary">—</span>';
-  return `<span class="${lb[1]}" style="font-size:${fontSize || 11}px">${lb[0]}</span>`;
+// ── Badge Loại khoản thu (Tạm ứng / Giai đoạn / Quyết toán / Khác) ──
+// r: bản ghi thu (hoặc chuỗi mã loaiThu — tương thích cách gọi cũ). Phiếu tự động → thêm nhãn "Tự động".
+function _dtLoaiThuBadge(r, fontSize) {
+  const rec = (r && typeof r === 'object') ? r : { loaiThu: r };
+  const fs = fontSize || 11;
+  const lb = DT_LOAI_THU[rec.loaiThu];
+  const auto = _dtIsAutoThu(rec)
+    ? ` <span class="badge bg-secondary-subtle text-secondary-emphasis border" style="font-size:${fs - 1}px" title="Hệ thống tự sinh khi lưu quyết toán (tiền còn phải thu)"><span class="material-symbols-outlined" style="font-size:${fs + 1}px;vertical-align:-2px">bolt</span>Tự động</span>` : '';
+  if (!lb) return auto || '<span class="text-body-secondary">—</span>';
+  return `<span class="${lb[1]}" style="font-size:${fs}px">${lb[0]}</span>${auto}`;
+}
+
+// ── Đặt giá trị dropdown "Loại khoản thu" — giữ được mã KHÔNG còn trong danh sách ──
+// (03/10/2026) "Quyết toán" đã gỡ khỏi dropdown; sửa 1 phiếu cũ nhập tay loại này thì thêm TẠM
+// 1 option "(loại cũ)" để lưu lại không bị mất loại. Option tạm bị gỡ ở lần đặt giá trị kế tiếp.
+function _thuSetLoaiThu(val) {
+  const sel = document.getElementById('thu-loaithu');
+  if (!sel) return;
+  sel.querySelectorAll('option[data-legacy]').forEach(o => o.remove());
+  if (val && ![...sel.options].some(o => o.value === val)) {
+    const o = document.createElement('option');
+    o.value = val;
+    o.dataset.legacy = '1';
+    o.textContent = (DT_LOAI_THU[val] ? DT_LOAI_THU[val][0] : val) + ' (loại cũ)';
+    sel.appendChild(o);
+  }
+  sel.value = val || '';
 }
 
 // ══ PHẦN 1: HỢP ĐỒNG CHÍNH ════════════════════════════════════
@@ -399,6 +426,11 @@ function saveThuRecord() {
   if (editId) {
     // Cập nhật record hiện có
     const idx = thuRecords.findIndex(r => String(r.id) === String(editId));
+    // Chặn cứng: phiếu tự động từ quyết toán không được sửa (phòng trường hợp form bị nạp nhầm)
+    if (idx >= 0 && _dtIsAutoThu(thuRecords[idx])) {
+      toast('Phiếu thu tự động từ quyết toán — không sửa được. Hãy sửa ở tab Quyết Toán.', 'error');
+      return;
+    }
     if (idx >= 0) {
       thuRecords[idx] = mkUpdate(thuRecords[idx], { ngay, congtrinh: ct, projectId: _thuPid, tien, nguoi, nd, loaiThu });
     }
@@ -424,8 +456,7 @@ function saveThuRecord() {
     if (nguoiEl) nguoiEl.value = '';
     const ndEl = document.getElementById('thu-nd');
     if (ndEl) ndEl.value = '';
-    const loaiThuEl = document.getElementById('thu-loaithu');
-    if (loaiThuEl) loaiThuEl.value = '';
+    _thuSetLoaiThu('');
 
     dtRenderAll();
     _thuOnCtChange(ct);   // dải "Đã thu / Còn lại" của CT đang chọn nhảy số mới
@@ -438,6 +469,10 @@ function saveThuRecord() {
 function editThuRecord(id) {
   const r = thuRecords.find(r => String(r.id) === String(id));
   if (!r) return;
+  if (_dtIsAutoThu(r)) {
+    toast('Phiếu thu tự động từ quyết toán — không sửa được. Hãy sửa ở tab Quyết Toán.', 'error');
+    return;
+  }
 
   // Rebuild options từ danh mục hiện hành trước khi set giá trị (tránh dropdown trắng khi đổi tên)
   _dtFillSelects();
@@ -454,8 +489,7 @@ function editThuRecord(id) {
   if (nguoiSel) _setSelectFlexible(nguoiSel, recCatName(r,'thu','nguoi'));
   const ndEl = document.getElementById('thu-nd');
   if (ndEl) ndEl.value = r.nd || '';
-  const loaiThuEl = document.getElementById('thu-loaithu');
-  if (loaiThuEl) loaiThuEl.value = r.loaiThu || '';
+  _thuSetLoaiThu(r.loaiThu || '');   // phiếu cũ loại "Quyết toán" → giữ bằng option tạm
 
   // Điền tiền
   const tienEl = document.getElementById('thu-tien');
@@ -493,8 +527,7 @@ function _thuResetForm() {
   if (nguoiSel) nguoiSel.value = '';
   const ngayEl = document.getElementById('thu-ngay');
   if (ngayEl) ngayEl.value = today();
-  const loaiThuEl = document.getElementById('thu-loaithu');
-  if (loaiThuEl) loaiThuEl.value = '';
+  _thuSetLoaiThu('');
   const progInfo = document.getElementById('thu-progress-info');
   if (progInfo) progInfo.style.display = 'none';
   const editEl = document.getElementById('thu-edit-id');
@@ -504,9 +537,13 @@ function _thuResetForm() {
 
 // ── Xóa mềm bản ghi thu tiền ─────────────────────────────────
 function delThuRecord(id) {
-  if (!confirm('Xóa bản ghi thu tiền này?')) return;
   const idx = thuRecords.findIndex(r => String(r.id) === String(id));
   if (idx < 0) return;
+  if (_dtIsAutoThu(thuRecords[idx])) {
+    toast('Phiếu thu tự động từ quyết toán — không xóa được ở đây. Bỏ tick "Ghi nhận phiếu thu tiền còn lại" ở tab Quyết Toán để gỡ.', 'error');
+    return;
+  }
+  if (!confirm('Xóa bản ghi thu tiền này?')) return;
   const now = Date.now();
   thuRecords[idx] = { ...thuRecords[idx], deletedAt: now, updatedAt: now, deviceId: DEVICE_ID, deletedBy: getCurrentUser()?.username || 'Không rõ' };
   save('thu_v1', thuRecords);
@@ -521,6 +558,7 @@ function delThuRecord(id) {
 // ── Vẽ 2 bảng của subtab THU TIỀN ────────────────────────────
 // (Tên hàm giữ nguyên để main.js gọi sẵn vẫn chạy.)
 function renderThuTable() {
+  dtPopulateThuCtFilter();      // dropdown "Chọn công trình" của Lịch Sử Thu Tiền luôn mới nhất
   renderThuTableTk(_thuTkPage);
   renderThuTienDo(_thuTdPage);
 }
@@ -555,20 +593,22 @@ function renderThuTableTk(page) {
   const pgWrap = document.getElementById('thutk-pagination');
   if (!tbody) return;
 
+  // Lọc: năm đang xem + công trình đang chọn (dropdown) + ô tìm kiếm
   const filtered = thuRecords
-    .filter(r => !r.deletedAt && inActiveYear(r.ngay) && _dtThuMatchSearch(r, _dtThuSearch))
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay) && _dtThuMatchCt(r) && _dtThuMatchSearch(r, _dtThuSearch))
     .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '')
       || ((b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)));
 
+  const dangLoc = !!(_dtThuSearch || _dtThuCtFilter);
   const tong = filtered.reduce((s, r) => s + (r.tien || 0), 0);
   if (badge) badge.textContent = filtered.length ? `(${filtered.length} khoản)` : '';
   if (sumEl) sumEl.innerHTML = filtered.length
-    ? `${_dtThuSearch ? 'Tổng khớp tìm kiếm' : 'Tổng đã thu'}: <b class="text-success font-monospace">${fmtM(tong)}</b>` : '';
+    ? `${_dtThuSearch ? 'Tổng khớp tìm kiếm' : (_dtThuCtFilter ? 'Tổng đã thu của CT' : 'Tổng đã thu')}: <b class="text-success font-monospace">${fmtM(tong)}</b>` : '';
 
   if (!filtered.length) {
     tbody.innerHTML = '';
     if (empty) {
-      empty.textContent = _dtThuSearch ? 'Không có khoản thu nào khớp tìm kiếm' : 'Chưa có khoản thu nào';
+      empty.textContent = dangLoc ? 'Không có khoản thu nào khớp bộ lọc' : 'Chưa có khoản thu nào';
       empty.style.display = '';
     }
     if (pgWrap) pgWrap.innerHTML = '';
@@ -586,11 +626,11 @@ function renderThuTableTk(page) {
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="thu-row-chk" data-id="${x(r.id)}"></td>
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}${isNew ? ' <span class="badge bg-warning text-dark" style="font-size:9px">Vừa lưu</span>' : ''}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
-      <td style="white-space:nowrap">${_dtLoaiThuBadge(r.loaiThu)}</td>
+      <td style="white-space:nowrap">${_dtLoaiThuBadge(r)}</td>
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r,'thu','nguoi') || '—')}</td>
       <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
-      <td class="action-col">${_dtThuActions(r.id)}</td>
+      <td class="action-col">${_dtThuActions(r)}</td>
     </tr>`;
   }).join('');
 
@@ -757,13 +797,13 @@ function _dtTienDoDetailRow(g) {
       return `<tr class="${String(r.id) === String(_dtThuLastId) ? 'dt-row-new' : ''}">
         <td class="text-center text-secondary">${i + 1}</td>
         <td style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
-        <td style="white-space:nowrap">${_dtLoaiThuBadge(r.loaiThu, 10)}</td>
+        <td style="white-space:nowrap">${_dtLoaiThuBadge(r, 10)}</td>
         <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
         <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(luyKe)}</td>
         <td class="text-end font-monospace text-secondary" style="white-space:nowrap">${pctLk}</td>
         <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r, 'thu', 'nguoi') || '—')}</td>
         <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
-        <td class="action-col">${_dtThuActions(r.id)}</td>
+        <td class="action-col">${_dtThuActions(r)}</td>
       </tr>`;
     }).join('');
     body = `<table class="table table-sm align-middle mb-0 dt-td-sub" style="font-size:12.5px">

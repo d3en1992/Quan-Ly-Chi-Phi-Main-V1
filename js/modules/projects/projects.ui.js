@@ -166,6 +166,7 @@ function _ctTongChi(p, c) {
 // Dùng CHUNG cho modal chi tiết công trình (openCTDetail) và tab QUYẾT TOÁN
 // (quyettoan.congtrinh.js) → 2 nơi luôn cùng số. Theo NĂM ĐANG LỌC như modal:
 //   Doanh thu       = max(HĐ chính, Đã thu) + Quyết toán (±)  — _dtCalcRevenue()
+//                     (đã có quyết toán → bỏ max: HĐ chính + Quyết toán)
 //   Chi phí dự toán = hóa đơn + HĐ thầu phụ + chi phí chung chia tỉ trọng
 //   Chi thực tế     = tổng chi trực tiếp (_ctTongChi) + chi phí chung chia tỉ trọng
 //   Lãi hiện tại    = Đã thu − Chi thực tế         (dòng tiền tới thời điểm hiện tại)
@@ -207,7 +208,8 @@ function ctTaiChinh(p, opts) {
     : { qt: 0, coThayThe: false };
   const Y = qtSum.qt;
 
-  const doanhThu   = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, tongThu, Y, qtSum.coThayThe) : X + Y;
+  // Đã có quyết toán (bất kỳ loại) → bỏ quy tắc max(HĐ, Đã thu) — xem _dtCalcRevenue (03/10/2026)
+  const doanhThu   = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, tongThu, Y, qtSum.coThayThe || qtSum.coQT) : X + Y;
   const chiPhiTong = (c.total || 0) + tongHDTP + chiChung;
   const loiNhuan   = doanhThu - chiPhiTong;
   const chiThucTe  = tc.tongChi + chiChung;
@@ -775,7 +777,7 @@ function openCTDetail(id) {
   const _X = tongGiaTriHD;       // (X) HĐ chính (giaTri + giaTriphu + phatSinh)
   const _Y = _fin.Y;             // (Y) quyết toán đã quy đổi delta trong năm đang lọc
 
-  // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán; đã có "thay thế" thì bỏ max — xem _dtCalcRevenue()
+  // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán; đã có quyết toán thì bỏ max — xem _dtCalcRevenue()
   const doanhThu    = _fin.doanhThu;
   const chiPhiTong  = _fin.chiPhiTong;          // tổng chi phí (dự toán/ước tính)
   const loiNhuan    = _fin.loiNhuan;            // lãi (≥0) / lỗ (<0)
@@ -1002,7 +1004,7 @@ function openCTDetail(id) {
   }
 
   // Tab 3 — Lịch sử thu tiền từ chủ đầu tư
-  const _LOAI_THU = { tamung: ['Tạm ứng', '#fd7e14'], giaidoan: ['Giai đoạn', '#0dcaf0'], quyettoan: ['Quyết toán', '#198754'] };
+  const _LOAI_THU = { tamung: ['Tạm ứng', '#fd7e14'], giaidoan: ['Giai đoạn', '#0dcaf0'], quyettoan: ['Quyết toán', '#198754'], khac: ['Khác', '#6c757d'] };
   const _thuList = (typeof thuRecords !== 'undefined' ? thuRecords : [])
     .filter(r => !r.deletedAt && inActiveYear(r.ngay) && (r.projectId ? r.projectId === p.id : r.congtrinh === p.name))
     .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));

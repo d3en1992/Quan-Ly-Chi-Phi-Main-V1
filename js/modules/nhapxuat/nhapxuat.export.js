@@ -330,11 +330,11 @@ function buildThuTien() {
     { label: 'CÔNG TRÌNH',       w: 32 },
     { label: 'SỐ TIỀN',          w: 15, num: true },
     { label: 'NỘI DUNG',         w: 36 },
-    { label: 'LOẠI THU',         w: 14 },  // loaiThu: Tạm ứng / Giai đoạn / Quyết toán
+    { label: 'LOẠI THU',         w: 14 },  // loaiThu: Tạm ứng / Giai đoạn / Quyết toán / Khác
     { label: 'ID',               w: 36 },
   ];
   // Map mã loaiThu → nhãn tiếng Việt để xuất ra (import sẽ map ngược lại)
-  const _thuLabel = { tamung: 'Tạm ứng', giaidoan: 'Giai đoạn', quyettoan: 'Quyết toán' };
+  const _thuLabel = { tamung: 'Tạm ứng', giaidoan: 'Giai đoạn', quyettoan: 'Quyết toán', khac: 'Khác' };
   const rows = thuRecords
     .filter(r => !r.deletedAt)
     .map(r => [

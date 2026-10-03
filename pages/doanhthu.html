@@ -56,13 +56,20 @@
                Khi bấm Sửa ở bảng bên dưới → form nạp dữ liệu, viền vàng + nhãn "Đang sửa". -->
           <div class="card shadow-sm border-0 mb-4 dt-form-card" id="hdc-form-card">
             <div class="card-body">
+              <!-- (03/10/2026) Dòng tiêu đề chứa luôn nút Lưu / Hủy sửa (căn phải) → form mỏng hơn,
+                   không còn hàng nút riêng dưới đáy. Tổng HĐ (#hdc-tong-label) cũng nằm ở dòng này. -->
               <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                <div class="qt-card-title">
-                  <span class="material-symbols-outlined msi-gap">edit_note</span><span id="hdc-form-title">Khai Báo Hợp Đồng Chính</span>
+                <div class="qt-card-title d-flex align-items-center gap-2 flex-wrap">
+                  <span><span class="material-symbols-outlined msi-gap">edit_note</span><span id="hdc-form-title">Khai Báo Hợp Đồng Chính</span></span>
+                  <span id="hdc-editing-badge" class="badge bg-warning text-dark" style="display:none">
+                    <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
+                  </span>
                 </div>
-                <span id="hdc-editing-badge" class="badge bg-warning text-dark" style="display:none">
-                  <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
-                </span>
+                <div class="d-flex align-items-center gap-2 ms-auto flex-wrap justify-content-end">
+                  <span id="hdc-tong-label" class="fw-semibold text-warning" style="font-size:13px"></span>
+                  <button class="btn btn-sm btn-outline-secondary" id="hdc-cancel-btn" style="display:none" onclick="_hdcCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
+                  <button class="btn btn-sm btn-warning fw-bold px-3" id="hdc-save-btn" onclick="saveHopDongChinh()"><span class="material-symbols-outlined msi-gap">save</span>Lưu</button>
+                </div>
               </div>
               <div class="row g-2">
                 <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
@@ -99,13 +106,6 @@
                 </div>
               </div>
               <input type="hidden" id="hdc-edit-id" />
-              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
-                <span id="hdc-tong-label" class="fw-semibold text-warning" style="font-size:13px"></span>
-                <div class="d-flex gap-2 ms-auto">
-                  <button class="btn btn-sm btn-outline-secondary" id="hdc-cancel-btn" style="display:none" onclick="_hdcCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
-                  <button class="btn btn-sm btn-warning fw-bold px-3" id="hdc-save-btn" onclick="saveHopDongChinh()"><span class="material-symbols-outlined msi-gap">save</span>Lưu</button>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -189,13 +189,18 @@
           <!-- ── KHU VỰC 1: FORM GHI NHẬN THU TIỀN (nằm ngay trên màn hình) ── -->
           <div class="card shadow-sm border-0 mb-4 dt-form-card" id="thu-form-card">
             <div class="card-body">
+              <!-- (03/10/2026) Nút Ghi nhận Thu / Hủy sửa nằm ngang hàng tiêu đề, căn phải -->
               <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                <div class="qt-card-title">
-                  <span class="material-symbols-outlined msi-gap">payments</span><span id="thu-form-title">Ghi Nhận Thu Tiền</span>
+                <div class="qt-card-title d-flex align-items-center gap-2 flex-wrap">
+                  <span><span class="material-symbols-outlined msi-gap">payments</span><span id="thu-form-title">Ghi Nhận Thu Tiền</span></span>
+                  <span id="thu-editing-badge" class="badge bg-warning text-dark" style="display:none">
+                    <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
+                  </span>
                 </div>
-                <span id="thu-editing-badge" class="badge bg-warning text-dark" style="display:none">
-                  <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
-                </span>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                  <button class="btn btn-sm btn-outline-secondary" id="thu-cancel-btn" style="display:none" onclick="_thuCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
+                  <button class="btn btn-sm btn-success fw-bold px-3" id="thu-save-btn" onclick="saveThuRecord()"><span class="material-symbols-outlined msi-gap">save</span>Ghi nhận Thu</button>
+                </div>
               </div>
               <div class="row g-2">
                 <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
@@ -210,11 +215,13 @@
                 </div>
                 <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
                   <label for="thu-loaithu" class="qt-lb mb-1 d-block">Loại Khoản Thu</label>
+                  <!-- (03/10/2026) Gỡ "Quyết toán" (phiếu thu quyết toán nay do hệ thống tự sinh ở tab
+                       QUYẾT TOÁN — ô "Ghi nhận phiếu thu tiền còn lại"); thêm "Khác" cho tiền vặt/ngoại lệ -->
                   <select id="thu-loaithu" class="form-select form-select-sm">
                     <option value="">-- Chọn loại --</option>
                     <option value="tamung">Tạm ứng</option>
                     <option value="giaidoan">Thanh toán giai đoạn</option>
-                    <option value="quyettoan">Quyết toán</option>
+                    <option value="khac">Khác</option>
                   </select>
                 </div>
                 <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
@@ -239,10 +246,6 @@
                 <span class="text-secondary">Còn lại: <span id="thu-prog-con" class="fw-bold text-warning">—</span></span>
               </div>
               <input type="hidden" id="thu-edit-id" />
-              <div class="d-flex justify-content-end gap-2 mt-3">
-                <button class="btn btn-sm btn-outline-secondary" id="thu-cancel-btn" style="display:none" onclick="_thuCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
-                <button class="btn btn-sm btn-success fw-bold px-3" id="thu-save-btn" onclick="saveThuRecord()"><span class="material-symbols-outlined msi-gap">save</span>Ghi nhận Thu</button>
-              </div>
             </div>
           </div>
 
@@ -254,7 +257,11 @@
             </div>
             <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px" title="Tick chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu thu</button>
           </div>
+          <!-- Thanh lọc: Chọn công trình (03/10/2026 — xem nhanh dòng thời gian thanh toán 1 CT) · Tìm kiếm -->
           <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <select id="dt-thu-ct-filter" class="form-select form-select-sm w-auto" style="min-width:200px;max-width:320px" onchange="dtSetThuCtFilter(this.value)" title="Lọc lịch sử thu theo công trình">
+              <option value="">-- Tất cả công trình --</option>
+            </select>
             <input type="text" id="dt-thu-search" class="form-control form-control-sm" style="max-width:300px" placeholder="Tìm số tiền, ngày (VD: 15/09), CT, người..." oninput="dtSetThuSearch(this.value)">
             <span id="thutk-sum" class="ms-auto text-secondary" style="font-size:12px"></span>
           </div>

@@ -129,6 +129,16 @@
                       <strong>Đây là quyết toán cuối cùng (Chốt sổ)</strong> → chuyển công trình sang <em>"Đã quyết toán"</em>
                     </label>
                   </div>
+                  <!-- (03/10/2026) Tự động hóa phiếu thu: tick → khi Lưu, hệ thống tính "còn phải thu" (toàn bộ
+                       các năm, sau quyết toán) và tự sinh 1 phiếu thu sang tab THU TIỀN. Phiếu bị KHÓA (không
+                       Sửa/Xóa ở tab Thu tiền); muốn gỡ thì bỏ tick rồi Lưu lại. Xem _qtSyncAutoThu(). -->
+                  <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="qtf-thu-conlai" onchange="qtUpdatePreview()" />
+                    <label class="form-check-label" for="qtf-thu-conlai" style="font-size:12px">
+                      <strong>Ghi nhận phiếu thu tiền còn lại</strong> → tự tạo phiếu thu cho số tiền còn phải thu (khóa, không sửa/xóa được)
+                    </label>
+                    <div id="qtf-thu-conlai-hint" class="text-secondary" style="font-size:11.5px"></div>
+                  </div>
 
                   <input type="hidden" id="qtf-edit-id" />
                   <div class="d-flex justify-content-end gap-2 mt-2">

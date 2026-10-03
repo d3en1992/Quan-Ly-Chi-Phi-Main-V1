@@ -189,15 +189,28 @@ const DT_TD_PG      = 10;  // số công trình / trang ở bảng Tiến Độ 
 const DT_HDC_RECENT = 5;   // số HĐ hiện ở bảng "Khai Báo Gần Đây"
 
 // ── Nhãn + màu badge cho Loại khoản thu (dùng chung form, sổ quỹ, bảng tiến độ) ──
+// (03/10/2026) "Quyết toán" ĐÃ GỠ khỏi dropdown form Thu tiền — nay chỉ do hệ thống tự sinh
+// (phiếu thu tiền còn lại khi lưu quyết toán, xem quyettoan.congtrinh.js → _qtSyncAutoThu).
+// Vẫn giữ mã 'quyettoan' ở đây để HIỂN THỊ phiếu tự động + phiếu cũ nhập tay trước đây.
+// Thêm "Khác" cho dòng tiền vặt / ngoại lệ.
 const DT_LOAI_THU = {
   tamung:    ['Tạm ứng',    'badge bg-warning text-dark'],
   giaidoan:  ['Giai đoạn',  'badge bg-info text-dark'],
   quyettoan: ['Quyết toán', 'badge bg-success'],
+  khac:      ['Khác',       'badge bg-secondary'],
 };
+
+// ── Phiếu thu TỰ ĐỘNG (sinh từ quyết toán) → khóa cứng, không Sửa/Xóa ở tab Thu tiền ──
+// Dấu hiệu: r.auto === true, r.qtId = id bản quyết toán sinh ra nó.
+function _dtIsAutoThu(r) {
+  return !!(r && r.auto);
+}
 
 // Bộ lọc bảng Danh Sách HĐ Chính (subtab HỢP ĐỒNG CHÍNH)
 let _dtTkCtFilter     = '';  // tên công trình ('' = tất cả)
 let _dtHdcNguoiFilter = '';  // tên người thực hiện ('' = tất cả)
+// Bộ lọc bảng Lịch Sử Thu Tiền (subtab THU TIỀN) — tên công trình ('' = tất cả) (03/10/2026)
+let _dtThuCtFilter = '';
 // CT filter riêng cho sub-tab THẦU PHỤ (tab Công Nợ)
 let _dtTpCtFilter = '';
 
@@ -251,6 +264,35 @@ function dtPopulateCtFilter() {
     nguoiSel.innerHTML = '<option value="">-- Tất cả người TH --</option>' +
       opts.map(n => `<option value="${x(n)}"${n === _dtHdcNguoiFilter ? ' selected' : ''}>${x(n)}</option>`).join('');
   }
+}
+
+// ── Nạp dropdown "Chọn công trình" trên đầu bảng Lịch Sử Thu Tiền (03/10/2026) ──
+// Chỉ liệt kê công trình ĐANG CÓ phiếu thu trong năm đang lọc (chọn là thấy ngay dòng thời gian
+// thanh toán, không bị toàn công trình rỗng). Luôn giữ lựa chọn hiện tại dù không còn phiếu.
+function dtPopulateThuCtFilter() {
+  const sel = document.getElementById('dt-thu-ct-filter');
+  if (!sel) return;
+  const names = new Set();
+  thuRecords.forEach(r => {
+    if (!r || r.deletedAt || !inActiveYear(r.ngay)) return;
+    const n = _resolveCtName(r);
+    if (n) names.add(n);
+  });
+  if (_dtThuCtFilter) names.add(_dtThuCtFilter);
+  const opts = [...names].sort((a, b) => a.localeCompare(b, 'vi'));
+  sel.innerHTML = '<option value="">-- Tất cả công trình --</option>' +
+    opts.map(n => `<option value="${x(n)}"${n === _dtThuCtFilter ? ' selected' : ''}>${x(n)}</option>`).join('');
+}
+
+// ── Phiếu thu có thuộc công trình đang lọc ở Lịch Sử Thu Tiền không ──
+function _dtThuMatchCt(r) {
+  if (!_dtThuCtFilter) return true;
+  return _resolveCtName(r) === _dtThuCtFilter;
+}
+
+function dtSetThuCtFilter(val) {
+  _dtThuCtFilter = val || '';
+  renderThuTableTk(0);
 }
 
 // ── Populate CT filter select cho sub-tab THẦU PHỤ ───────────────────────
@@ -331,11 +373,12 @@ function _dtInYear(ngay) {
 // Doanh thu = max(Giá trị HĐ chính, Tổng đã thu) + Quyết toán chi phí (±)
 // Lấy max thay vì luôn dùng giá trị HĐ chính: nếu khách đã trả nhiều hơn HĐ gốc
 // (phát sinh thêm ngoài hợp đồng), doanh thu phải phản ánh đúng số tiền thực nhận.
-// coThayThe = true (công trình đã có quyết toán THAY THẾ): giá trị thay thế là số chốt
-// chuẩn → KHÔNG dùng max nữa, doanh thu = HĐ gốc + quyết toán (đã quy đổi delta).
-// Hàm gọi chính: calcTongDoanhThu() trong js/modules/quyettoan/quyettoan.core.js
-function _dtCalcRevenue(giaTriHDChinh, tongThuTien, chiPhiQuyetToan, coThayThe) {
-  if (coThayThe) return (giaTriHDChinh || 0) + (chiPhiQuyetToan || 0);
+// boQuyTacMax = true khi công trình ĐÃ CÓ QUYẾT TOÁN (bất kỳ loại — từ 03/10/2026; trước đó
+// chỉ khi có bản THAY THẾ): quyết toán là số chốt chuẩn với Chủ Đầu Tư → KHÔNG dùng max nữa,
+// doanh thu = HĐ gốc + quyết toán (đã quy đổi delta). Nơi truyền: calcTongDoanhThu()
+// (quyettoan.core.js) và ctTaiChinh() (projects.ui.js) — đều truyền coThayThe || coQT.
+function _dtCalcRevenue(giaTriHDChinh, tongThuTien, chiPhiQuyetToan, boQuyTacMax) {
+  if (boQuyTacMax) return (giaTriHDChinh || 0) + (chiPhiQuyetToan || 0);
   const base = (giaTriHDChinh || 0) > (tongThuTien || 0) ? (giaTriHDChinh || 0) : (tongThuTien || 0);
   return base + (chiPhiQuyetToan || 0);
 }

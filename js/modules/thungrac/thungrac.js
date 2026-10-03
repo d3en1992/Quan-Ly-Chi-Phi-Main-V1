@@ -353,6 +353,9 @@ function _trashCheck(type, r) {
     } else if (type === 'thutien') {
       if (noProject('congtrinh')) warns.push('Thiếu công trình');
       if (!(Number(r.tien) > 0)) warns.push('Không có số tiền');
+      // (03/10/2026) Phiếu thu TỰ ĐỘNG từ quyết toán chỉ do form Quyết Toán quản lý → không khôi phục
+      // tay (dễ trùng với phiếu tự động mới / số tiền đã cũ). Muốn có lại: tick ô ở tab Quyết Toán.
+      if (r.auto) errors.push('Phiếu thu tự động từ quyết toán — không khôi phục được. Muốn tạo lại: mở tab QUYẾT TOÁN, tick "Ghi nhận phiếu thu tiền còn lại" rồi Lưu.');
     }
   } else if (type === 'hopdong-tp') {
     if (noProject('congtrinh')) warns.push('Thiếu công trình');

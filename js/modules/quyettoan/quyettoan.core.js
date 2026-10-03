@@ -152,11 +152,16 @@ function qtDaThuCuaCT(p, inScope) {
 }
 
 // ── Tổng hợp quyết toán của công trình trong phạm vi (năm đang lọc / toàn bộ) ──
-// Trả về { qt (Σ delta), tang, giam (số âm), thayThe (Σ delta của bản thay thế), coThayThe, soBan }
-// coThayThe tính trên TOÀN VÒNG ĐỜI (đã từng thay thế thì bỏ quy tắc max — xem _dtCalcRevenue).
+// Trả về { qt (Σ delta), tang, giam (số âm), thayThe (Σ delta của bản thay thế), coThayThe, coQT, soBan }
+// coThayThe / coQT tính trên TOÀN VÒNG ĐỜI:
+//   • coThayThe = đã từng có bản "Thay thế HĐ"
+//   • coQT      = đã có BẤT KỲ bản quyết toán nào (03/10/2026) → bỏ quy tắc max(HĐ, Đã thu)
+//                 (xem _dtCalcRevenue). Lý do: quyết toán là con số chốt với Chủ Đầu Tư; nếu vẫn
+//                 lấy max thì khi khách trả đủ "HĐ + phát sinh tăng", phần phát sinh bị cộng 2 lần
+//                 và "Còn phải thu" không bao giờ về 0 (phiếu thu còn lại tự động không khép được nợ).
 function qtTongQuyetToan(p, inScope, opts) {
   const { recs, deltas, coThayThe } = qtTinhDelta(p, opts);
-  const out = { qt: 0, tang: 0, giam: 0, thayThe: 0, coThayThe, soBan: 0 };
+  const out = { qt: 0, tang: 0, giam: 0, thayThe: 0, coThayThe, coQT: recs.length > 0, soBan: 0 };
   recs.forEach(r => {
     if (inScope && !inScope(r.ngay)) return;
     const d = deltas.get(r.id) || 0;
@@ -173,11 +178,11 @@ function qtTongQuyetToan(p, inScope, opts) {
 // ══ HÀM CHÍNH: TỔNG DOANH THU CỦA 1 CÔNG TRÌNH ═══════════════════
 // opts.allYears : true → tính toàn vòng đời; mặc định theo năm đang lọc (_dtInYear)
 // opts.excludeId / opts.extra : xem qtTinhDelta (phục vụ Live Preview)
-// Trả về: { hdGoc, daThu, qt, tang, giam, thayThe, coThayThe, tongDT, conPhaiThu }
+// Trả về: { hdGoc, daThu, qt, tang, giam, thayThe, coThayThe, coQT, tongDT, conPhaiThu }
 function calcTongDoanhThu(pOrId, opts) {
   opts = opts || {};
   const p = _qtResolveProj(pOrId);
-  const empty = { hdGoc: 0, daThu: 0, qt: 0, tang: 0, giam: 0, thayThe: 0, coThayThe: false, tongDT: 0, conPhaiThu: 0 };
+  const empty = { hdGoc: 0, daThu: 0, qt: 0, tang: 0, giam: 0, thayThe: 0, coThayThe: false, coQT: false, tongDT: 0, conPhaiThu: 0 };
   if (!p) return empty;
 
   const inScope = opts.allYears ? null
@@ -186,13 +191,14 @@ function calcTongDoanhThu(pOrId, opts) {
   const hdGoc = qtHdGocCuaCT(p, inScope);
   const daThu = qtDaThuCuaCT(p, inScope);
   const q     = qtTongQuyetToan(p, inScope, opts);
+  // Đã có quyết toán (bất kỳ loại) → bỏ quy tắc max: doanh thu = HĐ gốc + quyết toán
   const tongDT = (typeof _dtCalcRevenue === 'function')
-    ? _dtCalcRevenue(hdGoc, daThu, q.qt, q.coThayThe)
+    ? _dtCalcRevenue(hdGoc, daThu, q.qt, q.coThayThe || q.coQT)
     : hdGoc + q.qt;
 
   return {
     hdGoc, daThu,
-    qt: q.qt, tang: q.tang, giam: q.giam, thayThe: q.thayThe, coThayThe: q.coThayThe,
+    qt: q.qt, tang: q.tang, giam: q.giam, thayThe: q.thayThe, coThayThe: q.coThayThe, coQT: q.coQT,
     tongDT,
     conPhaiThu: tongDT - daThu,
   };

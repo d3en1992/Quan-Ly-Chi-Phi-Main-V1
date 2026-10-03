@@ -38,6 +38,110 @@ const _QT_SOTIEN_LABEL = {
   thaythe: 'Tổng giá trị mới thay thế HĐ (đ) *',
 };
 
+// ══ PHIẾU THU TỰ ĐỘNG "TIỀN CÒN LẠI" (03/10/2026) ════════════════════
+// Ô tick #qtf-thu-conlai "Ghi nhận phiếu thu tiền còn lại" ở form quyết toán. Khi Lưu:
+//   • Có tick   → tính CÒN PHẢI THU (toàn bộ các năm, sau quyết toán) rồi TẠO MỚI / CẬP NHẬT
+//                 1 phiếu thu: loaiThu = 'quyettoan', auto = true, qtId = id bản quyết toán.
+//                 Hết nợ (≤ 0) → không tạo; lỡ có phiếu cũ thì gỡ.
+//   • Bỏ tick   → phiếu tự động đang có (nếu có) bị XÓA MỀM (vào thùng rác, không khôi phục được).
+//   • Xóa quyết toán → xóa mềm luôn phiếu đi kèm.
+// Phiếu tự động hiện ở bảng Lịch Sử Thu Tiền (tab THU TIỀN) nhưng KHÓA CỨNG: không có nút Sửa/Xóa
+// (doanhthu.forms.js → _dtThuActions / editThuRecord / delThuRecord đều chặn theo _dtIsAutoThu).
+// Mọi thay đổi số tiền phải đi qua form quyết toán → dữ liệu tự động luôn khớp công thức.
+
+// Phiếu thu tự động (còn hiệu lực) của 1 bản quyết toán
+function _qtAutoThuOf(qtId) {
+  if (!qtId || typeof thuRecords === 'undefined') return null;
+  return thuRecords.find(t => t && !t.deletedAt && t.auto && String(t.qtId) === String(qtId)) || null;
+}
+
+// Số tiền phiếu tự động NÊN có = còn phải thu TOÀN VÒNG ĐỜI, KHÔNG tính chính phiếu tự động cũ
+// (vì phiếu đó sẽ được tính lại). opts: { excludeId, extra } như calcTongDoanhThu (xem trước khi Lưu).
+// Cộng lại phiếu cũ là đúng vì đã có quyết toán → doanh thu không phụ thuộc số đã thu (bỏ quy tắc max).
+function _qtTinhConLai(p, qtId, opts) {
+  const d  = calcTongDoanhThu(p, Object.assign({ allYears: true }, opts || {}));
+  const cu = _qtAutoThuOf(qtId);
+  return Math.round(d.conPhaiThu + (cu ? (cu.tien || 0) : 0));
+}
+
+// Đồng bộ phiếu thu tự động theo bản quyết toán vừa lưu.
+// Trả về { kind: 'created'|'updated'|'removed'|'none'|'skip', tien, id } để báo toast.
+function _qtSyncAutoThu(qtRec, p, want) {
+  const cu   = _qtAutoThuOf(qtRec.id);
+  const now  = Date.now();
+  const user = (typeof getCurrentUser === 'function' && getCurrentUser()?.username) || 'Không rõ';
+  const dev  = (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : '';
+  const _xoaMem = (r) => {
+    const i = thuRecords.findIndex(t => String(t.id) === String(r.id));
+    if (i >= 0) thuRecords[i] = { ...thuRecords[i], deletedAt: now, updatedAt: now, deviceId: dev, deletedBy: user };
+  };
+
+  if (!want) {
+    if (!cu) return { kind: 'skip' };
+    _xoaMem(cu);
+    save('thu_v1', thuRecords);
+    return { kind: 'removed', tien: cu.tien || 0 };
+  }
+
+  const con = _qtTinhConLai(p, qtRec.id);
+  if (con <= 0) {
+    if (cu) { _xoaMem(cu); save('thu_v1', thuRecords); }
+    return { kind: 'none', tien: con, removed: !!cu };
+  }
+
+  const fields = {
+    ngay:      qtRec.ngay,
+    congtrinh: p.name,
+    projectId: p.id,
+    tien:      con,
+    nguoi:     (qtRec.nguoi || '').trim().toUpperCase(),   // cùng quy ước form Thu tiền
+    nd:        'Thu tiền còn lại sau quyết toán (tự động)',
+    loaiThu:   'quyettoan',
+    auto:      true,
+    qtId:      qtRec.id,
+  };
+  let id, kind;
+  if (cu) {
+    const i = thuRecords.findIndex(t => String(t.id) === String(cu.id));
+    thuRecords[i] = mkUpdate(thuRecords[i], fields);
+    id = cu.id; kind = 'updated';
+  } else {
+    const rec = mkRecord(fields);
+    thuRecords.unshift(rec);
+    id = rec.id; kind = 'created';
+  }
+  save('thu_v1', thuRecords);
+  if (typeof _dtThuLastId !== 'undefined') _dtThuLastId = id;   // tô sáng ở bảng Lịch Sử Thu Tiền
+  return { kind, tien: con, id };
+}
+
+// Dòng gợi ý dưới ô tick — cho biết khi Lưu sẽ tạo / cập nhật / gỡ phiếu bao nhiêu tiền
+function _qtUpdateThuConLaiHint(f) {
+  const el  = document.getElementById('qtf-thu-conlai-hint');
+  const chk = document.getElementById('qtf-thu-conlai');
+  if (!el) return;
+  if (!f || !f.proj || !chk) { el.innerHTML = ''; return; }
+  const cu = f.editId ? _qtAutoThuOf(f.editId) : null;
+  if (!chk.checked) {
+    el.innerHTML = cu
+      ? `<span class="text-danger">⚠ Bỏ tick: phiếu thu tự động <b class="font-monospace">${fmtM(cu.tien)}</b> sẽ bị xóa khi Lưu.</span>`
+      : '';
+    return;
+  }
+  // Xem trước theo số tiền đang gõ (chưa gõ → theo quyết toán hiện hành)
+  const opts = f.soTien > 0 ? { excludeId: f.editId || undefined, extra: f.fake } : {};
+  const con  = _qtTinhConLai(f.proj, f.editId, opts);
+  if (con <= 0) {
+    el.innerHTML = `<span class="text-success">Công trình đã thu đủ${con < 0 ? ` (đang thu vượt <b class="font-monospace">${fmtM(-con)}</b>)` : ''} — sẽ không tạo phiếu thu.</span>` +
+      (cu ? ` <span class="text-danger">Phiếu tự động cũ ${fmtM(cu.tien)} sẽ bị gỡ.</span>` : '');
+    return;
+  }
+  const ngayTxt = f.ngay ? fmtISODate(f.ngay) : '—';
+  el.innerHTML = cu && cu.tien !== con
+    ? `→ Phiếu tự động hiện có <span class="font-monospace">${fmtM(cu.tien)}</span> sẽ cập nhật thành <b class="text-success font-monospace">${fmtM(con)}</b> (ngày ${ngayTxt}).`
+    : `→ ${cu ? 'Giữ' : 'Sẽ tạo'} phiếu thu <b class="text-success font-monospace">${fmtM(con)}</b> ngày ${ngayTxt} — còn phải thu sau quyết toán, tính trên <b>toàn bộ các năm</b>.`;
+}
+
 // ── Quyền: chỉ Admin + Giám đốc được ghi dữ liệu quyết toán ──
 function _qtCanEdit() {
   return (typeof isAdmin === 'function' && isAdmin()) ||
@@ -174,6 +278,8 @@ function _qtClearInputs() {
   if (st) { st.value = ''; st.dataset.raw = ''; }
   const chot = document.getElementById('qtf-chot');
   if (chot) chot.checked = false;
+  const thuCl = document.getElementById('qtf-thu-conlai');
+  if (thuCl) thuCl.checked = false;
   _qtSetLoai('tang');
   const title = document.getElementById('qtf-title');
   if (title) title.textContent = 'Thêm Quyết Toán';
@@ -204,6 +310,9 @@ function _qtFillForm(r, count) {
   _qtSetLoai(qtLoaiOf(r));
   const chot = document.getElementById('qtf-chot');
   if (chot) chot.checked = !!r.chot;
+  // Đang có phiếu thu tự động đi kèm → giữ tick (bỏ tick + Lưu = gỡ phiếu)
+  const thuCl = document.getElementById('qtf-thu-conlai');
+  if (thuCl) thuCl.checked = !!_qtAutoThuOf(r.id);
 
   const title = document.getElementById('qtf-title');
   if (title) title.textContent = 'Sửa Quyết Toán';
@@ -282,8 +391,9 @@ function _qtReadForm() {
 // Gọi mỗi khi đổi công trình / loại / số tiền / ngày → 2 ô "SAU QUYẾT TOÁN" nhảy số ngay.
 function qtUpdatePreview() {
   const f = _qtReadForm();
-  if (!f.proj) { _qtClearSummary(); return; }
+  if (!f.proj) { _qtClearSummary(); _qtUpdateThuConLaiHint(null); return; }
   document.getElementById('qt-sum-name')?.classList.remove('text-secondary');
+  _qtUpdateThuConLaiHint(f);   // dòng gợi ý của ô "Ghi nhận phiếu thu tiền còn lại"
 
   const { truoc, sau } = _qtFin(f);
   const _set = (id, html, color) => {
@@ -329,8 +439,8 @@ function qtUpdatePreview() {
   const lnCell = document.getElementById('qt-sum-lnsau-cell');
   if (lnCell) lnCell.style.borderColor = lnSau >= 0 ? 'var(--bs-success-border-subtle)' : 'var(--bs-danger-border-subtle)';
 
-  // Ghi chú quy tắc max(HĐ, Đã thu)
-  _set('qt-sum-note', (!truoc.qtSum.coThayThe && truoc.tongThu > truoc.X && truoc.X > 0)
+  // Ghi chú quy tắc max(HĐ, Đã thu) — chỉ còn áp dụng khi công trình CHƯA có quyết toán nào
+  _set('qt-sum-note', (!truoc.qtSum.coThayThe && !truoc.qtSum.coQT && truoc.tongThu > truoc.X && truoc.X > 0)
     ? 'Đã thu lớn hơn HĐ gốc → doanh thu đang lấy theo số đã thu (quy tắc cũ, áp dụng khi chưa có quyết toán thay thế).' : '');
 
   // ── Block 3: dòng kết quả tức thì ngay dưới ô số tiền ──
@@ -399,6 +509,21 @@ function qtSave() {
   if (chot && f.proj.status !== 'closed' &&
       !confirm(`Đánh dấu quyết toán cuối cùng → chuyển "${f.proj.name}" sang trạng thái "Đã quyết toán"?`)) return;
 
+  // ── Phiếu thu tự động "tiền còn lại" (03/10/2026) ──
+  // wantThu = null khi form không có ô tick (giao diện khác) → KHÔNG đụng phiếu đang có.
+  const thuChk  = document.getElementById('qtf-thu-conlai');
+  const wantThu = thuChk ? thuChk.checked : null;
+  const thuCu   = f.editId ? _qtAutoThuOf(f.editId) : null;
+  if (wantThu === false && thuCu &&
+      !confirm(`Bỏ tick "Ghi nhận phiếu thu tiền còn lại" → phiếu thu tự động ${fmtM(thuCu.tien)} (ngày ${fmtISODate(thuCu.ngay)}) sẽ bị XÓA.\nTiếp tục?`)) return;
+  if (wantThu) {
+    // Còn phải thu tính trên TOÀN BỘ các năm → máy chưa tải đủ năm thì số có thể thiếu/thừa
+    const thieu = (typeof qtMissingYears === 'function') ? qtMissingYears() : [];
+    if (thieu.length && !confirm(
+      `Máy chưa tải dữ liệu năm ${thieu.join(', ')} — số "còn phải thu" dùng để tạo phiếu thu có thể CHƯA ĐÚNG ` +
+      `(thiếu các đợt thu của những năm này).\n\nBấm Hủy, chọn "Tất cả năm" để tải đủ rồi lưu lại (khuyên dùng).\nBấm OK để vẫn lưu.`)) return;
+  }
+
   const fields = {
     ngay: f.ngay,
     congtrinh: f.proj.name,
@@ -408,15 +533,30 @@ function qtSave() {
     nd, nguoi, chot,
   };
 
+  let qtRec = null;   // bản quyết toán vừa ghi (cần id để gắn phiếu thu tự động)
+  let msg;
   if (f.editId && f.orig) {
     const idx = quyetToanRecords.findIndex(r => r.id === f.editId);
-    if (idx >= 0) quyetToanRecords[idx] = mkUpdate(quyetToanRecords[idx], fields);
-    toast('✅ Đã cập nhật quyết toán', 'success');
+    if (idx >= 0) { quyetToanRecords[idx] = mkUpdate(quyetToanRecords[idx], fields); qtRec = quyetToanRecords[idx]; }
+    msg = '✅ Đã cập nhật quyết toán';
   } else {
-    quyetToanRecords.unshift(mkRecord(fields));
-    toast('✅ Đã lưu quyết toán: ' + f.proj.name, 'success');
+    qtRec = mkRecord(fields);
+    quyetToanRecords.unshift(qtRec);
+    msg = '✅ Đã lưu quyết toán: ' + f.proj.name;
   }
   save('quyettoan_v1', quyetToanRecords);
+
+  // Sau khi quyết toán đã ghi (doanh thu mới đã có hiệu lực) → tạo / cập nhật / gỡ phiếu thu tự động
+  let thuChanged = false;
+  if (qtRec && wantThu !== null) {
+    const kq = _qtSyncAutoThu(qtRec, f.proj, wantThu);
+    thuChanged = kq.kind !== 'skip';
+    if (kq.kind === 'created')      msg += ` · 🧾 Đã tạo phiếu thu tự động ${fmtM(kq.tien)} (tab Thu tiền)`;
+    else if (kq.kind === 'updated') msg += ` · 🧾 Phiếu thu tự động: ${fmtM(kq.tien)}`;
+    else if (kq.kind === 'removed') msg += ' · Đã gỡ phiếu thu tự động';
+    else if (kq.kind === 'none')    msg += ' · Công trình đã thu đủ — không tạo phiếu thu' + (kq.removed ? ' (đã gỡ phiếu cũ)' : '');
+  }
+  toast(msg, 'success');
 
   // Quyết toán cuối cùng → đóng công trình (trạng thái "Đã quyết toán" + ngày quyết toán)
   if (chot && typeof updateProject === 'function') {
@@ -429,6 +569,7 @@ function qtSave() {
   // (tránh người dùng thao tác nhầm tiếp vào công trình cũ). Bảng lịch sử vẫn thấy bản vừa lưu.
   qtResetForm(false);
   _qtRefreshOtherTabs();
+  if (thuChanged && typeof renderDashboard === 'function') renderDashboard();   // tổng đã thu đổi
 }
 
 // ── Sửa: chọn công trình của bản ghi → qtOnCtChange tự nạp bản đó (chế độ Sửa) ──
@@ -463,7 +604,9 @@ function qtDelete(id) {
   const idx = quyetToanRecords.findIndex(r => String(r.id) === String(id));
   if (idx < 0) return;
   const r = quyetToanRecords[idx];
+  const thuAuto = _qtAutoThuOf(r.id);   // phiếu thu tự động đi kèm (nếu có) → xóa cùng
   let msg = `Xóa quyết toán "${QT_LOAI[qtLoaiOf(r)].label}" ${qtSoTienTxt(r)} của ${_resolveCtName(r) || r.congtrinh || ''}?`;
+  if (thuAuto) msg += `\n\nPhiếu thu tự động ${fmtM(thuAuto.tien)} (ngày ${fmtISODate(thuAuto.ngay)}) đi kèm cũng sẽ bị xóa.`;
   if (r.chot) msg += '\n\nLưu ý: công trình vẫn giữ trạng thái "Đã quyết toán". Muốn mở lại hãy sửa ở tab Công Trình.';
   if (!confirm(msg)) return;
 
@@ -474,6 +617,10 @@ function qtDelete(id) {
     deletedBy: getCurrentUser()?.username || 'Không rõ',
   };
   save('quyettoan_v1', quyetToanRecords);
+  if (thuAuto) {
+    _qtSyncAutoThu(r, _qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh), false);
+    if (typeof renderDashboard === 'function') renderDashboard();
+  }
 
   // Đang sửa đúng bản vừa xóa → nạp lại theo quy tắc 1-1 (hết bản → về chế độ Thêm)
   if (document.getElementById('qtf-edit-id')?.value === String(id)) qtResetForm(true);

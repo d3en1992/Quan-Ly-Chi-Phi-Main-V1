@@ -784,13 +784,14 @@ function parseSheet7(rows, lookup) {
 
 // ── Sheet 8: ThuTien ──────────────────────────────────────────
 // Col: NGÀY(0) · NGƯỜI THỰC HIỆN(1) · CÔNG TRÌNH(2) · SỐ TIỀN(3) · NỘI DUNG(4) · LOẠI THU(5) · ID(6)
-// Nhãn LOẠI THU ("Tạm ứng"/"Giai đoạn"/"Quyết toán") → mã (tamung/giaidoan/quyettoan)
+// Nhãn LOẠI THU ("Tạm ứng"/"Giai đoạn"/"Quyết toán"/"Khác") → mã (tamung/giaidoan/quyettoan/khac)
 function _parseLoaiThu(label) {
   const n = _normStr(label);
   if (!n) return '';
   if (n.includes('tam ung'))   return 'tamung';
   if (n.includes('giai doan')) return 'giaidoan';
   if (n.includes('quyet toan')) return 'quyettoan';
+  if (n === 'khac')            return 'khac';
   return '';  // không nhận dạng → để trống (không phải lỗi)
 }
 function parseSheet8(rows, lookup) {
@@ -832,6 +833,11 @@ function parseSheet8(rows, lookup) {
 
     if (rowErrs.length) { errors.push(...rowErrs); continue; }
 
+    // (03/10/2026) Nhập lại file đã xuất: phiếu thu TỰ ĐỘNG từ quyết toán (cùng ID) giữ nguyên
+    // dấu khóa auto/qtId — file Excel không có cột này, thiếu thì phiếu bị "mở khóa" ngoài ý muốn.
+    const _thuCu = (existingId && typeof thuRecords !== 'undefined')
+      ? thuRecords.find(t => t && String(t.id) === existingId) : null;
+
     records.push({
       id:        existingId || crypto.randomUUID(),
       ngay,
@@ -841,6 +847,7 @@ function parseSheet8(rows, lookup) {
       tien:      Math.round(tien),
       nd,
       loaiThu,
+      ...(_thuCu && _thuCu.auto ? { auto: true, qtId: _thuCu.qtId } : {}),
       createdAt: now, updatedAt: now, deletedAt: null, deviceId: dev,
     });
   }
