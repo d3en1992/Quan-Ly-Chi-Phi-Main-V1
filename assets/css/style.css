@@ -1080,6 +1080,26 @@ body.auth-guest #jb-btn {
   box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, .25);
 }
 
+/* ── Tab DOANH THU — bố cục form nằm ngoài màn hình (03/10/2026) ──
+   .dt-compact bọc 2 subtab HỢP ĐỒNG CHÍNH / THU TIỀN: cỡ chữ đồng bộ với tab Quyết Toán. */
+.dt-compact { font-size: 13px; }
+.dt-compact .form-control-sm,
+.dt-compact .form-select-sm { font-size: 13px; }
+/* Form khai báo: chừa chỗ cho topbar khi cuộn tới (nút Sửa) + viền vàng khi đang sửa */
+.dt-form-card { scroll-margin-top: 80px; transition: box-shadow .2s ease; }
+.dt-form-card.dt-editing { box-shadow: 0 0 0 2px var(--bs-warning) !important; }
+/* Dòng vừa lưu → tô vàng nhạt để đối chiếu ngay */
+.dt-row-new > td { background-color: var(--bs-warning-bg-subtle) !important; }
+/* Bảng Tiến Độ Thu: dòng công trình bấm được, mũi tên xoay khi mở chi tiết */
+.dt-td-row { cursor: pointer; }
+.dt-td-row:hover > td { background-color: var(--bs-tertiary-bg) !important; }
+.dt-td-row.is-open > td { background-color: var(--bs-primary-bg-subtle) !important; }
+.dt-td-chev { font-size: 18px; vertical-align: middle; color: var(--bs-secondary-color); transition: transform .15s ease; }
+.dt-td-row.is-open .dt-td-chev { transform: rotate(90deg); }
+.dt-td-detail > td { background-color: var(--bs-tertiary-bg) !important; padding: 10px 14px 12px 40px !important; }
+.dt-td-sub { background: transparent; }
+.dt-td-sub > :not(caption) > * > * { background-color: transparent; }
+
 
 
 

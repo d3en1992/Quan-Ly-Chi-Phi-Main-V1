@@ -358,10 +358,8 @@ function initDoanhThu() {
   thauPhuContracts = load('thauphu_v1', []);
   quyetToanRecords = load('quyettoan_v1', []);
 
-  _dtRenderDashboardMini();
-
+  // Nạp dropdown 2 form + bộ lọc + vẽ 3 thẻ thống kê và mọi bảng của 2 subtab
   dtPopulateSels();
-  dtPopulateCtFilter();
 
   // Set ngày mặc định = hôm nay nếu chưa có
   const ngayEl = document.getElementById('thu-ngay');
@@ -371,22 +369,10 @@ function initDoanhThu() {
   const hdtpNgayEl = document.getElementById('hdtp-ngay');
   if (hdtpNgayEl && !hdtpNgayEl.value) hdtpNgayEl.value = today();
 
-  // Set KHAI BÁO là sub-tab active mặc định
-  const kbBtn  = document.getElementById('dt-sub-khaibao-btn');
-  const kbPage = document.getElementById('dt-sub-khaibao');
-  document.querySelectorAll('#page-doanhthu .sub-page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('#page-doanhthu .nav-link').forEach(b => b.classList.remove('active'));
-  if (kbBtn && kbPage) { kbPage.classList.add('active'); kbBtn.classList.add('active'); }
-
-  // Render KHAI BÁO (bảng gộp 30 ngày) + THỐNG KÊ (các bảng toàn bộ)
-  renderKhaiBaoTable(0);
-  renderHdcTableTk(0);
-  renderHdtpTableTk(0);
-  renderThuTableTk(0);
-
-  // Reset edit state
-  _hdcResetForm();
-  _hdtpResetForm();
+  // (03/10/2026) KHÔNG ép về subtab đầu và KHÔNG xóa form HĐ Chính / Thu Tiền khi mở lại tab:
+  // form nay nằm thẳng trên màn hình → giữ nguyên subtab + nội dung đang nhập dở.
+  // Chỉ reset modal HĐ Thầu Phụ (dùng chung với tab Công Nợ) như trước.
+  if (typeof _hdtpResetForm === 'function') _hdtpResetForm();
 }
 
 // ── Init tab LỢI NHUẬN khi mở (02/10/2026 — tab chính riêng) ──

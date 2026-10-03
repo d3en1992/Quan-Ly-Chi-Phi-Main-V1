@@ -1,134 +1,173 @@
-<!-- Partial: page-doanhthu (tách từ index.html — Phase 2) -->
+<!-- Partial: page-doanhthu (tách từ index.html — Phase 2)
+     (03/10/2026) BỐ CỤC MỚI: bỏ popup → form nhập nằm ngay trên màn hình.
+       • Header chung : 3 thẻ thống kê (TỔNG DOANH THU / TỔNG ĐÃ THU / CÒN PHẢI THU) — luôn hiện trên cùng
+       • Subtab 1 HỢP ĐỒNG CHÍNH : [1] Form khai báo HĐ · [2] HĐ vừa tạo/sửa gần đây · [3] Danh sách + bộ lọc
+       • Subtab 2 THU TIỀN       : [1] Form ghi nhận thu · [2] Lịch sử thu tiền (sổ quỹ) · [3] Tiến độ thu theo công trình
+     Code: js/modules/doanhthu/doanhthu.core.js (state, điều hướng) + doanhthu.forms.js (form, bảng)
+     (02/10/2026) LỢI NHUẬN đã tách thành tab chính riêng — pages/loinhuan.html -->
 
-        <!-- Sub-nav: KHAI BÁO (làm việc hàng ngày) · THỐNG KÊ (theo dõi Hợp đồng chính)
-             (02/10/2026) LỢI NHUẬN đã tách thành tab chính riêng — pages/loinhuan.html -->
+        <!-- ══ HEADER CHUNG: 3 THẺ THỐNG KÊ TỔNG QUAN (luôn hiện, không phụ thuộc subtab) ══ -->
+        <div class="row g-3 mb-3" id="dt-mini-dash">
+          <!-- Mobile: chiếm toàn hàng; sm+: 1/3 -->
+          <div class="col-12 col-sm-4">
+            <div class="card shadow-sm border-0 h-100" style="background:var(--bs-primary-bg-subtle)">
+              <div class="card-body text-center py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Doanh Thu</div>
+                <div id="dt-mini-tonghd" class="fw-bold text-primary" style="font-size:20px">—</div>
+              </div>
+            </div>
+          </div>
+          <!-- Mobile: mỗi card chiếm 50%; sm+: 1/3 -->
+          <div class="col-6 col-sm-4">
+            <div class="card shadow-sm border-0 h-100" style="background:var(--bs-success-bg-subtle)">
+              <div class="card-body text-center py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Đã Thu</div>
+                <div id="dt-mini-dathu" class="fw-bold text-success" style="font-size:20px">—</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-sm-4">
+            <div class="card shadow-sm border-0 h-100" style="background:var(--bs-warning-bg-subtle)">
+              <div class="card-body text-center py-3">
+                <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Còn Phải Thu</div>
+                <div id="dt-mini-con" class="fw-bold text-warning" style="font-size:20px">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ THANH SUBTAB: HỢP ĐỒNG CHÍNH · THU TIỀN ══
+             ID nút = ID subtab + "-btn" (dtShowSub() dựa vào quy ước này) -->
         <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="dt-sub-nav">
-          <button
-            class="nav-link active"
-            id="dt-sub-khaibao-btn"
-            onclick="dtGoSub(this, 'dt-sub-khaibao')"
-          >
-            <span class="material-symbols-outlined msi-gap">edit_note</span>KHAI BÁO
+          <button class="nav-link active" id="dt-sub-hdc-btn" onclick="dtGoSub(this, 'dt-sub-hdc')">
+            <span class="material-symbols-outlined msi-gap">list_alt</span>HỢP ĐỒNG CHÍNH
           </button>
-          <button
-            class="nav-link"
-            id="dt-sub-thongke-btn"
-            onclick="dtGoSub(this, 'dt-sub-thongke')"
-          >
-            <span class="material-symbols-outlined msi-gap">bar_chart</span>THỐNG KÊ
+          <button class="nav-link" id="dt-sub-thu-btn" onclick="dtGoSub(this, 'dt-sub-thu')">
+            <span class="material-symbols-outlined msi-gap">payments</span>THU TIỀN
           </button>
         </div>
 
-        <!-- ── SUB TAB 1: KHAI BÁO ─────────────────────────────── -->
-        <div class="sub-page active" id="dt-sub-khaibao">
-          <!-- Dashboard mini: 3 stat cards -->
-          <div class="row g-3 mb-4" id="dt-mini-dash">
-            <!-- Mobile: chiếm toàn hàng; sm+: 1/3 -->
-            <div class="col-12 col-sm-4">
-              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-primary-bg-subtle)">
-                <div class="card-body text-center py-3">
-                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Doanh Thu</div>
-                  <div id="dt-mini-tonghd" class="fw-bold text-primary" style="font-size:20px">—</div>
-                  <!-- (02/10/2026) Đã gỡ dòng phụ "HĐ gốc · Quyết toán" — Quyết toán xem ở tab QUYẾT TOÁN -->
+        <!-- ════════════════════════════════════════════════════════════
+             SUBTAB 1: HỢP ĐỒNG CHÍNH
+             ════════════════════════════════════════════════════════════ -->
+        <div class="sub-page active dt-compact" id="dt-sub-hdc">
+
+          <!-- ── KHU VỰC 1: FORM KHAI BÁO HỢP ĐỒNG (nằm ngay trên màn hình, không popup) ──
+               Khi bấm Sửa ở bảng bên dưới → form nạp dữ liệu, viền vàng + nhãn "Đang sửa". -->
+          <div class="card shadow-sm border-0 mb-4 dt-form-card" id="hdc-form-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="qt-card-title">
+                  <span class="material-symbols-outlined msi-gap">edit_note</span><span id="hdc-form-title">Khai Báo Hợp Đồng Chính</span>
+                </div>
+                <span id="hdc-editing-badge" class="badge bg-warning text-dark" style="display:none">
+                  <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
+                </span>
+              </div>
+              <div class="row g-2">
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                  <label for="hdc-ngay" class="qt-lb mb-1 d-block">Ngày</label>
+                  <input type="date" id="hdc-ngay" class="form-control form-control-sm" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-4">
+                  <label for="hdc-ct-input" class="qt-lb mb-1 d-block">Công Trình *</label>
+                  <select id="hdc-ct-input" class="form-select form-select-sm" onchange="if(typeof hdcSyncChuDauTu==='function')hdcSyncChuDauTu()">
+                    <option value="">-- Chọn công trình --</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="hdc-khachhang" class="qt-lb mb-1 d-block">Chủ Đầu Tư <span style="font-weight:400;text-transform:none;letter-spacing:0">(tự động)</span></label>
+                  <input type="text" id="hdc-khachhang" class="form-control form-control-sm" placeholder="Nhập ở tab Công Trình..." readonly style="background:var(--bs-tertiary-bg);cursor:not-allowed" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="hdc-nguoi" class="qt-lb mb-1 d-block">Người TH</label>
+                  <select id="hdc-nguoi" class="form-select form-select-sm">
+                    <option value="">-- Chọn --</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="hdc-giatri" class="qt-lb mb-1 d-block">Giá Trị HĐ Chính (đ)</label>
+                  <input type="text" id="hdc-giatri" class="form-control form-control-sm font-monospace" placeholder="0" inputmode="numeric" oninput="fmtInputMoney(this);hdcUpdateTotal()" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="hdc-giatriphu" class="qt-lb mb-1 d-block">Giá Trị HĐ Phụ (đ)</label>
+                  <input type="text" id="hdc-giatriphu" class="form-control form-control-sm font-monospace" placeholder="0" inputmode="numeric" oninput="fmtInputMoney(this);hdcUpdateTotal()" />
+                </div>
+                <div class="col-12 col-xl-6">
+                  <label for="hdc-nd" class="qt-lb mb-1 d-block">Nội Dung</label>
+                  <input type="text" id="hdc-nd" class="form-control form-control-sm" placeholder="VD: Xây dựng phần thô, hoàn thiện..." />
                 </div>
               </div>
-            </div>
-            <!-- Mobile: mỗi card chiếm 50%; sm+: 1/3 -->
-            <div class="col-6 col-sm-4">
-              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-success-bg-subtle)">
-                <div class="card-body text-center py-3">
-                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tổng Đã Thu</div>
-                  <div id="dt-mini-dathu" class="fw-bold text-success" style="font-size:20px">—</div>
-                </div>
-              </div>
-            </div>
-            <div class="col-6 col-sm-4">
-              <div class="card shadow-sm border-0 h-100" style="background:var(--bs-warning-bg-subtle)">
-                <div class="card-body text-center py-3">
-                  <div class="text-secondary" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Còn Phải Thu</div>
-                  <div id="dt-mini-con" class="fw-bold text-warning" style="font-size:20px">—</div>
+              <input type="hidden" id="hdc-edit-id" />
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+                <span id="hdc-tong-label" class="fw-semibold text-warning" style="font-size:13px"></span>
+                <div class="d-flex gap-2 ms-auto">
+                  <button class="btn btn-sm btn-outline-secondary" id="hdc-cancel-btn" style="display:none" onclick="_hdcCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
+                  <button class="btn btn-sm btn-warning fw-bold px-3" id="hdc-save-btn" onclick="saveHopDongChinh()"><span class="material-symbols-outlined msi-gap">save</span>Lưu</button>
                 </div>
               </div>
             </div>
           </div>
-          <!-- Action buttons: tab Doanh Thu chỉ còn 2 thao tác nhập — HĐ Chính + Thu Tiền
-               (Quyết toán → tab QUYẾT TOÁN; HĐ Thầu Phụ → tab CÔNG NỢ) -->
-          <div class="row g-2 mb-4">
-            <div class="col-6">
-              <button class="btn btn-primary w-100 h-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdcResetForm();openDtModal('hdc')">
-                <i class="bi bi-file-earmark-text me-1"></i>+ Khai Báo HĐ Chính
-              </button>
-            </div>
-            <div class="col-6">
-              <button class="btn btn-success w-100 h-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_thuResetForm();openDtModal('thu')">
-                <i class="bi bi-cash-coin me-1"></i>+ Ghi Nhận Thu Tiền
-              </button>
-            </div>
-          </div>
-          <!-- Bảng GỘP CHUNG: mọi khai báo 30 ngày gần nhất (HĐ Chính + Thu Tiền).
-               (02/10/2026) Bỏ dòng Quyết Toán — không còn thuộc luồng Doanh Thu, xem ở tab QUYẾT TOÁN -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bs-border-color)">
+
+          <!-- ── KHU VỰC 2: KHAI BÁO GẦN ĐÂY — các HĐ vừa tạo/sửa gần nhất (để đối chiếu sau khi Lưu) ── -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">article</span>Khai Báo Gần Đây
-              <span class="text-secondary" style="font-size:11px;font-weight:400">(30 ngày gần nhất)</span>
-              <span id="kb-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">history</span>Khai Báo Gần Đây
+              <span class="text-secondary" style="font-size:11px;font-weight:400">(các hợp đồng vừa tạo / sửa gần nhất)</span>
             </div>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:680px">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:760px">
                 <thead class="table-light">
                   <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Cập Nhật Lúc</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày HĐ</th>
                     <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700">Đối Tác / Người</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Người TH</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Tổng HĐ</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
                     <th class="action-col"></th>
                   </tr>
                 </thead>
-                <tbody id="kb-tbody"></tbody>
+                <tbody id="hdc-recent-tbody"></tbody>
               </table>
             </div>
-            <div id="kb-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có khai báo nào trong 30 ngày gần nhất</div>
-            <div id="kb-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+            <div id="hdc-recent-empty" style="text-align:center;padding:24px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng nào</div>
           </div>
 
-        </div>
-        <!-- /dt-sub-khaibao -->
-
-        <!-- ── SUB TAB 2: THỐNG KÊ — chỉ theo dõi thông tin HỢP ĐỒNG CHÍNH (02/10/2026) ───── -->
-        <div class="sub-page" id="dt-sub-thongke">
-          <!-- Bộ lọc đối soát: Công trình + tìm kiếm -->
-          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
-            <select id="dt-tk-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetTkCtFilter(this.value)">
+          <!-- ── KHU VỰC 3: DANH SÁCH & THỐNG KÊ HỢP ĐỒNG CHÍNH (toàn bộ, năm đang lọc) ── -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">list_alt</span>Danh Sách Hợp Đồng Chính
+              <span id="hdctk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
+            </div>
+            <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px" title="Tick chọn 1 hợp đồng rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ Chính</button>
+          </div>
+          <!-- Thanh bộ lọc ngay trên đầu bảng: Công trình · Người thực hiện · Tìm kiếm -->
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <select id="dt-hdc-ct-filter" class="form-select form-select-sm w-auto" style="min-width:200px;max-width:320px" onchange="dtSetHdcCtFilter(this.value)" title="Lọc theo công trình">
               <option value="">-- Tất cả công trình --</option>
             </select>
-            <input type="text" id="dt-tk-search-input" class="form-control form-control-sm" style="max-width:220px" placeholder="Tìm CT, người TH, nội dung..." oninput="dtSetTkSearch(this.value)">
-          </div>
-
-          <!-- TK BẢNG 1: Hợp đồng chính (toàn bộ) -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">list_alt</span>Hợp Đồng Chính Công Ty
-            </div>
-            <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 hợp đồng rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ Chính</button>
+            <select id="dt-hdc-nguoi-filter" class="form-select form-select-sm w-auto" style="min-width:170px" onchange="dtSetHdcNguoiFilter(this.value)" title="Lọc theo người thực hiện">
+              <option value="">-- Tất cả người TH --</option>
+            </select>
+            <input type="text" id="dt-hdc-search" class="form-control form-control-sm" style="max-width:240px" placeholder="Tìm CT, CĐT, người TH, nội dung..." oninput="dtSetHdcSearch(this.value)">
+            <span id="hdctk-sum" class="ms-auto text-secondary" style="font-size:12px"></span>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:820px">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:900px">
                 <thead class="table-light">
                   <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" title="Chọn tất cả" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"/></th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
                     <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">CĐT</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Người TH</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Chính</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Phụ</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ</th>
-                    <!-- (02/10/2026) Bỏ 4 cột Quyết Toán / Tổng DT / Đã Thu / Còn Phải Thu → thêm cột Nội Dung HĐ -->
                     <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
                     <th class="action-col"></th>
                   </tr>
@@ -136,150 +175,147 @@
                 <tbody id="hdctk-tbody"></tbody>
               </table>
             </div>
-            <div id="hdctk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng nào</div>
+            <div id="hdctk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Không có hợp đồng nào khớp bộ lọc</div>
             <div id="hdctk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
+        </div>
+        <!-- /dt-sub-hdc -->
 
-          <!-- TK BẢNG 3: Lịch sử thu tiền (toàn bộ) -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">payments</span>Lịch Sử Thu Tiền
-              <span id="thutk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color);margin-left:4px"></span>
+        <!-- ════════════════════════════════════════════════════════════
+             SUBTAB 2: THU TIỀN — dòng tiền thực thu + công nợ theo công trình
+             ════════════════════════════════════════════════════════════ -->
+        <div class="sub-page dt-compact" id="dt-sub-thu">
+
+          <!-- ── KHU VỰC 1: FORM GHI NHẬN THU TIỀN (nằm ngay trên màn hình) ── -->
+          <div class="card shadow-sm border-0 mb-4 dt-form-card" id="thu-form-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="qt-card-title">
+                  <span class="material-symbols-outlined msi-gap">payments</span><span id="thu-form-title">Ghi Nhận Thu Tiền</span>
+                </div>
+                <span id="thu-editing-badge" class="badge bg-warning text-dark" style="display:none">
+                  <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
+                </span>
+              </div>
+              <div class="row g-2">
+                <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+                  <label for="thu-ngay" class="qt-lb mb-1 d-block">Ngày Thu *</label>
+                  <input type="date" id="thu-ngay" class="form-control form-control-sm" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-5 col-xl-4">
+                  <label for="thu-ct-input" class="qt-lb mb-1 d-block">Công Trình *</label>
+                  <select id="thu-ct-input" class="form-select form-select-sm" onchange="_thuOnCtChange(this.value)">
+                    <option value="">-- Chọn công trình --</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="thu-loaithu" class="qt-lb mb-1 d-block">Loại Khoản Thu</label>
+                  <select id="thu-loaithu" class="form-select form-select-sm">
+                    <option value="">-- Chọn loại --</option>
+                    <option value="tamung">Tạm ứng</option>
+                    <option value="giaidoan">Thanh toán giai đoạn</option>
+                    <option value="quyettoan">Quyết toán</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="thu-nguoi" class="qt-lb mb-1 d-block">Người TH</label>
+                  <select id="thu-nguoi" class="form-select form-select-sm">
+                    <option value="">-- Chọn --</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="thu-tien" class="qt-lb mb-1 d-block">Số Tiền Thu (đ) *</label>
+                  <input type="text" id="thu-tien" class="form-control form-control-sm font-monospace" placeholder="0" inputmode="numeric" oninput="fmtInputMoney(this)" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-9">
+                  <label for="thu-nd" class="qt-lb mb-1 d-block">Ghi Chú / Đợt</label>
+                  <input type="text" id="thu-nd" class="form-control form-control-sm" placeholder="VD: Đợt 1, Nghiệm thu móng..." />
+                </div>
+              </div>
+              <!-- Tình hình thu của công trình đang chọn (hiện khi đã chọn CT) -->
+              <div id="thu-progress-info" style="display:none;gap:16px;flex-wrap:wrap;align-items:center;background:var(--bs-tertiary-bg);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:12px;border:1px solid var(--bs-border-color)">
+                <span class="text-secondary">Tổng HĐ: <span id="thu-prog-hd" class="fw-bold text-body">—</span></span>
+                <span class="text-secondary">Đã thu: <span id="thu-prog-dathu" class="fw-bold text-success">—</span></span>
+                <span class="text-secondary">Còn lại: <span id="thu-prog-con" class="fw-bold text-warning">—</span></span>
+              </div>
+              <input type="hidden" id="thu-edit-id" />
+              <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-sm btn-outline-secondary" id="thu-cancel-btn" style="display:none" onclick="_thuCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
+                <button class="btn btn-sm btn-success fw-bold px-3" id="thu-save-btn" onclick="saveThuRecord()"><span class="material-symbols-outlined msi-gap">save</span>Ghi nhận Thu</button>
+              </div>
             </div>
-            <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu thu</button>
+          </div>
+
+          <!-- ── KHU VỰC 2: LỊCH SỬ THU TIỀN — "sổ quỹ" dòng thời gian, mới nhất → cũ nhất ── -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">receipt_long</span>Lịch Sử Thu Tiền
+              <span id="thutk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
+            </div>
+            <button class="btn btn-sm" onclick="exportThuToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px" title="Tick chọn 1 lần thu tiền rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu thu</button>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <input type="text" id="dt-thu-search" class="form-control form-control-sm" style="max-width:300px" placeholder="Tìm số tiền, ngày (VD: 15/09), CT, người..." oninput="dtSetThuSearch(this.value)">
+            <span id="thutk-sum" class="ms-auto text-secondary" style="font-size:12px"></span>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:720px">
                 <thead class="table-light">
                   <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.thu-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" title="Chọn tất cả" onchange="document.querySelectorAll('.thu-row-chk').forEach(c=>c.checked=this.checked)"/></th>
                     <th style="text-align:left;padding:8px 12px;font-weight:700">Ngày</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Loại</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">Số Tiền</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700">Người TH</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Ghi Chú</th>
                     <th class="action-col"></th>
                   </tr>
                 </thead>
                 <tbody id="thutk-tbody"></tbody>
               </table>
             </div>
-            <div id="thutk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có lịch sử thu tiền</div>
+            <div id="thutk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có khoản thu nào</div>
             <div id="thutk-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
 
-          <!-- (Bảng Quyết Toán đã chuyển sang tab QUYẾT TOÁN → Lịch Sử Quyết Toán) -->
-        </div>
-        <!-- /dt-sub-thongke -->
-
-        <!-- (02/10/2026) SUB TAB 3 "TỔNG QUAN LỢI NHUẬN" đã chuyển thành tab chính LỢI NHUẬN
-             → pages/loinhuan.html (giữ nguyên các ID dt-ln-* / dt-loinhuan-wrap) -->
-        <!-- MODALS: DOANH THU ============================================ -->
-
-        <!-- Modal: Khai Bao HD Chinh -->
-        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
-        <div id="dt-modal-hdc-ov" class="overlay">
-          <div class="app-modal" style="max-width:660px">
-            <div class="app-modal-head">
-              <h3><span class="material-symbols-outlined msi-gap">list_alt</span>Khai B&#225;o H&#7907;p &#272;&#7891;ng Ch&#237;nh</h3>
-              <button class="close-btn" onclick="closeDtModal('hdc')"><span class="material-symbols-outlined">close</span></button>
-            </div>
-            <div class="app-modal-body">
-              <div class="dt-form-grid">
-                <div class="dt-field"><label>Ng&#224;y</label><input type="date" id="hdc-ngay" /></div>
-                <div class="dt-field">
-                  <label>T&#234;n C&#244;ng Tr&#236;nh *</label>
-                  <select id="hdc-ct-input" onchange="if(typeof hdcSyncChuDauTu==='function')hdcSyncChuDauTu()" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
-                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
-                  </select>
-                </div>
-                <div class="dt-field">
-                  <label>Ch&#7911; &#272;&#7847;u T&#432; / C&#272;T <span style="font-weight:400;font-size:10px;color:var(--bs-secondary-color)">(t&#7921; &#273;&#7897;ng t&#7915; C&#244;ng Tr&#236;nh)</span></label>
-                  <input type="text" id="hdc-khachhang" placeholder="C&#225;c h&#227;y nh&#7853;p &#7903; tab C&#244;ng Tr&#236;nh..." readonly style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-tertiary-bg);color:var(--bs-body-color);cursor:not-allowed" />
-                </div>
-                <div class="dt-field">
-                  <label>Ng&#432;&#7901;i TH</label>
-                  <select id="hdc-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
-                    <option value="">-- Ch&#7885;n --</option>
-                  </select>
-                </div>
-                <div class="dt-field">
-                  <label>Gi&#225; Tr&#7883; H&#272; Ch&#237;nh (&#273;)</label>
-                  <input type="text" id="hdc-giatri" placeholder="0" oninput="fmtInputMoney(this);hdcUpdateTotal()" />
-                </div>
-                <div class="dt-field"><label>Gi&#225; Tr&#7883; H&#272; Ph&#7909; (&#273;)</label><input type="text" id="hdc-giatriphu" placeholder="0" oninput="fmtInputMoney(this);hdcUpdateTotal()" /></div>
-                <div class="dt-field" style="grid-column:1/-1"><label>N&#7897;i Dung</label><input type="text" id="hdc-nd" placeholder="VD: X&#226;y d&#7921;ng ph&#7847;n th&#244;, ho&#224;n thi&#7879;n..." style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" /></div>
-              </div>
-              <input type="hidden" id="hdc-edit-id" />
-            </div>
-            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:space-between;align-items:center;gap:8px">
-              <span id="hdc-tong-label" class="text-secondary" style="font-size:12px"></span>
-              <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary" onclick="closeDtModal('hdc')">H&#7911;y</button>
-                <button class="btn btn-warning" id="hdc-save-btn" onclick="saveHopDongChinh()"><span class="material-symbols-outlined msi-gap">save</span>L&#432;u</button>
-              </div>
+          <!-- ── KHU VỰC 3: TIẾN ĐỘ THU TIỀN THEO CÔNG TRÌNH (điểm nhấn) ──
+               Mỗi dòng = 1 công trình. Bấm vào dòng → xổ xuống các đợt thu của riêng công trình đó. -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+              <span class="dot"></span><span class="material-symbols-outlined msi-gap">donut_large</span>Tiến Độ Thu Tiền Theo Công Trình
+              <span id="thutd-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
             </div>
           </div>
-        </div>
-
-        <!-- Modal: Ghi Nhan Thu Tien -->
-        <!-- [CHẶN ĐÓNG NHẦM] Đã bỏ onclick đóng khi click nền — popup chỉ đóng bằng nút ✕ để tránh mất dữ liệu đang nhập -->
-        <div id="dt-modal-thu-ov" class="overlay">
-          <div class="app-modal" style="max-width:580px">
-            <div class="app-modal-head">
-              <h3><span class="material-symbols-outlined msi-gap">payments</span>Ghi Nh&#7853;n Thu Ti&#7873;n</h3>
-              <button class="close-btn" onclick="closeDtModal('thu')"><span class="material-symbols-outlined">close</span></button>
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <input type="text" id="dt-td-search" class="form-control form-control-sm" style="max-width:240px" placeholder="Tìm công trình, CĐT..." oninput="dtSetTdSearch(this.value)">
+            <span class="text-secondary" style="font-size:11px">Bấm vào 1 dòng để xem chi tiết các đợt thu · Sắp xếp: còn phải thu nhiều nhất lên đầu</span>
+          </div>
+          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
+            <div style="overflow-x:auto">
+              <table class="table table-sm align-middle mb-0" style="min-width:820px">
+                <thead class="table-light">
+                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
+                    <th style="width:28px"></th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700">Công Trình</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap" title="Giá trị hợp đồng của công trình (đã gồm quyết toán nếu có) — cùng cách tính với thẻ TỔNG DOANH THU">Tổng Giá Trị HĐ</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Đã Thu</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Còn Phải Thu</th>
+                    <th style="text-align:left;padding:8px 10px;font-weight:700;min-width:170px">% Hoàn Thành</th>
+                    <th style="text-align:center;padding:8px 10px;font-weight:700;white-space:nowrap">Số Đợt</th>
+                  </tr>
+                </thead>
+                <tbody id="thutd-tbody"></tbody>
+                <tfoot id="thutd-tfoot"></tfoot>
+              </table>
             </div>
-            <div class="app-modal-body">
-              <div class="dt-form-grid">
-                <div class="dt-field"><label>Ng&#224;y Thu *</label><input type="date" id="thu-ngay" /></div>
-                <div class="dt-field">
-                  <label>C&#244;ng Tr&#236;nh *</label>
-                  <select id="thu-ct-input" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="_thuOnCtChange(this.value)">
-                    <option value="">-- Ch&#7885;n c&#244;ng tr&#236;nh --</option>
-                  </select>
-                </div>
-              </div>
-              <div id="thu-progress-info" style="display:none;gap:16px;flex-wrap:wrap;align-items:center;background:var(--bs-tertiary-bg);border-radius:8px;padding:10px 14px;margin:8px 0;font-size:12px;border:1px solid var(--bs-border-color)">
-                <span class="text-secondary">T&#7893;ng H&#272;: <span id="thu-prog-hd" class="fw-bold text-body">&#x2014;</span></span>
-                <span class="text-secondary">&#272;&#227; thu: <span id="thu-prog-dathu" class="fw-bold text-success">&#x2014;</span></span>
-                <span class="text-secondary">C&#242;n l&#7841;i: <span id="thu-prog-con" class="fw-bold text-warning">&#x2014;</span></span>
-              </div>
-              <div class="dt-form-grid" style="margin-top:8px">
-                <div class="dt-field">
-                  <label>Lo&#7841;i Kho&#7843;n Thu</label>
-                  <select id="thu-loaithu" class="form-select form-select-sm" style="height:auto;padding:8px 10px">
-                    <option value="">-- Ch&#7885;n lo&#7841;i --</option>
-                    <option value="tamung">T&#7841;m &#7913;ng</option>
-                    <option value="giaidoan">Thanh to&#225;n giai &#273;o&#7841;n</option>
-                    <option value="quyettoan">Quy&#7871;t to&#225;n</option>
-                  </select>
-                </div>
-                <div class="dt-field">
-                  <label>Ng&#432;&#7901;i TH</label>
-                  <select id="thu-nguoi" style="width:100%;padding:8px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-size:13px;background:var(--bs-body-bg);color:var(--bs-body-color)">
-                    <option value="">-- Ch&#7885;n --</option>
-                  </select>
-                </div>
-                <div class="dt-field"><label>S&#7889; Ti&#7873;n Thu (&#273;) *</label><input type="text" id="thu-tien" placeholder="0" oninput="fmtInputMoney(this)" /></div>
-                <div class="dt-field"><label>Ghi Ch&#250; / &#272;&#7907;t</label><input type="text" id="thu-nd" placeholder="VD: &#272;&#7907;t 1, Nghi&#7879;m thu m&#243;ng..." /></div>
-              </div>
-              <input type="hidden" id="thu-edit-id" />
-            </div>
-            <div style="padding:14px 20px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);display:flex;justify-content:flex-end;gap:8px;align-items:center">
-              <button class="btn btn-outline-secondary btn-sm" id="thu-cancel-btn" style="display:none" onclick="_thuCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>H&#7911;y s&#7917;a</button>
-              <button class="btn btn-outline-secondary" onclick="closeDtModal('thu')">&#272;&#243;ng</button>
-              <button class="btn btn-success" id="thu-save-btn" onclick="saveThuRecord()">+ Ghi nh&#7853;n Thu</button>
-            </div>
+            <div id="thutd-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có công trình nào có hợp đồng hoặc khoản thu</div>
+            <div id="thutd-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
           </div>
         </div>
+        <!-- /dt-sub-thu -->
 
-        <!-- Modal: Khai Bao HD Thau Phu — ĐÃ DỜI sang khu modal global trong index.html
-             (để dùng được từ cả tab Doanh Thu lẫn tab Công Nợ; modal nằm trong .page ẩn sẽ không hiện). -->
-
-        <!-- Modal Quyết Toán: ĐÃ GỠ — form chuyển sang tab QUYẾT TOÁN (pages/quyettoan.html) -->
-
-        <!-- /MODALS: DOANH THU =========================================== -->
-      
+        <!-- (03/10/2026) Đã GỠ 2 popup "Khai Báo HĐ Chính" (#dt-modal-hdc-ov) và "Ghi Nhận Thu Tiền"
+             (#dt-modal-thu-ov) — form nay nằm thẳng trong từng subtab, GIỮ NGUYÊN ID ô nhập (hdc-* / thu-*).
+             Modal HĐ Thầu Phụ (#dt-modal-hdtp-ov) vẫn ở khu modal global trong index.html (tab Công Nợ dùng). -->

@@ -431,8 +431,7 @@ function _refreshAllTabs() {
   renderDashboard();        // Dashboard (gọi renderLaiLo() bên trong)
   renderProjectsPage();     // Tab Công Trình — cập nhật chi phí theo năm
 
-  dtPopulateSels();          // dropdowns tab Doanh Thu (gọi renderHdcTable/renderHdtpTable bên trong)
-  renderThuTable();          // lịch sử thu tiền
+  dtPopulateSels();          // tab Doanh Thu: dropdown + 3 thẻ + mọi bảng của 2 subtab HĐ Chính / Thu Tiền
   updateTop();
 }
 
@@ -493,8 +492,8 @@ function renderActiveTab() {
       buildFilters(); filterAndRender();
       break;
     case 'doanhthu':
-      // dtPopulateSels() gọi renderHdcTable + renderHdtpTable bên trong
-      dtPopulateSels(); renderThuTable();
+      // dtPopulateSels() nạp dropdown + vẽ lại 3 thẻ và mọi bảng của 2 subtab (dtRenderAll)
+      dtPopulateSels();
       break;
     case 'loinhuan':
       // Đổi năm / sync xong → tính lại lợi nhuận theo năm đang lọc

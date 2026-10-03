@@ -49,9 +49,9 @@ function _goTabWithCT(tabId, ctName) {
       if (selNcc) { selNcc.value = ctName; filterAndRenderUngNcc(); }
 
     } else if (tabId === 'doanhthu') {
-      _dtCtFilter = ctName;
-      const subBtn = document.getElementById('dt-sub-thongke-btn');
-      if (subBtn) dtGoSub(subBtn, 'dt-sub-thongke');
+      // (03/10/2026) Mở subtab HỢP ĐỒNG CHÍNH + lọc sẵn Danh Sách HĐ theo công trình này
+      // (trước đây gán nhầm _dtCtFilter của subtab KHAI BÁO cũ nên bộ lọc không ăn)
+      if (typeof dtFilterHdcByCt === 'function') dtFilterHdcByCt(ctName);
 
     } else if (tabId === 'thietbi') {
       const sel = document.getElementById('tb-filter-ct');

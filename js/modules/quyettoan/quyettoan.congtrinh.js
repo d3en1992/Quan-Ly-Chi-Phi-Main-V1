@@ -484,8 +484,8 @@ function qtDelete(id) {
 
 // ── Vẽ lại các bảng ở tab khác đang dùng số quyết toán (an toàn nếu tab chưa mở) ──
 function _qtRefreshOtherTabs() {
-  if (typeof renderKhaiBaoTable === 'function') renderKhaiBaoTable(0);
-  if (typeof _dtRenderDashboardMini === 'function') _dtRenderDashboardMini();
+  // Tab Doanh Thu: 3 thẻ + bảng Tiến Độ Thu (giá trị HĐ gồm quyết toán) — dtRenderAll vẽ cả 2
+  if (typeof dtRenderAll === 'function') dtRenderAll();
   if (typeof renderLoiNhuan === 'function') renderLoiNhuan();
 }
 
