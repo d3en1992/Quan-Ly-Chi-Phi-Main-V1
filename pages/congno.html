@@ -1,6 +1,6 @@
 <!-- Partial: page-congno (tách từ index.html — Phase 2) -->
 
-        <!-- Sub-nav: CÔNG NỢ (tất toán TP/NCC — 03/10/2026) · THẦU PHỤ (khai báo HĐ thầu phụ) -->
+        <!-- Sub-nav: CÔNG NỢ (tất toán TP/NCC — 03/10/2026) · HỢP ĐỒNG THẦU PHỤ (khai báo + đối soát HĐ thầu phụ) -->
         <div class="nav nav-pills gap-2 mb-3 flex-wrap" id="cn-sub-nav">
           <button
             class="nav-link active"
@@ -14,7 +14,7 @@
             id="cn-sub-thauphu-btn"
             onclick="cnGoSub(this, 'cn-sub-thauphu')"
           >
-            <span class="material-symbols-outlined msi-gap">handshake</span>THẦU PHỤ
+            <span class="material-symbols-outlined msi-gap">handshake</span>HỢP ĐỒNG THẦU PHỤ
           </button>
         </div>
 
@@ -133,46 +133,115 @@
         </div>
         <!-- /cn-sub-congno -->
 
-        <!-- ── SUB TAB 2: THẦU PHỤ (khai báo + đối soát HĐ Thầu Phụ) ───── -->
-        <div class="sub-page" id="cn-sub-thauphu">
-          <!-- Bộ lọc: Công trình + tìm kiếm -->
-          <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <label class="text-secondary" style="font-size:12px;font-weight:600">Lọc Công Trình:</label>
-            <select id="dt-tp-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetTpCtFilter(this.value)">
-              <option value="">-- Tất cả công trình --</option>
-            </select>
-            <input type="text" id="dt-tp-search-input" class="form-control form-control-sm" style="max-width:220px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetTpSearch(this.value)">
-          </div>
+        <!-- ── SUB TAB 2: HỢP ĐỒNG THẦU PHỤ (03/10/2026 — bỏ popup, bảng Master-Detail) ─────
+             [1] Form khai báo nằm thẳng trên màn hình (card #hdtp-form-card, lưới 3 cột) — nút Lưu ở dòng tiêu đề
+             [2] Bảng HĐ thầu phụ: + cột Đã Ứng (progress bar) · Còn Phải Trả; bấm 1 dòng → xổ "Lịch sử tạm ứng"
+                 của riêng HĐ đó + nút [+ Cập nhật tạm ứng] (ghi phiếu Ứng thầu phụ vào kho ung_v1)
+             Logic: js/modules/congno/congno.hdtp.js. GIỮ NGUYÊN ID ô nhập hdtp-* (dùng chung bindItemsToTable). -->
+        <div class="sub-page dt-compact" id="cn-sub-thauphu">
 
-          <div class="row g-2 mb-4">
-            <div class="col-12">
-              <button class="btn btn-warning w-100" style="padding:14px 10px;font-size:13px;font-weight:700;border-radius:10px" onclick="_hdtpResetForm();openDtModal('hdtp')">
-                <i class="bi bi-people me-1"></i>+ HĐ Thầu Phụ
-              </button>
+          <!-- ── KHU VỰC 1: FORM KHAI BÁO HĐ THẦU PHỤ ── -->
+          <div class="card shadow-sm border-0 mb-4 dt-form-card" id="hdtp-form-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="qt-card-title d-flex align-items-center gap-2 flex-wrap">
+                  <span><span class="material-symbols-outlined msi-gap">handshake</span><span id="hdtp-form-title">Khai Báo Hợp Đồng Thầu Phụ</span></span>
+                  <span id="hdtp-editing-badge" class="badge bg-warning text-dark" style="display:none">
+                    <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">edit</span>Đang sửa
+                  </span>
+                </div>
+                <div class="d-flex align-items-center gap-2 ms-auto flex-wrap justify-content-end">
+                  <span id="hdtp-tong-label" class="fw-semibold text-warning" style="font-size:13px"></span>
+                  <button class="btn btn-sm btn-outline-secondary" id="hdtp-cancel-btn" style="display:none" onclick="_hdtpCancelEdit()"><span class="material-symbols-outlined msi-gap">close</span>Hủy sửa</button>
+                  <button class="btn btn-sm btn-warning fw-bold px-3" id="hdtp-save-btn" onclick="saveHopDongThauPhu()"><span class="material-symbols-outlined msi-gap">save</span>Lưu</button>
+                </div>
+              </div>
+              <div class="row g-2">
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                  <label for="hdtp-ngay" class="qt-lb mb-1 d-block">Ngày *</label>
+                  <input type="date" id="hdtp-ngay" class="form-control form-control-sm" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-4">
+                  <label for="hdtp-ct-input" class="qt-lb mb-1 d-block">Công Trình *</label>
+                  <select id="hdtp-ct-input" class="form-select form-select-sm" onchange="_hdtpOnCtChange(this.value)">
+                    <option value="">-- Chọn công trình --</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="hdtp-thauphu" class="qt-lb mb-1 d-block">Thầu Phụ *</label>
+                  <select id="hdtp-thauphu" class="form-select form-select-sm">
+                    <option value="">-- Chọn thầu phụ --</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                  <label for="hdtp-giatri" class="qt-lb mb-1 d-block">Giá Trị HĐ (đ)</label>
+                  <input type="text" id="hdtp-giatri" class="form-control form-control-sm font-monospace" placeholder="0" inputmode="numeric" oninput="fmtInputMoney(this);hdtpUpdateTotal()" />
+                </div>
+                <div class="col-12 col-lg-8 col-xl-9">
+                  <label for="hdtp-nd" class="qt-lb mb-1 d-block">Nội Dung</label>
+                  <input type="text" id="hdtp-nd" class="form-control form-control-sm" placeholder="VD: Ép cọc, Móng, Thô..." />
+                </div>
+                <div class="col-12 col-lg-4 col-xl-3 d-flex align-items-end">
+                  <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="hdtp-btn-chitiet" onclick="window.togglehdtpChiTiet&&window.togglehdtpChiTiet()"><span class="material-symbols-outlined msi-gap">bar_chart</span>Khối lượng chi tiết</button>
+                </div>
+              </div>
+              <!-- Khối lượng chi tiết (tùy chọn) — có dòng thì Giá trị HĐ tự tính = Σ SL × Đơn giá -->
+              <div id="hdtp-chitiet-wrap" style="display:none;margin-top:10px;border:1px solid var(--bs-border-color);padding:10px;border-radius:6px;background:var(--bs-tertiary-bg)">
+                <div style="overflow-x:auto"><table class="entry-table" style="width:100%;min-width:400px"><thead><tr>
+                  <th style="text-align:left">Tên hạng mục</th>
+                  <th style="width:50px;text-align:center">Đơn vị</th>
+                  <th style="width:56px;text-align:center">Khối lượng</th>
+                  <th style="width:98px;text-align:right">Đơn giá (đ)</th>
+                  <th style="width:150px;text-align:right">Thành tiền (đ)</th>
+                  <th style="width:40px"></th>
+                </tr></thead><tbody id="hdtp-chitiet-tbody"></tbody></table></div>
+                <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.addhdtpChiTietRow&&window.addhdtpChiTietRow()">+ Thêm dòng</button>
+                  <div style="font-weight:bold;font-size:13px"><span class="text-body-secondary">Tổng chi tiết: </span><span id="hdtp-chitiet-tong" class="text-warning">0</span></div>
+                </div>
+              </div>
+              <input type="hidden" id="hdtp-edit-id" />
             </div>
           </div>
 
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <!-- ── KHU VỰC 2: BẢNG HỢP ĐỒNG THẦU PHỤ (Master-Detail) ── -->
+          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
               <span class="dot"></span><span class="material-symbols-outlined msi-gap">handshake</span>Hợp Đồng Thầu Phụ
+              <span id="hdtptk-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
             </div>
-            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px;margin-left:10px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ TP</button>
+            <button class="btn btn-sm" onclick="exportHdtpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px" title="Chọn 1 HĐ thầu phụ rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ TP</button>
+          </div>
+          <!-- Bộ lọc: Công trình + tìm kiếm -->
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <select id="dt-tp-ct-filter-sel" class="form-select form-select-sm w-auto" style="min-width:220px;max-width:340px" onchange="dtSetTpCtFilter(this.value)" title="Lọc theo công trình">
+              <option value="">-- Tất cả công trình --</option>
+            </select>
+            <input type="text" id="dt-tp-search-input" class="form-control form-control-sm" style="max-width:240px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetTpSearch(this.value)">
+            <span id="hdtptk-sum" class="ms-auto text-secondary" style="font-size:12px"></span>
+          </div>
+          <div class="text-secondary mb-2" style="font-size:11px">
+            Bấm vào 1 dòng để xem lịch sử tạm ứng / chi tiền của hợp đồng. <strong>Đã Ứng</strong> lấy từ phiếu Ứng thầu phụ
+            (tab Tiền Ứng, tất toán, nút Cập nhật tạm ứng) cùng Thầu phụ × Công trình, tính toàn vòng đời — cùng nguồn với tab Công Nợ.
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:580px">
+              <table class="table table-sm align-middle mb-0" style="min-width:980px">
                 <thead class="table-light">
                   <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="padding:8px 6px;text-align:center"><input type="checkbox" onchange="document.querySelectorAll('.hdtp-row-chk').forEach(c=>c.checked=this.checked)"/></th>
+                    <th style="padding:8px 6px;text-align:center;width:32px"><input type="checkbox" onchange="document.querySelectorAll('.hdtp-row-chk').forEach(c=>c.checked=this.checked)"/></th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
                     <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700">Thầu Phụ</th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700">Giá Trị HĐ</th>
-                    <th class="action-col"></th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Giá Trị HĐ</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap;min-width:150px">Đã Ứng</th>
+                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Còn Phải Trả</th>
+                    <th style="text-align:center;padding:8px 10px;font-weight:700;white-space:nowrap">Hành Động</th>
                   </tr>
                 </thead>
                 <tbody id="hdtptk-tbody"></tbody>
+                <tfoot id="hdtptk-tfoot"></tfoot>
               </table>
             </div>
             <div id="hdtptk-empty" style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng thầu phụ</div>

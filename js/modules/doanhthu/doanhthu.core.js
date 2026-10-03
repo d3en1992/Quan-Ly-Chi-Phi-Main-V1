@@ -459,9 +459,8 @@ function _dtRenderDashboardMini() {
 }
 
 // ── Modal open/close helpers ──────────────────────────────────
-// (03/10/2026) HĐ Chính + Thu Tiền KHÔNG còn popup (form nằm thẳng trong subtab).
-// 2 hàm này nay chỉ còn phục vụ modal HĐ Thầu Phụ (#dt-modal-hdtp-ov — tab Công Nợ).
-// Vẫn quét đủ 3 loại cho an toàn: overlay không tồn tại thì tự bỏ qua.
+// (03/10/2026) HĐ Chính, Thu Tiền và cả HĐ Thầu Phụ đều KHÔNG còn popup (form nằm thẳng trên màn hình).
+// 2 hàm này không còn nơi nào gọi — giữ lại cho an toàn (overlay không tồn tại thì tự bỏ qua).
 function openDtModal(type) {
   ['hdc','thu','hdtp'].forEach(t => {
     const ov = document.getElementById('dt-modal-' + t + '-ov');
@@ -569,7 +568,7 @@ function dtShowSub(id) {
   dtGoSub(document.getElementById(id + '-btn'), id);
 }
 
-// ── Bật/tắt trạng thái "Đang sửa" của form (prefix: 'hdc' | 'thu') ──
+// ── Bật/tắt trạng thái "Đang sửa" của form (prefix: 'hdc' | 'thu' | 'hdtp') ──
 // Viền vàng quanh form + nhãn "Đang sửa" + nút Hủy sửa + đổi tiêu đề/nút Lưu.
 function _dtSetEditing(prefix, on) {
   const card   = document.getElementById(prefix + '-form-card');
@@ -580,8 +579,10 @@ function _dtSetEditing(prefix, on) {
   if (card)   card.classList.toggle('dt-editing', !!on);
   if (badge)  badge.style.display  = on ? '' : 'none';
   if (cancel) cancel.style.display = on ? '' : 'none';
-  if (prefix === 'hdc') {
-    if (title) title.textContent = on ? 'Sửa Hợp Đồng Chính' : 'Khai Báo Hợp Đồng Chính';
+  if (prefix === 'hdc' || prefix === 'hdtp') {
+    // (03/10/2026) 'hdtp' = form HĐ Thầu Phụ ở tab Công Nợ (cũng đã bỏ popup)
+    const ten = prefix === 'hdc' ? 'Hợp Đồng Chính' : 'Hợp Đồng Thầu Phụ';
+    if (title) title.textContent = on ? 'Sửa ' + ten : 'Khai Báo ' + ten;
     if (save)  save.innerHTML = on
       ? '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật'
       : '<span class="material-symbols-outlined msi-gap">save</span>Lưu';

@@ -498,10 +498,12 @@ function initCongNo() {
   thauPhuContracts = load('thauphu_v1', []);
 
   ttRender();   // sub-tab CÔNG NỢ (tất toán)
-  // Chuẩn bị sẵn dữ liệu sub-tab THẦU PHỤ (bảng ẩn — sẽ hiện khi bấm sub-tab)
-  // dtPopulateSels(): nạp dropdown CT + Thầu Phụ cho modal HĐ Thầu Phụ (global) —
-  // cần gọi ở đây vì modal có thể mở từ tab Công Nợ mà chưa hề vào tab Doanh Thu.
+  // Chuẩn bị sẵn dữ liệu sub-tab HỢP ĐỒNG THẦU PHỤ (bảng ẩn — sẽ hiện khi bấm sub-tab)
+  // dtPopulateSels(): nạp dropdown CT + Thầu Phụ cho form HĐ Thầu Phụ (03/10/2026 — form nằm
+  // thẳng trên sub-tab, không còn popup) — cần gọi ở đây vì có thể chưa hề vào tab Doanh Thu.
   if (typeof dtPopulateSels === 'function') dtPopulateSels();
+  const hdtpNgay = document.getElementById('hdtp-ngay');
+  if (hdtpNgay && !hdtpNgay.value) hdtpNgay.value = today();
   if (typeof dtPopulateTpCtFilter === 'function') dtPopulateTpCtFilter();
   if (typeof renderHdtpTableTk === 'function') renderHdtpTableTk(0);
 }

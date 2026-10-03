@@ -401,8 +401,8 @@ function initDoanhThu() {
 
   // (03/10/2026) KHÔNG ép về subtab đầu và KHÔNG xóa form HĐ Chính / Thu Tiền khi mở lại tab:
   // form nay nằm thẳng trên màn hình → giữ nguyên subtab + nội dung đang nhập dở.
-  // Chỉ reset modal HĐ Thầu Phụ (dùng chung với tab Công Nợ) như trước.
-  if (typeof _hdtpResetForm === 'function') _hdtpResetForm();
+  // (03/10/2026) Form HĐ Thầu Phụ cũng đã ra ngoài màn hình (tab Công Nợ) → KHÔNG reset ở đây nữa,
+  // tránh mất nội dung đang nhập dở bên tab Công Nợ khi ghé qua tab Doanh Thu.
 }
 
 // ── Init tab LỢI NHUẬN khi mở (02/10/2026 — tab chính riêng) ──
