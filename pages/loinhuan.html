@@ -7,7 +7,7 @@
         <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
           <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
             <span class="dot"></span><span class="material-symbols-outlined msi-gap">trending_up</span>Tổng Quan Lợi Nhuận
-            <span class="text-secondary" style="font-size:11px;font-weight:400">(theo năm đang lọc — chọn "Tất cả năm" để xem toàn vòng đời)</span>
+            <span class="text-secondary" style="font-size:11px;font-weight:400">(theo NĂM HẠCH TOÁN: CT có ≥ 80% hóa đơn trong 1 năm chỉ hiện ở năm đó, số toàn vòng đời — nhãn <b>HT</b>; CT trải nhiều năm — nhãn <b>Nhiều năm</b> — hiện theo năm, riêng Lợi nhuận là số toàn thời gian)</span>
           </div>
           <!-- (03/10/2026) Mặc định bảng HIỆN ĐỦ cột chi tiết → nút ban đầu là "Thu gọn" -->
           <button class="btn btn-outline-secondary btn-sm" id="dt-ln-toggle-btn" onclick="toggleLoiNhuanDetail()">
@@ -23,6 +23,8 @@
             placeholder="Tìm tên CT hoặc CĐT..." autocomplete="off" oninput="lnSetSearch(this.value)">
           <span class="text-secondary" style="font-size:11px">Bấm vào số HĐ gốc / Đã thu / Hóa đơn / Thầu phụ để xem chi tiết · bấm tiêu đề cột để sắp xếp · <b>*</b> = cột Hóa đơn có tiền ứng NCC (rê chuột để xem)</span>
         </div>
+        <!-- (04/10/2026) Cảnh báo năm chưa có dữ liệu trong máy (năm hạch toán 80% có thể tính thiếu) -->
+        <div id="ln-year-note"></div>
         <!-- Bảng chi tiết Lợi Nhuận -->
         <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
           <div id="dt-loinhuan-wrap"></div>

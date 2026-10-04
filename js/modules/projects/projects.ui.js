@@ -1183,18 +1183,51 @@ function openCTDetail(id) {
       ${_mCross.cross ? `<div style="font-size:10px;font-style:italic;color:#9ca3af;margin-top:6px">*(Dữ liệu chi phí trải dài từ năm ${_mCross.startY} - ${_mCross.endY})</div>` : ''}
     </div>`;
 
-  // Cột 3 — HIỆU QUẢ: số CHÍNH = lãi/lỗ TỚI HIỆN TẠI = Đã thu − (chi thực tế + chi phí chia tỉ trọng).
-  //   (04/10/2026) Đã bỏ câu giải thích lãi/lỗ dự kiến — chỉ hiển thị con số.
-  //   Đã hoàn thành/quyết toán: dùng luôn lãi/lỗ cuối (loiNhuan).
-  const laiHienTai = tongThu - (tongChiCongTrinh + _chiPhiChungFixed); // lãi/lỗ dòng tiền tới hiện tại
-  const _hqNum   = isActiveCT ? laiHienTai : loiNhuan;
+  // Cột 3 — HIỆU QUẢ (LÃI / LỖ) — (04/10/2026) ĐỒNG BỘ với tab LỢI NHUẬN qua lnHieuQuaCT():
+  //   • CT có năm chiếm ≥ 80% hóa đơn → lợi nhuận hạch toán vào năm đó (= số toàn vòng đời)
+  //   • Không năm nào đạt 80%        → lợi nhuận toàn thời gian
+  //   Lợi nhuận = Tổng đã thu − (Hóa đơn + Thầu phụ + CP chung) theo dòng tiền thực (cash-basis).
+  //   KHÔNG phụ thuộc năm đang lọc → mở popup ở năm nào cũng ra cùng 1 số, khớp tab Lợi Nhuận.
+  // Kèm: Tỷ suất lợi nhuận = Lợi nhuận / Tổng đã thu × 100 (chưa có doanh thu → "—") + huy hiệu đánh giá.
+  // Fallback (tab Lợi Nhuận chưa nạp): lãi/lỗ dòng tiền theo năm đang lọc như trước.
+  const _hq = (typeof lnHieuQuaCT === 'function') ? lnHieuQuaCT(p) : null;
+  const _hqNum    = _hq ? _hq.ln : (tongThu - (tongChiCongTrinh + _chiPhiChungFixed));
+  const _hqDt     = _hq ? _hq.dt : tongThu;
+  const _hqMargin = _hq ? _hq.margin : (_hqDt > 0 ? _hqNum / _hqDt * 100 : null);   // chia cho 0 → null
   const _hqPos   = _hqNum >= 0;
   const _hqColor = _hqPos ? CG : CR;
   const _hqBg    = _hqPos ? BG : BR;
+  // Huy hiệu: Tốt (> 15%) · Thấp (0–15%) · Báo Động Lỗ (< 0) · Chưa có doanh thu
+  const _hqBadge = (typeof lnMarginBadge === 'function') ? lnMarginBadge(_hqNum, _hqMargin)
+    : (_hqNum < 0 ? '<span class="badge bg-danger">Báo Động Lỗ</span>' : '');
+  // Tỷ suất: 1 chữ số thập phân, giữ dấu âm khi lỗ
+  const _hqMarginTxt = _hqMargin === null ? '—'
+    : _hqMargin.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+  // Dòng giải thích cách hạch toán (rê chuột xem tỷ trọng hóa đơn từng năm)
+  const _hqEy = _hq && _hq.ey;
+  const _hqEyTip = (_hqEy && typeof _lnEyBreakdown === 'function') ? _lnEyBreakdown(_hqEy) : '';
+  const _hqBasis = !_hq ? `Dòng tiền theo ${x(yearLabel.toLowerCase())}`
+    : _hqEy.year ? `Hạch toán năm <b>${_hqEy.year}</b> (${Math.round(_hqEy.share * 100)}% hóa đơn)`
+    : (_hqEy.total ? 'Toàn thời gian (chi phí trải nhiều năm)' : 'Toàn thời gian');
   const _colProfit = `
     <div style="border:1.5px solid ${_hqColor};border-radius:8px;padding:11px 14px;background:${_hqBg}">
-      ${_lb((_hqPos ? '<span class="material-symbols-outlined msi-gap">trending_up</span>' : '<span class="material-symbols-outlined msi-gap">trending_down</span>') + 'Hiệu Quả (Lãi / Lỗ)')}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        ${_lb((_hqPos ? '<span class="material-symbols-outlined msi-gap">trending_up</span>' : '<span class="material-symbols-outlined msi-gap">trending_down</span>') + 'Hiệu Quả (Lãi / Lỗ)')}
+        <span style="flex-shrink:0">${_hqBadge}</span>
+      </div>
       <div style="font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${_hqColor};line-height:1.2">${_hqPos ? '' : '−'}${fmtS(Math.abs(_hqNum))}</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px;font-size:12px">
+        <span class="text-secondary">Tỷ suất lợi nhuận</span>
+        <strong style="font-family:'IBM Plex Mono',monospace;color:${_hqMargin === null ? 'var(--bs-secondary-color)' : _hqColor}"
+          title="Lợi nhuận / Tổng đã thu × 100">${_hqMarginTxt}</strong>
+      </div>
+      ${_hq ? `<div class="text-secondary" style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px">
+        <span>Đã thu ${fmtS(_hq.dt)}</span><span>Chi ${fmtS(_hq.chi)}</span>
+      </div>` : ''}
+      <div class="text-secondary" style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bs-border-color)"
+        ${_hqEyTip ? `title="Tỷ trọng hóa đơn: ${x(_hqEyTip)}"` : ''}>
+        <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">event</span>${_hqBasis}
+      </div>
     </div>`;
 
   html += `<div class="ctd-core" style="display:grid;grid-template-columns:repeat(${_cols},minmax(0,1fr));gap:10px;margin-bottom:14px">

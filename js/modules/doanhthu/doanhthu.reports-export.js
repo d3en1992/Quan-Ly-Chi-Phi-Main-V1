@@ -369,6 +369,75 @@ function _lnCdtOf(p) {
   return c ? (c.name || '') : ((p && p.chuDauTu) || '');
 }
 
+// ══ NĂM HẠCH TOÁN CHÍNH (Effective Year) — thuật toán "Tỷ trọng 80%" (04/10/2026) ══════════
+// Vấn đề: CT thi công chủ yếu năm 2025 (hóa đơn 1,18 tỷ) chỉ lặt vặt sang 2026 (141 nghìn) vẫn hiện
+// lợi nhuận ở năm 2026 → sai bức tranh tài chính. Cách xác định năm hạch toán của 1 công trình:
+//   1) Gom TỔNG HÓA ĐƠN của CT theo từng năm, trên TOÀN VÒNG ĐỜI (không theo bộ lọc năm).
+//   2) Năm nào chiếm ≥ 80% tổng hóa đơn vòng đời → effectiveYear = năm đó.
+//      Không năm nào đạt 80% (VD 60% / 40%) hoặc CT chưa có hóa đơn → effectiveYear = null.
+// Cách hiển thị khi đang lọc 1 (hoặc vài) năm — xem renderLoiNhuan():
+//   • Có effectiveYear  → CT CHỈ hiện khi lọc đúng năm đó, mọi cột là số TOÀN VÒNG ĐỜI
+//                         (cả công trình hạch toán vào 1 năm). Lọc năm khác → ẩn.
+//   • effectiveYear null → các cột Đã thu / Hóa đơn / Thầu phụ / CP chung hiện THEO NĂM như cũ,
+//                         riêng cột LỢI NHUẬN là số TOÀN THỜI GIAN (năm nào cũng cùng 1 số).
+// Lọc "Tất cả năm" → mọi CT đều là số toàn vòng đời (như trước).
+// LƯU Ý: chỉ tính được trên dữ liệu ĐANG CÓ TRONG MÁY. Năm chưa từng tải (qtMissingYears) sẽ thiếu
+// → hiện cảnh báo #ln-year-note để người dùng chọn năm đó 1 lần cho máy tải về.
+const LN_EY_RATE = 0.8;   // ngưỡng tỷ trọng (80%)
+
+// Hóa đơn có thuộc công trình p không (cùng quy tắc lnTinhCongTrinh)
+function _lnInvOfProj(rec, p) {
+  return (rec.projectId && rec.projectId === p.id) ||
+    (!rec.projectId && ((resolveProjectName(rec) === p.name) || (rec.congtrinh === p.name)));
+}
+
+// Gom tổng hóa đơn của công trình theo năm + xác định năm hạch toán
+// invsAll: hóa đơn MỌI NĂM (chưa lọc năm, đã bỏ bản xóa). Trả về
+//   { year: number|null, share: tỷ lệ năm cao nhất (0..1), total, byYear: { 2025: 1180000000, ... } }
+function lnEffectiveYear(p, invsAll) {
+  const byYear = {};
+  let total = 0;
+  (invsAll || []).forEach(i => {
+    if (!i.ngay || !_lnInvOfProj(i, p)) return;
+    const y = parseInt(String(i.ngay).slice(0, 4));
+    if (!y) return;
+    const v = i.thanhtien || i.tien || 0;
+    byYear[y] = (byYear[y] || 0) + v;
+    total += v;
+  });
+  let year = null, share = 0;
+  if (total > 0) {
+    Object.entries(byYear).forEach(([y, v]) => {
+      const s = v / total;
+      if (s > share) share = s;
+      if (s >= LN_EY_RATE) year = parseInt(y);
+    });
+  }
+  return { year, share, total, byYear };
+}
+
+// Chạy fn() như đang chọn "Tất cả năm" (để tính số TOÀN VÒNG ĐỜI bằng chính các hàm theo năm sẵn có:
+// _dtInYear, inActiveYear, calcTongDoanhThu, allocateCompanyCost…) rồi TRẢ LẠI bộ lọc năm như cũ.
+// Chạy đồng bộ + finally → bộ lọc năm luôn được khôi phục, không ảnh hưởng tab khác.
+function _lnAllYears(fn) {
+  const saveYears = activeYears, saveYear = activeYear;
+  try {
+    activeYears = new Set();
+    activeYear  = 0;
+    return fn();
+  } finally {
+    activeYears = saveYears;
+    activeYear  = saveYear;
+  }
+}
+
+// Mô tả tỷ trọng theo năm cho tooltip: "2025: 99,9% · 2026: 0,1%"
+function _lnEyBreakdown(ey) {
+  if (!ey || !ey.total) return 'Chưa có hóa đơn';
+  return Object.keys(ey.byYear).sort().map(y =>
+    `${y}: ${(ey.byYear[y] / ey.total * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`).join(' · ');
+}
+
 // ── TÍNH số liệu mọi công trình + vẽ mini dashboard, rồi vẽ bảng ──
 // Gọi khi mở tab / đổi năm / dữ liệu đổi. Gõ tìm & sắp xếp chỉ gọi _lnRenderTable().
 function renderLoiNhuan() {
@@ -379,18 +448,52 @@ function renderLoiNhuan() {
   const _lnProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => p && p.id !== 'COMPANY');
 
+  const yearMode = !!(activeYears && activeYears.size > 0);   // false = "Tất cả năm"
+
+  // (1) Số liệu TOÀN VÒNG ĐỜI của mọi CT (tính 1 lượt dưới chế độ "Tất cả năm")
+  const lifeMap = _lnAllYears(() => {
+    const ctxL = _lnContext();
+    return new Map(_lnProjs.map(p => [p.id, lnTinhCongTrinh(p, ctxL)]));
+  });
+  // (2) Số liệu THEO NĂM ĐANG LỌC (chỉ cần khi đang lọc năm)
+  const ctxY = yearMode ? _lnContext() : null;
+  // (3) Hóa đơn mọi năm — để xác định năm hạch toán
+  const invsAll = getInvoicesCached().filter(i => !i.deletedAt);
+
   // Số liệu từng công trình — hàm dùng chung lnTinhCongTrinh (Hồ sơ Khách hàng cũng gọi)
   // Gắn thêm tên CĐT + bản KHÔNG DẤU của tên CT / CĐT (chuẩn hóa 1 lần, dùng cho mọi lần gõ tìm)
-  const ctx = _lnContext();
   _lnRowsAll = _lnProjs.map(p => {
-    const r = lnTinhCongTrinh(p, ctx);
-    r.cdt   = _lnCdtOf(p);
+    const ey   = lnEffectiveYear(p, invsAll);
+    const life = lifeMap.get(p.id);
+    let r;
+    if (!yearMode) {
+      r = { ...life, mode: 'all' };                                  // Tất cả năm: toàn vòng đời
+    } else if (ey.year) {
+      if (!activeYears.has(ey.year)) return null;                     // hạch toán năm khác → ẩn
+      r = { ...life, mode: 'ey' };                                    // hạch toán năm này: toàn vòng đời
+    } else {
+      r = lnTinhCongTrinh(p, ctxY);                                   // không đạt 80%: cột theo năm…
+      r.lnNam = r.ln;                                                 // (giữ lời/lỗ riêng năm để tooltip)
+      r.ln    = life.ln;                                              // …riêng LỢI NHUẬN = toàn thời gian
+      r.mode  = 'split';
+    }
+    r.ey     = ey;
+    r.cdt    = _lnCdtOf(p);
     r._nName = _lnNorm(r.name);
     r._nCdt  = _lnNorm(r.cdt);
     return r;
-  }).filter(r => r.dt || r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
+  }).filter(r => r && (r.dt || r.A || r.B || r.C || r.X || r.Y)); // bỏ công trình không có dữ liệu
 
   _lnRowsAll.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
+  // Cảnh báo: năm chưa có dữ liệu trong máy → tỷ trọng 80% có thể tính thiếu
+  const note = document.getElementById('ln-year-note');
+  if (note) {
+    const miss = (yearMode && typeof qtMissingYears === 'function') ? qtMissingYears() : [];
+    note.innerHTML = miss.length
+      ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:12px">⚠ Máy chưa có dữ liệu năm <b>${miss.join(', ')}</b> — năm hạch toán (quy tắc 80%) của một số công trình có thể chưa chính xác. Chọn năm đó ở bộ lọc năm 1 lần để tải về, rồi quay lại.</div>`
+      : '';
+  }
 
   // Ô tìm kiếm giữ chữ đang gõ (đồng bộ lại state khi tab được vẽ lại)
   const sEl = document.getElementById('ln-search');
@@ -403,11 +506,54 @@ function renderLoiNhuan() {
   }
 
   // ── Mini dashboard (donut + bar) — luôn tính trên TOÀN BỘ công trình, không theo ô tìm ──
+  // Lợi nhuận tổng = Σ lợi nhuận từng dòng (dòng "không đạt 80%" dùng lợi nhuận toàn thời gian)
   const aChi = _lnSum(_lnRowsAll, 'A') + _lnSum(_lnRowsAll, 'B') + _lnSum(_lnRowsAll, 'C');
   const aDt  = _lnSum(_lnRowsAll, 'dt');
-  if (dash) dash.innerHTML = _lnBuildDashboard(_lnRowsAll, aChi, aDt, aDt - aChi);
+  if (dash) dash.innerHTML = _lnBuildDashboard(_lnRowsAll, aChi, aDt, _lnSum(_lnRowsAll, 'ln'));
 
   _lnRenderTable();
+}
+
+// ══ HIỆU QUẢ (LÃI / LỖ) CỦA 1 CÔNG TRÌNH — dùng CHUNG tab Lợi Nhuận và popup Chi tiết công trình ══
+// (04/10/2026) Theo đúng quy tắc năm hạch toán 80% của tab Lợi Nhuận:
+//   • Có năm chiếm ≥ 80% hóa đơn → lợi nhuận hạch toán vào năm đó = số TOÀN VÒNG ĐỜI công trình
+//     (đúng con số dòng của CT khi lọc năm đó ở tab Lợi Nhuận).
+//   • Không năm nào đạt 80% → lợi nhuận TOÀN THỜI GIAN (đúng con số cột Lợi nhuận mọi năm ở tab).
+//   → cả 2 trường hợp đều là lợi nhuận TOÀN VÒNG ĐỜI; khác nhau ở nhãn giải thích (ey.year).
+// Công thức lợi nhuận = Tổng đã thu − (Hóa đơn + Thầu phụ + CP chung) cash-basis — lnTinhCongTrinh.
+// Tỷ suất lợi nhuận (margin) = Lợi nhuận / Tổng đã thu × 100 ; chưa có doanh thu → null.
+// @returns {{ ey, row, ln, dt, chi, margin }}
+function lnHieuQuaCT(p) {
+  const invsAll = getInvoicesCached().filter(i => !i.deletedAt);
+  const ey  = lnEffectiveYear(p, invsAll);
+  const row = _lnAllYears(() => lnTinhCongTrinh(p, _lnContext()));
+  const margin = row.dt > 0 ? (row.ln / row.dt) * 100 : null;
+  return { ey, row, ln: row.ln, dt: row.dt, chi: row.chi, margin };
+}
+
+// Huy hiệu đánh giá hiệu quả theo tỷ suất lợi nhuận:
+//   lỗ (ln < 0)            → đỏ  "Báo Động Lỗ"
+//   chưa có doanh thu       → xám "Chưa có doanh thu"
+//   tỷ suất > 15%           → xanh "Tốt"
+//   tỷ suất 0 – 15%         → vàng "Thấp"
+const LN_MARGIN_TOT = 15;   // ngưỡng "Tốt" (%)
+function lnMarginBadge(ln, margin) {
+  if (ln < 0)          return '<span class="badge bg-danger">Báo Động Lỗ</span>';
+  if (margin === null) return '<span class="badge bg-secondary">Chưa có doanh thu</span>';
+  if (margin > LN_MARGIN_TOT) return '<span class="badge bg-success">Tốt</span>';
+  return '<span class="badge bg-warning text-dark">Thấp</span>';
+}
+
+// Nhãn nhỏ cạnh tên CT cho biết cách hạch toán (chỉ khi đang lọc năm)
+function _lnEyBadge(r) {
+  if (r.mode === 'ey') {
+    const pct = Math.round(r.ey.share * 100);
+    return `<span class="ln-ey" title="Năm hạch toán ${r.ey.year}: chiếm ${pct}% tổng hóa đơn (${_lnEyBreakdown(r.ey)}). Mọi cột là số TOÀN VÒNG ĐỜI công trình.">HT ${r.ey.year} · ${pct}%</span>`;
+  }
+  if (r.mode === 'split') {
+    return `<span class="ln-ey is-split" title="Không năm nào chiếm ≥ 80% hóa đơn (${_lnEyBreakdown(r.ey)}). Các cột hiện theo năm đang lọc; riêng LỢI NHUẬN là số TOÀN THỜI GIAN.">Nhiều năm</span>`;
+  }
+  return '';
 }
 
 // Cộng 1 cột số của danh sách dòng
@@ -429,7 +575,8 @@ function _lnRenderTable() {
   // Tổng cộng (theo các dòng đang hiển thị)
   const tA = _lnSum(rowsData, 'A'), tB = _lnSum(rowsData, 'B'), tC = _lnSum(rowsData, 'C');
   const tDt = _lnSum(rowsData, 'dt'), tX = _lnSum(rowsData, 'X');
-  const tChi = tA + tB + tC, tLN = tDt - tChi;
+  // Lợi nhuận tổng = Σ lợi nhuận từng dòng (không lấy tDt − tChi: dòng "Nhiều năm" dùng LN toàn thời gian)
+  const tChi = tA + tB + tC, tLN = _lnSum(rowsData, 'ln');
 
   // ── Bảng chi tiết (03/10/2026 — thiết kế lại theo "phân cấp thị giác") ──
   // Bố cục 4 khu vực, ngăn bằng kẻ dọc nhẹ:
@@ -455,12 +602,12 @@ function _lnRenderTable() {
                <td class="text-end ln-sub">${L(_lnNum(r.B), r.B, 'thauphu')}</td>
                <td class="text-end ln-sub">${_lnNum(r.C)}</td>` : ''}
       ${_lnChiCell(r.chi, r.dt, det ? '' : SEP)}
-      <td class="text-end ${SEP}">${_lnBadge(r.ln)}</td>`;
+      <td class="text-end ${SEP}"${r.mode === 'split' ? ` title="Lợi nhuận TOÀN THỜI GIAN của công trình (riêng năm đang lọc: ${_lnShort(r.lnNam)})"` : ''}>${_lnBadge(r.ln)}</td>`;
   };
 
   // Tên CĐT hiện nhỏ dưới tên công trình (để thấy vì sao dòng khớp khi tìm theo CĐT)
   const rows = rowsData.map(r => `<tr>
-      <td class="ln-name">${x(r.name)}${r.cdt ? `<div class="ln-cdt">${x(r.cdt)}</div>` : ''}</td>${_rowCells(r, true)}
+      <td class="ln-name">${x(r.name)} ${_lnEyBadge(r)}${r.cdt ? `<div class="ln-cdt">${x(r.cdt)}</div>` : ''}</td>${_rowCells(r, true)}
     </tr>`).join('');
 
   const totalRow = { dt: tDt, X: tX, A: tA, B: tB, C: tC, chi: tChi, ln: tLN };
@@ -515,9 +662,7 @@ function _lnContext() {
 function lnTinhCongTrinh(p, ctx) {
   ctx = ctx || _lnContext();
   // Helper: 1 bản ghi (hóa đơn) có thuộc công trình p không
-  const _matchProj = (rec) =>
-    (rec.projectId && rec.projectId === p.id) ||
-    (!rec.projectId && ((resolveProjectName(rec) === p.name) || (rec.congtrinh === p.name)));
+  const _matchProj = (rec) => _lnInvOfProj(rec, p);
   // (04/10/2026) CASH-BASIS — chi phí tính theo tiền THỰC CHI:
   //   (B) Thầu phụ = Σ tiền ĐÃ ỨNG cho thầu phụ của CT (không lấy giá trị HĐ thầu phụ)
   //   (A) Hóa đơn  = Σ hóa đơn của các NCC CHƯA có phiếu ứng ở CT này
@@ -650,6 +795,8 @@ window.initLoiNhuan = initLoiNhuan;
 window.lnDrill = lnDrill;
 window.lnSortBy = lnSortBy;
 window.lnSetSearch = lnSetSearch;
+window.lnHieuQuaCT = lnHieuQuaCT;
+window.lnMarginBadge = lnMarginBadge;
 window.dtGoSub = dtGoSub;
 
 // [ADDED COPY KLCT]
