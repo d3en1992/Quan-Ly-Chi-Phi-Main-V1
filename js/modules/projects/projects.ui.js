@@ -490,25 +490,31 @@ const _CT_SECTIONS = [
 
 // ── 1 thẻ công trình (dùng chung cho mọi chế độ xem) ──
 // it = { p, c, tongChi, days, noCost }
+// (04/10/2026) Bố cục 5 thông tin: [1] TÊN ĐẦY ĐỦ (không cắt mã CT/SC/SN ở đầu — trước đây
+// _ctCategoryInfo().display bỏ mất mã và hiện badge riêng) · [2] ĐỊA CHỈ công trình (p.note) ngay
+// dưới tên · [3] CHI PHÍ (góc phải, như cũ) · [4] TRẠNG THÁI (badge như cũ) · [5] SỐ NGÀY thi công.
+// Đã bỏ dòng "N hóa đơn" cho gọn.
 function _ctCardHtml(it) {
   const { p, c, tongChi, days, noCost } = it;
-  const dim      = p.status === 'closed' ? 'opacity:.72;' : '';
-  const durLabel = days > 0 ? `${days} ngày` : '';
-  const _cat = _ctCategoryInfo(p.name);
-  const _badges = `<span style="display:inline-flex;gap:4px;margin-left:5px;vertical-align:middle">${_ctCategoryBadge(p.name)}${_ctCrossYearBadge(p, (c && c.invs) || [])}</span>`;
-  const countLine = (!noCost && c.count > 0)
-    ? `<span>${c.count} hóa đơn</span>${durLabel ? `<span class="text-secondary">·</span><span>${durLabel}</span>` : ''}`
-    : `<span class="ghost">Chưa phát sinh</span>`;
+  const dim   = p.status === 'closed' ? 'opacity:.72;' : '';
+  const cross = _ctCrossYearBadge(p, (c && c.invs) || []);
+  // Số ngày thi công: thẻ "chưa phát sinh" chưa tính sẵn → tính theo ngày bắt đầu / kết thúc
+  const d = days > 0 ? days : (noCost ? _ptDurationDays(p, []) : 0);
+  const dayLine = d > 0
+    ? `<span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">schedule</span> ${d} ngày thi công`
+    : '<span class="ghost">Chưa có ngày thi công</span>';
+  const addr = (p.note || '').trim();
   // [FIX] Hiển thị TỔNG CHI thực tế (gồm ứng thầu phụ / NCC) thay vì chỉ tổng hóa đơn
   const total = noCost ? '<span class="text-secondary">—</span>' : fmtS(tongChi);
   return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
     <div class="ct-card-head" style="align-items:flex-start">
       <div style="flex:1;min-width:0">
-        <div class="ct-card-name" style="margin-bottom:5px">${x(_cat.display)}${_badges}</div>
-        <div style="margin-bottom:4px">${_ptStatusBadge(p.status)}</div>
-        <div class="ct-card-count" style="display:flex;gap:6px;flex-wrap:wrap">
-          ${countLine}
+        <div class="ct-card-name">${x(p.name)}${cross ? ` <span style="vertical-align:middle">${cross}</span>` : ''}</div>
+        <div class="ct-card-addr" title="${x(addr || 'Chưa có địa chỉ công trình')}">
+          <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">location_on</span>${addr ? x(addr) : '<span class="ghost">Chưa có địa chỉ</span>'}
         </div>
+        <div style="margin:5px 0 3px">${_ptStatusBadge(p.status)}</div>
+        <div class="ct-card-count">${dayLine}</div>
       </div>
       <div class="ct-card-total" style="margin-left:8px">${total}</div>
     </div>
@@ -722,7 +728,6 @@ function _ctRenderGrid() {
       <div style="flex:1;min-width:0">
         <div class="ct-card-name" style="margin-bottom:5px"><span class="material-symbols-outlined msi-gap">apartment</span>${x(PROJECT_COMPANY.name)}</div>
         <div style="margin-bottom:4px"><span class="text-primary fw-bold" style="font-size:10px;padding:2px 9px;border-radius:10px;background:rgba(var(--bs-primary-rgb),.1);white-space:nowrap">Chi phí chung</span></div>
-        <div class="ct-card-count">${companyCosts.count} hóa đơn</div>
       </div>
       <div class="ct-card-total" style="margin-left:8px">${fmtS(companyCosts.total)}</div>
     </div>
@@ -1273,18 +1278,62 @@ function _ctSelectCustomer(prefix, id) {
 function _onCustPickerChange(prefix) {
   const id = document.getElementById(`ct-${prefix}-customer`)?.value || '';
   const c  = id && typeof getCustomerById === 'function' ? getCustomerById(id) : null;
-  // Kế thừa địa chỉ: chỉ điền khi ô trống hoặc đang chứa địa chỉ do app tự điền trước đó
-  const noteEl = document.getElementById(`ct-${prefix}-note`);
-  const st = _ctFormAuto[prefix];
-  if (noteEl && c && c.address) {
-    const cur = noteEl.value.trim();
-    if (!cur || cur === st.note) {
-      noteEl.value = c.address;
-      st.note = c.address;
-      _ctFlash(noteEl);
-    }
-  }
+  _ctApplyCustAddress(prefix, c);
   if (prefix === 'new') _ctAutoName();
+}
+
+// ── Tự điền ĐỊA CHỈ CÔNG TRÌNH từ địa chỉ khách hàng — "nhẹ tay" (04/10/2026) ──
+//   • Ô trống, hoặc đang là địa chỉ APP tự điền trước đó (người dùng chưa sửa) → điền + nháy viền
+//     + dòng nhắc "Đã tự điền từ địa chỉ khách hàng".
+//   • Ô đã có địa chỉ NGƯỜI DÙNG gõ/sửa → TUYỆT ĐỐI không đè; chỉ hiện gợi ý nhỏ
+//     "Địa chỉ khách: … [Dùng địa chỉ này]" để người dùng tự quyết.
+//   • Khách không có địa chỉ: ô đang giữ địa chỉ tự điền của khách CŨ → trả về trống (khỏi nhầm).
+function _ctApplyCustAddress(prefix, c) {
+  const noteEl = document.getElementById(`ct-${prefix}-note`);
+  const hint   = document.getElementById(`ct-${prefix}-note-hint`);
+  if (!noteEl) return;
+  const st   = _ctFormAuto[prefix];
+  const cur  = noteEl.value.trim();
+  const addr = c && c.address ? c.address.trim() : '';
+  if (!addr) {
+    if (cur && cur === st.note) { noteEl.value = ''; st.note = ''; }
+    if (hint) hint.innerHTML = '';
+    return;
+  }
+  if (!cur || cur === st.note) {
+    noteEl.value = addr;
+    st.note = addr;
+    _ctFlash(noteEl);
+    if (hint) hint.innerHTML = '<span class="text-success"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">auto_awesome</span> Đã tự điền từ địa chỉ khách hàng — sửa lại nếu công trình ở chỗ khác.</span>';
+    return;
+  }
+  if (cur === addr) { if (hint) hint.innerHTML = ''; return; }
+  // Người dùng đã nhập địa chỉ khác → không đè, chỉ gợi ý
+  if (hint) hint.innerHTML = `<span class="text-secondary">Địa chỉ khách: <b>${x(addr)}</b></span>
+    <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline text-decoration-none" style="font-size:11.5px" onclick="_ctUseCustAddress('${prefix}')">Dùng địa chỉ này</button>`;
+}
+
+// Nút "Dùng địa chỉ này" — người dùng CHỦ ĐỘNG lấy địa chỉ khách
+function _ctUseCustAddress(prefix) {
+  const id = document.getElementById(`ct-${prefix}-customer`)?.value || '';
+  const c  = id ? getCustomerById(id) : null;
+  const noteEl = document.getElementById(`ct-${prefix}-note`);
+  if (!c || !c.address || !noteEl) return;
+  noteEl.value = c.address;
+  _ctFormAuto[prefix].note = c.address;
+  _ctFlash(noteEl);
+  const hint = document.getElementById(`ct-${prefix}-note-hint`);
+  if (hint) hint.innerHTML = '';
+}
+
+// Người dùng gõ vào ô địa chỉ → đó là địa chỉ "của người dùng" (không còn coi là tự điền)
+function _ctNoteTyped(prefix) {
+  const noteEl = document.getElementById(`ct-${prefix}-note`);
+  if (noteEl && noteEl.value.trim() !== _ctFormAuto[prefix].note) {
+    _ctFormAuto[prefix].note = '';
+    const hint = document.getElementById(`ct-${prefix}-note-hint`);
+    if (hint && hint.textContent.includes('Đã tự điền')) hint.innerHTML = '';
+  }
 }
 
 // Nháy viền xanh ngắn để người dùng thấy ô vừa được tự điền
@@ -1294,17 +1343,30 @@ function _ctFlash(el) {
   setTimeout(() => { el.style.boxShadow = ''; }, 900);
 }
 
-// Gợi ý tên công trình: "<Loại> <Tên khách> - <Hạng mục> - T<tháng>/<yy>"
+// Độ dài tối đa tên công trình (ô nhập có maxlength tương ứng)
+const CT_NAME_MAX = 40;
+
+// Gợi ý tên công trình: "<Loại> <Tên khách> - <Hạng mục>"
+// (04/10/2026) Bỏ phần "- T<tháng>/<năm>" — ngày thi công đã lưu riêng (Ngày bắt đầu).
+// Dài quá CT_NAME_MAX → cắt bớt ở cuối (ô tên vẫn sửa tay được).
 function _ctSuggestName(prefix) {
   const loai = document.getElementById(`ct-${prefix}-loai`)?.value || 'CT';
   const cid  = document.getElementById(`ct-${prefix}-customer`)?.value || '';
   const c    = cid && typeof getCustomerById === 'function' ? getCustomerById(cid) : null;
   const hm   = (document.getElementById(`ct-${prefix}-hangmuc`)?.value || '').trim();
-  const sd   = document.getElementById(`ct-${prefix}-startdate`)?.value || new Date().toISOString().slice(0, 10);
-  const tg   = /^\d{4}-\d{2}/.test(sd) ? `T${parseInt(sd.slice(5, 7), 10)}/${sd.slice(2, 4)}` : '';
-  const parts = [c ? c.name : '', hm, tg].filter(Boolean);
   if (!c) return '';                                   // chưa chọn khách → chưa gợi ý
-  return (loai !== 'KHAC' ? loai + ' ' : '') + parts.join(' - ');
+  const name = (loai !== 'KHAC' ? loai + ' ' : '') + [c.name, hm].filter(Boolean).join(' - ');
+  return name.length > CT_NAME_MAX ? name.slice(0, CT_NAME_MAX).trim() : name;
+}
+
+// Bộ đếm ký tự dưới ô tên ("12/40")
+function _ctNameCounter(prefix) {
+  const el = document.getElementById(`ct-${prefix}-name`);
+  const ct = document.getElementById(`ct-${prefix}-name-count`);
+  if (!el || !ct) return;
+  const n = el.value.length;
+  ct.textContent = `${n}/${CT_NAME_MAX}`;
+  ct.className = n >= CT_NAME_MAX ? 'text-danger fw-semibold' : 'text-secondary';
 }
 
 // Tự điền tên (form tạo) nếu người dùng chưa sửa tay ô tên
@@ -1315,6 +1377,7 @@ function _ctAutoName(force) {
   if (!_ctFormAuto.new.name) return;
   const sug = _ctSuggestName('new');
   if (sug) el.value = sug;
+  _ctNameCounter('new');
 }
 
 // Đổi mã loại ở đầu tên (form sửa): "SC Nhà A..." + chọn SN → "SN Nhà A..."
@@ -1356,7 +1419,14 @@ function _resolveCustomerFromPicker(prefix) {
 // ══════════════════════════════════════════════════════════════════
 //  MODAL TẠO MỚI
 // ══════════════════════════════════════════════════════════════════
-function openCTCreateModal() {
+// opts.customerId: chọn sẵn Chủ đầu tư (mở từ Hồ sơ Khách hàng — 04/10/2026)
+function openCTCreateModal(opts) {
+  opts = (opts && typeof opts === 'object' && !(opts instanceof Event)) ? opts : {};
+  // Form tạo đang mở dở (người dùng đang nhập) → KHÔNG vẽ lại form (mất dữ liệu); chỉ chọn khách
+  if (opts.customerId && document.getElementById('ct-modal')?.classList.contains('open') && document.getElementById('ct-new-name')) {
+    _ctSelectCustomer('new', opts.customerId);
+    return;
+  }
   const today   = new Date().toISOString().slice(0, 10);
   const _curY   = new Date().getFullYear();
   const _defSD  = (typeof activeYear !== 'undefined' && activeYear > 0 && activeYear < _curY)
@@ -1398,15 +1468,18 @@ function openCTCreateModal() {
         <label style="${lblStyle}">Tên Công Trình *
           <button type="button" class="btn btn-link btn-sm p-0 ms-2 text-decoration-none" style="font-size:11px;text-transform:none;letter-spacing:0" onclick="_ctAutoName(true)" title="Điền lại tên theo gợi ý">↺ Gợi ý lại</button>
         </label>
-        <input id="ct-new-name" type="text" placeholder="Chọn Chủ đầu tư → tự gợi ý: SN Cô Sáu - Hạng mục - T10/26" autocomplete="off"
-          style="${inpStyle};font-size:14px" oninput="_ctFormAuto.new.name=false">
-        <div class="text-secondary" style="font-size:11px;margin-top:3px">Tự gợi ý theo cú pháp <b>Loại Tên khách - Hạng mục - Tháng/Năm</b>. Sửa tay thì app ngừng tự điền.</div>
+        <input id="ct-new-name" type="text" maxlength="${CT_NAME_MAX}" placeholder="Chọn Chủ đầu tư → tự gợi ý: SN Cô Sáu - Ốp gạch sân vườn" autocomplete="off"
+          style="${inpStyle};font-size:14px" oninput="_ctFormAuto.new.name=false;_ctNameCounter('new')">
+        <div class="d-flex justify-content-between gap-2" style="font-size:11px;margin-top:3px">
+          <span class="text-secondary">Tự gợi ý theo cú pháp <b>Loại Tên khách - Hạng mục</b> (ngày thi công đã lưu riêng). Sửa tay thì app ngừng tự điền.</span>
+          <span id="ct-new-name-count" class="text-secondary" style="white-space:nowrap">0/${CT_NAME_MAX}</span>
+        </div>
       </div>
       <!-- Hàng 4: Ngày bắt đầu | Ngày kết thúc -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
           <label style="${lblStyle}">Ngày Bắt Đầu</label>
-          <input id="ct-new-startdate" type="date" value="${_defSD}" onchange="_ctAutoName()"
+          <input id="ct-new-startdate" type="date" value="${_defSD}"
             style="${inpStyle};font-family:'IBM Plex Mono',monospace">
         </div>
         <div>
@@ -1424,7 +1497,8 @@ function openCTCreateModal() {
       <div>
         <label style="${lblStyle}">Địa Chỉ Công Trình</label>
         <input id="ct-new-note" type="text" placeholder="Địa chỉ công trình (tự điền từ địa chỉ khách hàng)..." autocomplete="off"
-          style="${inpStyle}">
+          style="${inpStyle}" oninput="_ctNoteTyped('new')">
+        <div id="ct-new-note-hint" style="font-size:11.5px;margin-top:3px"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:4px">
         <button class="btn btn-primary" style="flex:1" onclick="saveCTCreate()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Công Trình</button>
@@ -1433,7 +1507,13 @@ function openCTCreateModal() {
     </div>
   `;
   document.getElementById('ct-modal').classList.add('open');
-  setTimeout(() => document.getElementById('ct-new-customer')?.focus(), 80);
+  if (opts.customerId && typeof getCustomerById === 'function' && getCustomerById(opts.customerId)) {
+    // Khách chọn sẵn → điền địa chỉ (ô đang trống) + gợi ý tên; con trỏ vào ô Hạng mục
+    _ctSelectCustomer('new', opts.customerId);
+    setTimeout(() => document.getElementById('ct-new-hangmuc')?.focus(), 80);
+  } else {
+    setTimeout(() => document.getElementById('ct-new-customer')?.focus(), 80);
+  }
 }
 
 function saveCTCreate() {
@@ -1448,6 +1528,7 @@ function saveCTCreate() {
   // Chủ đầu tư bắt buộc (khóa ngoại customerId) — để gộp nhóm theo khách hàng chính xác
   if (!customerId) { toast('Vui lòng chọn Chủ Đầu Tư (hoặc bấm + Thêm nhanh)!', 'error'); document.getElementById('ct-new-customer')?.focus(); return; }
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-new-name')?.focus(); return; }
+  if (name.length > CT_NAME_MAX) { toast(`Tên công trình tối đa ${CT_NAME_MAX} ký tự (đang ${name.length})!`, 'error'); document.getElementById('ct-new-name')?.focus(); return; }
   try {
     createProject({ name, type: (loai === 'CT' || loai === 'SC') ? loai : 'OTHER', status, startDate, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId });
     closeModal();
@@ -1492,8 +1573,9 @@ function openCTEditModal(id) {
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
         <div>
           <label style="${lblStyle}">Tên Công Trình *</label>
-          <input id="ct-edit-name" type="text" value="${x(p.name)}" autocomplete="off"
-            style="${inpStyle};font-size:14px">
+          <input id="ct-edit-name" type="text" value="${x(p.name)}" maxlength="${Math.max(CT_NAME_MAX, (p.name || '').length)}" autocomplete="off"
+            style="${inpStyle};font-size:14px" oninput="_ctNameCounter('edit')">
+          <div class="text-end" style="font-size:11px;margin-top:2px"><span id="ct-edit-name-count" class="${(p.name || '').length >= CT_NAME_MAX ? 'text-danger fw-semibold' : 'text-secondary'}">${(p.name || '').length}/${CT_NAME_MAX}</span></div>
         </div>
         ${_ctLoaiSelect('edit', _ctLoaiOfName(p.name), inpStyle, lblStyle, "const n=document.getElementById('ct-edit-name');n.value=_ctSwapPrefix(n.value,this.value)")}
       </div>
@@ -1539,7 +1621,8 @@ function openCTEditModal(id) {
       <div>
         <label style="${lblStyle}">Địa Chỉ Công Trình</label>
         <input id="ct-edit-note" type="text" value="${x(p.note||'')}" placeholder="Địa chỉ công trình..." autocomplete="off"
-          style="${inpStyle}">
+          style="${inpStyle}" oninput="_ctNoteTyped('edit')">
+        <div id="ct-edit-note-hint" style="font-size:11.5px;margin-top:3px"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:4px">
         <button class="btn btn-primary" style="flex:1" onclick="saveCTEdit('${p.id}')"><span class="material-symbols-outlined msi-gap">save</span>Lưu Thay Đổi</button>
@@ -1565,6 +1648,10 @@ function saveCTEdit(id) {
   const _kRaw      = parseFloat(document.getElementById('ct-edit-hesotitrong')?.value);
   const heSoTiTrong = (isFinite(_kRaw) && _kRaw >= 0) ? _kRaw : 1;
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-edit-name')?.focus(); return; }
+  // Giới hạn 40 ký tự chỉ áp khi ĐỔI tên (CT cũ tên dài hơn vẫn lưu được các sửa đổi khác)
+  if (name.length > CT_NAME_MAX && name !== (getProjectById(id)?.name || '')) {
+    toast(`Tên công trình tối đa ${CT_NAME_MAX} ký tự (đang ${name.length})!`, 'error'); document.getElementById('ct-edit-name')?.focus(); return;
+  }
 
   // [PATCH] Validation: block nếu status=completed mà thiếu endDate
   if (status === 'completed' && !endDate) {

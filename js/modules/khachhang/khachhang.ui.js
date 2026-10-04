@@ -272,7 +272,8 @@ function _khProfileHtml(id) {
         </div>
         ${money}
       </div>`;
-  }).join('') : '<div class="text-secondary text-center py-3" style="font-size:12px">Khách hàng chưa có công trình nào.</div>';
+  }).join('') : `<div class="text-secondary text-center py-3" style="font-size:12px">Khách hàng chưa có công trình nào.
+      <button class="btn btn-link btn-sm p-0 ms-1 align-baseline" onclick="_khAddProject('${_khEsc(c.id)}')">+ Thêm công trình đầu tiên</button></div>`;
 
   return `
     <style>
@@ -290,7 +291,8 @@ function _khProfileHtml(id) {
           <span><span class="material-symbols-outlined msi-gap">location_on</span>${_khEsc(c.address || 'Chưa có địa chỉ')}</span>
         </div>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-primary btn-sm fw-semibold" onclick="_khAddProject('${_khEsc(c.id)}')" title="Tạo công trình mới cho khách hàng này"><span class="material-symbols-outlined msi-gap">add</span>Thêm Công Trình</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="_khOpenEdit('${_khEsc(c.id)}')"><span class="material-symbols-outlined msi-gap">edit</span>Sửa</button>
         <button class="btn btn-outline-danger btn-sm" onclick="_khDelete('${_khEsc(c.id)}')"><span class="material-symbols-outlined msi-gap">delete</span>Xóa</button>
       </div>
@@ -300,6 +302,14 @@ function _khProfileHtml(id) {
       <div class="fw-bold mb-1" style="font-size:13px"><span class="material-symbols-outlined msi-gap">history</span>Lịch Sử Công Trình <span class="text-secondary fw-normal" style="font-size:12px">(${projs.length})</span></div>
       <div class="kh-tl">${timeline}</div>
     </div>`;
+}
+
+// Nút "+ Thêm Công Trình" trong hồ sơ (04/10/2026) → đóng hồ sơ, mở form "Thêm Công Trình Mới"
+// với Chủ đầu tư CHỌN SẴN = khách này. Địa chỉ công trình tự điền từ địa chỉ khách CHỈ KHI ô đang
+// trống (form đang nhập dở thì giữ nguyên, chỉ hiện gợi ý) — xem _ctApplyCustAddress (projects.ui.js).
+function _khAddProject(id) {
+  closeKhachHangModal();
+  if (typeof openCTCreateModal === 'function') openCTCreateModal({ customerId: id });
 }
 
 // Bấm 1 công trình trong hồ sơ → đóng hồ sơ, mở chi tiết công trình

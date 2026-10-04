@@ -419,6 +419,8 @@ select.cell-input {
 .ct-card-head { padding: 14px 16px; background: transparent; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ct-card-name { font-size: 13px; font-weight: 700; line-height: 1.4; }
 .ct-card-count { font-size: 11px; color: var(--bs-secondary-color); margin-top: 2px; }
+/* Địa chỉ công trình ngay dưới tên (04/10/2026) — 1 dòng, dài thì "..." (di chuột xem đủ) */
+.ct-card-addr { font-size: 11.5px; color: var(--bs-secondary-color); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ct-card-total { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; color: var(--bs-warning); white-space: nowrap; }
 .ct-card-body { padding: 12px 16px; }
 .ct-loai-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--bs-border-color-translucent); font-size: 12px; }
