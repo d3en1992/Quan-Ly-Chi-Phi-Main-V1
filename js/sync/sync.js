@@ -359,6 +359,9 @@ function _dmRerenderIfActive() {
 // Nạp lại biến global của 1 key từ _mem, sau khi dữ liệu cloud được gộp/thay vào _mem.
 // QUAN TRỌNG: nếu biến global (invoices, ccData...) còn trỏ vào mảng CŨ thì lần save()
 // kế tiếp sẽ lưu lại mảng cũ → làm rơi mất record vừa gộp từ máy khác.
+// Kho có trường tên công trình (bản sao) — nạp lại xong thì relinkProjectNames()
+const _RELINK_KEYS = new Set(['inv_v3', 'ung_v1', 'cc_v2', 'tb_v1', 'thu_v1', 'thauphu_v1', 'quyettoan_v1', 'projects_v1']);
+
 function _refreshGlobal(key) {
   switch (key) {
     case 'inv_v3':       if (typeof invoices         !== 'undefined') invoices         = load(key, []); break;
@@ -373,6 +376,9 @@ function _refreshGlobal(key) {
     case 'quyettoan_v1': if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load(key, []); break;
     case 'cat_cn_roles': if (typeof cnRoles          !== 'undefined') cnRoles          = load(key, {}); break;
   }
+  // (04/10/2026) Dữ liệu vừa thay từ cloud mang tên CT có thể đã cũ → viết lại bản sao tên
+  // theo projectId (trên RAM). projects_v1 đổi (máy khác đổi tên) → áp cho mọi kho.
+  if (_RELINK_KEYS.has(key) && typeof relinkProjectNames === 'function') relinkProjectNames();
   if (_INV_CACHE_KEYS.has(key) && typeof clearInvoiceCache === 'function') clearInvoiceCache();
 }
 
@@ -1081,3 +1087,97 @@ window.addEventListener('online', () => {
     schedulePush();
   }
 });
+
+// ══════════════════════════════════════════════════════════════
+// [17] THEO DÕI THAY ĐỔI DANH SÁCH CÔNG TRÌNH TỪ MÁY KHÁC (04/10/2026)
+// ══════════════════════════════════════════════════════════════
+// App gọi Firestore qua REST (không có SDK) → KHÔNG có onSnapshot. Thay bằng "dò nhẹ":
+//   • Khi tab được mở lại / cửa sổ được focus (tối thiểu cách nhau 20 giây)
+//   • Mỗi 2 phút khi tab đang hiển thị
+// Mỗi lần dò = ĐỌC 1 doc meta_cong_trinh. updateTime không đổi → dừng. Danh sách công trình
+// khác local (id/updatedAt/deletedAt) → áp bản cloud → relinkProjectNames (qua _refreshGlobal)
+// → vẽ lại tab đang mở + dropdown công trình → tên mới hiện ngay, KHÔNG cần F5.
+// An toàn: bỏ qua khi đang sync, khi doc còn thay đổi local chưa đẩy (outbox), khi chưa đăng nhập.
+// Người dùng đang gõ trong ô nhập → hoãn vẽ lại tới khi rời ô (không làm mất nội dung đang nhập).
+const _CT_WATCH_MS      = 120_000;
+const _CT_WATCH_MIN_GAP = 20_000;
+let _ctWatchLastTime = null;     // updateTime lần dò trước
+let _ctWatchLastRun  = 0;
+let _ctWatchBusy     = false;
+let _ctWatchPending  = null;     // danh sách đổi tên chờ vẽ lại (đang gõ)
+
+// Chữ ký danh sách công trình (đủ để biết có gì đổi)
+function _ctProjSig(arr) {
+  return (arr || []).map(p => `${p.id}:${p.updatedAt || 0}:${p.deletedAt || 0}`).sort().join('|');
+}
+
+function _ctUserTyping() {
+  const el = document.activeElement;
+  return !!(el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.type !== 'search');
+}
+
+async function ctWatchTick(force) {
+  if (_ctWatchBusy || document.hidden) return;
+  if (!force && Date.now() - _ctWatchLastRun < _CT_WATCH_MIN_GAP) return;
+  if (!fbReady() || isSyncing()) return;
+  if (typeof getCurrentUser === 'function' && !getCurrentUser()) return;
+  if (_outboxHas('meta_cong_trinh') || _outboxIsOverwrite('meta_cong_trinh')) return;
+  _ctWatchBusy = true;
+  _ctWatchLastRun = Date.now();
+  try {
+    const { data, updateTime, exists } = await fsGetWithTime('meta_cong_trinh');
+    if (!exists || !data || !Array.isArray(data.projects)) return;
+    if (updateTime && updateTime === _ctWatchLastTime) return;
+    _ctWatchLastTime = updateTime;
+    const local = load('projects_v1', []);
+    if (_ctProjSig(data.projects) === _ctProjSig(local)) return;
+    // Trong lúc chờ mạng có thể vừa sync / vừa sửa local → nhường cho luồng sync thường
+    if (isSyncing() || _outboxHas('meta_cong_trinh')) return;
+    const oldNames = new Map(local.map(p => [p.id, p.name]));
+    _metaApply('meta_cong_trinh', data, 'replace', null);   // → _refreshGlobal → relinkProjectNames
+    const renamed = data.projects
+      .filter(p => p && !p.deletedAt && oldNames.has(p.id) && oldNames.get(p.id) !== p.name)
+      .map(p => ({ from: oldNames.get(p.id), to: p.name }));
+    console.log('[Sync] 🔄 Danh sách công trình đổi từ máy khác', renamed.length ? renamed : '');
+    _ctWatchRerender(renamed);
+  } catch (e) {
+    console.warn('[Sync] Dò thay đổi công trình lỗi (bỏ qua):', e.message || e);
+  } finally {
+    _ctWatchBusy = false;
+  }
+}
+
+function _ctWatchRerender(renamed) {
+  if (_ctUserTyping()) { _ctWatchPending = (_ctWatchPending || []).concat(renamed || []); return; }
+  const list = (_ctWatchPending || []).concat(renamed || []);
+  _ctWatchPending = null;
+  try {
+    if (typeof MB !== 'undefined' && MB.on) {
+      // Điện thoại: KHÔNG gọi renderActiveTab (nó xóa bản nháp chấm công) — chỉ nạp lại + vẽ lại
+      if (typeof _reloadGlobals === 'function') _reloadGlobals();
+      if (typeof mbRender === 'function') mbRender();
+    } else if (typeof renderActiveTab === 'function') {
+      renderActiveTab();
+    }
+    // Dropdown công trình ở các tab không đang mở (để lúc chuyển tab đã đúng tên)
+    if (typeof refreshHoadonCtDropdowns === 'function') refreshHoadonCtDropdowns();
+    if (typeof rebuildUngSelects       === 'function') rebuildUngSelects();
+    if (typeof populateCCCtSel         === 'function') populateCCCtSel();
+  } catch (e) { console.warn('[Sync] Vẽ lại sau đổi tên công trình lỗi:', e); }
+  if (list.length && typeof toast === 'function') {
+    const t = list.length === 1 ? `"${list[0].from}" → "${list[0].to}"` : `${list.length} công trình`;
+    toast(`🔄 Máy khác vừa đổi tên công trình: ${t}`, 'info');
+  }
+}
+
+(function () {
+  // Rời ô nhập → vẽ lại phần đang hoãn
+  document.addEventListener('focusout', () => {
+    if (!_ctWatchPending) return;
+    setTimeout(() => { if (_ctWatchPending && !_ctUserTyping()) _ctWatchRerender([]); }, 400);
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) ctWatchTick(false); });
+  window.addEventListener('focus', () => ctWatchTick(false));
+  setInterval(() => ctWatchTick(true), _CT_WATCH_MS);
+})();
+window.ctWatchTick = ctWatchTick;

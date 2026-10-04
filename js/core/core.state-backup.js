@@ -321,6 +321,9 @@ function _reloadGlobals() {
   if (typeof cnRoles !== 'undefined') cnRoles = load('cat_cn_roles', {});
   // Module projects.js
   if (typeof projects !== 'undefined') projects = load('projects_v1', []);
+  // (04/10/2026) Tên CT trên mọi bản ghi = bản sao theo projectId → viết lại theo tên mới nhất
+  // (chỉ trên RAM, không ghi cloud) — xem relinkProjectNames (projects.model.js)
+  if (typeof relinkProjectNames === 'function') relinkProjectNames();
   // Migration one-time: tạo cat_items_v1 từ string arrays nếu chưa có
   _migrateCatItemsIfNeeded();
   // Rebuild string arrays từ items (áp dụng soft-delete từ cloud sau pull)

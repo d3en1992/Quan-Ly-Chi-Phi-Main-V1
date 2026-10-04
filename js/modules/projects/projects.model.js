@@ -257,40 +257,124 @@ function _assertProjectNameOk(name, exceptId = null) {
     throw new Error('Tên "' + (name || '').trim() + '" trùng với một mục trong Danh Mục — vui lòng đặt tên khác.');
 }
 
-// Lan tên mới của project xuống các record (text congtrinh/ct) + liên kết record text cũ mồ côi.
-// Match: record có projectId===id  HOẶC  record text-only khớp tên CŨ (normalized).
-// → set projectId=id + cập nhật text sang tên mới, cứu record import/legacy khỏi kẹt tên cũ.
+// ══════════════════════════════════════════════════════════════════
+//  ĐỔI TÊN CÔNG TRÌNH — "ID LÀ NGUỒN SỰ THẬT, TÊN TRÊN BẢN GHI CHỈ LÀ BẢN SAO" (04/10/2026)
+// ══════════════════════════════════════════════════════════════════
+// Vấn đề cũ: đổi tên chỉ ghi tên mới vào bản ghi (hóa đơn, ứng, chấm công...) bằng cách sửa tại
+// chỗ, KHÔNG đổi updatedAt → bộ đồng bộ (bảng bóng so updatedAt) coi là "chuẩn hóa nội bộ", không
+// đẩy cloud → lần pull sau cloud trả tên CŨ về; máy khác cũng chỉ thấy tên cũ.
+//
+// Cách làm mới (không "ghi dây chuyền" hàng nghìn bản ghi trên Firebase):
+//   1. Bản ghi đã có projectId → tên hiển thị luôn lấy từ projects theo id. Trường text
+//      (congtrinh / ct) chỉ là BẢN SAO: relinkProjectNames() viết lại bản sao này TRÊN RAM mỗi khi
+//      dữ liệu được nạp (khởi động, pull, đổi tên, nhận thay đổi từ máy khác) → mọi màn hình (kể cả
+//      chỗ còn đọc thẳng r.congtrinh) tự đúng. KHÔNG đổi updatedAt → không phát sinh lượt ghi cloud.
+//      ⇒ Đổi tên = ĐÚNG 1 LỆNH GHI (doc meta_cong_trinh) — vốn đã nguyên tử, không cần batch/rollback.
+//   2. Bản ghi cũ CHƯA có projectId (chỉ có tên) → project lưu `aliases` (các tên cũ, đã chuẩn hóa)
+//      để vẫn nhận ra dù tên đã đổi, ở mọi năm / mọi máy. Bản ghi mồ côi thuộc năm đang nạp được
+//      gắn hẳn projectId (đổi updatedAt → đẩy cloud) để lần sau khỏi phải dò theo tên.
+
+// Field chứa tên CT theo từng kho
+const _PROJ_NAME_FIELDS = [
+  ['invoices',         'inv_v3',       'congtrinh'],
+  ['ccData',           'cc_v2',        'ct'],
+  ['ungRecords',       'ung_v1',       'congtrinh'],
+  ['tbData',           'tb_v1',        'ct'],
+  ['thuRecords',       'thu_v1',       'congtrinh'],
+  ['thauPhuContracts', 'thauphu_v1',   'congtrinh'],
+  ['quyetToanRecords', 'quyettoan_v1', 'congtrinh'],
+];
+
+// Lấy mảng global theo tên biến (an toàn khi module chưa nạp)
+function _projGlobalArr(varName) {
+  switch (varName) {
+    case 'invoices':         return typeof invoices         !== 'undefined' ? invoices         : null;
+    case 'ccData':           return typeof ccData           !== 'undefined' ? ccData           : null;
+    case 'ungRecords':       return typeof ungRecords       !== 'undefined' ? ungRecords       : null;
+    case 'tbData':           return typeof tbData           !== 'undefined' ? tbData           : null;
+    case 'thuRecords':       return typeof thuRecords       !== 'undefined' ? thuRecords       : null;
+    case 'thauPhuContracts': return typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : null;
+    case 'quyetToanRecords': return typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : null;
+  }
+  return null;
+}
+
+// Tìm project (còn sống) có tên CŨ khớp — dùng cho bản ghi chưa có projectId
+function findProjectByAlias(name) {
+  const n = _normProjName(name);
+  if (!n) return null;
+  if (projects.some(p => !p.deletedAt && _normProjName(p.name) === n)) return null; // tên hiện tại thắng
+  return projects.find(p => !p.deletedAt && Array.isArray(p.aliases) && p.aliases.includes(n)) || null;
+}
+
+/**
+ * Viết lại BẢN SAO tên công trình trên mọi bản ghi trong RAM theo projectId.
+ * - Không đổi updatedAt, không gọi save() → không phát sinh ghi cloud.
+ * - Bản ghi chưa có projectId mà tên khớp tên CŨ (aliases) → gắn projectId + tên mới TRÊN RAM
+ *   (không lưu; sẽ được lưu tự nhiên khi bản ghi được sửa lần sau).
+ * @returns {number} số bản ghi đã viết lại
+ */
+function relinkProjectNames() {
+  if (typeof projects === 'undefined' || !Array.isArray(projects)) return 0;
+  const nameById = new Map();
+  projects.forEach(p => { if (p && !p.deletedAt && p.id && p.name) nameById.set(p.id, p.name); });
+  if (typeof PROJECT_COMPANY !== 'undefined') nameById.set('COMPANY', PROJECT_COMPANY.name);
+  // Bảng tên cũ → project (chỉ dựng khi có alias)
+  // Tên cũ trùng TÊN HIỆN TẠI của 1 công trình khác → công trình mang tên đó thắng (bỏ alias)
+  const curNames = new Set(projects.filter(p => p && !p.deletedAt).map(p => _normProjName(p.name)));
+  const byAlias = new Map();
+  projects.forEach(p => {
+    if (p && !p.deletedAt && Array.isArray(p.aliases)) {
+      p.aliases.forEach(a => { if (a && !curNames.has(a) && !byAlias.has(a)) byAlias.set(a, p); });
+    }
+  });
+
+  let n = 0;
+  _PROJ_NAME_FIELDS.forEach(([varName, , field]) => {
+    const arr = _projGlobalArr(varName);
+    if (!Array.isArray(arr)) return;
+    arr.forEach(r => {
+      if (!r || typeof r !== 'object') return;
+      let pid = r.projectId || (varName === 'ccData' ? r.ctPid : null);
+      if (!pid && byAlias.size && r[field]) {
+        const p = byAlias.get(_normProjName(r[field]));
+        if (p) { r.projectId = p.id; pid = p.id; }
+      }
+      if (!pid) return;
+      const nm = nameById.get(pid);
+      // COMPANY: các kho thiết bị (tb_v1.ct = tên kho) cũng gắn COMPANY → giữ tên kho, không đè
+      if (!nm || pid === 'COMPANY') return;
+      if (r[field] !== nm) { r[field] = nm; n++; }
+    });
+  });
+  if (n && typeof clearInvoiceCache === 'function') clearInvoiceCache();
+  return n;
+}
+
+// Đổi tên CT: chỉ xử lý bản ghi MỒ CÔI (chưa có projectId) khớp tên cũ — gắn hẳn projectId.
+// Bản ghi đã có projectId KHÔNG cần ghi gì (relinkProjectNames lo phần hiển thị).
+// Bản ghi mồ côi: đổi updatedAt để việc gắn id được đẩy cloud (nếu không, pull lần sau sẽ trả
+// bản ghi về trạng thái mồ côi). Số lượng thường rất ít (dữ liệu đời cũ / nhập Excel).
 function _propagateProjectRename(id, oldName, newName) {
   if (!newName || oldName === newName) return;
   const normOld = _normProjName(oldName);
-  // field text chứa tên CT theo từng store
-  const apply = (arr, field) => {
-    if (typeof arr === 'undefined' || !Array.isArray(arr)) return false;
+  if (!normOld) return;
+  const now = Date.now();
+  const dev = (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : '';
+  _PROJ_NAME_FIELDS.forEach(([varName, key, field]) => {
+    const arr = _projGlobalArr(varName);
+    if (!Array.isArray(arr)) return;
     let changed = false;
-    arr.forEach(r => {
-      if (r.deletedAt) return;
-      const isLinked  = r.projectId === id;
-      const isOrphan  = !r.projectId && normOld && _normProjName(r[field] || '') === normOld;
-      if (!isLinked && !isOrphan) return;
-      if (!r.projectId) r.projectId = id;
-      if (r[field] !== newName) r[field] = newName;
+    arr.forEach((r, i) => {
+      if (!r || r.deletedAt || r.projectId) return;
+      if (varName === 'ccData' && r.ctPid) return;
+      if (_normProjName(r[field] || '') !== normOld) return;
+      arr[i] = { ...r, projectId: id, [field]: newName, updatedAt: now, deviceId: dev };
       changed = true;
     });
-    return changed;
-  };
-  const inv = apply(typeof invoices         !== 'undefined' ? invoices         : undefined, 'congtrinh');
-  const cc  = apply(typeof ccData           !== 'undefined' ? ccData           : undefined, 'ct');
-  const ung = apply(typeof ungRecords       !== 'undefined' ? ungRecords       : undefined, 'congtrinh');
-  const tb  = apply(typeof tbData           !== 'undefined' ? tbData           : undefined, 'ct');
-  const thu = apply(typeof thuRecords       !== 'undefined' ? thuRecords       : undefined, 'congtrinh');
-  const tp  = apply(typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : undefined, 'congtrinh');
-  if (inv || cc) { if (typeof clearInvoiceCache === 'function') clearInvoiceCache(); }
-  if (inv) save('inv_v3',   invoices);
-  if (cc)  save('cc_v2',    ccData);
-  if (ung) save('ung_v1',   ungRecords);
-  if (tb)  save('tb_v1',    tbData);
-  if (thu) save('thu_v1',   thuRecords);
-  if (tp)  save('thauphu_v1', thauPhuContracts);
+    if (changed) save(key, arr);
+  });
+  relinkProjectNames();
 }
 
 // Re-key hợp đồng chính legacy (key = tên CT) sang projectId khi đổi tên CT.
@@ -387,6 +471,15 @@ function updateProject(id, changes = {}) {
     const _k = Number(safeChanges.heSoTiTrong);
     safeChanges.heSoTiTrong = (isFinite(_k) && _k >= 0) ? _k : 1;
   }
+  // Đổi tên → ghi tên CŨ vào aliases (đã chuẩn hóa) để bản ghi đời cũ chỉ có tên vẫn nhận ra
+  // công trình ở mọi năm / mọi máy (relinkProjectNames, findProjectIdByName).
+  if (typeof safeChanges.name === 'string' && safeChanges.name &&
+      _normProjName(safeChanges.name) !== _normProjName(oldName)) {
+    const al = new Set(Array.isArray(projects[idx].aliases) ? projects[idx].aliases : []);
+    if (_normProjName(oldName)) al.add(_normProjName(oldName));
+    al.delete(_normProjName(safeChanges.name));        // đổi về lại tên cũ → bỏ khỏi alias
+    safeChanges.aliases = [...al];
+  }
   projects[idx] = {
     ...projects[idx],
     ...safeChanges,
@@ -394,8 +487,9 @@ function updateProject(id, changes = {}) {
     createdAt,
     updatedAt: Date.now()
   };
-  _saveProjects();
-  // Đổi tên CT → lan tên mới xuống record (cứu record text-only mồ côi) + re-key HĐ legacy
+  _saveProjects();   // ← lệnh ghi DUY NHẤT lên cloud cho việc đổi tên (doc meta_cong_trinh)
+  // Đổi tên CT → bản sao tên trên RAM cập nhật ngay (relinkProjectNames) + gắn id cho bản ghi
+  // mồ côi khớp tên cũ + re-key HĐ legacy
   const newName = projects[idx].name;
   if (newName !== oldName) {
     _rekeyHopDongOnRename(id, oldName, newName);
@@ -460,7 +554,10 @@ function findProjectIdByName(name) {
   const _norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
   const nNorm = _norm(n);
   const fuzzy = projects.find(p => !p.deletedAt && _norm(p.name) === nNorm);
-  return fuzzy ? fuzzy.id : null;
+  if (fuzzy) return fuzzy.id;
+  // Tên CŨ của công trình đã đổi tên (aliases — 04/10/2026): nhập Excel / dữ liệu đời cũ vẫn khớp
+  const old = findProjectByAlias(n);
+  return old ? old.id : null;
 }
 
 /**
