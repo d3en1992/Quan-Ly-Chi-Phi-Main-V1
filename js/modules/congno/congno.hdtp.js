@@ -370,7 +370,7 @@ function renderHdtpTableTk(page) {
       <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(r.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_resolveCtName(r))}</td>
       <td style="white-space:nowrap">${x(recCatName(r,'thauphu','thauphu'))}</td>
-      <td class="text-secondary hdtp-nd-cell"><span class="hdtp-nd-clamp">${x(r.nd || '—')}</span></td>
+      <td class="text-secondary hdtp-nd-cell" title="${x(r.nd || '')}"><span class="hdtp-nd-1line">${x(r.nd || '—')}</span></td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap">${tong ? fmtM(tong) : '—'}</td>
       <td class="text-end">${_hdtpDaUngCell(a.daUng, tong)}</td>
       <td class="text-end" style="white-space:nowrap">${_hdtpConCell(tong - a.daUng, tong)}</td>

@@ -2164,3 +2164,18 @@ td.action-col > div {
 
 /* (04/10/2026) Ô chọn công trình ở form Thu Tiền: tìm kiếm được, chiếm trọn cột */
 #thu-form-card .ss-wrap { display: block; width: 100% !important; min-width: 0 !important; }
+
+/* (04/10/2026) Bảng HỢP ĐỒNG THẦU PHỤ (tab Công Nợ): cột Nội Dung chỉ 1 dòng, dài thì "…",
+   rê chuột xem đủ (title trên <td>). Trước đây chữ tự xuống hàng làm dòng phình rất cao. */
+#hdtptk-tbody td.hdtp-nd-cell { max-width: 240px; white-space: nowrap; overflow: hidden; font-size: 12px; }
+#hdtptk-tbody td.hdtp-nd-cell .hdtp-nd-1line {
+  display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* (04/10/2026) Tab Lợi Nhuận: tiêu đề cột sắp xếp được + số bấm được (drill-down) */
+.ln-table th.ln-sortable { cursor: pointer; user-select: none; }
+.ln-table th.ln-sortable:hover { color: var(--bs-primary) !important; }
+.ln-table th.ln-sortable .ln-sort-ic { font-size: 14px; vertical-align: -3px; margin-left: 2px; opacity: .45; }
+.ln-table th.ln-sortable.is-sorted .ln-sort-ic { opacity: 1; color: var(--bs-primary); }
+.ln-table a.ln-link { color: inherit; text-decoration: none; border-bottom: 1px dashed currentColor; }
+.ln-table a.ln-link:hover { color: var(--bs-primary); border-bottom-style: solid; }
