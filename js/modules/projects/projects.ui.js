@@ -570,7 +570,8 @@ function _ctRenderBody(gridWrap, items, companyCard) {
         ${_ctCardsGrid(list)}
       </div>`;
     }).join('');
-    gridWrap.innerHTML = (companyCard ? `<div class="mb-4">${_ctCardsGrid([], companyCard)}</div>` : '') + sections;
+    // (05/10/2026) Thẻ CÔNG TY (chi phí chung) xuống CUỐI — công trình thực tế ưu tiên lên trên
+    gridWrap.innerHTML = sections + _ctCompanyBlock(companyCard);
     return;
   }
 
@@ -581,8 +582,20 @@ function _ctRenderBody(gridWrap, items, companyCard) {
     if (!groups.has(cl.key)) groups.set(cl.key, { key: cl.key, name: cl.name, items: [] });
     groups.get(cl.key).items.push(it);
   });
-  const list = [...groups.values()].sort((a, b) =>
-    (a.key === '__none__') - (b.key === '__none__') || a.name.localeCompare(b.name, 'vi'));
+  // (05/10/2026) Thêm cả khách hàng CHƯA có công trình trong danh sách đang xem (vd vừa tạo hàng loạt)
+  // → có dòng để bấm "+" gán nhanh công trình cũ. Chỉ khi không lọc trạng thái / loại / lãi-lỗ;
+  // đang tìm kiếm thì chỉ thêm khách khớp tên.
+  if (!_ctFStatus && !_ctFType && !_ctFLaiLo && typeof getAllCustomers === 'function') {
+    const q = (_ctSearch || '').toLowerCase().trim();
+    getAllCustomers().forEach(c => {
+      if (groups.has(c.id)) return;
+      if (q && !(c.name || '').toLowerCase().includes(q)) return;
+      groups.set(c.id, { key: c.id, name: c.name, items: [] });
+    });
+  }
+  // Thứ tự: khách CÓ công trình (A→Z) → khách chưa có công trình (A→Z) → "(Chưa gán khách hàng)"
+  const _rank = g => g.key === '__none__' ? 2 : (g.items.length ? 0 : 1);
+  const list = [...groups.values()].sort((a, b) => _rank(a) - _rank(b) || a.name.localeCompare(b.name, 'vi'));
 
   const rows = list.map(g => {
     const open = _ctOpenClients.has(g.key);
@@ -592,13 +605,17 @@ function _ctRenderBody(gridWrap, items, companyCard) {
     g.items.forEach(it => { cnt[_projTypeByName(it.p.name)]++; });
     const typeTags = [['CT', 'CT'], ['SC', 'SC'], ['OTHER', 'SN/Khác']]
       .filter(([k]) => cnt[k]).map(([k, lb]) => `<span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:10px">${lb} ${cnt[k]}</span>`).join(' ');
-    const none = g.key === '__none__';
-    return `<div class="ct-client ${open ? 'is-open' : ''}" data-ct-client="${x(g.key)}">
-      <div class="ct-client-head" onclick="_ctToggleClient(this.parentElement.dataset.ctClient)" title="Bấm để ${open ? 'thu gọn' : 'xem các công trình'}">
-        <span class="ct-client-toggle">${open ? '−' : '+'}</span>
+    const none  = g.key === '__none__';
+    const empty = !g.items.length;
+    // Nút "Gán nhanh công trình" ngay cạnh tên khách (không có ở nhóm "Chưa gán")
+    const assignBtn = none ? '' : `<button type="button" class="btn btn-outline-success btn-sm ct-assign-btn" onclick="event.stopPropagation();openCTQuickAssign('${x(g.key)}')" title="Gán nhanh công trình có sẵn cho ${x(g.name)}"><span class="material-symbols-outlined">add_link</span></button>`;
+    return `<div class="ct-client ${open ? 'is-open' : ''} ${empty ? 'is-empty' : ''}" data-ct-client="${x(g.key)}">
+      <div class="ct-client-head" onclick="${empty ? `openCTQuickAssign('${x(g.key)}')` : '_ctToggleClient(this.parentElement.dataset.ctClient)'}" title="${empty ? 'Chưa có công trình — bấm để gán' : `Bấm để ${open ? 'thu gọn' : 'xem các công trình'}`}">
+        <span class="ct-client-toggle">${empty ? '·' : (open ? '−' : '+')}</span>
         <span class="material-symbols-outlined text-secondary" style="font-size:20px">${none ? 'help' : 'person'}</span>
         <span class="ct-client-name ${none ? 'text-secondary fst-italic' : ''}">${none ? '(Chưa gán khách hàng)' : x(g.name)}</span>
-        <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">${g.items.length} công trình</span>
+        ${assignBtn}
+        <span class="badge rounded-pill ${empty ? 'bg-body-secondary text-secondary' : 'bg-primary-subtle text-primary-emphasis'}">${empty ? 'Chưa có công trình' : g.items.length + ' công trình'}</span>
         <span class="d-none d-md-inline">${typeTags}</span>
         <span class="ms-auto text-secondary" style="font-size:12px;white-space:nowrap">Tổng chi <b class="font-monospace" style="color:var(--bs-body-color)">${fmtS(sum)}</b></span>
         ${none ? '' : `<button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation();openKhachHangProfile('${x(g.key)}')" title="Xem hồ sơ khách hàng"><span class="material-symbols-outlined msi-gap">contacts</span>Hồ sơ</button>`}
@@ -608,14 +625,127 @@ function _ctRenderBody(gridWrap, items, companyCard) {
   }).join('');
 
   gridWrap.innerHTML = `
-    ${companyCard ? `<div class="mb-3">${_ctCardsGrid([], companyCard)}</div>` : ''}
     <div class="d-flex align-items-center gap-2 mb-2" style="font-size:12px">
       <span class="text-secondary">${list.length} khách hàng</span>
       <button class="btn btn-link btn-sm p-0 ms-auto text-decoration-none" onclick="_ctToggleClient('*')">Mở tất cả</button>
       <span class="text-secondary">·</span>
       <button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="_ctToggleClient('-')">Thu gọn tất cả</button>
     </div>
-    <div class="ct-client-list">${rows}</div>`;
+    <div class="ct-client-list">${rows}</div>
+    ${_ctCompanyBlock(companyCard)}`;
+}
+
+// ── Khối thẻ CÔNG TY (chi phí chung) — luôn đặt CUỐI danh sách (05/10/2026) ──
+function _ctCompanyBlock(companyCard) {
+  if (!companyCard) return '';
+  return `<div class="ct-section mt-2">
+    <div class="ct-section-head">
+      <span class="material-symbols-outlined">apartment</span>
+      <span class="ct-section-title">Chi Phí Chung Công Ty</span>
+    </div>
+    ${_ctCardsGrid([], companyCard)}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  GÁN NHANH CÔNG TRÌNH CŨ CHO KHÁCH HÀNG (05/10/2026)
+// ══════════════════════════════════════════════════════════════════
+// Bấm nút "+" (add_link) cạnh tên khách ở chế độ "Theo khách hàng" → popup liệt kê công trình
+// (MỌI năm, không phụ thuộc bộ lọc năm): ưu tiên nhóm "Chưa gán khách hàng"; bật công tắc để xem
+// cả công trình đang thuộc khách khác (chuyển sang khách này). Tick 1 hoặc nhiều → "Gán".
+// Lưu: updateProject(id, { customerId, chuDauTu }) — chỉ ghi doc meta_cong_trinh (1 lượt đẩy
+// cloud cho cả lô) + IndexedDB qua save(); chuDauTu đồng bộ sang HĐ chính (_syncChuDauTuToHopDong).
+let _ctQaCust   = '';     // id khách đang gán
+let _ctQaShowAll = false;  // hiện cả công trình đã có khách khác
+let _ctQaSearch = '';
+
+function openCTQuickAssign(custId) {
+  const c = (typeof getCustomerById === 'function') ? getCustomerById(custId) : null;
+  if (!c) { toast('Không tìm thấy khách hàng', 'error'); return; }
+  _ctQaCust = custId; _ctQaShowAll = false; _ctQaSearch = '';
+  document.getElementById('modal-title').innerHTML = `<span class="material-symbols-outlined msi-gap">add_link</span>Gán công trình cho: ${x(c.name)}`;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="text-secondary" style="font-size:12px">Chọn công trình có sẵn (mọi năm) để gắn vào khách hàng này — tick được nhiều công trình cùng lúc.</div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <input id="ct-qa-search" type="search" class="form-control form-control-sm" style="max-width:280px" placeholder="🔍 Tìm công trình, địa chỉ..." oninput="_ctQaSearch=this.value;_ctQaRenderList()">
+        <div class="form-check form-switch mb-0 ms-auto">
+          <input class="form-check-input" type="checkbox" role="switch" id="ct-qa-all" onchange="_ctQaShowAll=this.checked;_ctQaRenderList()">
+          <label class="form-check-label" for="ct-qa-all" style="font-size:12px">Hiện cả công trình đã có khách khác</label>
+        </div>
+      </div>
+      <div id="ct-qa-list" style="max-height:52vh;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:8px"></div>
+      <div class="d-flex align-items-center gap-2">
+        <span id="ct-qa-count" class="text-secondary" style="font-size:12px"></span>
+        <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="closeModal()">Hủy</button>
+        <button id="ct-qa-ok" class="btn btn-success btn-sm fw-bold" onclick="_ctQaConfirm()" disabled><span class="material-symbols-outlined msi-gap">link</span>Gán</button>
+      </div>
+    </div>`;
+  _ctQaRenderList();
+  document.getElementById('ct-modal').classList.add('open');
+  setTimeout(() => document.getElementById('ct-qa-search')?.focus(), 80);
+}
+
+function _ctQaRenderList() {
+  const box = document.getElementById('ct-qa-list');
+  if (!box) return;
+  const keep = new Set([...box.querySelectorAll('.ct-qa-chk:checked')].map(e => e.value));   // giữ tick khi lọc
+  const q = (_ctQaSearch || '').toLowerCase().trim();
+  const rows = projects.filter(_isValidProject).filter(p => p.id !== 'COMPANY')
+    .map(p => ({ p, cl: _ctClientOf(p) }))
+    .filter(({ cl }) => cl.key !== _ctQaCust)                                   // đã thuộc khách này → bỏ
+    .filter(({ cl }) => _ctQaShowAll || cl.key === '__none__')
+    .filter(({ p, cl }) => !q || (p.name || '').toLowerCase().includes(q) || (p.note || '').toLowerCase().includes(q) || (cl.name || '').toLowerCase().includes(q))
+    // Chưa gán lên đầu, rồi ngày bắt đầu mới → cũ
+    .sort((a, b) => (a.cl.key !== '__none__') - (b.cl.key !== '__none__') || (b.p.startDate || '').localeCompare(a.p.startDate || ''));
+  if (!rows.length) {
+    box.innerHTML = `<div class="text-secondary text-center p-4" style="font-size:13px">${q ? 'Không có công trình nào khớp tìm kiếm.' : (_ctQaShowAll ? 'Không còn công trình nào để gán.' : 'Không còn công trình nào "Chưa gán khách hàng". Bật công tắc để xem công trình đang thuộc khách khác.')}</div>`;
+  } else {
+    box.innerHTML = rows.map(({ p, cl }) => {
+      const yr = (p.startDate || '').slice(0, 4);
+      const tag = cl.key === '__none__'
+        ? `<span class="badge bg-warning-subtle text-warning-emphasis" style="font-size:10px">Chưa gán${p.chuDauTu ? ' · CĐT cũ: ' + x(p.chuDauTu) : ''}</span>`
+        : `<span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:10px">Đang thuộc: ${x(cl.name)}</span>`;
+      return `<label class="ct-qa-row">
+        <input type="checkbox" class="form-check-input ct-qa-chk" value="${x(p.id)}" ${keep.has(p.id) ? 'checked' : ''} onchange="_ctQaUpdateCount()">
+        <span style="flex:1;min-width:0">
+          <span class="fw-semibold">${x(p.name)}</span>
+          <span class="d-block text-secondary" style="font-size:11.5px">${yr ? 'Năm ' + yr + ' · ' : ''}${typeof _ptStatusBadge === 'function' ? _ptStatusBadge(p.status) : ''} ${p.note ? '· ' + x(p.note) : ''}</span>
+        </span>
+        ${tag}
+      </label>`;
+    }).join('');
+  }
+  _ctQaUpdateCount();
+}
+
+function _ctQaUpdateCount() {
+  const n = document.querySelectorAll('#ct-qa-list .ct-qa-chk:checked').length;
+  const cnt = document.getElementById('ct-qa-count');
+  if (cnt) cnt.textContent = n ? `Đã chọn ${n} công trình` : 'Chưa chọn công trình nào';
+  const ok = document.getElementById('ct-qa-ok');
+  if (ok) ok.disabled = !n;
+}
+
+function _ctQaConfirm() {
+  const c = getCustomerById(_ctQaCust);
+  if (!c) return;
+  const ids = [...document.querySelectorAll('#ct-qa-list .ct-qa-chk:checked')].map(e => e.value);
+  if (!ids.length) return;
+  const moving = ids.map(id => getProjectById(id)).filter(p => p && _ctClientOf(p).key !== '__none__');
+  if (moving.length && !confirm(`${moving.length} công trình đang thuộc khách khác sẽ CHUYỂN sang "${c.name}":\n• ` +
+      moving.map(p => p.name).join('\n• ') + '\n\nTiếp tục?')) return;
+  let ok = 0;
+  ids.forEach(id => {
+    try { if (updateProject(id, { customerId: c.id, chuDauTu: c.name })) ok++; }
+    catch (e) { console.warn('[QuickAssign] lỗi', id, e); }
+  });
+  closeModal();
+  _ctOpenClients.add(c.id);          // mở sẵn nhóm khách vừa gán
+  renderProjectsPage();
+  // Công trình không có chi phí trong năm đang xem thì không hiện trong danh sách → nhắc
+  const hidden = ids.filter(id => !document.querySelector(`[data-ct-client="${CSS.escape(c.id)}"] .ct-card[onclick*="'${id}'"]`)).length;
+  toast(`✅ Đã gán ${ok} công trình cho ${c.name}` + (hidden ? ` · ${hidden} công trình không có chi phí trong năm đang xem (chọn "Tất cả năm" để thấy)` : ''), 'success');
 }
 
 // ── Tìm kiếm: khớp tên công trình HOẶC tên khách hàng ──
@@ -1344,10 +1474,12 @@ function _ctFlash(el) {
 }
 
 // Độ dài tối đa tên công trình (ô nhập có maxlength tương ứng)
-const CT_NAME_MAX = 40;
+const CT_NAME_MAX = 45;
 
-// Gợi ý tên công trình: "<Loại> <Tên khách> - <Hạng mục>"
+// Gợi ý tên công trình: "<Loại> <Tên khách> (<Hạng mục>)"  — VD "SN Cô Sáu (Ốp gạch sân vườn, Mái che)"
 // (04/10/2026) Bỏ phần "- T<tháng>/<năm>" — ngày thi công đã lưu riêng (Ngày bắt đầu).
+// (05/10/2026) Hạng mục đặt trong NGOẶC ĐƠN thay cho dấu " - "; mã loại vẫn KHÔNG có ngoặc vuông
+// (app nhận loại theo chữ đầu tên — "[SN]" sẽ bị xếp sai phân khu).
 // Dài quá CT_NAME_MAX → cắt bớt ở cuối (ô tên vẫn sửa tay được).
 function _ctSuggestName(prefix) {
   const loai = document.getElementById(`ct-${prefix}-loai`)?.value || 'CT';
@@ -1355,8 +1487,15 @@ function _ctSuggestName(prefix) {
   const c    = cid && typeof getCustomerById === 'function' ? getCustomerById(cid) : null;
   const hm   = (document.getElementById(`ct-${prefix}-hangmuc`)?.value || '').trim();
   if (!c) return '';                                   // chưa chọn khách → chưa gợi ý
-  const name = (loai !== 'KHAC' ? loai + ' ' : '') + [c.name, hm].filter(Boolean).join(' - ');
-  return name.length > CT_NAME_MAX ? name.slice(0, CT_NAME_MAX).trim() : name;
+  const head = (loai !== 'KHAC' ? loai + ' ' : '') + c.name;
+  if (!hm) return head.slice(0, CT_NAME_MAX).trim();
+  let name = `${head} (${hm})`;
+  // Quá dài → cắt bớt PHẦN HẠNG MỤC nhưng vẫn giữ dấu đóng ngoặc
+  if (name.length > CT_NAME_MAX) {
+    const room = CT_NAME_MAX - head.length - 3;              // 3 = " (" + ")"
+    name = room > 0 ? `${head} (${hm.slice(0, room).trim()})` : head.slice(0, CT_NAME_MAX).trim();
+  }
+  return name;
 }
 
 // Bộ đếm ký tự dưới ô tên ("12/40")
@@ -1468,10 +1607,10 @@ function openCTCreateModal(opts) {
         <label style="${lblStyle}">Tên Công Trình *
           <button type="button" class="btn btn-link btn-sm p-0 ms-2 text-decoration-none" style="font-size:11px;text-transform:none;letter-spacing:0" onclick="_ctAutoName(true)" title="Điền lại tên theo gợi ý">↺ Gợi ý lại</button>
         </label>
-        <input id="ct-new-name" type="text" maxlength="${CT_NAME_MAX}" placeholder="Chọn Chủ đầu tư → tự gợi ý: SN Cô Sáu - Ốp gạch sân vườn" autocomplete="off"
+        <input id="ct-new-name" type="text" maxlength="${CT_NAME_MAX}" placeholder="Chọn Chủ đầu tư → tự gợi ý: SN Cô Sáu (Ốp gạch sân vườn)" autocomplete="off"
           style="${inpStyle};font-size:14px" oninput="_ctFormAuto.new.name=false;_ctNameCounter('new')">
         <div class="d-flex justify-content-between gap-2" style="font-size:11px;margin-top:3px">
-          <span class="text-secondary">Tự gợi ý theo cú pháp <b>Loại Tên khách - Hạng mục</b> (ngày thi công đã lưu riêng). Sửa tay thì app ngừng tự điền.</span>
+          <span class="text-secondary">Tự gợi ý theo cú pháp <b>Loại Tên khách (Hạng mục)</b> (ngày thi công đã lưu riêng). Sửa tay thì app ngừng tự điền.</span>
           <span id="ct-new-name-count" class="text-secondary" style="white-space:nowrap">0/${CT_NAME_MAX}</span>
         </div>
       </div>

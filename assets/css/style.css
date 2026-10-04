@@ -416,6 +416,15 @@ select.cell-input {
 .ct-client-name { font-weight: 700; font-size: 14px; }
 .ct-client-body { padding: 12px 14px 14px 46px; border-top: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); }
 @media (max-width: 768px) { .ct-client-body { padding-left: 14px; } }
+/* Gán nhanh công trình (05/10/2026): nút "+" cạnh tên khách, khách chưa có CT, danh sách chọn */
+.ct-assign-btn { padding: 1px 6px; line-height: 1; border-radius: 6px; }
+.ct-assign-btn .material-symbols-outlined { font-size: 17px; vertical-align: -3px; }
+.ct-client.is-empty { border-style: dashed; background: transparent; }
+.ct-client.is-empty .ct-client-name { font-weight: 600; color: var(--bs-secondary-color); }
+.ct-qa-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--bs-border-color); cursor: pointer; margin: 0; font-size: 13px; }
+.ct-qa-row:last-child { border-bottom: none; }
+.ct-qa-row:hover { background: var(--bs-tertiary-bg); }
+.ct-qa-row:has(input:checked) { background: var(--bs-success-bg-subtle); }
 .ct-card-head { padding: 14px 16px; background: transparent; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ct-card-name { font-size: 13px; font-weight: 700; line-height: 1.4; }
 .ct-card-count { font-size: 11px; color: var(--bs-secondary-color); margin-top: 2px; }
