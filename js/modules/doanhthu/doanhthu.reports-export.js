@@ -244,25 +244,52 @@ function _lnBuildDashboard(rowsData, tChi, tDt, tLN) {
   </div>`;
 }
 
-// ── Trạng thái bộ lọc + sắp xếp của bảng Lợi Nhuận (04/10/2026) ──
-let _lnCtFilter = '';                    // tên công trình đang lọc ('' = tất cả)
-let _lnSort     = { key: '', dir: -1 };  // key: dt | A | B | C | chi | ln ; dir: -1 cao→thấp, 1 thấp→cao
+// ── Trạng thái tìm kiếm + sắp xếp của bảng Lợi Nhuận (04/10/2026) ──
+let _lnSearch   = '';                    // từ khóa ĐÃ CHUẨN HÓA (không dấu, chữ thường) — '' = hiện tất cả
+let _lnSort     = { key: '', dir: -1 };  // key: dt | X | A | B | C | chi | ln ; dir: -1 cao→thấp, 1 thấp→cao
+let _lnRowsAll  = [];                    // số liệu mọi công trình của lần tính gần nhất (renderLoiNhuan)
+                                         // → gõ tìm / sắp xếp chỉ VẼ LẠI BẢNG, không tính lại từ đầu
 
-// Chọn công trình ở ô lọc (searchable dropdown) → vẽ lại bảng
-function lnSetCtFilter(val) {
-  _lnCtFilter = val || '';
-  renderLoiNhuan();
+// ── Chuẩn hóa chuỗi tiếng Việt để so khớp KHÔNG DẤU ──
+//   "Chùa Huyền Trang" → "chua huyen trang" ; "ĐẶNG" → "dang"
+//   1) normalize('NFD') tách chữ có dấu thành chữ gốc + dấu rời (vd "ề" → "e" + ̂ + ̀)
+//   2) xóa các dấu rời (khối Unicode U+0300–U+036F)
+//   3) đ/Đ KHÔNG bị NFD tách → đổi tay thành d
+//   4) chữ thường + gộp nhiều khoảng trắng thành 1
+function _lnNorm(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ── 1 dòng có khớp từ khóa không: quét TÊN CÔNG TRÌNH và TÊN CHỦ ĐẦU TƯ (khớp 1 trong 2 là giữ) ──
+// Gõ nhiều từ (vd "a nhut thoai") → MỌI từ đều phải xuất hiện (thứ tự tùy ý) trong tên CT hoặc tên CĐT.
+function _lnMatchSearch(r, q) {
+  if (!q) return true;
+  const words = q.split(' ');
+  return [r._nName, r._nCdt].some(txt => txt && words.every(w => txt.includes(w)));
+}
+
+// ── Sự kiện "input" của ô tìm kiếm → lọc realtime (gõ tới đâu lọc tới đó) ──
+function lnSetSearch(val) {
+  _lnSearch = _lnNorm(val);
+  _lnRenderTable();
 }
 
 // Bấm tiêu đề cột số tiền: lần 1 → Cao xuống Thấp, bấm lại → Thấp lên Cao (đảo chiều mỗi lần bấm)
 function lnSortBy(key) {
   if (_lnSort.key === key) _lnSort.dir = -_lnSort.dir;
   else _lnSort = { key, dir: -1 };
-  renderLoiNhuan();
+  _lnRenderTable();
 }
 
 // ── DRILL-DOWN: bấm 1 con số trong bảng → mở tab tương ứng + lọc sẵn theo công trình ──
 //   thu     → tab DOANH THU › subtab THU TIỀN, lọc Lịch Sử Thu Tiền theo CT
+//   hdgoc   → tab DOANH THU › subtab HỢP ĐỒNG CHÍNH, lọc Danh Sách HĐ Chính theo CT
 //   hoadon  → tab THỐNG KÊ CP/HĐ, lọc hóa đơn theo CT (dùng lại _goTabWithCT của tab Công Trình)
 //   thauphu → tab CÔNG NỢ TP/NCC › subtab HỢP ĐỒNG THẦU PHỤ, lọc theo CT
 function lnDrill(el) {
@@ -270,6 +297,8 @@ function lnDrill(el) {
   const ct = el && el.dataset ? el.dataset.ct : '';
   if (!go || !ct) return;
   if (go === 'hoadon') { if (typeof _goTabWithCT === 'function') _goTabWithCT('thongke', ct); return; }
+  // HĐ gốc: _goTabWithCT('doanhthu') → dtFilterHdcByCt() mở subtab HỢP ĐỒNG CHÍNH + lọc sẵn
+  if (go === 'hdgoc')  { if (typeof _goTabWithCT === 'function') _goTabWithCT('doanhthu', ct); return; }
 
   const pageId = go === 'thu' ? 'doanhthu' : 'congno';
   const navBtn = document.querySelector(`[data-page="${pageId}"]`);
@@ -297,7 +326,7 @@ function lnDrill(el) {
   }, 150);
 }
 
-// Con số bấm được để xem chi tiết (go: thu | hoadon | thauphu). Số 0 → không tạo link.
+// Con số bấm được để xem chi tiết (go: thu | hdgoc | hoadon | thauphu). Số 0 → không tạo link.
 function _lnLink(html, v, go, ctName) {
   if (!Math.round(v || 0) || !ctName) return html;
   return `<a href="#" class="ln-link" data-go="${go}" data-ct="${x(ctName)}" onclick="event.preventDefault();lnDrill(this)" title="Xem chi tiết: ${x(ctName)}">${html}</a>`;
@@ -310,6 +339,14 @@ function _lnSortTh(key, label, cls, title) {
   return `<th class="text-end ln-sortable ${cls || ''}${on ? ' is-sorted' : ''}" onclick="lnSortBy('${key}')" title="${title ? title + ' — ' : ''}Bấm để sắp xếp theo số tiền">${label}<span class="material-symbols-outlined ln-sort-ic">${icon}</span></th>`;
 }
 
+// Tên Chủ đầu tư của công trình: hồ sơ khách hàng (customerId) → trường chuDauTu cũ
+function _lnCdtOf(p) {
+  const c = (p && p.customerId && typeof getCustomerById === 'function') ? getCustomerById(p.customerId) : null;
+  return c ? (c.name || '') : ((p && p.chuDauTu) || '');
+}
+
+// ── TÍNH số liệu mọi công trình + vẽ mini dashboard, rồi vẽ bảng ──
+// Gọi khi mở tab / đổi năm / dữ liệu đổi. Gõ tìm & sắp xếp chỉ gọi _lnRenderTable().
 function renderLoiNhuan() {
   const wrap = document.getElementById('dt-loinhuan-wrap');
   const dash = document.getElementById('dt-ln-dashboard');
@@ -319,53 +356,65 @@ function renderLoiNhuan() {
     .filter(p => p && p.id !== 'COMPANY');
 
   // Số liệu từng công trình — hàm dùng chung lnTinhCongTrinh (Hồ sơ Khách hàng cũng gọi)
+  // Gắn thêm tên CĐT + bản KHÔNG DẤU của tên CT / CĐT (chuẩn hóa 1 lần, dùng cho mọi lần gõ tìm)
   const ctx = _lnContext();
-  const allRows = _lnProjs.map(p => lnTinhCongTrinh(p, ctx))
-    .filter(r => r.dt || r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
+  _lnRowsAll = _lnProjs.map(p => {
+    const r = lnTinhCongTrinh(p, ctx);
+    r.cdt   = _lnCdtOf(p);
+    r._nName = _lnNorm(r.name);
+    r._nCdt  = _lnNorm(r.cdt);
+    return r;
+  }).filter(r => r.dt || r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
 
-  allRows.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  _lnRowsAll.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 
-  // ── Ô lọc công trình (searchable dropdown) — nạp lại theo danh sách đang có số liệu ──
-  if (_lnCtFilter && !allRows.some(r => r.name === _lnCtFilter)) _lnCtFilter = '';  // CT không còn trong năm đang lọc
-  const fSel = document.getElementById('ln-ct-filter');
-  if (fSel) {
-    fSel.innerHTML = '<option value="">-- Tất cả công trình --</option>' +
-      allRows.map(r => `<option value="${x(r.name)}">${x(r.name)}</option>`).join('');
-    fSel.value = _lnCtFilter;
-    if (typeof _ssEnhance === 'function') _ssEnhance(fSel);   // gõ để tìm (dùng chung form Hóa Đơn)
-  }
+  // Ô tìm kiếm giữ chữ đang gõ (đồng bộ lại state khi tab được vẽ lại)
+  const sEl = document.getElementById('ln-search');
+  if (sEl) _lnSearch = _lnNorm(sEl.value);
 
-  if (!allRows.length) {
+  if (!_lnRowsAll.length) {
     if (dash) dash.innerHTML = '';
     wrap.innerHTML = '<div style="text-align:center;padding:32px;color:var(--bs-secondary-color);font-size:13px">Chưa có dữ liệu</div>';
     return;
   }
 
-  // ── Mini dashboard (donut + bar) — luôn tính trên TOÀN BỘ công trình, không theo ô lọc ──
-  const _sum = (list, k) => list.reduce((s, r) => s + (r[k] || 0), 0);
-  const aChi = _sum(allRows, 'A') + _sum(allRows, 'B') + _sum(allRows, 'C');
-  const aDt  = _sum(allRows, 'dt');
-  if (dash) dash.innerHTML = _lnBuildDashboard(allRows, aChi, aDt, aDt - aChi);
+  // ── Mini dashboard (donut + bar) — luôn tính trên TOÀN BỘ công trình, không theo ô tìm ──
+  const aChi = _lnSum(_lnRowsAll, 'A') + _lnSum(_lnRowsAll, 'B') + _lnSum(_lnRowsAll, 'C');
+  const aDt  = _lnSum(_lnRowsAll, 'dt');
+  if (dash) dash.innerHTML = _lnBuildDashboard(_lnRowsAll, aChi, aDt, aDt - aChi);
 
-  // ── Bảng: áp ô lọc công trình + sắp xếp theo cột đang chọn ──
-  const rowsData = _lnCtFilter ? allRows.filter(r => r.name === _lnCtFilter) : allRows.slice();
+  _lnRenderTable();
+}
+
+// Cộng 1 cột số của danh sách dòng
+function _lnSum(list, k) {
+  return list.reduce((s, r) => s + (r[k] || 0), 0);
+}
+
+// ── VẼ BẢNG từ _lnRowsAll: áp ô tìm kiếm + sắp xếp ──
+function _lnRenderTable() {
+  const wrap = document.getElementById('dt-loinhuan-wrap');
+  if (!wrap || !_lnRowsAll.length) return;
+
+  const rowsData = _lnRowsAll.filter(r => _lnMatchSearch(r, _lnSearch));
   if (_lnSort.key) {
     const k = _lnSort.key, d = _lnSort.dir;
     rowsData.sort((a, b) => ((a[k] || 0) - (b[k] || 0)) * d || a.name.localeCompare(b.name, 'vi'));
   }
 
   // Tổng cộng (theo các dòng đang hiển thị)
-  const tA = _sum(rowsData, 'A'), tB = _sum(rowsData, 'B'), tC = _sum(rowsData, 'C');
-  const tDt = _sum(rowsData, 'dt');
+  const tA = _lnSum(rowsData, 'A'), tB = _lnSum(rowsData, 'B'), tC = _lnSum(rowsData, 'C');
+  const tDt = _lnSum(rowsData, 'dt'), tX = _lnSum(rowsData, 'X');
   const tChi = tA + tB + tC, tLN = tDt - tChi;
 
   // ── Bảng chi tiết (03/10/2026 — thiết kế lại theo "phân cấp thị giác") ──
   // Bố cục 4 khu vực, ngăn bằng kẻ dọc nhẹ:
-  //   CÔNG TRÌNH | DOANH THU: TỔNG ĐÃ THU (cash-basis)
+  //   CÔNG TRÌNH | DOANH THU:          TỔNG ĐÃ THU (cash-basis) · HĐ gốc (chỉ tham chiếu)
   //              | CHI TIẾT CHI PHÍ:   Hóa đơn · Thầu phụ · CP chung · TỔNG CHI (+ badge % DT)
   //              | HIỆU QUẢ:           LỢI NHUẬN (badge xanh/đỏ)
   // (04/10/2026) Chi phí cash-basis: Thầu phụ = đã ứng; Hóa đơn = HĐ của NCC chưa ứng + đã ứng NCC.
-  // Số Đã thu / Hóa đơn / Thầu phụ của từng dòng bấm được → lnDrill() mở tab chi tiết đã lọc sẵn.
+  // Cột "HĐ gốc" (r.X) CHỈ HIỂN THỊ — KHÔNG tham gia Tổng chi / Lợi nhuận.
+  // Số Đã thu / HĐ gốc / Hóa đơn / Thầu phụ của từng dòng bấm được → lnDrill() mở tab chi tiết đã lọc sẵn.
   // det=false (bấm "Thu gọn") → chỉ còn Công trình | Tổng thu | Tổng chi | Lợi nhuận.
   const det = _lnShowDetail;
   const SEP = 'ln-sep';   // class kẻ dọc ở ô ĐẦU mỗi khu vực (khu Doanh thu đã có kẻ ở mép cột tên)
@@ -375,42 +424,46 @@ function renderLoiNhuan() {
     const L = (html, v, go) => link ? _lnLink(html, v, go, r.name) : html;
     return `
       <td class="text-end ln-total">${L(_lnNum(r.dt), r.dt, 'thu')}</td>
-      ${det ? `<td class="text-end ln-sub ${SEP}">${L(_lnNum(r.A), r.A, 'hoadon')}</td>
+      ${det ? `<td class="text-end ln-sub">${L(_lnNum(r.X), r.X, 'hdgoc')}</td>
+               <td class="text-end ln-sub ${SEP}">${L(_lnNum(r.A), r.A, 'hoadon')}</td>
                <td class="text-end ln-sub">${L(_lnNum(r.B), r.B, 'thauphu')}</td>
                <td class="text-end ln-sub">${_lnNum(r.C)}</td>` : ''}
       ${_lnChiCell(r.chi, r.dt, det ? '' : SEP)}
       <td class="text-end ${SEP}">${_lnBadge(r.ln)}</td>`;
   };
 
+  // Tên CĐT hiện nhỏ dưới tên công trình (để thấy vì sao dòng khớp khi tìm theo CĐT)
   const rows = rowsData.map(r => `<tr>
-      <td class="ln-name">${x(r.name)}</td>${_rowCells(r, true)}
+      <td class="ln-name">${x(r.name)}${r.cdt ? `<div class="ln-cdt">${x(r.cdt)}</div>` : ''}</td>${_rowCells(r, true)}
     </tr>`).join('');
 
-  const totalRow = { dt: tDt, A: tA, B: tB, C: tC, chi: tChi, ln: tLN };
+  const totalRow = { dt: tDt, X: tX, A: tA, B: tB, C: tC, chi: tChi, ln: tLN };
+  const colCount = det ? 9 : 5;
 
   wrap.innerHTML = `
     <div style="overflow-x:auto">
-      <table class="table table-sm table-striped table-hover align-middle mb-0 ln-table" style="min-width:${det ? 900 : 560}px">
+      <table class="table table-sm table-striped table-hover align-middle mb-0 ln-table" style="min-width:${det ? 1000 : 560}px">
         <thead>
           <tr class="ln-grp">
             <th class="ln-name" rowspan="2" style="text-align:left;vertical-align:bottom">Công trình</th>
-            <th>Doanh thu (VNĐ)</th>
+            <th colspan="${det ? 2 : 1}">Doanh thu (VNĐ)</th>
             <th colspan="${det ? 4 : 1}" class="${SEP}">${det ? 'Chi tiết chi phí' : 'Chi phí'} (VNĐ)</th>
             <th class="${SEP}">Hiệu quả</th>
           </tr>
           <tr class="ln-col">
             ${_lnSortTh('dt', 'TỔNG ĐÃ THU', 'ln-th-total')}
-            ${det ? _lnSortTh('A', 'Hóa đơn', SEP, 'NCC đã ứng tiền → chỉ tính số đã ứng; NCC chưa ứng → tính theo hóa đơn')
+            ${det ? _lnSortTh('X', 'HĐ gốc', '', 'Giá trị hợp đồng gốc — chỉ để tham chiếu, KHÔNG tính vào lợi nhuận')
+                  + _lnSortTh('A', 'Hóa đơn', SEP, 'NCC đã ứng tiền → chỉ tính số đã ứng; NCC chưa ứng → tính theo hóa đơn')
                   + _lnSortTh('B', 'Thầu phụ', '', 'Tổng tiền đã ứng cho thầu phụ')
                   + _lnSortTh('C', 'CP chung', '') : ''}
             ${_lnSortTh('chi', 'TỔNG CHI <span class="fw-normal">(% DT)</span>', 'ln-th-total ' + (det ? '' : SEP), 'Badge xám = chi phí chiếm bao nhiêu % doanh thu')}
             ${_lnSortTh('ln', 'LỢI NHUẬN', 'ln-th-total ' + SEP)}
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || `<tr><td colspan="${colCount}" class="text-center text-secondary py-4" style="font-size:13px">Không có công trình / chủ đầu tư nào khớp từ khóa</td></tr>`}</tbody>
         <tfoot>
           <tr>
-            <td class="ln-name" style="font-weight:700">TỔNG CỘNG${_lnCtFilter ? ' <span class="fw-normal text-secondary" style="font-size:11px">(đang lọc 1 công trình)</span>' : ''}</td>${_rowCells(totalRow, false)}
+            <td class="ln-name" style="font-weight:700">TỔNG CỘNG${_lnSearch ? ` <span class="fw-normal text-secondary" style="font-size:11px">(${rowsData.length}/${_lnRowsAll.length} công trình khớp tìm kiếm)</span>` : ''}</td>${_rowCells(totalRow, false)}
           </tr>
         </tfoot>
       </table>
@@ -560,7 +613,7 @@ window.initDoanhThu = initDoanhThu;
 window.initLoiNhuan = initLoiNhuan;
 window.lnDrill = lnDrill;
 window.lnSortBy = lnSortBy;
-window.lnSetCtFilter = lnSetCtFilter;
+window.lnSetSearch = lnSetSearch;
 window.dtGoSub = dtGoSub;
 
 // [ADDED COPY KLCT]

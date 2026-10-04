@@ -4,7 +4,7 @@
 // (03/10/2026) BỐ CỤC MỚI — 2 subtab, form nằm thẳng trên màn hình (không còn popup):
 //   SUBTAB HỢP ĐỒNG CHÍNH (#dt-sub-hdc)
 //     [1] Form khai báo HĐ ............ saveHopDongChinh / editHopDongChinh / _hdcResetForm
-//     [2] Khai Báo Gần Đây ............ renderHdcRecent()   — HĐ vừa tạo/sửa gần nhất
+//     [2] (đã gỡ 04/10/2026) Khai Báo Gần Đây
 //     [3] Danh Sách HĐ + bộ lọc ....... renderHdcTableTk()  — lọc CT / người TH / tìm kiếm
 //   SUBTAB THU TIỀN (#dt-sub-thu)
 //     [1] Form ghi nhận thu ........... saveThuRecord / editThuRecord / _thuResetForm
@@ -284,48 +284,14 @@ function delHopDongChinh(keyId) {
 // ── Vẽ 2 bảng của subtab HỢP ĐỒNG CHÍNH ──────────────────────
 // (Tên hàm giữ nguyên để các nơi gọi sẵn — main.js, đổi năm, sync — vẫn chạy.)
 function renderHdcTable() {
-  dtPopulateCtFilter();         // bộ lọc CT / Người TH luôn có option mới nhất
-  renderHdcRecent();
+  dtPopulateCtFilter();         // bộ lọc Công trình luôn có option mới nhất
   renderHdcTableTk(_hdcTkPage);
 }
 
-// ── [KHU VỰC 2] KHAI BÁO GẦN ĐÂY — DT_HDC_RECENT hợp đồng vừa tạo/sửa gần nhất ──
-// Sắp theo thời điểm cập nhật (updatedAt), KHÔNG lọc năm: mục đích là đối chiếu
-// ngay cái vừa nhập, kể cả khi ngày HĐ thuộc năm khác năm đang xem.
-function renderHdcRecent() {
-  const tbody = document.getElementById('hdc-recent-tbody');
-  const empty = document.getElementById('hdc-recent-empty');
-  if (!tbody) return;
-
-  const list = Object.entries(hopDongData)
-    .filter(([, hd]) => hd && !hd.deletedAt)
-    .sort((a, b) => (b[1].updatedAt || b[1].createdAt || 0) - (a[1].updatedAt || a[1].createdAt || 0))
-    .slice(0, DT_HDC_RECENT);
-
-  if (!list.length) {
-    tbody.innerHTML = '';
-    if (empty) empty.style.display = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-
-  tbody.innerHTML = list.map(([keyId, hd]) => {
-    const tong = _dtHdcTong(hd);
-    const isNew = keyId === _dtHdcLastKey;
-    return `<tr class="${isNew ? 'dt-row-new' : ''}">
-      <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${_dtFmtTs(hd.updatedAt || hd.createdAt)}${isNew ? ' <span class="badge bg-warning text-dark" style="font-size:9px">Vừa lưu</span>' : ''}</td>
-      <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
-      <td style="font-weight:600;white-space:nowrap">${x(_dtHdcCtName(keyId))}</td>
-      <td class="text-secondary" style="white-space:nowrap">${x(recCatName(hd, 'hopdong', 'nguoi') || '—')}</td>
-      <td class="text-end font-monospace fw-semibold text-warning" style="white-space:nowrap">${tong ? fmtM(tong) : '—'}</td>
-      <td class="text-body-secondary" style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(hd.nd || '')}">${x(hd.nd || '—')}</td>
-      <td class="action-col">${_dtHdcActions(keyId)}</td>
-    </tr>`;
-  }).join('');
-}
+// (04/10/2026) Đã gỡ khu "Khai Báo Gần Đây" (renderHdcRecent) theo yêu cầu.
 
 // ── [KHU VỰC 3] DANH SÁCH & THỐNG KÊ HỢP ĐỒNG CHÍNH (năm đang lọc) ──
-// Bộ lọc: Công trình (_dtTkCtFilter) · Người TH (_dtHdcNguoiFilter) · Tìm kiếm (_dtTkSearch)
+// Bộ lọc: Công trình (_dtTkCtFilter) · Tìm kiếm (_dtTkSearch). (04/10/2026: bỏ lọc Người TH + cột CĐT/Người TH)
 function renderHdcTableTk(page) {
   page = page || 0;
   _hdcTkPage = page;
@@ -341,10 +307,6 @@ function renderHdcTableTk(page) {
     .filter(([keyId, v]) => !v.deletedAt && _dtInYear(v.ngay) && _dtMatchTkHDCFilter(keyId, v))
     .sort((a, b) => (b[1].ngay || '').localeCompare(a[1].ngay || '')
       || ((b[1].updatedAt || b[1].createdAt || 0) - (a[1].updatedAt || a[1].createdAt || 0)));
-
-  if (_dtHdcNguoiFilter) {
-    entries = entries.filter(([, v]) => recCatName(v, 'hopdong', 'nguoi') === _dtHdcNguoiFilter);
-  }
 
   if (_dtTkSearch) {
     const q = _dtTkSearch;
@@ -377,13 +339,10 @@ function renderHdcTableTk(page) {
 
   tbody.innerHTML = slice.map(([keyId, hd]) => {
     const tong = _dtHdcTong(hd);
-    const cdt  = _dtHdcCdt(keyId, hd);
     return `<tr class="${keyId === _dtHdcLastKey ? 'dt-row-new' : ''}">
       <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
       <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_dtHdcCtName(keyId))}</td>
-      <td class="text-body-secondary" style="font-size:12px;white-space:nowrap">${x(cdt || '—')}</td>
-      <td class="text-secondary" style="font-size:12px;white-space:nowrap">${x(recCatName(hd, 'hopdong', 'nguoi') || '—')}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTriphu ? fmtS(hd.giaTriphu) : '<span class="text-body-secondary">—</span>'}</td>
       <td class="text-end font-monospace fw-bold text-warning" style="white-space:nowrap" title="${tong ? fmtM(tong) : ''}">${tong ? fmtS(tong) : '—'}</td>

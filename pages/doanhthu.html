@@ -109,32 +109,7 @@
             </div>
           </div>
 
-          <!-- ── KHU VỰC 2: KHAI BÁO GẦN ĐÂY — các HĐ vừa tạo/sửa gần nhất (để đối chiếu sau khi Lưu) ── -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">history</span>Khai Báo Gần Đây
-              <span class="text-secondary" style="font-size:11px;font-weight:400">(các hợp đồng vừa tạo / sửa gần nhất)</span>
-            </div>
-          </div>
-          <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
-            <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:760px">
-                <thead class="table-light">
-                  <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Cập Nhật Lúc</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày HĐ</th>
-                    <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Người TH</th>
-                    <th style="text-align:right;padding:8px 10px;font-weight:700;white-space:nowrap">Tổng HĐ</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700">Nội Dung</th>
-                    <th class="action-col"></th>
-                  </tr>
-                </thead>
-                <tbody id="hdc-recent-tbody"></tbody>
-              </table>
-            </div>
-            <div id="hdc-recent-empty" style="text-align:center;padding:24px;color:var(--bs-secondary-color);font-size:13px;display:none">Chưa có hợp đồng nào</div>
-          </div>
+          <!-- (04/10/2026) Đã gỡ khu "Khai Báo Gần Đây" (bảng HĐ vừa tạo/sửa) — chiếm chỗ, không cần nữa -->
 
           <!-- ── KHU VỰC 3: DANH SÁCH & THỐNG KÊ HỢP ĐỒNG CHÍNH (toàn bộ, năm đang lọc) ── -->
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -144,27 +119,22 @@
             </div>
             <button class="btn btn-sm" onclick="exportHdcToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:6px 12px" title="Tick chọn 1 hợp đồng rồi bấm để xuất phiếu PNG"><span class="material-symbols-outlined msi-gap">upload</span>Xuất phiếu HĐ Chính</button>
           </div>
-          <!-- Thanh bộ lọc ngay trên đầu bảng: Công trình · Người thực hiện · Tìm kiếm -->
+          <!-- Thanh bộ lọc ngay trên đầu bảng: Công trình · Tìm kiếm (04/10/2026: bỏ lọc Người TH) -->
           <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
             <select id="dt-hdc-ct-filter" class="form-select form-select-sm w-auto" style="min-width:200px;max-width:320px" onchange="dtSetHdcCtFilter(this.value)" title="Lọc theo công trình">
               <option value="">-- Tất cả công trình --</option>
-            </select>
-            <select id="dt-hdc-nguoi-filter" class="form-select form-select-sm w-auto" style="min-width:170px" onchange="dtSetHdcNguoiFilter(this.value)" title="Lọc theo người thực hiện">
-              <option value="">-- Tất cả người TH --</option>
             </select>
             <input type="text" id="dt-hdc-search" class="form-control form-control-sm" style="max-width:240px" placeholder="Tìm CT, CĐT, người TH, nội dung..." oninput="dtSetHdcSearch(this.value)">
             <span id="hdctk-sum" class="ms-auto text-secondary" style="font-size:12px"></span>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">
-              <table class="table table-sm table-hover align-middle mb-0" style="min-width:900px">
+              <table class="table table-sm table-hover align-middle mb-0" style="min-width:720px">
                 <thead class="table-light">
                   <tr style="font-size:11px;color:var(--bs-secondary-color);border-bottom:2px solid var(--bs-border-color)">
                     <th style="padding:8px 6px;text-align:center"><input type="checkbox" title="Chọn tất cả" onchange="document.querySelectorAll('.hdc-row-chk').forEach(c=>c.checked=this.checked)"/></th>
                     <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Ngày</th>
                     <th style="text-align:left;padding:8px 12px;font-weight:700">Công Trình</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">CĐT</th>
-                    <th style="text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap">Người TH</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Chính</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">HĐ Phụ</th>
                     <th style="text-align:right;padding:8px 10px;font-weight:700">Tổng HĐ</th>

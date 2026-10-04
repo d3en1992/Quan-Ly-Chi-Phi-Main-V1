@@ -186,7 +186,6 @@ let _thuTkPage  = 0;
 let _thuTdPage  = 0;
 const DT_PG         = 7;   // số dòng / trang cho bảng HĐ Chính + Lịch sử thu
 const DT_TD_PG      = 10;  // số công trình / trang ở bảng Tiến Độ Thu
-const DT_HDC_RECENT = 5;   // số HĐ hiện ở bảng "Khai Báo Gần Đây"
 
 // ── Nhãn + màu badge cho Loại khoản thu (dùng chung form, sổ quỹ, bảng tiến độ) ──
 // (03/10/2026) "Quyết toán" ĐÃ GỠ khỏi dropdown form Thu tiền — nay chỉ do hệ thống tự sinh
@@ -208,7 +207,6 @@ function _dtIsAutoThu(r) {
 
 // Bộ lọc bảng Danh Sách HĐ Chính (subtab HỢP ĐỒNG CHÍNH)
 let _dtTkCtFilter     = '';  // tên công trình ('' = tất cả)
-let _dtHdcNguoiFilter = '';  // tên người thực hiện ('' = tất cả)
 // Bộ lọc bảng Lịch Sử Thu Tiền (subtab THU TIỀN) — tên công trình ('' = tất cả) (03/10/2026)
 let _dtThuCtFilter = '';
 // CT filter riêng cho sub-tab THẦU PHỤ (tab Công Nợ)
@@ -245,25 +243,12 @@ function _dtMatchTpProjFilter(record) {
   return (record.congtrinh || '') === _dtTpCtFilter;
 }
 
-// ── Nạp 2 bộ lọc trên đầu bảng Danh Sách HĐ Chính: Công trình + Người thực hiện ──
+// ── Nạp bộ lọc Công trình trên đầu bảng Danh Sách HĐ Chính ──
 function dtPopulateCtFilter() {
   const ctSel = document.getElementById('dt-hdc-ct-filter');
   if (ctSel) ctSel.innerHTML = _buildProjFilterOpts(_dtTkCtFilter, { includeCompany: false, placeholder: '-- Tất cả công trình --' });
 
-  // Người TH: chỉ liệt kê những người ĐANG có hợp đồng (trong năm đang lọc)
-  const nguoiSel = document.getElementById('dt-hdc-nguoi-filter');
-  if (nguoiSel) {
-    const names = new Set();
-    Object.values(hopDongData).forEach(hd => {
-      if (!hd || hd.deletedAt || !_dtInYear(hd.ngay)) return;
-      const n = recCatName(hd, 'hopdong', 'nguoi');
-      if (n) names.add(n);
-    });
-    if (_dtHdcNguoiFilter) names.add(_dtHdcNguoiFilter); // giữ lựa chọn hiện tại dù không còn HĐ
-    const opts = [...names].sort((a, b) => a.localeCompare(b, 'vi'));
-    nguoiSel.innerHTML = '<option value="">-- Tất cả người TH --</option>' +
-      opts.map(n => `<option value="${x(n)}"${n === _dtHdcNguoiFilter ? ' selected' : ''}>${x(n)}</option>`).join('');
-  }
+  // (04/10/2026) Đã bỏ bộ lọc Người TH của Danh Sách HĐ Chính
 }
 
 // ── Nạp dropdown "Chọn công trình" trên đầu bảng Lịch Sử Thu Tiền (03/10/2026) ──
@@ -304,11 +289,6 @@ function dtPopulateTpCtFilter() {
 // ── Bộ lọc bảng Danh Sách HĐ Chính → vẽ lại từ trang đầu ─────────────────
 function dtSetHdcCtFilter(val) {
   _dtTkCtFilter = val || '';
-  renderHdcTableTk(0);
-}
-
-function dtSetHdcNguoiFilter(val) {
-  _dtHdcNguoiFilter = val || '';
   renderHdcTableTk(0);
 }
 

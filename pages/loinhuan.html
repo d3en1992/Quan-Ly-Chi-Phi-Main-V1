@@ -16,13 +16,12 @@
         </div>
         <!-- Mini dashboard: donut Doanh thu/Chi phí + Top 5 lãi / Top 5 lỗ -->
         <div id="dt-ln-dashboard" class="mb-3"></div>
-        <!-- (04/10/2026) Ô lọc công trình — gõ để tìm (renderLoiNhuan nạp option + _ssEnhance) -->
+        <!-- (04/10/2026) Ô tìm kiếm thông minh: gõ tên công trình HOẶC tên chủ đầu tư, KHÔNG DẤU vẫn tìm được
+             (lnSetSearch → _lnNorm / _lnMatchSearch trong doanhthu.reports-export.js) — lọc realtime khi gõ -->
         <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-          <select id="ln-ct-filter" class="form-select form-select-sm w-auto" style="min-width:260px;max-width:380px"
-            onchange="lnSetCtFilter(this.value)" title="Lọc bảng Lợi Nhuận theo công trình">
-            <option value="">-- Tất cả công trình --</option>
-          </select>
-          <span class="text-secondary" style="font-size:11px">Bấm vào số Đã thu / Hóa đơn / Thầu phụ để xem chi tiết · bấm tiêu đề cột để sắp xếp</span>
+          <input type="search" id="ln-search" class="form-control form-control-sm" style="max-width:320px"
+            placeholder="Tìm tên CT hoặc CĐT..." autocomplete="off" oninput="lnSetSearch(this.value)">
+          <span class="text-secondary" style="font-size:11px">Bấm vào số Đã thu / HĐ gốc / Hóa đơn / Thầu phụ để xem chi tiết · bấm tiêu đề cột để sắp xếp</span>
         </div>
         <!-- Bảng chi tiết Lợi Nhuận -->
         <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
