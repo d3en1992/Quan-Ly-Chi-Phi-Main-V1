@@ -1345,21 +1345,46 @@ function openCTDetail(id) {
 //     → tạo xong tự chọn luôn khách vừa tạo.
 //   • Chọn khách → tự điền "Địa chỉ công trình" từ địa chỉ khách (nếu ô đang trống / đang là
 //     địa chỉ tự điền trước đó — không đè địa chỉ người dùng đã gõ tay).
-//   • Form TẠO: tự gợi ý Tên công trình = "<Loại> <Tên khách> - <Hạng mục> - T<tháng>/<năm 2 số>"
+//   • Tự gợi ý Tên công trình = "<Loại> <Tên khách> (<Hạng mục>)" (05/10/2026: cả form Sửa; loại lấy từ tiền tố tên)
 //     VD "SN Cô Sáu - Ốp gạch sân vườn - T10/26". KHÔNG dùng ngoặc "[SN]": loại công trình của app
 //     được nhận theo CHỮ ĐẦU TÊN (_projTypeByName "CT…/SC…", badge _ctCategoryInfo) — có "[" ở đầu
 //     thì công trình bị xếp sai loại và badge hiện "[S".
 //   • Nhãn "Ghi chú" → "Địa chỉ công trình" (vẫn lưu vào field `note` như cũ).
 
-// Các loại công trình cho form (mã = chữ đầu tên công trình)
-const _CT_LOAI_OPTS = [
-  ['CT',   'CT — Công trình mới'],
-  ['SC',   'SC — Sửa chữa'],
-  ['SN',   'SN — Sửa nhỏ'],
-  ['KHAC', 'Khác (không mã)'],
-];
+// ══ LOẠI CÔNG TRÌNH — TỰ NHẬN DIỆN TỪ TÊN (05/10/2026) ═══════════════
+// Đã BỎ dropdown "Loại công trình" ở 2 form Thêm/Sửa. Loại được tự đọc từ TIỀN TỐ của tên:
+//   "SN Cô Sáu (Ốp gạch)"   → 'SN'        "[SN] Cô Sáu (Ốp gạch)" → 'SN'
+//   "CT Nhà anh Tài"        → 'CT'        "SC 213 Quang Trung"    → 'SC'
+//   "Nhà anh Tài" (không mã)→ 'Khác'
+// Tiền tố phải đứng riêng: "CTY ABC", "Scan…" KHÔNG tính là CT/SC (chữ cái liền sau mã → bỏ qua).
+const CT_LOAI_RE = /^\s*\[?\s*(CT|SC|SN)\s*\]?(?![a-zà-ỹ])/i;
+
+// Trả về 'CT' | 'SC' | 'SN' | 'Khác'
+function ctDetectLoai(name) {
+  const m = String(name || '').match(CT_LOAI_RE);
+  return m ? m[1].toUpperCase() : 'Khác';
+}
+
+// Loại của 1 công trình đã lưu: ưu tiên field loaiCongTrinh, CT cũ chưa có → đọc từ tên
+function ctLoaiOf(p) {
+  return (p && p.loaiCongTrinh) || ctDetectLoai(p && p.name);
+}
+
+// Chuẩn hóa tiền tố trước khi lưu: "[SN] Cô Sáu" → "SN Cô Sáu"
+// Lý do: app xếp phân khu / badge theo CHỮ ĐẦU tên (_projTypeByName, _ctCategoryInfo) —
+// để "[" ở đầu thì công trình bị xếp sai loại và badge hiện "[S".
+function _ctNormalizeNamePrefix(name) {
+  return String(name || '').trim().replace(/^\[\s*(CT|SC|SN)\s*\]\s*/i, (_, code) => code.toUpperCase() + ' ');
+}
+
+// Bỏ tiền tố loại khỏi tên (để so sánh 2 tên mà không tính phần mã)
+function _ctStripPrefix(name) {
+  return String(name || '').trim().replace(CT_LOAI_RE, '').replace(/^[\s\-–:.]+/, '').trim();
+}
 
 // Trạng thái tự điền của từng form ('new' | 'edit')
+//   name: true = ô Tên đang do app tự điền theo Chủ đầu tư + Hạng mục
+//   note: địa chỉ app đã tự điền (để biết người dùng đã sửa hay chưa)
 const _ctFormAuto = { new: { name: true, note: '' }, edit: { name: false, note: '' } };
 
 /**
@@ -1464,7 +1489,7 @@ function _onCustPickerChange(prefix) {
   const id = document.getElementById(`ct-${prefix}-customer`)?.value || '';
   const c  = id && typeof getCustomerById === 'function' ? getCustomerById(id) : null;
   _ctApplyCustAddress(prefix, c);
-  if (prefix === 'new') _ctAutoName();
+  _ctAutoName(false, prefix);   // form Sửa chỉ đổi tên khi tên đang khớp gợi ý (_ctFormAuto.edit.name)
 }
 
 // ── Tự điền ĐỊA CHỈ CÔNG TRÌNH từ địa chỉ khách hàng — "nhẹ tay" (04/10/2026) ──
@@ -1533,16 +1558,18 @@ const CT_NAME_MAX = 45;
 
 // Gợi ý tên công trình: "<Loại> <Tên khách> (<Hạng mục>)"  — VD "SN Cô Sáu (Ốp gạch sân vườn, Mái che)"
 // (04/10/2026) Bỏ phần "- T<tháng>/<năm>" — ngày thi công đã lưu riêng (Ngày bắt đầu).
-// (05/10/2026) Hạng mục đặt trong NGOẶC ĐƠN thay cho dấu " - "; mã loại vẫn KHÔNG có ngoặc vuông
-// (app nhận loại theo chữ đầu tên — "[SN]" sẽ bị xếp sai phân khu).
+// (05/10/2026) Hạng mục đặt trong NGOẶC ĐƠN thay cho dấu " - "; mã loại vẫn KHÔNG có ngoặc vuông.
+// (05/10/2026) Bỏ dropdown Loại → mã loại lấy theo TIỀN TỐ đang có trong ô Tên (người dùng gõ "SN"
+//   ở đầu tên là đổi loại); ô Tên còn trống → mặc định "CT"; ô Tên không có mã → không gắn mã (Khác).
 // Dài quá CT_NAME_MAX → cắt bớt ở cuối (ô tên vẫn sửa tay được).
 function _ctSuggestName(prefix) {
-  const loai = document.getElementById(`ct-${prefix}-loai`)?.value || 'CT';
+  const cur  = (document.getElementById(`ct-${prefix}-name`)?.value || '').trim();
+  const loai = cur ? ctDetectLoai(cur) : 'CT';
   const cid  = document.getElementById(`ct-${prefix}-customer`)?.value || '';
   const c    = cid && typeof getCustomerById === 'function' ? getCustomerById(cid) : null;
   const hm   = (document.getElementById(`ct-${prefix}-hangmuc`)?.value || '').trim();
   if (!c) return '';                                   // chưa chọn khách → chưa gợi ý
-  const head = (loai !== 'KHAC' ? loai + ' ' : '') + c.name;
+  const head = (loai !== 'Khác' ? loai + ' ' : '') + c.name;
   if (!hm) return head.slice(0, CT_NAME_MAX).trim();
   let name = `${head} (${hm})`;
   // Quá dài → cắt bớt PHẦN HẠNG MỤC nhưng vẫn giữ dấu đóng ngoặc
@@ -1553,7 +1580,7 @@ function _ctSuggestName(prefix) {
   return name;
 }
 
-// Bộ đếm ký tự dưới ô tên ("12/40")
+// Bộ đếm ký tự dưới ô tên ("12/45") + nhãn loại tự nhận diện ("Loại: SN")
 function _ctNameCounter(prefix) {
   const el = document.getElementById(`ct-${prefix}-name`);
   const ct = document.getElementById(`ct-${prefix}-name-count`);
@@ -1561,38 +1588,130 @@ function _ctNameCounter(prefix) {
   const n = el.value.length;
   ct.textContent = `${n}/${CT_NAME_MAX}`;
   ct.className = n >= CT_NAME_MAX ? 'text-danger fw-semibold' : 'text-secondary';
+  const lb = document.getElementById(`ct-${prefix}-loai-auto`);
+  if (lb) lb.textContent = el.value.trim() ? ctDetectLoai(el.value) : '—';
 }
 
-// Tự điền tên (form tạo) nếu người dùng chưa sửa tay ô tên
-function _ctAutoName(force) {
-  const el = document.getElementById('ct-new-name');
+// Tự điền tên nếu người dùng chưa sửa tay ô tên (dùng cho cả form Thêm và Sửa)
+// force = true (nút "↺ Gợi ý lại") → bật lại chế độ tự điền
+function _ctAutoName(force, prefix) {
+  prefix = prefix || 'new';
+  const el = document.getElementById(`ct-${prefix}-name`);
   if (!el) return;
-  if (force) _ctFormAuto.new.name = true;
-  if (!_ctFormAuto.new.name) return;
-  const sug = _ctSuggestName('new');
+  if (force) _ctFormAuto[prefix].name = true;
+  if (!_ctFormAuto[prefix].name) { _ctNameCounter(prefix); return; }
+  const sug = _ctSuggestName(prefix);
   if (sug) el.value = sug;
-  _ctNameCounter('new');
+  _ctNameCounter(prefix);
 }
 
-// Đổi mã loại ở đầu tên (form sửa): "SC Nhà A..." + chọn SN → "SN Nhà A..."
-function _ctSwapPrefix(name, loai) {
-  const base = (name || '').trim().replace(/^(CT|SC|SN)(?![a-zà-ỹ])[\s\-–:.]*/i, '');
-  return (loai && loai !== 'KHAC' ? loai + ' ' : '') + base;
+// Người dùng gõ vào ô Tên:
+//   • Chỉ đổi / thêm / bỏ MÃ LOẠI ở đầu (phần còn lại vẫn đúng gợi ý) → GIỮ chế độ tự điền,
+//     để gõ "SN" rồi tiếp tục nhập Hạng mục vẫn tự cập nhật tên.
+//   • Sửa phần khác của tên → app ngừng tự điền (tôn trọng tên người dùng tự đặt).
+function _ctNameTyped(prefix) {
+  const el  = document.getElementById(`ct-${prefix}-name`);
+  const sug = _ctSuggestName(prefix);
+  _ctFormAuto[prefix].name = !!(el && sug && _ctStripPrefix(el.value) === _ctStripPrefix(sug));
+  _ctNameCounter(prefix);
 }
 
-// Mã loại hiện tại của 1 tên công trình (cho dropdown Loại)
-function _ctLoaiOfName(name) {
-  const m = (name || '').trim().match(/^(CT|SC|SN)(?![a-zà-ỹ])/i);
-  return m ? m[1].toUpperCase() : 'KHAC';
+// ══ BẢNG TÍNH M2 SÀN / KHỐI LƯỢNG (05/10/2026) ═════════════════════════
+// Bảng động trong form Thêm/Sửa công trình: TÊN HẠNG MỤC | ĐVT | KL (+ nút xóa dòng).
+//   • Form Thêm: sẵn 3 dòng trống. Form Sửa: nạp lại đúng các dòng đã lưu (chưa có → 3 dòng trống).
+//   • Nút [+ 1 dòng] thêm dòng; gõ KL → "Tổng KL" (#tongKL) cập nhật ngay.
+//   • Lưu vào record công trình ở field `khoiLuong`: [{ ten, dvt, kl }] (bỏ các dòng trống).
+// Chỉ 1 form công trình mở tại 1 thời điểm (cùng modal #ct-modal) → dùng ID cố định ct-kl-tbody / tongKL.
+const CT_KL_DEFAULT_ROWS = 3;
+const CT_KL_DEFAULT_DVT  = 'm2';
+
+// HTML 1 dòng của bảng (r: { ten, dvt, kl } — bỏ trống = dòng mới)
+function _ctKlRowHtml(r) {
+  r = r || {};
+  const kl = (r.kl === 0 || r.kl) ? r.kl : '';
+  return `<tr>
+    <td><input type="text" class="form-control form-control-sm ct-kl-ten" value="${x(r.ten || '')}" placeholder="VD: Sàn tầng 1" autocomplete="off"></td>
+    <td><input type="text" class="form-control form-control-sm ct-kl-dvt" value="${x(r.dvt === undefined ? CT_KL_DEFAULT_DVT : r.dvt)}" autocomplete="off"></td>
+    <td><input type="number" step="any" min="0" inputmode="decimal" class="form-control form-control-sm text-end font-monospace ct-kl-kl" value="${kl}" oninput="ctKlUpdateTotal()"></td>
+    <td class="text-center"><button type="button" class="btn btn-link btn-sm p-0 text-danger text-decoration-none" title="Xóa dòng" onclick="ctKlDelRow(this)"><span class="material-symbols-outlined" style="font-size:18px">close</span></button></td>
+  </tr>`;
 }
 
-function _ctLoaiSelect(prefix, cur, inpStyle, lblStyle, onchange) {
-  return `<div>
-    <label style="${lblStyle}">Loại Công Trình</label>
-    <select id="ct-${prefix}-loai" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)" onchange="${onchange}">
-      ${_CT_LOAI_OPTS.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${l}</option>`).join('')}
-    </select>
-  </div>`;
+// HTML cả khối bảng (dùng trong template 2 form). rows: mảng đã lưu (bỏ trống → 3 dòng trống)
+function _ctKlTableHtml(rows, lblStyle) {
+  const list = (Array.isArray(rows) && rows.length) ? rows : Array.from({ length: CT_KL_DEFAULT_ROWS }, () => ({}));
+  return `
+    <label style="${lblStyle}">Bảng Tính M2 Sàn / Khối Lượng</label>
+    <div class="table-responsive border rounded">
+      <table class="table table-sm align-middle mb-0 ct-kl-table">
+        <thead class="table-light">
+          <tr style="font-size:11px">
+            <th>TÊN HẠNG MỤC</th>
+            <th style="width:110px">ĐVT</th>
+            <th style="width:150px" class="text-end">KL</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="ct-kl-tbody">${list.map(_ctKlRowHtml).join('')}</tbody>
+      </table>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mt-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="ctKlAddRow()">+ 1 dòng</button>
+      <span style="font-size:13px">Tổng KL: <span id="tongKL" class="fw-bold font-monospace">${_ctKlFmt(_ctKlSum(list))}</span></span>
+    </div>`;
+}
+
+// Thêm 1 dòng trống cuối bảng + đặt con trỏ vào ô Tên hạng mục
+function ctKlAddRow() {
+  const tb = document.getElementById('ct-kl-tbody');
+  if (!tb) return;
+  tb.insertAdjacentHTML('beforeend', _ctKlRowHtml({}));
+  tb.lastElementChild?.querySelector('.ct-kl-ten')?.focus();
+}
+
+// Xóa 1 dòng → tính lại tổng
+function ctKlDelRow(btn) {
+  const tr = btn && btn.closest('tr');
+  if (tr) tr.remove();
+  ctKlUpdateTotal();
+}
+
+// Đọc số KL của 1 ô (rỗng / sai → 0)
+function _ctKlNum(v) {
+  const n = parseFloat(String(v === undefined || v === null ? '' : v).replace(',', '.'));
+  return isFinite(n) ? n : 0;
+}
+
+// Tổng KL của mảng dòng
+function _ctKlSum(rows) {
+  return (rows || []).reduce((s, r) => s + _ctKlNum(r.kl), 0);
+}
+
+// Định dạng tổng: tối đa 2 chữ số thập phân, dấu phẩy thập phân kiểu Việt Nam
+function _ctKlFmt(n) {
+  return (Math.round(n * 100) / 100).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+}
+
+// Sự kiện oninput của ô KL → cập nhật "Tổng KL" ngay
+function ctKlUpdateTotal() {
+  const el = document.getElementById('tongKL');
+  if (el) el.textContent = _ctKlFmt(_ctKlSum(ctKlSerialize({ keepEmpty: true })));
+}
+
+// Đọc bảng → mảng Object để lưu vào record công trình
+//   [{ ten: 'Sàn tầng 1', dvt: 'm2', kl: 120.5 }, ...]
+//   Bỏ dòng không có Tên hạng mục lẫn KL (dòng trống). opts.keepEmpty = true → giữ hết (để tính tổng).
+function ctKlSerialize(opts) {
+  opts = opts || {};
+  const out = [];
+  document.querySelectorAll('#ct-kl-tbody tr').forEach(tr => {
+    const ten   = (tr.querySelector('.ct-kl-ten')?.value || '').trim();
+    const dvt   = (tr.querySelector('.ct-kl-dvt')?.value || '').trim();
+    const klRaw = (tr.querySelector('.ct-kl-kl')?.value || '').trim();
+    if (!opts.keepEmpty && !ten && !klRaw) return;
+    out.push({ ten, dvt, kl: _ctKlNum(klRaw) });
+  });
+  return out;
 }
 
 /**
@@ -1609,6 +1728,108 @@ function _resolveCustomerFromPicker(prefix) {
   }
   return { customerId: null, chuDauTu: '' };
 }
+
+// ══ BỐ CỤC CHUNG CỦA FORM THÊM / SỬA (05/10/2026 — lưới Bootstrap) ══════
+//   Dòng 1: Chủ đầu tư [+ Thêm nhanh] (7/12)        | Trạng thái (5/12)
+//           (khung Thêm nhanh khách hàng — ẩn, hiện khi bấm nút)
+//   Dòng 2: Hạng mục (~60% — gõ là tự điền Tên)      | Tên công trình (~40%) + loại tự nhận diện
+//   Dòng 3: Bảng tính m2 sàn / khối lượng
+//   Dòng 4: Ngày bắt đầu | Ngày kết thúc | Ngày quyết toán   (3 cột đều)
+//   Dòng 5: Hệ số tỉ trọng (3/12)                    | Địa chỉ công trình (9/12)
+// v: giá trị nạp sẵn (form Sửa) — { custId, status, hangMuc, name, khoiLuong, sd, sdHint, ed, cld, k, note }
+function _ctFormHtml(prefix, v, inpStyle, lblStyle) {
+  const mono = `${inpStyle};font-family:'IBM Plex Mono',monospace`;
+  const selStyle = `${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)`;
+  const isNew = prefix === 'new';
+  const statusOpts = Object.entries(PROJECT_STATUS)
+    .map(([val, lb]) => `<option value="${val}"${v.status === val ? ' selected' : ''}>${lb}</option>`).join('');
+  const nameMax = Math.max(CT_NAME_MAX, (v.name || '').length);
+  const nameLen = (v.name || '').length;
+  return `
+    <div class="row g-3">
+      <!-- Dòng 1: Chủ đầu tư | Trạng thái -->
+      <div class="col-md-7">${_renderCustomerSelect(prefix, v.custId || null, inpStyle, lblStyle)}</div>
+      <div class="col-md-5">
+        <label style="${lblStyle}">Trạng Thái</label>
+        <select id="ct-${prefix}-status" style="${selStyle}">${statusOpts}</select>
+      </div>
+      <!-- Khung Thêm nhanh khách hàng (ẩn — hiện khi bấm [+ Thêm nhanh]) -->
+      <div class="col-12" style="margin-top:0">${_renderNewCustPane(prefix, inpStyle, lblStyle)}</div>
+
+      <!-- Dòng 2: Hạng mục (~60%) | Tên công trình (~40%) -->
+      <div class="col-md-7">
+        <label style="${lblStyle}">Hạng Mục</label>
+        <input id="ct-${prefix}-hangmuc" type="text" value="${x(v.hangMuc || '')}" placeholder="VD: Ốp gạch sân vườn, Làm mái che..." autocomplete="off"
+          style="${inpStyle}" oninput="_ctAutoName(false,'${prefix}')">
+        <div class="text-secondary" style="font-size:11px;margin-top:3px">Gõ hạng mục → tên công trình tự điền theo <b>Loại Tên khách (Hạng mục)</b>.</div>
+      </div>
+      <div class="col-md-5">
+        <label style="${lblStyle}">Tên Công Trình *
+          <button type="button" class="btn btn-link btn-sm p-0 ms-2 text-decoration-none" style="font-size:11px;text-transform:none;letter-spacing:0" onclick="_ctAutoName(true,'${prefix}')" title="Điền lại tên theo gợi ý">↺ Gợi ý lại</button>
+        </label>
+        <input id="ct-${prefix}-name" type="text" value="${x(v.name || '')}" maxlength="${nameMax}" placeholder="VD: SN Cô Sáu (Ốp gạch)" autocomplete="off"
+          style="${inpStyle};font-size:14px" oninput="_ctNameTyped('${prefix}')">
+        <div class="d-flex justify-content-between gap-2" style="font-size:11px;margin-top:3px">
+          <span class="text-secondary" title="Gõ CT / SC / SN ở đầu tên để đổi loại; không có mã = Khác">Loại (tự nhận diện): <b id="ct-${prefix}-loai-auto">${v.name ? ctDetectLoai(v.name) : '—'}</b></span>
+          <span id="ct-${prefix}-name-count" class="${nameLen >= CT_NAME_MAX ? 'text-danger fw-semibold' : 'text-secondary'}" style="white-space:nowrap">${nameLen}/${CT_NAME_MAX}</span>
+        </div>
+      </div>
+
+      <!-- Dòng 3: Bảng tính m2 sàn -->
+      <div class="col-12">${_ctKlTableHtml(v.khoiLuong, lblStyle)}</div>
+
+      <!-- Dòng 4: Ngày bắt đầu | Ngày kết thúc | Ngày quyết toán -->
+      <div class="col-md-4">
+        <label style="${lblStyle}">Ngày Bắt Đầu${v.sdHint || ''}</label>
+        <input id="ct-${prefix}-startdate" type="date" value="${v.sd || ''}" style="${mono}">
+      </div>
+      <div class="col-md-4">
+        <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
+        <input id="ct-${prefix}-enddate" type="date" value="${v.ed || ''}" style="${mono}">
+      </div>
+      <div class="col-md-4">
+        <label style="${lblStyle}">Ngày Quyết Toán <span style="font-weight:400;text-transform:none">(khi đã QT)</span></label>
+        <input id="ct-${prefix}-closeddate" type="date" value="${v.cld || ''}" style="${mono}">
+      </div>
+
+      <!-- Dòng 5: Hệ số tỉ trọng | Địa chỉ công trình -->
+      <div class="col-md-3">
+        <label style="${lblStyle}" title="Chia chi phí chung — mặc định 1, nhập 0 để không gánh">Hệ Số Tỉ Trọng</label>
+        <input id="ct-${prefix}-hesotitrong" type="number" min="0" step="0.1" value="${v.k}" style="${mono}"
+          title="Chia chi phí chung — mặc định 1, nhập 0 để không gánh">
+      </div>
+      <div class="col-md-9">
+        <label style="${lblStyle}">Địa Chỉ Công Trình</label>
+        <input id="ct-${prefix}-note" type="text" value="${x(v.note || '')}" placeholder="Địa chỉ công trình (tự điền từ địa chỉ khách hàng)..." autocomplete="off"
+          style="${inpStyle}" oninput="_ctNoteTyped('${prefix}')">
+        <div id="ct-${prefix}-note-hint" style="font-size:11.5px;margin-top:3px"></div>
+      </div>
+
+      <div class="col-12 d-flex gap-2" style="margin-top:16px">
+        ${isNew
+          ? `<button class="btn btn-primary" style="flex:1" onclick="saveCTCreate()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Công Trình</button>
+             <button class="btn btn-outline-secondary" onclick="closeModal()">Hủy</button>`
+          : `<button class="btn btn-primary" style="flex:1" onclick="saveCTEdit('${v.id}')"><span class="material-symbols-outlined msi-gap">save</span>Lưu Thay Đổi</button>
+             <button class="btn btn-outline-secondary" onclick="openCTDetail('${v.id}')">Hủy</button>`}
+      </div>
+    </div>`;
+}
+
+// Đọc Hệ số tỉ trọng: số ≥ 0 hợp lệ, sai → 1
+function _ctReadK(prefix) {
+  const raw = parseFloat(document.getElementById(`ct-${prefix}-hesotitrong`)?.value);
+  return (isFinite(raw) && raw >= 0) ? raw : 1;
+}
+
+// Hạng mục của CT cũ chưa lưu field hangMuc → lấy phần trong ngoặc cuối tên "SN Cô Sáu (Ốp gạch)"
+function _ctHangMucOf(p) {
+  if (p && typeof p.hangMuc === 'string') return p.hangMuc;
+  const m = String((p && p.name) || '').match(/\(([^()]*)\)\s*$/);
+  return m ? m[1].trim() : '';
+}
+
+const _CT_INP_STYLE = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
+const _CT_LBL_STYLE = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
 
 // ══════════════════════════════════════════════════════════════════
 //  MODAL TẠO MỚI
@@ -1627,79 +1848,10 @@ function openCTCreateModal(opts) {
                   ? `${activeYear}-01-01`
                   : today;
   _ctFormAuto.new = { name: true, note: '' };
-  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
-  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   document.getElementById('modal-title').textContent = '+ Thêm Công Trình Mới';
-  document.getElementById('modal-body').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <!-- Hàng 1: Loại | Chủ đầu tư (bắt buộc, dropdown + Thêm nhanh) -->
-      <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:12px">
-        ${_ctLoaiSelect('new', 'CT', inpStyle, lblStyle, '_ctAutoName()')}
-        ${_renderCustomerSelect('new', null, inpStyle, lblStyle)}
-      </div>
-      <!-- Khung Thêm nhanh khách hàng (ẩn — hiện khi bấm [+ Thêm nhanh]) -->
-      ${_renderNewCustPane('new', inpStyle, lblStyle)}
-      <!-- Hàng 2: Hạng mục | Trạng thái -->
-      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:12px">
-        <div>
-          <label style="${lblStyle}">Hạng Mục</label>
-          <input id="ct-new-hangmuc" type="text" placeholder="VD: Ốp gạch sân vườn, Làm mái che..." autocomplete="off"
-            style="${inpStyle}" oninput="_ctAutoName()">
-        </div>
-        <div>
-          <label style="${lblStyle}">Trạng Thái</label>
-          <select id="ct-new-status" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)"
-            onchange="document.getElementById('ct-new-closeddate-wrap').style.display=this.value==='closed'?'':'none'">
-            <option value="planning">Chuẩn bị thi công</option>
-            <option value="active" selected>Đang thi công</option>
-            <option value="completed">Hoàn thành (chưa QT)</option>
-            <option value="closed">Đã quyết toán</option>
-          </select>
-        </div>
-      </div>
-      <!-- Hàng 3: Tên công trình (tự gợi ý, sửa tay được) -->
-      <div>
-        <label style="${lblStyle}">Tên Công Trình *
-          <button type="button" class="btn btn-link btn-sm p-0 ms-2 text-decoration-none" style="font-size:11px;text-transform:none;letter-spacing:0" onclick="_ctAutoName(true)" title="Điền lại tên theo gợi ý">↺ Gợi ý lại</button>
-        </label>
-        <input id="ct-new-name" type="text" maxlength="${CT_NAME_MAX}" placeholder="Chọn Chủ đầu tư → tự gợi ý: SN Cô Sáu (Ốp gạch sân vườn)" autocomplete="off"
-          style="${inpStyle};font-size:14px" oninput="_ctFormAuto.new.name=false;_ctNameCounter('new')">
-        <div class="d-flex justify-content-between gap-2" style="font-size:11px;margin-top:3px">
-          <span class="text-secondary">Tự gợi ý theo cú pháp <b>Loại Tên khách (Hạng mục)</b> (ngày thi công đã lưu riêng). Sửa tay thì app ngừng tự điền.</span>
-          <span id="ct-new-name-count" class="text-secondary" style="white-space:nowrap">0/${CT_NAME_MAX}</span>
-        </div>
-      </div>
-      <!-- Hàng 4: Ngày bắt đầu | Ngày kết thúc -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label style="${lblStyle}">Ngày Bắt Đầu</label>
-          <input id="ct-new-startdate" type="date" value="${_defSD}"
-            style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-        </div>
-        <div>
-          <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
-          <input id="ct-new-enddate" type="date"
-            style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-        </div>
-      </div>
-      <div id="ct-new-closeddate-wrap" style="display:none">
-        <label style="${lblStyle}">Ngày Quyết Toán</label>
-        <input id="ct-new-closeddate" type="date"
-          style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-      </div>
-      <!-- Hàng 5: Địa chỉ công trình (field note — tự kế thừa địa chỉ khách hàng) -->
-      <div>
-        <label style="${lblStyle}">Địa Chỉ Công Trình</label>
-        <input id="ct-new-note" type="text" placeholder="Địa chỉ công trình (tự điền từ địa chỉ khách hàng)..." autocomplete="off"
-          style="${inpStyle}" oninput="_ctNoteTyped('new')">
-        <div id="ct-new-note-hint" style="font-size:11.5px;margin-top:3px"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-primary" style="flex:1" onclick="saveCTCreate()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Công Trình</button>
-        <button class="btn btn-outline-secondary" onclick="closeModal()">Hủy</button>
-      </div>
-    </div>
-  `;
+  document.getElementById('modal-body').innerHTML = _ctFormHtml('new', {
+    status: 'active', sd: _defSD, k: 1, khoiLuong: [],
+  }, _CT_INP_STYLE, _CT_LBL_STYLE);
   document.getElementById('ct-modal').classList.add('open');
   if (opts.customerId && typeof getCustomerById === 'function' && getCustomerById(opts.customerId)) {
     // Khách chọn sẵn → điền địa chỉ (ô đang trống) + gợi ý tên; con trỏ vào ô Hạng mục
@@ -1711,20 +1863,28 @@ function openCTCreateModal(opts) {
 }
 
 function saveCTCreate() {
-  const name       = (document.getElementById('ct-new-name')?.value || '').trim();
+  // Chuẩn hóa "[SN] Cô Sáu" → "SN Cô Sáu" rồi TỰ NHẬN DIỆN loại từ tiền tố tên
+  const name       = _ctNormalizeNamePrefix(document.getElementById('ct-new-name')?.value || '');
+  const loaiCongTrinh = ctDetectLoai(name);                 // 'CT' | 'SC' | 'SN' | 'Khác'
   const status     = document.getElementById('ct-new-status')?.value || 'active';
   const startDate  = document.getElementById('ct-new-startdate')?.value || '';
   const endDate    = document.getElementById('ct-new-enddate')?.value || '';
   const closedDate = document.getElementById('ct-new-closeddate')?.value || '';
   const note       = (document.getElementById('ct-new-note')?.value || '').trim();
-  const loai       = document.getElementById('ct-new-loai')?.value || 'OTHER';
+  const hangMuc    = (document.getElementById('ct-new-hangmuc')?.value || '').trim();
+  const khoiLuong  = ctKlSerialize();                       // bảng m2 sàn → [{ten, dvt, kl}]
+  const heSoTiTrong = _ctReadK('new');
   const { customerId, chuDauTu } = _resolveCustomerFromPicker('new');
   // Chủ đầu tư bắt buộc (khóa ngoại customerId) — để gộp nhóm theo khách hàng chính xác
   if (!customerId) { toast('Vui lòng chọn Chủ Đầu Tư (hoặc bấm + Thêm nhanh)!', 'error'); document.getElementById('ct-new-customer')?.focus(); return; }
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-new-name')?.focus(); return; }
   if (name.length > CT_NAME_MAX) { toast(`Tên công trình tối đa ${CT_NAME_MAX} ký tự (đang ${name.length})!`, 'error'); document.getElementById('ct-new-name')?.focus(); return; }
   try {
-    createProject({ name, type: (loai === 'CT' || loai === 'SC') ? loai : 'OTHER', status, startDate, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId });
+    createProject({
+      name, type: (loaiCongTrinh === 'CT' || loaiCongTrinh === 'SC') ? loaiCongTrinh : 'OTHER',
+      loaiCongTrinh, hangMuc, khoiLuong, heSoTiTrong,
+      status, startDate, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId,
+    });
     closeModal();
     toast('✅ Đã thêm: ' + name, 'success');
     renderProjectsPage();
@@ -1752,97 +1912,46 @@ function openCTEditModal(id) {
   const sdHint = !p.startDateUserEdited && _autoSd
     ? ' <span class="text-secondary" style="font-size:10px;font-weight:400">(tự động từ chấm công)</span>'
     : '';
-  const ed  = p.endDate    || '';
-  const cld = p.closedDate || '';
   // Khách hàng đang gắn (customerId còn sống; CT cũ chưa có id → dò theo tên Chủ đầu tư)
   const _editCust = (p.customerId && typeof getCustomerById === 'function' ? getCustomerById(p.customerId) : null)
     || (p.chuDauTu && typeof findCustomerByName === 'function' ? findCustomerByName(p.chuDauTu) : null);
   _ctFormAuto.edit = { name: false, note: '' };
-  const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--bs-border-color);border-radius:8px;font-family:inherit;font-size:13px;outline:none';
-  const lblStyle = 'font-size:11px;font-weight:700;color:var(--bs-secondary-color);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
   document.getElementById('modal-title').innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Sửa Công Trình';
-  document.getElementById('modal-body').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <!-- Hàng 1: Tên công trình | Loại (đổi Loại → đổi mã ở đầu tên) -->
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
-        <div>
-          <label style="${lblStyle}">Tên Công Trình *</label>
-          <input id="ct-edit-name" type="text" value="${x(p.name)}" maxlength="${Math.max(CT_NAME_MAX, (p.name || '').length)}" autocomplete="off"
-            style="${inpStyle};font-size:14px" oninput="_ctNameCounter('edit')">
-          <div class="text-end" style="font-size:11px;margin-top:2px"><span id="ct-edit-name-count" class="${(p.name || '').length >= CT_NAME_MAX ? 'text-danger fw-semibold' : 'text-secondary'}">${(p.name || '').length}/${CT_NAME_MAX}</span></div>
-        </div>
-        ${_ctLoaiSelect('edit', _ctLoaiOfName(p.name), inpStyle, lblStyle, "const n=document.getElementById('ct-edit-name');n.value=_ctSwapPrefix(n.value,this.value)")}
-      </div>
-      ${!_editCust ? `<div class="alert alert-warning py-1 px-2 mb-0" style="font-size:12px">⚠ Công trình chưa gắn khách hàng${p.chuDauTu ? ` (tên cũ: <b>${x(p.chuDauTu)}</b>)` : ''} — chọn Chủ đầu tư để lưu được.</div>` : ''}
-      <!-- Hàng 2: Chủ đầu tư (bắt buộc, dropdown + Thêm nhanh) | Trạng thái -->
-      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:12px">
-        ${_renderCustomerSelect('edit', _editCust ? _editCust.id : null, inpStyle, lblStyle)}
-        <div>
-          <label style="${lblStyle}">Trạng Thái</label>
-          <select id="ct-edit-status" style="${inpStyle};background:var(--bs-body-bg);color:var(--bs-body-color)"
-            onchange="document.getElementById('ct-edit-closeddate-wrap').style.display=this.value==='closed'?'':'none'">
-            ${Object.entries(PROJECT_STATUS).map(([v,l]) => `<option value="${v}"${p.status===v?' selected':''}>${l}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <!-- Khung Thêm nhanh khách hàng (ẩn — hiện khi bấm [+ Thêm nhanh]) -->
-      ${_renderNewCustPane('edit', inpStyle, lblStyle)}
-      <!-- Hàng 3: Ngày bắt đầu | Ngày kết thúc -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label style="${lblStyle}">Ngày Bắt Đầu${sdHint}</label>
-          <input id="ct-edit-startdate" type="date" value="${sd}"
-            style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-        </div>
-        <div>
-          <label style="${lblStyle}">Ngày Kết Thúc <span style="font-weight:400;text-transform:none">(tùy chọn)</span></label>
-          <input id="ct-edit-enddate" type="date" value="${ed}"
-            style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-        </div>
-      </div>
-      <div id="ct-edit-closeddate-wrap" style="${p.status==='closed'?'':'display:none'}">
-        <label style="${lblStyle}">Ngày Quyết Toán</label>
-        <input id="ct-edit-closeddate" type="date" value="${cld}"
-          style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-      </div>
-      <!-- Hàng 3.5: Hệ số tỉ trọng phân bổ chi phí chung -->
-      <div>
-        <label style="${lblStyle}">Hệ Số Tỉ Trọng <span style="font-weight:400;text-transform:none">(chia chi phí chung — mặc định 1, nhập 0 để không gánh)</span></label>
-        <input id="ct-edit-hesotitrong" type="number" min="0" step="0.1" value="${getProjectK(p)}"
-          style="${inpStyle};font-family:'IBM Plex Mono',monospace">
-      </div>
-      <!-- Hàng 4: Địa chỉ công trình (field note — giữ key cũ, chỉ đổi nhãn) -->
-      <div>
-        <label style="${lblStyle}">Địa Chỉ Công Trình</label>
-        <input id="ct-edit-note" type="text" value="${x(p.note||'')}" placeholder="Địa chỉ công trình..." autocomplete="off"
-          style="${inpStyle}" oninput="_ctNoteTyped('edit')">
-        <div id="ct-edit-note-hint" style="font-size:11.5px;margin-top:3px"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-primary" style="flex:1" onclick="saveCTEdit('${p.id}')"><span class="material-symbols-outlined msi-gap">save</span>Lưu Thay Đổi</button>
-        <button class="btn btn-outline-secondary" onclick="openCTDetail('${p.id}')">Hủy</button>
-      </div>
-    </div>
-  `;
+  document.getElementById('modal-body').innerHTML =
+    (!_editCust ? `<div class="alert alert-warning py-1 px-2 mb-3" style="font-size:12px">⚠ Công trình chưa gắn khách hàng${p.chuDauTu ? ` (tên cũ: <b>${x(p.chuDauTu)}</b>)` : ''} — chọn Chủ đầu tư để lưu được.</div>` : '') +
+    _ctFormHtml('edit', {
+      id: p.id, custId: _editCust ? _editCust.id : null, status: p.status,
+      hangMuc: _ctHangMucOf(p), name: p.name,
+      khoiLuong: Array.isArray(p.khoiLuong) ? p.khoiLuong : [],   // nạp lại đúng các dòng đã lưu
+      sd, sdHint, ed: p.endDate || '', cld: p.closedDate || '',
+      k: getProjectK(p), note: p.note || '',
+    }, _CT_INP_STYLE, _CT_LBL_STYLE);
+  // Tên hiện tại đúng bằng tên gợi ý (Khách + Hạng mục) → bật tự điền: sửa Hạng mục là tên đổi theo.
+  // Tên người dùng đã tự đặt khác gợi ý → KHÔNG tự đè.
+  const _sug = _ctSuggestName('edit');
+  _ctFormAuto.edit.name = !!_sug && _ctStripPrefix(_sug) === _ctStripPrefix(p.name);
   document.getElementById('ct-modal').classList.add('open');
 }
 
 function saveCTEdit(id) {
-  const name       = (document.getElementById('ct-edit-name')?.value || '').trim();
+  // Chuẩn hóa "[SN] Cô Sáu" → "SN Cô Sáu" rồi TỰ NHẬN DIỆN loại từ tiền tố tên
+  const name       = _ctNormalizeNamePrefix(document.getElementById('ct-edit-name')?.value || '');
+  const loaiCongTrinh = ctDetectLoai(name);
   const status     = document.getElementById('ct-edit-status')?.value;
   const startDate  = document.getElementById('ct-edit-startdate')?.value || '';
   const endDate    = document.getElementById('ct-edit-enddate')?.value || '';
   const closedDate = document.getElementById('ct-edit-closeddate')?.value || '';
   const note       = (document.getElementById('ct-edit-note')?.value || '').trim();
+  const hangMuc    = (document.getElementById('ct-edit-hangmuc')?.value || '').trim();
+  const khoiLuong  = ctKlSerialize();
   // Lấy customerId + tên CĐT từ picker (chọn có sẵn / tạo KH mới / để trống)
   const { customerId, chuDauTu } = _resolveCustomerFromPicker('edit');
   // Chủ đầu tư bắt buộc (04/10/2026)
   if (!customerId) { toast('Vui lòng chọn Chủ Đầu Tư (hoặc bấm + Thêm nhanh)!', 'error'); document.getElementById('ct-edit-customer')?.focus(); return; }
   // Hệ số tỉ trọng: parse số, không hợp lệ → 1
-  const _kRaw      = parseFloat(document.getElementById('ct-edit-hesotitrong')?.value);
-  const heSoTiTrong = (isFinite(_kRaw) && _kRaw >= 0) ? _kRaw : 1;
+  const heSoTiTrong = _ctReadK('edit');
   if (!name) { toast('Vui lòng nhập tên công trình!', 'error'); document.getElementById('ct-edit-name')?.focus(); return; }
-  // Giới hạn 40 ký tự chỉ áp khi ĐỔI tên (CT cũ tên dài hơn vẫn lưu được các sửa đổi khác)
+  // Giới hạn ký tự chỉ áp khi ĐỔI tên (CT cũ tên dài hơn vẫn lưu được các sửa đổi khác)
   if (name.length > CT_NAME_MAX && name !== (getProjectById(id)?.name || '')) {
     toast(`Tên công trình tối đa ${CT_NAME_MAX} ký tự (đang ${name.length})!`, 'error'); document.getElementById('ct-edit-name')?.focus(); return;
   }
@@ -1871,7 +1980,13 @@ function saveCTEdit(id) {
     : (p?.startDateUserEdited || false);
 
   try {
-    updateProject(id, { name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null, note, chuDauTu, customerId, heSoTiTrong });
+    updateProject(id, {
+      name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null,
+      note, chuDauTu, customerId, heSoTiTrong,
+      // (05/10/2026) loại tự nhận diện từ tên + hạng mục + bảng m2 sàn
+      loaiCongTrinh, type: (loaiCongTrinh === 'CT' || loaiCongTrinh === 'SC') ? loaiCongTrinh : 'OTHER',
+      hangMuc, khoiLuong,
+    });
   } catch (e) {
     // updateProject throw khi tên trùng CT khác hoặc trùng tên Danh Mục
     toast('❌ ' + e.message, 'error');

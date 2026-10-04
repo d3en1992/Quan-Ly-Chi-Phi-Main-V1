@@ -402,7 +402,7 @@ function _rekeyHopDongOnRename(id, oldName, newName) {
  * @param {string} [opts.note]      Ghi chú
  * @returns {Object} Công trình vừa tạo
  */
-function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '', chuDauTu = '', customerId = null, heSoTiTrong = 1 } = {}) {
+function createProject({ name, type = 'OTHER', status = 'active', startDate, endDate, closedDate, year, note = '', chuDauTu = '', customerId = null, heSoTiTrong = 1, loaiCongTrinh = '', hangMuc = '', khoiLuong = [] } = {}) {
   if (!name || !name.trim()) throw new Error('Tên công trình không được để trống');
   if (!PROJECT_STATUS[status]) throw new Error('Trạng thái không hợp lệ: ' + status);
   // Chống trùng tên + trùng tên danh mục (tránh tạo CT ambiguous / bị xóa khi reload)
@@ -433,6 +433,11 @@ function createProject({ name, type = 'OTHER', status = 'active', startDate, end
     customerId:  customerId || null,
     // Hệ số tỉ trọng phân bổ chi phí chung (mặc định 1, k=0 → không gánh)
     heSoTiTrong: (typeof heSoTiTrong === 'number' && isFinite(heSoTiTrong) && heSoTiTrong >= 0) ? heSoTiTrong : 1,
+    // (05/10/2026) Loại tự nhận diện từ tiền tố tên ('CT'|'SC'|'SN'|'Khác' — ctDetectLoai, projects.ui.js)
+    loaiCongTrinh: loaiCongTrinh || '',
+    // Hạng mục (dùng gợi ý tên) + bảng tính m2 sàn / khối lượng: [{ ten, dvt, kl }]
+    hangMuc:     (hangMuc || '').trim(),
+    khoiLuong:   Array.isArray(khoiLuong) ? khoiLuong : [],
     createdYear: _year,
     createdAt:   nowMs,
     updatedAt:   nowMs
