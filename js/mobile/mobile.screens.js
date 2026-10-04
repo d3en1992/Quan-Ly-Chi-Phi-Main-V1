@@ -139,7 +139,7 @@ function mbScrDashboard() {
 
   const kpis = [
     { cls: '',      label: 'Tổng chi phí',       value: mbFmt(totChi),          hint: invs.length + ' hóa đơn' },
-    { cls: '',      label: 'Doanh thu (sau QT)', value: mbFmt(totHd),           hint: P.length + ' công trình' },
+    { cls: '',      label: 'Giá trị HĐ (sau QT)', value: mbFmt(totHd),           hint: P.length + ' công trình' },
     { cls: 'green', label: 'Đã thu',             value: mbFmt(totThu),          hint: mbPct(totThu, totHd) + '% doanh thu' },
     { cls: 'blue',  label: 'Lợi nhuận tạm tính', value: mbFmtSigned(totThu - totChi), hint: 'Đã thu − chi phí' },
   ];
@@ -265,7 +265,7 @@ function mbScrProjectDetail() {
     ['Trạng thái',        stLabel,                 ''],
     ['Giá trị hợp đồng',  mbFull(st.hd),           ''],
     ['Quyết toán (±)',    st.qt ? (st.qt > 0 ? '+' : '-') + mbFull(Math.abs(st.qt)) : '0 đ', st.qt < 0 ? 'var(--mb-red)' : (st.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)')],
-    ['Doanh thu sau QT',  mbFull(st.dt),           'var(--mb-primary)'],
+    ['Giá trị HĐ sau QT',  mbFull(st.dt),           'var(--mb-primary)'],
     ['Tổng chi phí',      mbFull(st.chi),          ''],
     ['— trong đó hóa đơn', mbFull(st.hoaDon),      'var(--mb-muted)'],
     ['— ứng thầu phụ',    mbFull(st.ungTp),        'var(--mb-muted)'],
@@ -1038,10 +1038,10 @@ function mbDtThongKe() {
 
 function mbDtLoiNhuan() {
   const invMap = mbInvMap();
-  const rows = mbProjects().map(p => ({ p, st: mbProjStats(p, invMap) })).filter(r => r.st.dt > 0);
+  const rows = mbProjects().map(p => ({ p, st: mbProjStats(p, invMap) })).filter(r => r.st.thu > 0 || r.st.chi > 0);
 
-  // totHd = tổng DOANH THU SAU QUYẾT TOÁN (HĐ gốc ± quyết toán / thay thế)
-  const totHd  = rows.reduce((s, r) => s + r.st.dt, 0);
+  // totHd = tổng DOANH THU = tiền đã thu thực tế (cash-basis, 04/10/2026)
+  const totHd  = rows.reduce((s, r) => s + r.st.thu, 0);
   const totInv = mbInvoices().filter(i => i.projectId !== 'COMPANY').reduce((s, i) => s + mbInvAmount(i), 0);
   const totTp  = (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
     .filter(r => !r.deletedAt && inActiveYear(r.ngay))
@@ -1050,7 +1050,7 @@ function mbDtLoiNhuan() {
   const loi    = totHd - totInv - totTp - chung;
 
   const breakdown = [
-    ['X · Doanh thu (sau quyết toán)', totHd, 'var(--mb-primary)'],
+    ['X · Doanh thu (đã thu)', totHd, 'var(--mb-primary)'],
     ['A · Chi phí hóa đơn',         totInv, 'var(--mb-red)'],
     ['B · Chi phí thầu phụ',        totTp,  'var(--mb-amber)'],
     ['C · Phân bổ chi phí chung',   chung,  'var(--mb-purple)'],
@@ -1074,15 +1074,15 @@ function mbDtLoiNhuan() {
     <div class="mb-sec-title">Lãi/lỗ theo công trình</div>
     <div class="mb-col">
       ${rows.length ? rows.map(({ p, st }) => {
-        const lai = st.dt - st.chi;
-        const pct = mbPct(Math.abs(lai), st.dt);
+        const lai = st.thu - st.chi;
+        const pct = mbPct(Math.abs(lai), st.thu);
         return `<div class="mb-card mb-card-sm tap" data-act="openProject" data-arg="${mbX(p.id)}">
           <div class="mb-row-between" style="margin-bottom:5px">
             <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(p.name)}</span>
             <span class="mb-tag ${lai >= 0 ? 'green' : 'red'}">${lai >= 0 ? 'Lãi' : 'Lỗ'} ${pct}%</span>
           </div>
           <div class="mb-row-between" style="font-size:11.5px;color:var(--mb-muted)">
-            <span>DT ${mbFmt(st.dt)} · Chi ${mbFmt(st.chi)}</span>
+            <span>DT ${mbFmt(st.thu)} · Chi ${mbFmt(st.chi)}</span>
             <span style="font-weight:800;color:${lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)'}">${mbFmtSigned(lai)}</span>
           </div>
         </div>`;
@@ -1316,7 +1316,7 @@ function mbQtCongTrinh() {
           <div class="mb-grid3" style="margin-bottom:9px">
             <div><div style="font-size:10px;color:var(--mb-muted-2)">HĐ gốc</div><div style="font-size:12px;font-weight:700">${mbFmt(d.hdGoc)}</div></div>
             <div><div style="font-size:10px;color:var(--mb-muted-2)">Quyết toán</div><div style="font-size:12px;font-weight:700;color:${d.qt < 0 ? 'var(--mb-red)' : d.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'}">${d.qt ? mbFmtSigned(d.qt) : '0'}</div></div>
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">Doanh thu</div><div style="font-size:12px;font-weight:800;color:var(--mb-primary)">${mbFmt(d.tongDT)}</div></div>
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">Giá trị HĐ</div><div style="font-size:12px;font-weight:800;color:var(--mb-primary)">${mbFmt(d.tongDT)}</div></div>
           </div>
           <div class="mb-bar"><i style="width:${mbBarW(d.daThu, d.tongDT)};background:var(--mb-green)"></i></div>
           <div class="mb-row-between" style="margin-top:5px;font-size:10.5px;color:var(--mb-muted-2)">

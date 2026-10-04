@@ -494,7 +494,7 @@ function closeDtModal(type) {
 function _thuOnCtChange(ctName) {
   const infoEl = document.getElementById('thu-progress-info');
   if (!infoEl) return;
-  if (!ctName) { infoEl.style.display = 'none'; return; }
+  if (!ctName || ctName === 'CÔNG TY') { infoEl.style.display = 'none'; return; }   // CÔNG TY: không có HĐ
 
   const proj = (typeof getAllProjects === 'function' ? getAllProjects() : []).find(p => p.name === ctName) || null;
   if (!proj || typeof calcTongDoanhThu !== 'function') { infoEl.style.display = 'none'; return; }
@@ -612,6 +612,14 @@ function dtRenderAll() {
   renderThuTable();
 }
 
+// ── Danh sách tên đối tượng cho dropdown THU TIỀN ──
+// = "CÔNG TY" (thu không thuộc dự án nào) + các công trình CHƯA quyết toán
+//   (Chuẩn bị / Đang thi công / Hoàn thành chưa chốt sổ — loại bỏ status 'closed').
+function _dtThuProjectOptions(projs) {
+  const open = (projs || []).filter(p => p && p.id !== 'COMPANY' && p.status !== 'closed').map(p => p.name);
+  return ['CÔNG TY', ...open];
+}
+
 // ── Chỉ nạp lại các dropdown trong 2 form (Công trình, Người TH, Thầu phụ) ──
 // Tách riêng để nút Sửa nạp option mới nhất mà KHÔNG phải vẽ lại mọi bảng.
 function _dtFillSelects() {
@@ -622,7 +630,7 @@ function _dtFillSelects() {
   // (Form Quyết Toán đã chuyển sang tab QUYẾT TOÁN — tự nạp dropdown riêng.)
   const projForYear = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => activeYear === 0 || _ctInActiveYear(p.name));
-  ['hdc-ct-input','thu-ct-input','hdtp-ct-input'].forEach(id => {
+  ['hdc-ct-input','hdtp-ct-input'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel || sel.tagName !== 'SELECT') return;
     const cur = sel.value;
@@ -630,6 +638,17 @@ function _dtFillSelects() {
       projForYear.map(p => `<option value="${x(p.name)}">${x(p.name)}</option>`).join('');
     if (cur) sel.value = cur;
   });
+
+  // (04/10/2026) Form THU TIỀN: có hạng mục CÔNG TY, ẩn công trình "Đã quyết toán",
+  // và là ô chọn có GÕ ĐỂ TÌM (dùng chung _ssEnhance của form Hóa Đơn Chi Phí).
+  const thuSel = document.getElementById('thu-ct-input');
+  if (thuSel && thuSel.tagName === 'SELECT') {
+    const cur = thuSel.value;
+    thuSel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
+      _dtThuProjectOptions(projForYear).map(n => `<option value="${x(n)}">${x(n)}</option>`).join('');
+    if (cur) _setSelectFlexible(thuSel, cur);   // đang sửa phiếu của CT đã QT → vẫn giữ được giá trị
+    if (typeof _ssEnhance === 'function') _ssEnhance(thuSel);
+  }
 
   // Thầu phụ select
   const allTp = [...new Set([...cats.thauPhu].filter(Boolean))].sort((a,b) => a.localeCompare(b,'vi'));

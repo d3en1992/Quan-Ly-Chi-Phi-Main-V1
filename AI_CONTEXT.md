@@ -2096,6 +2096,19 @@ Chỉ sửa tài liệu, KHÔNG đổi code. Đối chiếu từng tên hàm/fil
 
 **File đã sửa:** `js/modules/projects/projects.ui.js`, `js/modules/khachhang/khachhang.ui.js`, `assets/css/style.css`.
 
+### 9.61 Doanh thu = TIỀN THỰC THU (cash-basis) + dọn popup Chi tiết CT + form Thu Tiền có tìm kiếm/CÔNG TY (04/10/2026)
+- **Định nghĩa mới:** *Doanh thu* = tổng đã thu thực tế (Σ `thuRecords`), KHÔNG còn là HĐ gốc + quyết toán. Giá trị HĐ sau quyết toán vẫn được tính nhưng chỉ làm mẫu số cho % đã thu / còn phải thu.
+  - `calcTongDoanhThu()` (quyettoan.core.js) trả thêm **`doanhThu` (= `daThu`)**; `tongDT` nay nghĩa là *giá trị HĐ sau QT* (bảng Tiến Độ Thu, thẻ Còn Phải Thu, xuất Excel nhapxuat vẫn dùng).
+  - `ctTaiChinh()` (projects.ui.js): `doanhThu = tongThu`; thêm **`giaTriHD`** (công thức cũ `_dtCalcRevenue`); `loiNhuan = doanhThu − chiPhiTong`; `conPhaiThu = giaTriHD − tongThu`.
+  - `lnTinhCongTrinh()` (doanhthu.reports-export.js): `dt = _dt.doanhThu` → tab Lợi Nhuận và Hồ sơ Khách hàng cùng đổi theo. `X`/`Y` vẫn trả về nhưng không hiển thị.
+- **Tab Lợi Nhuận:** bỏ 2 cột "HĐ gốc" · "Quyết toán"; chỉ còn cột **TỔNG ĐÃ THU**; LỢI NHUẬN = Đã thu − Tổng chi (A+B+C, giữ nguyên cách tính chi phí).
+- **Popup Chi tiết công trình:** nhãn "Doanh Thu (HĐ + Quyết toán)" → **"Doanh Thu"**; xóa câu giải thích lãi/lỗ dự kiến (`_hqDesc`) dưới số Hiệu quả.
+- **Tab Quyết Toán** (quyettoan.congtrinh.js): các chỗ "DT sau QT / còn phải thu / cảnh báo âm" đổi sang `giaTriHD` để giữ nguyên hành vi cũ.
+- **Tab Doanh Thu:** thẻ "Tổng Doanh Thu" đổi nhãn → "Tổng Giá Trị HĐ" (vì đi cặp với Còn Phải Thu). **Mobile:** màn Lợi nhuận dùng `st.thu`; các nhãn "Doanh thu (sau QT)" → "Giá trị HĐ".
+- **Form THU TIỀN** (`_dtFillSelects`, doanhthu.core.js): `#thu-ct-input` thành ô **gõ để tìm** (`_ssEnhance` dùng chung với form Hóa Đơn); thêm hạng mục **CÔNG TY** (`projectId='COMPANY'`); hàm lọc mới **`_dtThuProjectOptions(projs)`** loại công trình `status==='closed'` (khi SỬA phiếu của CT đã QT vẫn giữ giá trị nhờ `_setSelectFlexible`). Phiếu thu CÔNG TY nằm ở dòng "(CÔNG TY / Chưa gắn công trình)" của bảng Tiến Độ Thu; dải Tổng HĐ/Đã thu/Còn lại ẩn khi chọn CÔNG TY.
+
+**File đã sửa:** `js/modules/quyettoan/quyettoan.core.js`, `quyettoan.congtrinh.js`, `js/modules/projects/projects.ui.js`, `js/modules/doanhthu/doanhthu.core.js`, `doanhthu.forms.js`, `doanhthu.reports-export.js`, `js/mobile/mobile.screens.js`, `pages/doanhthu.html`, `assets/css/style.css`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

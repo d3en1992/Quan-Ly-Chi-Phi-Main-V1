@@ -411,9 +411,9 @@ function saveThuRecord() {
   if (!ngay) { toast('Vui lòng chọn Ngày!', 'error'); return; }
   if (!tien) { toast('Vui lòng nhập Số Tiền!', 'error'); return; }
 
-  // Chỉ cho phép CT đã tồn tại
+  // Chỉ cho phép CT đã tồn tại (hoặc hạng mục CÔNG TY — thu không thuộc dự án nào)
   const _thuProjExists = (typeof getAllProjects === 'function') &&
-    getAllProjects().some(p => p.id !== 'COMPANY' && p.name === ct);
+    (ct === 'CÔNG TY' || getAllProjects().some(p => p.id !== 'COMPANY' && p.name === ct));
   if (!_thuProjExists) {
     toast('Chỉ được tạo công trình tại tab Công Trình', 'error');
     return;
@@ -421,7 +421,7 @@ function saveThuRecord() {
 
   _dtAddCT(ct);
   const _thuProj = projects.find(p => p.name === ct) || null;
-  const _thuPid  = _thuProj ? _thuProj.id : null;
+  const _thuPid  = ct === 'CÔNG TY' ? 'COMPANY' : (_thuProj ? _thuProj.id : null);
 
   if (editId) {
     // Cập nhật record hiện có
@@ -670,7 +670,7 @@ function _dtTienDoGroups() {
   const leLe = thuYear.filter(r => !daGom.has(r));
   if (leLe.length) {
     const s = leLe.reduce((t, r) => t + (r.tien || 0), 0);
-    groups.push({ key: '__none__', name: '(Chưa gắn công trình)', cdt: '', coHD: false,
+    groups.push({ key: '__none__', name: '(CÔNG TY / Chưa gắn công trình)', cdt: '', coHD: false,
                   tongDT: 0, daThu: s, con: 0, recs: leLe, orphan: true });
   }
   return groups;

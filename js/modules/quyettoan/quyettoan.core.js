@@ -178,11 +178,14 @@ function qtTongQuyetToan(p, inScope, opts) {
 // ══ HÀM CHÍNH: TỔNG DOANH THU CỦA 1 CÔNG TRÌNH ═══════════════════
 // opts.allYears : true → tính toàn vòng đời; mặc định theo năm đang lọc (_dtInYear)
 // opts.excludeId / opts.extra : xem qtTinhDelta (phục vụ Live Preview)
-// Trả về: { hdGoc, daThu, qt, tang, giam, thayThe, coThayThe, coQT, tongDT, conPhaiThu }
+// (04/10/2026) ĐỊNH NGHĨA DOANH THU = TIỀN THỰC THU (cash-basis) = Σ thuRecords → trường `doanhThu` (= daThu).
+// `tongDT` giờ chỉ còn nghĩa "GIÁ TRỊ HỢP ĐỒNG SAU QUYẾT TOÁN" (HĐ gốc ± QT) — làm mẫu số cho
+// % đã thu / còn phải thu, KHÔNG dùng làm doanh thu/lợi nhuận.
+// Trả về: { hdGoc, daThu, doanhThu, qt, tang, giam, thayThe, coThayThe, coQT, tongDT, conPhaiThu }
 function calcTongDoanhThu(pOrId, opts) {
   opts = opts || {};
   const p = _qtResolveProj(pOrId);
-  const empty = { hdGoc: 0, daThu: 0, qt: 0, tang: 0, giam: 0, thayThe: 0, coThayThe: false, coQT: false, tongDT: 0, conPhaiThu: 0 };
+  const empty = { hdGoc: 0, daThu: 0, doanhThu: 0, qt: 0, tang: 0, giam: 0, thayThe: 0, coThayThe: false, coQT: false, tongDT: 0, conPhaiThu: 0 };
   if (!p) return empty;
 
   const inScope = opts.allYears ? null
@@ -197,7 +200,7 @@ function calcTongDoanhThu(pOrId, opts) {
     : hdGoc + q.qt;
 
   return {
-    hdGoc, daThu,
+    hdGoc, daThu, doanhThu: daThu,
     qt: q.qt, tang: q.tang, giam: q.giam, thayThe: q.thayThe, coThayThe: q.coThayThe, coQT: q.coQT,
     tongDT,
     conPhaiThu: tongDT - daThu,

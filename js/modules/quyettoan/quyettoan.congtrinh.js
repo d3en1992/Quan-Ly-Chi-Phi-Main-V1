@@ -214,7 +214,7 @@ function _qtFin(f) {
   }
   const a = calcTongDoanhThu(f.proj);
   const b = f.soTien > 0 ? calcTongDoanhThu(f.proj, { excludeId: opt.qtExcludeId, extra: f.fake }) : null;
-  const map = d => d && ({ X: d.hdGoc, Y: d.qt, tongThu: d.daThu, doanhThu: d.tongDT, conPhaiThu: d.conPhaiThu,
+  const map = d => d && ({ X: d.hdGoc, Y: d.qt, tongThu: d.daThu, doanhThu: d.daThu, giaTriHD: d.tongDT, conPhaiThu: d.conPhaiThu,
                            chiThucTe: 0, chiChung: 0, hieuQua: 0, laiHienTai: 0, isActive: true, soDotThu: 0, qtSum: d });
   return { truoc: map(a), sau: map(b) };
 }
@@ -427,12 +427,12 @@ function qtUpdatePreview() {
   if (hqCell) hqCell.style.borderColor = truoc.hieuQua >= 0 ? 'var(--bs-success-border-subtle)' : 'var(--bs-danger-border-subtle)';
 
   // ── Hàng 3 (REAL-TIME): DOANH THU SAU QT | LỢI NHUẬN SAU QT = DT sau QT − Chi phí thực tế đã chi ──
-  const dtSau = sau ? sau.doanhThu : truoc.doanhThu;
+  const dtSau = sau ? sau.giaTriHD : truoc.giaTriHD;
   const lnSau = dtSau - truoc.chiThucTe;
-  const chenh = dtSau - truoc.doanhThu;
+  const chenh = dtSau - truoc.giaTriHD;
   _set('qt-sum-dtsau', fmtM(dtSau));
   _set('qt-sum-dtsau-sub', sau
-    ? `<span style="color:${chenh < 0 ? CR : CG};font-weight:600">${chenh ? (chenh > 0 ? '▲ +' : '▼ −') + fmtS(Math.abs(chenh)) : 'không đổi'}</span> so với DT hiện hành ${fmtS(truoc.doanhThu)}`
+    ? `<span style="color:${chenh < 0 ? CR : CG};font-weight:600">${chenh ? (chenh > 0 ? '▲ +' : '▼ −') + fmtS(Math.abs(chenh)) : 'không đổi'}</span> so với DT hiện hành ${fmtS(truoc.giaTriHD)}`
     : 'Chưa nhập số tiền — đang bằng doanh thu HĐ + QT hiện hành');
   _set('qt-sum-lnsau', _signed(lnSau), lnSau >= 0 ? CG : CR);
   _set('qt-sum-lnsau-sub', 'DT sau QT − Chi phí thực tế đã chi');
@@ -456,13 +456,13 @@ function qtUpdatePreview() {
   }
   hint.className = 'mt-1 fw-semibold ' + (chenh < 0 ? 'text-danger' : 'text-success');
   hint.style.fontSize = '12.5px';
-  hint.innerHTML = `💡 Doanh thu mới sẽ cập nhật thành: <span class="font-monospace">${fmtM(sau.doanhThu)}</span>` +
+  hint.innerHTML = `💡 Doanh thu mới sẽ cập nhật thành: <span class="font-monospace">${fmtM(sau.giaTriHD)}</span>` +
     ` <span style="font-weight:400">(${chenh ? (chenh > 0 ? '▲ +' : '▼ −') + fmtM(Math.abs(chenh)) : 'không đổi'}` +
     ` · còn phải thu ${sau.conPhaiThu >= 0 ? fmtM(sau.conPhaiThu) : '−' + fmtM(-sau.conPhaiThu)})</span>`;
 
   // ── Cảnh báo chống sai sót ──
   const warns = [];
-  if (sau.doanhThu < 0) {
+  if (sau.giaTriHD < 0) {
     warns.push(['danger', 'Doanh thu sau quyết toán bị ÂM — kiểm tra lại số tiền giảm trừ.']);
   } else if (sau.conPhaiThu < 0) {
     warns.push(['warning', `Đã thu VƯỢT doanh thu sau quyết toán ${fmtM(-sau.conPhaiThu)} — công ty đang thu dư, có thể phải hoàn trả Chủ Đầu Tư.`]);
@@ -503,7 +503,7 @@ function qtSave() {
 
   // Kiểm tra kết quả trước khi ghi (cùng công thức với preview)
   const { sau } = _qtFin(f);
-  if (sau.doanhThu < 0) { toast('Doanh thu sau quyết toán bị âm — kiểm tra lại số tiền!', 'error'); return; }
+  if (sau.giaTriHD < 0) { toast('Doanh thu sau quyết toán bị âm — kiểm tra lại số tiền!', 'error'); return; }
   if (sau.conPhaiThu < 0 &&
       !confirm(`Đã thu vượt doanh thu sau quyết toán ${fmtM(-sau.conPhaiThu)}.\nVẫn lưu quyết toán này?`)) return;
   if (chot && f.proj.status !== 'closed' &&

@@ -281,7 +281,7 @@ function renderLoiNhuan() {
 
   // ── Bảng chi tiết (03/10/2026 — thiết kế lại theo "phân cấp thị giác") ──
   // Bố cục 4 khu vực, ngăn bằng kẻ dọc nhẹ:
-  //   CÔNG TRÌNH | CHI TIẾT DOANH THU: HĐ gốc · Quyết toán · TỔNG THU
+  //   CÔNG TRÌNH | DOANH THU: TỔNG ĐÃ THU (cash-basis)
   //              | CHI TIẾT CHI PHÍ:   Hóa đơn · Thầu phụ · CP chung · TỔNG CHI (+ badge % DT)
   //              | HIỆU QUẢ:           LỢI NHUẬN (badge xanh/đỏ)
   // Cột thành phần (ln-sub) mờ + nhỏ; cột tổng (ln-total) đậm + to. Số hiện ĐẦY ĐỦ, căn phải.
@@ -291,8 +291,6 @@ function renderLoiNhuan() {
 
   // 1 dòng dữ liệu (dùng chung cho từng công trình và dòng TỔNG CỘNG)
   const _rowCells = (r) => `
-      ${det ? `<td class="text-end ln-sub">${_lnNum(r.X)}</td>
-               <td class="text-end ln-sub">${_lnNum(r.Y, true)}</td>` : ''}
       <td class="text-end ln-total">${_lnNum(r.dt)}</td>
       ${det ? `<td class="text-end ln-sub ${SEP}">${_lnNum(r.A)}</td>
                <td class="text-end ln-sub">${_lnNum(r.B)}</td>
@@ -312,13 +310,12 @@ function renderLoiNhuan() {
         <thead>
           <tr class="ln-grp">
             <th class="ln-name" rowspan="2" style="text-align:left;vertical-align:bottom">Công trình</th>
-            <th colspan="${det ? 3 : 1}">${det ? 'Chi tiết doanh thu' : 'Doanh thu'} (VNĐ)</th>
+            <th>Doanh thu (VNĐ)</th>
             <th colspan="${det ? 4 : 1}" class="${SEP}">${det ? 'Chi tiết chi phí' : 'Chi phí'} (VNĐ)</th>
             <th class="${SEP}">Hiệu quả</th>
           </tr>
           <tr class="ln-col">
-            ${det ? '<th class="text-end">HĐ gốc</th><th class="text-end">Quyết toán</th>' : ''}
-            <th class="text-end ln-th-total">TỔNG THU</th>
+            <th class="text-end ln-th-total">TỔNG ĐÃ THU</th>
             ${det ? `<th class="text-end ${SEP}">Hóa đơn</th><th class="text-end">Thầu phụ</th><th class="text-end">CP chung</th>` : ''}
             <th class="text-end ln-th-total ${det ? '' : SEP}" title="Badge xám = chi phí chiếm bao nhiêu % doanh thu">TỔNG CHI <span class="fw-normal">(% DT)</span></th>
             <th class="text-end ln-th-total ${SEP}">LỢI NHUẬN</th>
@@ -360,13 +357,14 @@ function lnTinhCongTrinh(p, ctx) {
     .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);   // (A) hóa đơn
   const B = _lnContractsB(p);                                  // (B) thầu phụ
   const C = ctx.allocMap[p.id] || 0;                          // (C) chi phí chung phân bổ
-  // (X) HĐ gốc · (Y) quyết toán đã quy đổi delta · Doanh thu
+  // (X) HĐ gốc · (Y) quyết toán (chỉ để tham khảo, không vào doanh thu) · Doanh thu = đã thu
   // → tất cả lấy từ calcTongDoanhThu() (quyettoan.core.js) — nguồn duy nhất của công thức
   const _dt = calcTongDoanhThu(p);
   const X = _dt.hdGoc;
   const Y = _dt.qt;
   const chi = A + B + C;
-  const dt = _dt.tongDT;
+  // (04/10/2026) Doanh thu = TỔNG ĐÃ THU thực tế (cash-basis), không còn là HĐ gốc + quyết toán
+  const dt = _dt.doanhThu;
   return { name: p.name, A, B, C, X, Y, chi, dt, ln: dt - chi };
 }
 

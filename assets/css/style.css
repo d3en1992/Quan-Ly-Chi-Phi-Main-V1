@@ -2161,3 +2161,6 @@ td.action-col > div {
 .qt-sum-val { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Dòng phụ nhỏ dưới mỗi ô chi tiết công trình (tab Quyết Toán) */
 .qt-sum-sub { font-size: 10.5px; color: var(--bs-secondary-color); margin-top: 2px; line-height: 1.35; }
+
+/* (04/10/2026) Ô chọn công trình ở form Thu Tiền: tìm kiếm được, chiếm trọn cột */
+#thu-form-card .ss-wrap { display: block; width: 100% !important; min-width: 0 !important; }

@@ -165,16 +165,16 @@ function _ctTongChi(p, c) {
 // ══ TÀI CHÍNH CỐT LÕI CỦA 1 CÔNG TRÌNH (single source of truth) ══════
 // Dùng CHUNG cho modal chi tiết công trình (openCTDetail) và tab QUYẾT TOÁN
 // (quyettoan.congtrinh.js) → 2 nơi luôn cùng số. Theo NĂM ĐANG LỌC như modal:
-//   Doanh thu       = max(HĐ chính, Đã thu) + Quyết toán (±)  — _dtCalcRevenue()
-//                     (đã có quyết toán → bỏ max: HĐ chính + Quyết toán)
+//   Doanh thu       = TỔNG ĐÃ THU thực tế (cash-basis, từ thuRecords) — đổi 04/10/2026
+//   Giá trị HĐ      = max(HĐ chính, Đã thu) + Quyết toán (±)  — _dtCalcRevenue() — chỉ để tính % / còn phải thu
 //   Chi phí dự toán = hóa đơn + HĐ thầu phụ + chi phí chung chia tỉ trọng
 //   Chi thực tế     = tổng chi trực tiếp (_ctTongChi) + chi phí chung chia tỉ trọng
-//   Lãi hiện tại    = Đã thu − Chi thực tế         (dòng tiền tới thời điểm hiện tại)
-//   Lãi dự kiến     = Doanh thu − Chi phí dự toán  (khi hoàn thành)
-//   Hiệu quả        = đang thi công/kế hoạch → Lãi hiện tại; đã xong → Lãi dự kiến (lãi/lỗ cuối)
+//   Lãi hiện tại    = Đã thu − Chi thực tế
+//   Lợi nhuận       = Doanh thu (đã thu) − Chi phí (A+B+C, cùng tab Lợi Nhuận)
+//   Hiệu quả        = đang thi công/kế hoạch → Lãi hiện tại; đã xong → Lợi nhuận
 // opts.qtExcludeId / opts.qtExtra: bỏ 1 quyết toán / thêm 1 quyết toán giả định
 //   → dùng để xem trước "doanh thu SAU quyết toán" khi đang nhập form.
-// @returns {{ c, tc, X, Y, qtSum, tongThu, soDotThu, tongHDTP, chiChung, doanhThu,
+// @returns {{ c, tc, X, Y, qtSum, tongThu, soDotThu, tongHDTP, chiChung, doanhThu, giaTriHD,
 //             chiPhiTong, loiNhuan, chiThucTe, laiHienTai, hieuQua, isActive, conPhaiThu }}
 function ctTaiChinh(p, opts) {
   opts = opts || {};
@@ -209,7 +209,8 @@ function ctTaiChinh(p, opts) {
   const Y = qtSum.qt;
 
   // Đã có quyết toán (bất kỳ loại) → bỏ quy tắc max(HĐ, Đã thu) — xem _dtCalcRevenue (03/10/2026)
-  const doanhThu   = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, tongThu, Y, qtSum.coThayThe || qtSum.coQT) : X + Y;
+  const giaTriHD   = (typeof _dtCalcRevenue === 'function') ? _dtCalcRevenue(X, tongThu, Y, qtSum.coThayThe || qtSum.coQT) : X + Y;
+  const doanhThu   = tongThu;                       // doanh thu = tiền thực thu
   const chiPhiTong = (c.total || 0) + tongHDTP + chiChung;
   const loiNhuan   = doanhThu - chiPhiTong;
   const chiThucTe  = tc.tongChi + chiChung;
@@ -217,9 +218,9 @@ function ctTaiChinh(p, opts) {
   const isActive   = (p.status === 'active' || p.status === 'planning');
   return {
     c, tc, X, Y, qtSum, tongThu, soDotThu: thuList.length, tongHDTP, chiChung,
-    doanhThu, chiPhiTong, loiNhuan, chiThucTe, laiHienTai, isActive,
+    doanhThu, giaTriHD, chiPhiTong, loiNhuan, chiThucTe, laiHienTai, isActive,
     hieuQua: isActive ? laiHienTai : loiNhuan,
-    conPhaiThu: doanhThu - tongThu,
+    conPhaiThu: giaTriHD - tongThu,
   };
 }
 window.ctTaiChinh = ctTaiChinh;
@@ -1006,7 +1007,7 @@ function openCTDetail(id) {
 
   // ══ TÍNH TOÁN TÀI CHÍNH CỐT LÕI — dùng CÙNG công thức bảng "Lợi Nhuận" ══
   //   Chi phí   = A(hóa đơn/vật tư) + B(HĐ thầu phụ) + C(chi phí chung phân bổ)
-  //   Doanh thu = X(HĐ chính)       + Y(quyết toán, có dấu ±)
+  //   Doanh thu = tổng đã thu thực tế (cash-basis)
   //   Lợi nhuận = Doanh thu − Chi phí  → khớp tuyệt đối với tab Doanh Thu → Lợi Nhuận
   // Số liệu cốt lõi lấy từ ctTaiChinh() — DÙNG CHUNG với tab QUYẾT TOÁN (cùng công thức, cùng số)
   const _fin = ctTaiChinh(p);
@@ -1016,12 +1017,13 @@ function openCTDetail(id) {
   const _X = tongGiaTriHD;       // (X) HĐ chính (giaTri + giaTriphu + phatSinh)
   const _Y = _fin.Y;             // (Y) quyết toán đã quy đổi delta trong năm đang lọc
 
-  // Doanh thu = max(HĐ chính, Đã thu) + Quyết toán; đã có quyết toán thì bỏ max — xem _dtCalcRevenue()
+  // Doanh thu = tổng đã thu; giá trị HĐ sau QT (_fin.giaTriHD) chỉ làm mẫu số % / còn phải thu
   const doanhThu    = _fin.doanhThu;
+  const giaTriHD    = _fin.giaTriHD;
   const chiPhiTong  = _fin.chiPhiTong;          // tổng chi phí (dự toán/ước tính)
   const loiNhuan    = _fin.loiNhuan;            // lãi (≥0) / lỗ (<0)
-  const conPhaiThuCT = doanhThu - tongThu;      // còn phải thu từ chủ đầu tư
-  const pctThu = doanhThu   > 0 ? Math.round(tongThu / doanhThu * 100) : 0;          // % đã thu
+  const conPhaiThuCT = giaTriHD - tongThu;      // còn phải thu từ chủ đầu tư
+  const pctThu = giaTriHD   > 0 ? Math.round(tongThu / giaTriHD * 100) : 0;          // % đã thu
   const pctChi = chiPhiTong > 0 ? Math.round(tongChiCongTrinh / chiPhiTong * 100) : 0; // % đã chi / dự toán
   const isActiveCT = (p.status === 'active' || p.status === 'planning'); // đang thi công
 
@@ -1116,14 +1118,14 @@ function openCTDetail(id) {
   // ══ KHU TÀI CHÍNH CỐT LÕI (3 cột: Doanh thu · Chi phí · Lãi/Lỗ) ══
   const _cols = isKetoan() ? 1 : 3; // kế toán chỉ xem Chi phí
 
-  // Cột 1 — DOANH THU: số CHÍNH là Doanh Thu (= max(HĐ, đã thu) + quyết toán),
+  // Cột 1 — DOANH THU: số CHÍNH là Doanh Thu (= tổng đã thu),
   // dòng phụ kèm "đã thu" (dòng tiền thực đã vào) + còn phải thu.
   const _colRevenue = `
     <div style="${_bxG}">
-      ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Doanh Thu (HĐ + Quyết toán)')}
+      ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Doanh Thu')}
       ${_vl(doanhThu ? fmtS(doanhThu) : '—', CG)}
       <div class="text-secondary" style="font-size:11px;font-weight:600;margin-top:2px">Đã thu: <span style="color:var(--bs-body-color)">${fmtS(tongThu)}</span>${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
-      ${doanhThu > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
+      ${giaTriHD > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
       <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
         Còn phải thu: <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
       </div>
@@ -1148,31 +1150,17 @@ function openCTDetail(id) {
     </div>`;
 
   // Cột 3 — HIỆU QUẢ: số CHÍNH = lãi/lỗ TỚI HIỆN TẠI = Đã thu − (chi thực tế + chi phí chia tỉ trọng).
-  //   Đang thi công: câu giải thích nêu thêm "lãi dự kiến khi hoàn thành" (= doanh thu − tổng chi phí).
+  //   (04/10/2026) Đã bỏ câu giải thích lãi/lỗ dự kiến — chỉ hiển thị con số.
   //   Đã hoàn thành/quyết toán: dùng luôn lãi/lỗ cuối (loiNhuan).
   const laiHienTai = tongThu - (tongChiCongTrinh + _chiPhiChungFixed); // lãi/lỗ dòng tiền tới hiện tại
   const _hqNum   = isActiveCT ? laiHienTai : loiNhuan;
   const _hqPos   = _hqNum >= 0;
   const _hqColor = _hqPos ? CG : CR;
   const _hqBg    = _hqPos ? BG : BR;
-  let _hqDesc;
-  if (isActiveCT) {
-    const _duKien = loiNhuan >= 0
-      ? `Lãi <strong style="color:${CG}">dự kiến</strong> khi hoàn thành: <strong>${fmtS(loiNhuan)}</strong>.`
-      : `Dự kiến <strong style="color:${CR}">lỗ ${fmtS(-loiNhuan)}</strong> khi hoàn thành.`;
-    _hqDesc = `Đang thi công — đây là ${_hqPos ? 'lãi' : 'lỗ'} tính tới thời điểm hiện tại `
-      + `(${_hqPos ? 'thu nhiều hơn chi' : 'chi nhiều hơn thu'}). ${_duKien}`;
-  } else {
-    const _tt = (p.status === 'closed') ? 'đã quyết toán' : 'đã hoàn thành';
-    _hqDesc = _hqPos
-      ? `Công trình ${_tt} — đạt lợi nhuận <strong style="color:${CG}">${fmtS(loiNhuan)}</strong>.`
-      : `Công trình ${_tt} — <strong style="color:${CR}">lỗ ${fmtS(-loiNhuan)}</strong>.`;
-  }
   const _colProfit = `
     <div style="border:1.5px solid ${_hqColor};border-radius:8px;padding:11px 14px;background:${_hqBg}">
       ${_lb((_hqPos ? '<span class="material-symbols-outlined msi-gap">trending_up</span>' : '<span class="material-symbols-outlined msi-gap">trending_down</span>') + 'Hiệu Quả (Lãi / Lỗ)')}
       <div style="font-size:24px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:${_hqColor};line-height:1.2">${_hqPos ? '' : '−'}${fmtS(Math.abs(_hqNum))}</div>
-      <div class="text-secondary" style="font-size:11.5px;margin-top:6px;line-height:1.5">${_hqDesc}</div>
     </div>`;
 
   html += `<div class="ctd-core" style="display:grid;grid-template-columns:repeat(${_cols},minmax(0,1fr));gap:10px;margin-bottom:14px">
