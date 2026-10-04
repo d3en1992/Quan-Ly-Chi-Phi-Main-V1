@@ -2182,3 +2182,6 @@ td.action-col > div {
 
 /* (04/10/2026) Tab Lợi Nhuận: tên Chủ đầu tư nhỏ dưới tên công trình */
 .ln-table td.ln-name .ln-cdt { font-size: 11px; font-weight: 400; color: var(--bs-secondary-color); }
+
+/* (04/10/2026) Tab Lợi Nhuận: dấu * ở cột Hóa đơn = trong số có tiền ứng NCC */
+.ln-table .ln-ung-mark { color: var(--bs-warning-text-emphasis); font-weight: 700; margin-left: 1px; }

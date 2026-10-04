@@ -23,6 +23,33 @@ const _PT_GROUP_LABELS = {
 const _PT_ORDER = ['planning','active','completed','closed'];
 
 // ── Điều hướng sang tab khác và auto-set CT filter ─────────────────
+// ── Chọn 1 công trình trong ô lọc <select> mà KHÔNG BAO GIỜ để ô bị trắng (04/10/2026) ──
+// Nguyên nhân ô trắng: danh sách option của ô lọc chỉ gồm các CT CÓ dữ liệu trong năm đang lọc
+// (VD f-ct của Thống Kê CP/HĐ dựng từ hóa đơn). CT không có hóa đơn nào → không có option →
+// gán .value thất bại → ô trắng, bảng không lọc. Cách vá:
+//   1) khớp đúng tên → chọn luôn
+//   2) khớp KHÔNG phân biệt hoa/thường/khoảng trắng → chọn option đó (tên lệch nhẹ)
+//   3) không có → THÊM option tạm "(tên) — không có dữ liệu" rồi chọn → ô hiện đúng tên, bảng lọc ra rỗng
+// KHÔNG phát sự kiện change: onchange của f-ct gọi buildFilters() dựng lại option → sẽ xóa option tạm.
+// Trả về true nếu CT có sẵn trong danh sách (có dữ liệu), false nếu phải thêm option tạm.
+function _ctSelectForce(sel, ctName) {
+  if (!sel) return false;
+  const norm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const opts = [...sel.options];
+  let opt = opts.find(o => o.value === ctName) || opts.find(o => norm(o.value) === norm(ctName));
+  const coSan = !!opt;
+  if (!opt) {
+    sel.querySelectorAll('option[data-tmp-ct]').forEach(o => o.remove());   // dọn option tạm lần trước
+    opt = document.createElement('option');
+    opt.value = ctName;
+    opt.textContent = ctName + ' — không có dữ liệu';
+    opt.dataset.tmpCt = '1';
+    sel.appendChild(opt);
+  }
+  sel.value = opt.value;
+  return coSan;
+}
+
 function _goTabWithCT(tabId, ctName) {
   // Map alias IDs → actual data-page IDs (nav buttons dùng tên thật)
   const _pageId = { hoadon: 'nhap', ung: 'nhapung', thongke: 'thongkecphd' }[tabId] || tabId;
@@ -37,7 +64,7 @@ function _goTabWithCT(tabId, ctName) {
       const subBtn = document.querySelector('#page-nhap .nav-link[onclick*="sub-tat-ca"]');
       if (subBtn) goSubPage(subBtn, 'sub-tat-ca');
       const sel = document.getElementById('f-ct');
-      if (sel) { sel.value = ctName; filterAndRender(); }
+      if (sel) { _ctSelectForce(sel, ctName); filterAndRender(); }
 
     } else if (tabId === 'ung') {
       // Chuyển sang subtab Báo Cáo rồi set filter CT cho cả 2 bảng TP + NCC
@@ -45,8 +72,8 @@ function _goTabWithCT(tabId, ctName) {
       if (typeof ungShowSubBaoCao === 'function') ungShowSubBaoCao();
       const selTp  = document.getElementById('uf-tp-ct');
       const selNcc = document.getElementById('uf-ncc-ct');
-      if (selTp)  { selTp.value = ctName;  filterAndRenderUngTp(); }
-      if (selNcc) { selNcc.value = ctName; filterAndRenderUngNcc(); }
+      if (selTp)  { _ctSelectForce(selTp, ctName);  filterAndRenderUngTp(); }
+      if (selNcc) { _ctSelectForce(selNcc, ctName); filterAndRenderUngNcc(); }
 
     } else if (tabId === 'doanhthu') {
       // (03/10/2026) Mở subtab HỢP ĐỒNG CHÍNH + lọc sẵn Danh Sách HĐ theo công trình này
@@ -55,11 +82,18 @@ function _goTabWithCT(tabId, ctName) {
 
     } else if (tabId === 'thietbi') {
       const sel = document.getElementById('tb-filter-ct');
-      if (sel) { sel.value = ctName; tbPage = 1; tbRenderList(); }
+      if (sel) { _ctSelectForce(sel, ctName); tbPage = 1; tbRenderList(); }
 
     } else if (tabId === 'thongke') {
+      // Thống Kê CP/HĐ: dựng lại option theo dữ liệu mới nhất TRƯỚC, rồi mới chọn CT
+      // (goPage đã gọi buildFilters, gọi lại cho chắc khi cache vừa đổi) → lọc bảng
+      if (typeof buildFilters === 'function') buildFilters();
       const sel = document.getElementById('f-ct');
-      if (sel) { sel.value = ctName; filterAndRender(); }
+      if (sel) {
+        const coSan = _ctSelectForce(sel, ctName);
+        filterAndRender();
+        if (!coSan) toast(`"${ctName}" không có hóa đơn nào trong năm đang lọc`, 'info');
+      }
     }
   }, 150);
 }

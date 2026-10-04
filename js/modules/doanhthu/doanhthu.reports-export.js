@@ -296,7 +296,21 @@ function lnDrill(el) {
   const go = el && el.dataset ? el.dataset.go : '';
   const ct = el && el.dataset ? el.dataset.ct : '';
   if (!go || !ct) return;
-  if (go === 'hoadon') { if (typeof _goTabWithCT === 'function') _goTabWithCT('thongke', ct); return; }
+  if (go === 'hoadon') {
+    // Số Hóa đơn = phần hóa đơn thật (aHd) + tiền ứng NCC (aUng). Thống Kê CP/HĐ chỉ có hóa đơn:
+    //   • có hóa đơn thật → mở Thống Kê CP/HĐ (lọc theo CT); có thêm tiền ứng NCC → nhắc xem ở tab Tiền Ứng
+    //   • chỉ có tiền ứng NCC → mở thẳng tab Tiền Ứng (lọc theo CT), vì Thống Kê sẽ không có dòng nào
+    const aHd = +el.dataset.ahd || 0, aUng = +el.dataset.aung || 0;
+    if (typeof _goTabWithCT !== 'function') return;
+    if (aHd <= 0 && aUng > 0) {
+      _goTabWithCT('ung', ct);
+      toast(`Số ${fmtM(aUng)} của "${ct}" là TIỀN ỨNG NHÀ CUNG CẤP — đang mở tab Tiền Ứng`, 'info');
+    } else {
+      _goTabWithCT('thongke', ct);
+      if (aUng > 0) toast(`Trong số này có ${fmtM(aUng)} tiền ứng NCC (không phải hóa đơn) — xem ở tab Tiền Ứng`, 'info');
+    }
+    return;
+  }
   // HĐ gốc: _goTabWithCT('doanhthu') → dtFilterHdcByCt() mở subtab HỢP ĐỒNG CHÍNH + lọc sẵn
   if (go === 'hdgoc')  { if (typeof _goTabWithCT === 'function') _goTabWithCT('doanhthu', ct); return; }
 
@@ -327,9 +341,19 @@ function lnDrill(el) {
 }
 
 // Con số bấm được để xem chi tiết (go: thu | hdgoc | hoadon | thauphu). Số 0 → không tạo link.
-function _lnLink(html, v, go, ctName) {
+// extra: { ahd, aung, tip } — chỉ dùng cho cột Hóa đơn (tách hóa đơn thật / tiền ứng NCC)
+function _lnLink(html, v, go, ctName, extra) {
   if (!Math.round(v || 0) || !ctName) return html;
-  return `<a href="#" class="ln-link" data-go="${go}" data-ct="${x(ctName)}" onclick="event.preventDefault();lnDrill(this)" title="Xem chi tiết: ${x(ctName)}">${html}</a>`;
+  extra = extra || {};
+  const data = extra.ahd !== undefined ? ` data-ahd="${Math.round(extra.ahd)}" data-aung="${Math.round(extra.aung || 0)}"` : '';
+  const tip  = extra.tip || ('Xem chi tiết: ' + ctName);
+  return `<a href="#" class="ln-link" data-go="${go}" data-ct="${x(ctName)}"${data} onclick="event.preventDefault();lnDrill(this)" title="${x(tip)}">${html}</a>`;
+}
+
+// Tooltip cột Hóa đơn: cho biết con số gồm bao nhiêu hóa đơn thật, bao nhiêu tiền ứng NCC
+function _lnTipA(r) {
+  if (!r.aUng) return 'Hóa đơn — bấm để xem ở Thống Kê CP/HĐ';
+  return `Hóa đơn (NCC chưa ứng): ${fmtM(r.aHd || 0)}\nTiền ứng NCC (thực chi): ${fmtM(r.aUng)}\nBấm để xem chi tiết`;
 }
 
 // Tiêu đề cột sắp xếp được (icon: ⇅ chưa sắp · ↓ cao→thấp · ↑ thấp→cao)
@@ -409,7 +433,7 @@ function _lnRenderTable() {
 
   // ── Bảng chi tiết (03/10/2026 — thiết kế lại theo "phân cấp thị giác") ──
   // Bố cục 4 khu vực, ngăn bằng kẻ dọc nhẹ:
-  //   CÔNG TRÌNH | DOANH THU:          TỔNG ĐÃ THU (cash-basis) · HĐ gốc (chỉ tham chiếu)
+  //   CÔNG TRÌNH | DOANH THU:          HĐ gốc (chỉ tham chiếu) · TỔNG ĐÃ THU (cash-basis)
   //              | CHI TIẾT CHI PHÍ:   Hóa đơn · Thầu phụ · CP chung · TỔNG CHI (+ badge % DT)
   //              | HIỆU QUẢ:           LỢI NHUẬN (badge xanh/đỏ)
   // (04/10/2026) Chi phí cash-basis: Thầu phụ = đã ứng; Hóa đơn = HĐ của NCC chưa ứng + đã ứng NCC.
@@ -421,11 +445,13 @@ function _lnRenderTable() {
 
   // 1 dòng dữ liệu (dùng chung cho từng công trình và dòng TỔNG CỘNG — dòng tổng không có link)
   const _rowCells = (r, link) => {
-    const L = (html, v, go) => link ? _lnLink(html, v, go, r.name) : html;
+    const L = (html, v, go, extra) => link ? _lnLink(html, v, go, r.name, extra) : html;
+    // Phần Hóa đơn có tiền ứng NCC → đánh dấu * nhỏ để dễ nhận ra
+    const aMark = (link && r.aUng) ? '<sup class="ln-ung-mark">*</sup>' : '';
     return `
+      ${det ? `<td class="text-end ln-sub">${L(_lnNum(r.X), r.X, 'hdgoc')}</td>` : ''}
       <td class="text-end ln-total">${L(_lnNum(r.dt), r.dt, 'thu')}</td>
-      ${det ? `<td class="text-end ln-sub">${L(_lnNum(r.X), r.X, 'hdgoc')}</td>
-               <td class="text-end ln-sub ${SEP}">${L(_lnNum(r.A), r.A, 'hoadon')}</td>
+      ${det ? `<td class="text-end ln-sub ${SEP}">${L(_lnNum(r.A) + aMark, r.A, 'hoadon', { ahd: r.aHd || 0, aung: r.aUng || 0, tip: _lnTipA(r) })}</td>
                <td class="text-end ln-sub">${L(_lnNum(r.B), r.B, 'thauphu')}</td>
                <td class="text-end ln-sub">${_lnNum(r.C)}</td>` : ''}
       ${_lnChiCell(r.chi, r.dt, det ? '' : SEP)}
@@ -451,9 +477,9 @@ function _lnRenderTable() {
             <th class="${SEP}">Hiệu quả</th>
           </tr>
           <tr class="ln-col">
+            ${det ? _lnSortTh('X', 'HĐ gốc', '', 'Giá trị hợp đồng gốc — chỉ để tham chiếu, KHÔNG tính vào lợi nhuận') : ''}
             ${_lnSortTh('dt', 'TỔNG ĐÃ THU', 'ln-th-total')}
-            ${det ? _lnSortTh('X', 'HĐ gốc', '', 'Giá trị hợp đồng gốc — chỉ để tham chiếu, KHÔNG tính vào lợi nhuận')
-                  + _lnSortTh('A', 'Hóa đơn', SEP, 'NCC đã ứng tiền → chỉ tính số đã ứng; NCC chưa ứng → tính theo hóa đơn')
+            ${det ? _lnSortTh('A', 'Hóa đơn', SEP, 'NCC đã ứng tiền → chỉ tính số đã ứng; NCC chưa ứng → tính theo hóa đơn')
                   + _lnSortTh('B', 'Thầu phụ', '', 'Tổng tiền đã ứng cho thầu phụ')
                   + _lnSortTh('C', 'CP chung', '') : ''}
             ${_lnSortTh('chi', 'TỔNG CHI <span class="fw-normal">(% DT)</span>', 'ln-th-total ' + (det ? '' : SEP), 'Badge xám = chi phí chiếm bao nhiêu % doanh thu')}
@@ -499,10 +525,16 @@ function lnTinhCongTrinh(p, ctx) {
   //   VD: CT A Nhựt, NCC "VLXD Phương" xuất HĐ 88tr nhưng mới ứng 40tr → cột Hóa đơn chỉ cộng 40tr.
   //   Cùng quy tắc với _ctTongChi() (projects.ui.js) của popup Chi tiết công trình.
   const ung = _lnUngCT(p);
-  const A = ctx.invs.filter(_matchProj)
+  // (04/10/2026) Tách 2 phần của cột Hóa đơn để tooltip / drill-down biết số đến từ đâu:
+  //   aHd  = phần HÓA ĐƠN thật (NCC chưa ứng) → có ở tab Thống Kê CP/HĐ
+  //   aUng = phần TIỀN ỨNG NCC              → chỉ có ở tab Tiền Ứng (KHÔNG có trong Thống Kê CP/HĐ)
+  // Lưu ý: phiếu ứng NCC gắn theo công trình của PHIẾU ỨNG, không đi theo hóa đơn. Chuyển hóa đơn
+  // sang CT khác mà không sửa phiếu ứng → số ứng vẫn nằm ở CT cũ (đúng theo dòng tiền thực chi).
+  const aHd = ctx.invs.filter(_matchProj)
     .filter(i => !_lnNccDaUng(i, ung.nccSet))                  // NCC đã ứng → bỏ giá trị hóa đơn
-    .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0)
-    + ung.ungNcc;                                              // … thay bằng số tiền đã ứng NCC
+    .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);
+  const aUng = ung.ungNcc;                                     // … thay bằng số tiền đã ứng NCC
+  const A = aHd + aUng;
   const B = ung.ungTp;                                         // (B) thầu phụ = đã ứng
   const C = ctx.allocMap[p.id] || 0;                          // (C) chi phí chung phân bổ
   // (X) HĐ gốc · (Y) quyết toán (chỉ để tham khảo, không vào doanh thu) · Doanh thu = đã thu
@@ -513,7 +545,7 @@ function lnTinhCongTrinh(p, ctx) {
   const chi = A + B + C;
   // (04/10/2026) Doanh thu = TỔNG ĐÃ THU thực tế (cash-basis), không còn là HĐ gốc + quyết toán
   const dt = _dt.doanhThu;
-  return { id: p.id, name: p.name, A, B, C, X, Y, chi, dt, ln: dt - chi };
+  return { id: p.id, name: p.name, A, aHd, aUng, B, C, X, Y, chi, dt, ln: dt - chi };
 }
 
 // ── Tiền ứng (thực chi) của công trình p — dùng cho cột Hóa đơn / Thầu phụ tab Lợi Nhuận ──
@@ -602,6 +634,10 @@ function initDoanhThu() {
 // Nạp lại dữ liệu HĐ chính / thầu phụ / quyết toán mới nhất rồi vẽ dashboard + bảng.
 // (Trước đây phần nạp này nằm trong initDoanhThu vì Lợi nhuận là sub-tab của Doanh Thu.)
 function initLoiNhuan() {
+  // (04/10/2026) Phòng thủ: bỏ cache hóa đơn + nạp lại phiếu ứng từ bộ nhớ → mở tab là tính trên
+  // dữ liệu MỚI NHẤT (hóa đơn vừa chuyển CT bị trừ ở CT cũ, cộng vào CT mới).
+  if (typeof clearInvoiceCache === 'function') clearInvoiceCache();
+  if (typeof ungRecords !== 'undefined') ungRecords = load('ung_v1', []);
   hopDongData      = load('hopdong_v1', {});
   thauPhuContracts = load('thauphu_v1', []);
   quyetToanRecords = load('quyettoan_v1', []);
