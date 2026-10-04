@@ -11,8 +11,14 @@
  *    project.chuDauTu = customer.name để tương thích ngược (search/sort/HĐ).
  *
  *  Shape 1 khách hàng:
- *    { id, name, phone, email, address, taxCode, note,
+ *    { id, name, phone, address, taxCode, note,
  *      createdAt, updatedAt, deletedAt }
+ *  (04/10/2026) BỎ trường email: không còn hiển thị / nhập / ghi mới. Bản ghi cũ lỡ có
+ *  `email` vẫn giữ nguyên trong dữ liệu (không xóa để tránh đụng đồng bộ), chỉ không dùng nữa.
+ *
+ *  PHÂN QUYỀN SĐT (khCanSeePhone): admin + giamdoc xem/sửa SĐT; ketoan KHÔNG thấy SĐT
+ *  (hiện "Chỉ admin được xem") và ô SĐT bị khóa — kế toán vẫn Thêm/Sửa Tên, Địa chỉ, Xóa.
+ *  Lưu ý: đây là chặn trên GIAO DIỆN; dữ liệu SĐT vẫn nằm trong bản đồng bộ chung.
  *
  *  Phụ thuộc global: load/save (core.storage), crypto.randomUUID,
  *  x() (escape HTML — dùng khi render option).
@@ -82,14 +88,13 @@ function getAllCustomers() {
  * @param {Object} data { name, phone, email, address, taxCode, note }
  * @returns {Object}
  */
-function createCustomer({ name, phone = '', email = '', address = '', taxCode = '', note = '' } = {}) {
+function createCustomer({ name, phone = '', address = '', taxCode = '', note = '' } = {}) {
   if (!name || !name.trim()) throw new Error('Tên khách hàng không được để trống');
   const now = Date.now();
   const customer = {
     id:        crypto.randomUUID(),
     name:      name.trim(),
     phone:     (phone || '').trim(),
-    email:     (email || '').trim(),
     address:   (address || '').trim(),
     taxCode:   (taxCode || '').trim(),
     note:      (note || '').trim(),
@@ -114,7 +119,7 @@ function updateCustomer(id, changes = {}) {
   const { createdAt } = customers[idx];
   const { id: _id, createdAt: _ca, updatedAt: _ua, ...safe } = changes;
   // Trim các trường chuỗi nếu có
-  ['name', 'phone', 'email', 'address', 'taxCode', 'note'].forEach(f => {
+  ['name', 'phone', 'address', 'taxCode', 'note'].forEach(f => {
     if (typeof safe[f] === 'string') safe[f] = safe[f].trim();
   });
   customers[idx] = {
@@ -164,10 +169,35 @@ function getCustomerOptions(selectedId = null) {
   let html = `<option value="">— Chọn khách hàng —</option>`;
   getAllCustomers().forEach(c => {
     const sel = c.id === selectedId ? ' selected' : '';
-    const phone = c.phone ? ` (${esc(c.phone)})` : '';
+    // SĐT chỉ hiện trong dropdown cho người được xem (admin / giám đốc)
+    const phone = (c.phone && khCanSeePhone()) ? ` (${esc(c.phone)})` : '';
     html += `<option value="${esc(c.id)}"${sel}>${esc(c.name)}${phone}</option>`;
   });
   return html;
+}
+
+/**
+ * Người dùng hiện tại có được XEM / SỬA số điện thoại khách hàng không.
+ * admin + giamdoc → có; ketoan (và vai trò khác) → không.
+ * @returns {boolean}
+ */
+function khCanSeePhone() {
+  const role = (typeof getCurrentUser === 'function' && getCurrentUser()) ? getCurrentUser().role : '';
+  return role === 'admin' || role === 'giamdoc';
+}
+
+/**
+ * Các công trình (chưa xóa, trừ CÔNG TY) thuộc 1 khách hàng.
+ * Khớp theo customerId; công trình cũ chưa có customerId thì so tên Chủ đầu tư.
+ * @param {string} customerId
+ * @returns {Object[]}
+ */
+function getProjectsOfCustomer(customerId) {
+  const c = getCustomerById(customerId);
+  if (!c || typeof projects === 'undefined') return [];
+  const key = _normCustomerName(c.name);
+  return projects.filter(p => p && !p.deletedAt && p.id !== 'COMPANY' &&
+    (p.customerId ? p.customerId === c.id : (_normCustomerName(p.chuDauTu) === key && !!key)));
 }
 
 /**

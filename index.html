@@ -1218,11 +1218,13 @@
       </div>
     </div>
 
-    <!-- Modal: Quản Lý Khách Hàng (custom overlay — cùng pattern ct-modal) -->
+    <!-- Modal: Hồ Sơ Khách Hàng (custom overlay — cùng pattern ct-modal)
+         (04/10/2026) Nâng cấp từ "Quản Lý Khách Hàng": danh sách + bấm tên → hồ sơ (lịch sử công trình,
+         tổng giá trị khách hàng). Nội dung vẽ bởi khachhang.ui.js (_khRender). -->
     <div class="overlay" id="kh-modal">
-      <div class="app-modal" style="max-width:720px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+      <div class="app-modal" style="max-width:880px;width:95%;max-height:86vh;display:flex;flex-direction:column">
         <div class="app-modal-head">
-          <h3><span class="material-symbols-outlined msi-gap">group</span>Quản Lý Khách Hàng</h3>
+          <h3><span class="material-symbols-outlined msi-gap">contacts</span>Hồ Sơ Khách Hàng</h3>
           <button class="close-btn" onclick="closeKhachHangModal()"><span class="material-symbols-outlined">close</span></button>
         </div>
         <div class="app-modal-body" id="kh-modal-body" style="flex:1;overflow-y:auto;padding:0"></div>

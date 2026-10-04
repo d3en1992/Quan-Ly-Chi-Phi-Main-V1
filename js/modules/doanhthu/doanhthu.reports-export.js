@@ -252,34 +252,10 @@ function renderLoiNhuan() {
   const _lnProjs = (typeof getAllProjects === 'function' ? getAllProjects() : [])
     .filter(p => p && p.id !== 'COMPANY');
 
-  // Map phân bổ chi phí chung CÔNG TY theo projectId (tôn trọng năm đang lọc)
-  const allocMap = {};
-  if (typeof allocateCompanyCost === 'function') {
-    allocateCompanyCost().forEach(a => { if (a && a.p) allocMap[a.p.id] = a.allocated || 0; });
-  }
-
-  // Helper: 1 bản ghi (hóa đơn / thầu phụ / quyết toán) có thuộc công trình p không
-  const _matchProj = (rec, p) =>
-    (rec.projectId && rec.projectId === p.id) ||
-    (!rec.projectId && ((resolveProjectName(rec) === p.name) || (rec.congtrinh === p.name)));
-
-  // (A) Hóa đơn/vật tư theo công trình (năm đang lọc)
-  const invs = getInvoicesCached().filter(i => !i.deletedAt && _dtInYear(i.ngay));
-
-  const rowsData = _lnProjs.map(p => {
-    const A = invs.filter(i => _matchProj(i, p))
-      .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);   // (A) hóa đơn
-    const B = _lnContractsB(p);                                  // (B) thầu phụ
-    const C = allocMap[p.id] || 0;                              // (C) chi phí chung phân bổ
-    // (X) HĐ gốc · (Y) quyết toán đã quy đổi delta (tăng/giảm/thay thế) · Đã thu · Doanh thu
-    // → tất cả lấy từ calcTongDoanhThu() (quyettoan.core.js) — nguồn duy nhất của công thức
-    const _dt = calcTongDoanhThu(p);
-    const X = _dt.hdGoc;
-    const Y = _dt.qt;
-    const chi = A + B + C;
-    const dt = _dt.tongDT;
-    return { name: p.name, A, B, C, X, Y, chi, dt, ln: dt - chi };
-  }).filter(r => r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
+  // Số liệu từng công trình — hàm dùng chung lnTinhCongTrinh (Hồ sơ Khách hàng cũng gọi)
+  const ctx = _lnContext();
+  const rowsData = _lnProjs.map(p => lnTinhCongTrinh(p, ctx))
+    .filter(r => r.A || r.B || r.C || r.X || r.Y); // bỏ công trình không có dữ liệu
 
   rowsData.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 
@@ -356,6 +332,42 @@ function renderLoiNhuan() {
         </tfoot>
       </table>
     </div>`;
+}
+
+// ── Dữ liệu dùng chung khi tính nhiều công trình 1 lượt (tính 1 lần, tránh lặp) ──
+// (04/10/2026) Tách từ renderLoiNhuan để Hồ sơ Khách hàng (khachhang.ui.js) tính "Tổng giá trị
+// khách hàng" bằng ĐÚNG công thức tab Lợi Nhuận → 2 nơi luôn cùng số. Theo NĂM ĐANG LỌC.
+function _lnContext() {
+  // Map phân bổ chi phí chung CÔNG TY theo projectId (tôn trọng năm đang lọc)
+  const allocMap = {};
+  if (typeof allocateCompanyCost === 'function') {
+    allocateCompanyCost().forEach(a => { if (a && a.p) allocMap[a.p.id] = a.allocated || 0; });
+  }
+  // (A) Hóa đơn/vật tư (năm đang lọc)
+  const invs = getInvoicesCached().filter(i => !i.deletedAt && _dtInYear(i.ngay));
+  return { allocMap, invs };
+}
+
+// ── Số liệu Lời/Lỗ của 1 công trình (công thức tab Lợi Nhuận) ──
+// ctx: kết quả _lnContext() (bỏ trống → tự tạo). Trả về { name, A, B, C, X, Y, chi, dt, ln }
+function lnTinhCongTrinh(p, ctx) {
+  ctx = ctx || _lnContext();
+  // Helper: 1 bản ghi (hóa đơn) có thuộc công trình p không
+  const _matchProj = (rec) =>
+    (rec.projectId && rec.projectId === p.id) ||
+    (!rec.projectId && ((resolveProjectName(rec) === p.name) || (rec.congtrinh === p.name)));
+  const A = ctx.invs.filter(_matchProj)
+    .reduce((s, i) => s + (i.thanhtien || i.tien || 0), 0);   // (A) hóa đơn
+  const B = _lnContractsB(p);                                  // (B) thầu phụ
+  const C = ctx.allocMap[p.id] || 0;                          // (C) chi phí chung phân bổ
+  // (X) HĐ gốc · (Y) quyết toán đã quy đổi delta · Doanh thu
+  // → tất cả lấy từ calcTongDoanhThu() (quyettoan.core.js) — nguồn duy nhất của công thức
+  const _dt = calcTongDoanhThu(p);
+  const X = _dt.hdGoc;
+  const Y = _dt.qt;
+  const chi = A + B + C;
+  const dt = _dt.tongDT;
+  return { name: p.name, A, B, C, X, Y, chi, dt, ln: dt - chi };
 }
 
 // (B) Tổng giá trị thầu phụ thuộc công trình p (năm đang lọc)

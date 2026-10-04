@@ -403,6 +403,19 @@ select.cell-input {
   background: var(--bs-body-bg);
 }
 .ct-card:hover { box-shadow: var(--bs-box-shadow) !important; transform: translateY(-2px); }
+
+/* ── Tab Công Trình: 3 phân khu theo loại + chế độ "Theo khách hàng" (04/10/2026) ── */
+.ct-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1.5px solid var(--bs-border-color); }
+.ct-section-head .material-symbols-outlined { font-size: 20px; color: var(--bs-primary); }
+.ct-section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.ct-client { border: 1px solid var(--bs-border-color); border-radius: 10px; background: var(--bs-body-bg); margin-bottom: 8px; overflow: hidden; }
+.ct-client-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; cursor: pointer; }
+.ct-client-head:hover { background: var(--bs-tertiary-bg); }
+.ct-client.is-open > .ct-client-head { background: var(--bs-primary-bg-subtle); }
+.ct-client-toggle { width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid var(--bs-border-color); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; line-height: 1; color: var(--bs-primary); flex-shrink: 0; }
+.ct-client-name { font-weight: 700; font-size: 14px; }
+.ct-client-body { padding: 12px 14px 14px 46px; border-top: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); }
+@media (max-width: 768px) { .ct-client-body { padding-left: 14px; } }
 .ct-card-head { padding: 14px 16px; background: transparent; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ct-card-name { font-size: 13px; font-weight: 700; line-height: 1.4; }
 .ct-card-count { font-size: 11px; color: var(--bs-secondary-color); margin-top: 2px; }
