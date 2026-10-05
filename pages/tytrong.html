@@ -1,0 +1,209 @@
+<!-- Partial: page-tytrong — Tab TỈ TRỌNG CHI PHÍ (05/10/2026)
+     JS: js/modules/tytrong/tytrong.core.js (tính toán) + tytrong.ui.js (giao diện)
+     Tiền tố ID: tyt- → KHÔNG trùng ID với tab khác.
+     Bố cục (Laptop ≥992px 2 cột, tablet/điện thoại tự xếp dọc):
+       Hàng 1: [Chọn công trình]            | [4 thẻ KPI: Tổng chi · Tổng sàn · Chi phí/m2 · Đã phân bổ]
+       Hàng 2: [Bảng M2 sàn]                 | [Cấu trúc Giai đoạn → Hạng mục (+ mốc ngày)]
+       Hàng 3: [Theo loại chi phí]           | [Theo giai đoạn / hạng mục]
+       Hàng 4: [Phân bổ chi phí — gán hàng loạt] (trải rộng) -->
+<div class="qt-compact" id="tyt-root">
+  <div class="row g-3 mb-3">
+    <!-- ══ CHỌN CÔNG TRÌNH ══ -->
+    <div class="col-12 col-lg-5">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <label for="tytf-ct" class="qt-card-title mb-2 d-block">
+            <span class="material-symbols-outlined msi-gap">apartment</span>Chọn Công Trình
+          </label>
+          <select id="tytf-ct" class="form-select form-select-sm" onchange="tytOnCtChange()">
+            <option value="">-- Chọn công trình --</option>
+          </select>
+          <div class="text-secondary mt-2" style="font-size:11px;font-style:italic">
+            Số liệu chi phí theo <b>năm đang lọc</b> (giống thẻ công trình). Chọn "Tất cả năm" để xem trọn vòng đời công trình.
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ══ KPI ══ -->
+    <div class="col-12 col-lg-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="qt-card-title mb-2"><span class="material-symbols-outlined msi-gap">monitoring</span>Tổng Quan</div>
+          <div class="row g-2" id="tyt-kpi">
+            <div class="col-6 col-md-3"><div class="qt-sum-cell h-100">
+              <div class="qt-sum-lb">Tổng chi phí</div><div id="tyt-kpi-chi" class="qt-sum-val text-danger">—</div>
+              <div id="tyt-kpi-chi-sub" class="qt-sum-sub"></div>
+            </div></div>
+            <div class="col-6 col-md-3"><div class="qt-sum-cell h-100">
+              <div class="qt-sum-lb">Tổng diện tích sàn</div><div id="tyt-kpi-san" class="qt-sum-val">—</div>
+              <div id="tyt-kpi-san-sub" class="qt-sum-sub"></div>
+            </div></div>
+            <div class="col-6 col-md-3"><div class="qt-sum-cell qt-sum-main h-100">
+              <div class="qt-sum-lb">Chi phí / m2 sàn</div><div id="tyt-kpi-m2" class="qt-sum-val text-primary">—</div>
+              <div class="qt-sum-sub">Tổng chi ÷ Tổng sàn</div>
+            </div></div>
+            <div class="col-6 col-md-3"><div class="qt-sum-cell h-100">
+              <div class="qt-sum-lb">Đã phân bổ</div><div id="tyt-kpi-pb" class="qt-sum-val">—</div>
+              <div id="tyt-kpi-pb-sub" class="qt-sum-sub"></div>
+            </div></div>
+          </div>
+          <div id="tyt-kpi-warn"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chưa chọn công trình → thẻ hướng dẫn -->
+  <div id="tyt-empty" class="card shadow-sm border-0 mb-3">
+    <div class="card-body d-flex flex-column align-items-center justify-content-center text-secondary text-center" style="min-height:180px;font-size:13px">
+      <span class="material-symbols-outlined mb-2" style="font-size:34px">touch_app</span>
+      Chọn công trình ở khung "Chọn Công Trình" để xem tỉ trọng chi phí.
+    </div>
+  </div>
+
+  <div id="tyt-main" style="display:none">
+    <div class="row g-3 mb-3">
+      <!-- ══ BẢNG M2 SÀN ══ (dời từ form Sửa công trình sang đây) -->
+      <div class="col-12 col-lg-5">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+              <div class="qt-card-title"><span class="material-symbols-outlined msi-gap">square_foot</span>Bảng Tính M2 Sàn</div>
+              <span id="tyt-kl-dirty" class="badge text-bg-warning" style="display:none">Chưa lưu</span>
+            </div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0" style="font-size:12.5px">
+                <thead class="table-light">
+                  <tr style="font-size:10.5px">
+                    <th>TÊN (Trệt, Lầu 1...)</th>
+                    <th style="width:62px">ĐVT</th>
+                    <th style="width:86px" class="text-end">KL</th>
+                    <th style="width:62px" class="text-end" title="Hệ số quy đổi diện tích — VD mái, sân: 0,5. Mặc định 1">Hệ số</th>
+                    <th style="width:44px" class="text-center" title="Bỏ tick = không cộng vào Tổng diện tích sàn">Tính</th>
+                    <th style="width:30px"></th>
+                  </tr>
+                </thead>
+                <tbody id="tyt-kl-tbody"></tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytKlAddRow()">+ 1 dòng</button>
+              <span>Tổng sàn: <b id="tyt-kl-tong" class="font-monospace">0</b> m2</span>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="tytKlReset()" title="Bỏ thay đổi chưa lưu">Hủy</button>
+              <button class="btn btn-sm btn-primary fw-bold" onclick="tytKlSave()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Bảng M2</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- ══ CẤU TRÚC GIAI ĐOẠN → HẠNG MỤC ══ -->
+      <div class="col-12 col-lg-7">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+              <div class="qt-card-title"><span class="material-symbols-outlined msi-gap">account_tree</span>Giai Đoạn &amp; Hạng Mục</div>
+              <span id="tyt-ct-dirty" class="badge text-bg-warning" style="display:none">Chưa lưu</span>
+            </div>
+            <div class="text-secondary mb-2" style="font-size:11px">
+              Đặt <b>Từ ngày – Đến ngày</b> cho giai đoạn → chi phí phát sinh trong khoảng đó <b>tự xếp vào giai đoạn</b> (cả nhân công chấm công). Phần còn lại gán tay ở khung "Phân Bổ Chi Phí" bên dưới.
+            </div>
+            <div id="tyt-ct-body"></div>
+            <div class="d-flex justify-content-between flex-wrap gap-2 mt-2">
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytGdAdd()">+ Giai đoạn</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytCtMau()" title="Tạo nhanh 4 giai đoạn phổ biến, hạng mục lấy từ bảng M2">Dùng mẫu gợi ý</button>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="tytCtReset()" title="Bỏ thay đổi chưa lưu">Hủy</button>
+                <button class="btn btn-sm btn-primary fw-bold" onclick="tytCtSave()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Cấu Trúc</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <!-- ══ THEO LOẠI CHI PHÍ ══ -->
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <div class="qt-card-title mb-2"><span class="material-symbols-outlined msi-gap">category</span>Theo Loại Chi Phí</div>
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12.5px;min-width:440px">
+                <thead class="table-light"><tr>
+                  <th>Loại chi phí</th><th class="text-end">Tổng chi</th><th class="text-end" style="width:120px">Tỉ trọng</th><th class="text-end">đ / m2</th>
+                </tr></thead>
+                <tbody id="tyt-loai-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- ══ THEO GIAI ĐOẠN / HẠNG MỤC ══ -->
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body">
+            <div class="qt-card-title mb-2"><span class="material-symbols-outlined msi-gap">stacked_bar_chart</span>Theo Giai Đoạn / Hạng Mục</div>
+            <div style="overflow-x:auto">
+              <table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12.5px;min-width:440px">
+                <thead class="table-light"><tr>
+                  <th>Giai đoạn / Hạng mục</th><th class="text-end">Tổng chi</th><th class="text-end" style="width:120px">Tỉ trọng</th><th class="text-end">đ / m2</th>
+                </tr></thead>
+                <tbody id="tyt-gd-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PHÂN BỔ CHI PHÍ (gán hàng loạt) ══ -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+          <div class="qt-card-title me-2"><span class="material-symbols-outlined msi-gap">move_down</span>Phân Bổ Chi Phí</div>
+          <span id="tyt-pb-count" class="text-secondary" style="font-size:12px"></span>
+        </div>
+        <!-- Bộ lọc -->
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <select id="tyt-pb-tt" class="form-select form-select-sm" style="width:auto" onchange="tytPbFilter()">
+            <option value="chua">Chưa phân bổ</option>
+            <option value="ngay">Tự xếp theo mốc ngày</option>
+            <option value="tay">Đã gán tay</option>
+            <option value="all">Tất cả</option>
+          </select>
+          <select id="tyt-pb-loai" class="form-select form-select-sm" style="width:auto" onchange="tytPbFilter()"></select>
+          <input type="text" id="tyt-pb-q" class="form-control form-control-sm" style="width:240px" placeholder="Tìm nội dung, NCC, thầu phụ..." oninput="tytPbFilter()">
+        </div>
+        <!-- Thanh thao tác -->
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 rounded" style="background:var(--bs-tertiary-bg)">
+          <span style="font-size:12px">Đã chọn <b id="tyt-pb-selcount">0</b> dòng →</span>
+          <select id="tyt-pb-dich" class="form-select form-select-sm" style="width:auto;min-width:220px"></select>
+          <button class="btn btn-sm btn-primary fw-bold" onclick="tytPbAssign()"><span class="material-symbols-outlined msi-gap">done_all</span>Gán</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="tytPbUnassign()" title="Xóa gán tay — dòng quay về tự xếp theo mốc ngày (nếu có)">Bỏ gán tay</button>
+        </div>
+        <div class="records-wrap card shadow-sm overflow-hidden">
+          <div style="overflow-x:auto">
+            <table class="table table-sm table-hover align-middle mb-0" style="min-width:860px;font-size:12.5px">
+              <thead class="table-light">
+                <tr style="font-size:11px">
+                  <th style="width:34px" class="text-center"><input type="checkbox" class="form-check-input" id="tyt-pb-all" onchange="tytPbSelectAll(this.checked)" title="Chọn / bỏ chọn TẤT CẢ dòng đang lọc (mọi trang)"></th>
+                  <th style="white-space:nowrap">Ngày</th>
+                  <th>Loại</th>
+                  <th>Nội dung</th>
+                  <th>NCC / Thầu phụ / Người</th>
+                  <th class="text-end">Số tiền</th>
+                  <th>Thuộc</th>
+                </tr>
+              </thead>
+              <tbody id="tyt-pb-tbody"></tbody>
+            </table>
+          </div>
+          <div id="tyt-pb-pagination" style="padding:8px 16px;border-top:1px solid var(--bs-border-color);display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:1px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

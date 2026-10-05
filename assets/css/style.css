@@ -2202,3 +2202,21 @@ td.action-col > div {
 #qtf-card.qtf-locked .form-control:disabled,
 #qtf-card.qtf-locked .form-select:disabled { background-color: var(--bs-tertiary-bg); color: var(--bs-body-color); opacity: 1; }
 #qtf-card.qtf-locked .btn-check:disabled + .btn { opacity: 1; }   /* loại đã chốt vẫn rõ màu */
+
+/* ── (05/10/2026) Tab TỈ TRỌNG CHI PHÍ (pages/tytrong.html) ── */
+#tyt-root .ss-wrap { display: block; width: 100% !important; min-width: 0 !important; }
+/* Khối 1 giai đoạn trong khung "Giai Đoạn & Hạng Mục" */
+.tyt-gd-box { border: 1px solid var(--bs-border-color); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: var(--bs-tertiary-bg); }
+.tyt-gd-no { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bs-primary); color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.tyt-hm-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0 30px; }
+.tyt-hm-list input { max-width: 320px; }
+/* Thanh tỉ trọng nhỏ dưới số % */
+.tyt-bar { height: 4px; border-radius: 2px; background: var(--bs-secondary-bg); margin-top: 3px; overflow: hidden; }
+.tyt-bar > span { display: block; height: 100%; background: var(--bs-primary); }
+/* Phân cấp dòng trong 2 bảng báo cáo */
+.tyt-rpt .tyt-rpt-gd td { font-weight: 700; background: var(--bs-tertiary-bg); }
+.tyt-rpt .tyt-rpt-hm td:first-child { padding-left: 22px; }
+.tyt-rpt .tyt-rpt-chua td { color: var(--bs-warning-text-emphasis); background: var(--bs-warning-bg-subtle); font-weight: 600; }
+.tyt-rpt .tyt-rpt-total td { font-weight: 700; border-top: 2px solid var(--bs-border-color); }
+.tyt-rpt .tyt-rpt-zero td { opacity: .5; }

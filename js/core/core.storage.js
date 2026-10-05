@@ -100,6 +100,7 @@ const DB_KEY_MAP = {
   'projects_v1':  { table: 'settings',   isArr: false, rowId: 'projects'    },
   'customers_v1': { table: 'settings',   isArr: false, rowId: 'customers'   }, // Chủ đầu tư (CRM) — mảng khách hàng lưu blob trong settings
   'quyettoan_v1': { table: 'settings',   isArr: false, rowId: 'quyettoan'   }, // Quyết toán chi phí — mảng lưu blob trong settings (giống customers_v1)
+  'tytrong_v1':   { table: 'settings',   isArr: false, rowId: 'tytrong'     }, // (05/10/2026) Tỉ trọng chi phí: giai đoạn/hạng mục/phân bổ — mỗi CT 1 bản ghi
   'hopdong_v1':   { table: 'settings',   isArr: false, rowId: 'hopdong'     },
   'thauphu_v1':   { table: 'settings',   isArr: false, rowId: 'thauphu'     },
   'trash_v1':     { table: 'settings',   isArr: false, rowId: 'trash'       },
@@ -227,7 +228,7 @@ const LAST_SYNC_KEY = 'lastSyncAt';
 // Keys kích hoạt pending counter — gồm cả cat để xóa danh mục không bị sống lại sau pull
 const _SYNC_DATA_KEYS = new Set([
   'inv_v3','cc_v2','ung_v1','tb_v1','thu_v1',
-  'thauphu_v1','hopdong_v1','quyettoan_v1','projects_v1','customers_v1','trash_v1','users_v1',
+  'thauphu_v1','hopdong_v1','quyettoan_v1','tytrong_v1','projects_v1','customers_v1','trash_v1','users_v1',
   // Cat string-array keys: pending guard tránh pull ghi đè danh mục đã xóa local
   'cat_ct','cat_loai','cat_ncc','cat_nguoi','cat_tp','cat_cn','cat_tbteb',
   // Roles & years: cần pending guard giống cat arrays
@@ -267,6 +268,7 @@ const _META_KEY_DOC = {
   hopdong_v1:   'meta_hop_dong',
   thauphu_v1:   'meta_hop_dong',
   quyettoan_v1: 'meta_quyet_toan',  // (03/10/2026) tách khỏi meta_hop_dong → doc riêng, dễ xem trên Firebase Console
+  tytrong_v1:   'meta_ty_trong',    // (05/10/2026) tab Tỉ Trọng Chi Phí — doc riêng
 };
 // Key có thuộc nhóm meta không (thay cho _META_TRIGGER_KEYS cục bộ cũ trong pushChanges)
 function _isMetaKey(k) { return Object.prototype.hasOwnProperty.call(_META_KEY_DOC, k); }

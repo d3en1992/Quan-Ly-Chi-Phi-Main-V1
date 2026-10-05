@@ -30,6 +30,7 @@ function fsUnwrap(doc) {
 //   cpct_data/meta_hop_dong    → { hopDong, thauPhu }
 //   cpct_data/meta_quyet_toan  → { quyetToan }   (tách riêng từ 03/10/2026 — trước nằm trong meta_hop_dong)
 //        mỗi bản ghi quyết toán luôn có createdAt / updatedAt / deletedAt (null = chưa xóa)
+//   cpct_data/meta_ty_trong    → { tyTrong }     (05/10/2026 — tab Tỉ Trọng Chi Phí: giai đoạn/hạng mục/phân bổ)
 //   cpct_data/y2025_hoa_don / _tien_ung / _cham_cong / _thiet_bi / _thu_tien → { records }
 function fbDocYearCat(yr, cat) { return `y${yr}_${cat}`; }
 function fbDocMetaCT() { return 'meta_cong_trinh'; }
@@ -38,6 +39,7 @@ function fbDocMetaDM() { return 'meta_danh_muc'; }
 function fbDocMetaTK() { return 'meta_tai_khoan'; }
 function fbDocMetaHD() { return 'meta_hop_dong'; }
 function fbDocMetaQT() { return 'meta_quyet_toan'; }
+function fbDocMetaTT() { return 'meta_ty_trong'; }
 
 // Bảng ánh xạ: hạng mục theo năm → key local + trường ngày để lọc theo năm
 const _YEAR_CATS = [
@@ -91,6 +93,10 @@ function fbMetaHDPayload() {
 function fbMetaQTPayload() {
   // Quyết toán công trình — doc riêng meta_quyet_toan. Đảm bảo đủ 3 trường lưu vết thời gian.
   return { v: 4, quyetToan: _qtAuditFields(load('quyettoan_v1', [])) };
+}
+function fbMetaTTPayload() {
+  // (05/10/2026) Tỉ trọng chi phí — mỗi công trình 1 bản ghi { projectId, giaiDoan, hangMuc, phanBo }
+  return { v: 4, tyTrong: load('tytrong_v1', []) };
 }
 // Bổ sung createdAt / updatedAt / deletedAt cho bản ghi quyết toán đời cũ còn thiếu
 // (bản ghi mới đã có sẵn nhờ mkRecord / mkUpdate / xóa mềm). Không đổi giá trị đã có.

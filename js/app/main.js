@@ -196,7 +196,7 @@ function goPage(btn, id) {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
     thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
     nhapung: '💰 Ứng TP/NCC', thietbi: '🔧 Theo Dõi TB',
-    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', loinhuan: '📈 Lợi Nhuận', quyettoan: '🧾 Quyết Toán', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', loinhuan: '📈 Lợi Nhuận', quyettoan: '🧾 Quyết Toán', tytrong: '🥧 Tỉ Trọng Chi Phí', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
     thungrac: '🗑️ Thùng Rác'
   };
   _setTopbarTabTitle(_PAGE_LABELS[id] || '');
@@ -209,6 +209,7 @@ function goPage(btn, id) {
   if (id==='doanhthu') initDoanhThu();
   if (id==='loinhuan') initLoiNhuan();   // (02/10/2026) tab chính Lợi Nhuận
   if (id==='quyettoan') initQuyetToan();
+  if (id==='tytrong') initTyTrong();     // (05/10/2026) tab Tỉ Trọng Chi Phí
   if (id==='congno') initCongNo();
   if (id==='nhapung') { initUngTableIfEmpty(); buildUngFilters(); filterAndRenderUng(); }
   if (id==='chamcong') { populateCCCtSel(); rebuildCCNameList(); renderCCHistory(); renderCCTLT(); renderCCTLTMini(); if (typeof renderCCUngLedger==='function') renderCCUngLedger(); }
@@ -231,7 +232,7 @@ function goPage(btn, id) {
 // Danh sách id tab hợp lệ — khớp với data-page trong index.html
 const _VALID_PAGES = new Set([
   'congtrinh', 'nhap', 'thongkecphd', 'chamcong', 'nhapung',
-  'thietbi', 'danhmuc', 'doanhthu', 'loinhuan', 'quyettoan', 'congno', 'dashboard', 'thungrac'
+  'thietbi', 'danhmuc', 'doanhthu', 'loinhuan', 'quyettoan', 'tytrong', 'congno', 'dashboard', 'thungrac'
 ]);
 
 // Đọc id tab từ location.hash, vd '#/chamcong' → 'chamcong' (trả '' nếu không hợp lệ)
@@ -502,6 +503,10 @@ function renderActiveTab() {
     case 'quyettoan':
       // Đổi năm / sync xong → vẽ lại nhưng GIỮ nội dung form đang nhập
       qtRefresh();
+      break;
+    case 'tytrong':
+      // Đổi năm / sync xong → tính lại, GIỮ bảng M2 + cấu trúc đang sửa dở
+      tytRefresh();
       break;
     case 'congno':
       // Render lại toàn bộ page Công Nợ khi đổi năm

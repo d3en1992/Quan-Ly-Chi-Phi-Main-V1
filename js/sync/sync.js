@@ -374,6 +374,7 @@ function _refreshGlobal(key) {
     case 'hopdong_v1':   if (typeof hopDongData      !== 'undefined') hopDongData      = load(key, {}); break;
     case 'thauphu_v1':   if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = load(key, []); break;
     case 'quyettoan_v1': if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load(key, []); break;
+    case 'tytrong_v1':   if (typeof tyTrongRecords   !== 'undefined') tyTrongRecords   = load(key, []); break;
     case 'cat_cn_roles': if (typeof cnRoles          !== 'undefined') cnRoles          = load(key, {}); break;
   }
   // (04/10/2026) Dữ liệu vừa thay từ cloud mang tên CT có thể đã cũ → viết lại bản sao tên
@@ -415,10 +416,11 @@ function _parseYearDocId(docId) {
   return c ? { docId, yr: m[1], cat: c.cat, key: c.key, dateField: c.dateField } : null;
 }
 
-// ── 6 doc meta dùng chung ──
+// ── 7 doc meta dùng chung ──
 // ⚠️ THỨ TỰ: meta_hop_dong PHẢI đứng TRƯỚC meta_quyet_toan — khi đọc meta_hop_dong còn field
 //    quyetToan đời cũ, dữ liệu đó được gộp vào local trước, rồi mới xử lý doc quyết toán riêng.
-const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong', 'meta_quyet_toan'];
+// (05/10/2026) + meta_ty_trong (tab Tỉ Trọng Chi Phí) — doc mới, chưa có trên cloud thì pull bỏ qua.
+const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong', 'meta_quyet_toan', 'meta_ty_trong'];
 
 function _metaPayload(docId) {
   switch (docId) {
@@ -428,6 +430,7 @@ function _metaPayload(docId) {
     case 'meta_tai_khoan':  return fbMetaTKPayload();
     case 'meta_hop_dong':   return fbMetaHDPayload();
     case 'meta_quyet_toan': return fbMetaQTPayload();
+    case 'meta_ty_trong':   return fbMetaTTPayload();
   }
   return null;
 }
@@ -553,6 +556,14 @@ function _metaApply(docId, d, mode, purge) {
       const v = merge ? _purgeArr(mergeDatasets(load('quyettoan_v1', []), d.quyetToan), 'quyettoan_v1', purge) : d.quyetToan;
       _memSet('quyettoan_v1', v);
       _refreshGlobal('quyettoan_v1');
+      return true;
+    }
+    case 'meta_ty_trong': {
+      // (05/10/2026) Tỉ trọng chi phí — mảng có id → mergeDatasets (tombstone + bản sửa sau thắng)
+      if (!Array.isArray(d.tyTrong)) return false;
+      const v = merge ? _purgeArr(mergeDatasets(load('tytrong_v1', []), d.tyTrong), 'tytrong_v1', purge) : d.tyTrong;
+      _memSet('tytrong_v1', v);
+      _refreshGlobal('tytrong_v1');
       return true;
     }
   }

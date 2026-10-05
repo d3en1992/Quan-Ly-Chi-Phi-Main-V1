@@ -315,6 +315,7 @@ function _reloadGlobals() {
   if (typeof thuRecords       !== 'undefined') thuRecords       = load('thu_v1',     []);
   if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = load('thauphu_v1', []);
   if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load('quyettoan_v1', []);
+  if (typeof tyTrongRecords   !== 'undefined') tyTrongRecords   = load('tytrong_v1',   []);   // (05/10/2026) tab Tỉ Trọng
   // Migration hopdong_v1: chuyển key tên CT → projectId (chạy sau khi projects đã load)
   _migrateHopDongKeys();
   // Module chamcong.js — cnRoles
@@ -552,7 +553,7 @@ function importJSON(file) {
 //       mất / quay về trạng thái cũ (bản ghi đã xóa vĩnh viễn sau đó sẽ hiện lại).
 // Năm của 1 doc cloud dạng y2025_hoa_don
 const _IMP_YEAR_KEYS = ['inv_v3', 'ung_v1', 'cc_v2', 'tb_v1', 'thu_v1'];
-const _IMP_REC_KEYS  = [..._IMP_YEAR_KEYS, 'projects_v1', 'customers_v1', 'thauphu_v1', 'quyettoan_v1'];
+const _IMP_REC_KEYS  = [..._IMP_YEAR_KEYS, 'projects_v1', 'customers_v1', 'thauphu_v1', 'quyettoan_v1', 'tytrong_v1'];
 
 // Tập docId năm mà file có dữ liệu
 function _impFileYearDocs(data) {
@@ -774,8 +775,8 @@ async function importJSONFull(data, opts) {
       } catch (e) {
         console.warn('[Import] Không liệt kê được doc cloud — chỉ ghi đè các năm có dữ liệu:', e.message || e);
       }
-      // (c) 6 doc meta (meta_quyet_toan tách riêng từ 03/10/2026)
-      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong','meta_quyet_toan']
+      // (c) 7 doc meta (meta_quyet_toan tách riêng từ 03/10/2026, meta_ty_trong thêm 05/10/2026)
+      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong','meta_quyet_toan','meta_ty_trong']
         .forEach(id => docIds.add(id));
       // overwrite:true → nếu phải đẩy bù sau khi tải lại app, doc này vẫn được GHI ĐÈ
       // (không gộp dữ liệu cloud cũ vào — đúng ý nghĩa "khôi phục")

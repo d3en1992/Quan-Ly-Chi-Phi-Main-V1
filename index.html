@@ -1021,6 +1021,14 @@
                     data-bs-dismiss="offcanvas">
               <span class="material-symbols-outlined msi-gap">fact_check</span>QUYẾT TOÁN
             </button>
+            <!-- (05/10/2026) Tab TỈ TRỌNG CHI PHÍ — chi phí theo loại / giai đoạn / hạng mục, đ/m2 sàn
+                 (ẩn với Kế toán giống Lợi Nhuận, xem applyRoleUI) -->
+            <button class="nav-btn"
+                    data-page="tytrong"
+                    onclick="goPage(this,'tytrong')"
+                    data-bs-dismiss="offcanvas">
+              <span class="material-symbols-outlined msi-gap">pie_chart</span>TỈ TRỌNG CHI PHÍ
+            </button>
             <button class="nav-btn"
                     data-page="dashboard"
                     onclick="goPage(this,'dashboard')"
@@ -1193,6 +1201,9 @@
       <!-- PAGE: QUYẾT TOÁN (chỉ còn Quyết toán công trình — Tất toán TP/NCC đã chuyển sang tab CÔNG NỢ TP/NCC, 03/10/2026) -->
       <div class="page" id="page-quyettoan" data-partial="pages/quyettoan.html"></div>
 
+      <!-- PAGE: TỈ TRỌNG CHI PHÍ (05/10/2026) -->
+      <div class="page" id="page-tytrong" data-partial="pages/tytrong.html"></div>
+
       <!-- ════════════════════════════════════════════════════════════ -->
       <!-- PAGE: CÔNG NỢ (tab chính độc lập)                              -->
       <!-- ════════════════════════════════════════════════════════════ -->
@@ -1284,6 +1295,9 @@
     <!-- Tab QUYẾT TOÁN: core (hàm tính dùng chung) phải nạp trước congtrinh -->
     <script src="js/modules/quyettoan/quyettoan.core.js"></script>
     <script src="js/modules/quyettoan/quyettoan.congtrinh.js"></script>
+    <!-- (05/10/2026) Tab TỈ TRỌNG CHI PHÍ: core (tính toán) trước ui. Nạp sau quyettoan.congtrinh.js vì dùng _qtProjList -->
+    <script src="js/modules/tytrong/tytrong.core.js"></script>
+    <script src="js/modules/tytrong/tytrong.ui.js"></script>
     <!-- (03/10/2026) Tab CÔNG NỢ TP/NCC → sub-tab CÔNG NỢ = Tất toán TP/NCC (thay bảng Công Nợ cũ
          doanhthu.congno.js đã xóa). Nạp sau quyettoan.core.js vì dùng qtCtInYear / qtMissingYears. -->
     <script src="js/modules/congno/congno.tattoan.js"></script>

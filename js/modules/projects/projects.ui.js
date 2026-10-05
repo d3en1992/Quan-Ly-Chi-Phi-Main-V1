@@ -1617,8 +1617,10 @@ function _ctNameTyped(prefix) {
 }
 
 // ══ BẢNG TÍNH M2 SÀN / KHỐI LƯỢNG (05/10/2026) ═════════════════════════
-// Bảng động trong form Thêm/Sửa công trình: TÊN HẠNG MỤC | ĐVT | KL (+ nút xóa dòng).
-//   • Form Thêm: sẵn 3 dòng trống. Form Sửa: nạp lại đúng các dòng đã lưu (chưa có → 3 dòng trống).
+// Bảng động trong form THÊM công trình: TÊN HẠNG MỤC | ĐVT | KL (+ nút xóa dòng).
+//   • Form Thêm: sẵn 3 dòng trống.
+//   • (05/10/2026) Form Sửa KHÔNG còn bảng này: chỉ hiện tổng read-only (_ctKlReadonlyHtml);
+//     bảng đầy đủ (thêm cột Hệ số, Tính) nằm ở tab TỈ TRỌNG CHI PHÍ (js/modules/tytrong/).
 //   • Nút [+ 1 dòng] thêm dòng; gõ KL → "Tổng KL" (#tongKL) cập nhật ngay.
 //   • Lưu vào record công trình ở field `khoiLuong`: [{ ten, dvt, kl }] (bỏ các dòng trống).
 // Chỉ 1 form công trình mở tại 1 thời điểm (cùng modal #ct-modal) → dùng ID cố định ct-kl-tbody / tongKL.
@@ -1698,6 +1700,26 @@ function ctKlUpdateTotal() {
   if (el) el.textContent = _ctKlFmt(_ctKlSum(ctKlSerialize({ keepEmpty: true })));
 }
 
+// (05/10/2026) Form Sửa công trình: bảng M2 đã dời sang tab TỈ TRỌNG CHI PHÍ.
+// Ở đây chỉ hiện TỔNG DIỆN TÍCH SÀN (read-only, tính theo hệ số + cột "Tính" — ttTongSan)
+// và nút mở tab Tỉ Trọng với công trình này được chọn sẵn (tytOpenFor).
+// v: { id, khoiLuong }
+function _ctKlReadonlyHtml(v, lblStyle) {
+  const rows = Array.isArray(v.khoiLuong) ? v.khoiLuong : [];
+  const tong = (typeof tytTongSanRows === 'function') ? tytTongSanRows(rows) : _ctKlSum(rows);
+  // Kế toán không thấy tab Tỉ Trọng (auth.js) → không hiện nút dẫn sang
+  const coNut = typeof tytOpenFor === 'function' && !(typeof isKetoan === 'function' && isKetoan());
+  return `
+    <label style="${lblStyle}">Tổng Diện Tích Sàn</label>
+    <div class="d-flex align-items-center flex-wrap gap-2 border rounded px-3 py-2" style="background:var(--bs-tertiary-bg)">
+      <span class="fw-bold font-monospace" style="font-size:15px">${rows.length ? _ctKlFmt(tong) + ' m2' : '—'}</span>
+      <span class="text-secondary" style="font-size:11.5px">${rows.length ? `(${rows.length} dòng)` : '(chưa nhập)'}</span>
+      ${coNut ? `<button type="button" class="btn btn-outline-primary btn-sm ms-auto" onclick="tytOpenFor('${v.id}')" title="Bảng M2 sàn nằm ở tab Tỉ Trọng Chi Phí (đóng form này, thay đổi chưa lưu sẽ mất)">
+        <span class="material-symbols-outlined msi-gap">square_foot</span>Sửa tại tab Tỉ Trọng Chi Phí
+      </button>` : ''}
+    </div>`;
+}
+
 // Đọc bảng → mảng Object để lưu vào record công trình
 //   [{ ten: 'Sàn tầng 1', dvt: 'm2', kl: 120.5 }, ...]
 //   Bỏ dòng không có Tên hạng mục lẫn KL (dòng trống). opts.keepEmpty = true → giữ hết (để tính tổng).
@@ -1733,7 +1755,7 @@ function _resolveCustomerFromPicker(prefix) {
 //   Dòng 1: Chủ đầu tư [+ Thêm nhanh] (7/12)        | Trạng thái (5/12)
 //           (khung Thêm nhanh khách hàng — ẩn, hiện khi bấm nút)
 //   Dòng 2: Hạng mục (~60% — gõ là tự điền Tên)      | Tên công trình (~40%) + loại tự nhận diện
-//   Dòng 3: Bảng tính m2 sàn / khối lượng
+//   Dòng 3: Bảng tính m2 sàn / khối lượng (form Thêm) · Tổng diện tích sàn read-only (form Sửa)
 //   Dòng 4: Ngày bắt đầu | Ngày kết thúc | Ngày quyết toán   (3 cột đều)
 //   Dòng 5: Hệ số tỉ trọng (3/12)                    | Địa chỉ công trình (9/12)
 // v: giá trị nạp sẵn (form Sửa) — { custId, status, hangMuc, name, khoiLuong, sd, sdHint, ed, cld, k, note }
@@ -1775,8 +1797,9 @@ function _ctFormHtml(prefix, v, inpStyle, lblStyle) {
         </div>
       </div>
 
-      <!-- Dòng 3: Bảng tính m2 sàn -->
-      <div class="col-12">${_ctKlTableHtml(v.khoiLuong, lblStyle)}</div>
+      <!-- Dòng 3: Bảng tính m2 sàn — form Thêm: nhập nhanh tại đây.
+           (05/10/2026) Form Sửa: bảng đã DỜI sang tab TỈ TRỌNG CHI PHÍ → chỉ hiện tổng (read-only) -->
+      <div class="col-12">${isNew ? _ctKlTableHtml(v.khoiLuong, lblStyle) : _ctKlReadonlyHtml(v, lblStyle)}</div>
 
       <!-- Dòng 4: Ngày bắt đầu | Ngày kết thúc | Ngày quyết toán -->
       <div class="col-md-4">
@@ -1943,7 +1966,7 @@ function saveCTEdit(id) {
   const closedDate = document.getElementById('ct-edit-closeddate')?.value || '';
   const note       = (document.getElementById('ct-edit-note')?.value || '').trim();
   const hangMuc    = (document.getElementById('ct-edit-hangmuc')?.value || '').trim();
-  const khoiLuong  = ctKlSerialize();
+  // (05/10/2026) KHÔNG đọc/ghi khoiLuong ở đây nữa — bảng M2 sửa ở tab Tỉ Trọng Chi Phí
   // Lấy customerId + tên CĐT từ picker (chọn có sẵn / tạo KH mới / để trống)
   const { customerId, chuDauTu } = _resolveCustomerFromPicker('edit');
   // Chủ đầu tư bắt buộc (04/10/2026)
@@ -1983,9 +2006,9 @@ function saveCTEdit(id) {
     updateProject(id, {
       name, status, startDate, startDateUserEdited, endDate: endDate || null, closedDate: closedDate || null,
       note, chuDauTu, customerId, heSoTiTrong,
-      // (05/10/2026) loại tự nhận diện từ tên + hạng mục + bảng m2 sàn
+      // (05/10/2026) loại tự nhận diện từ tên + hạng mục (bảng m2 sàn: sửa ở tab Tỉ Trọng Chi Phí)
       loaiCongTrinh, type: (loaiCongTrinh === 'CT' || loaiCongTrinh === 'SC') ? loaiCongTrinh : 'OTHER',
-      hangMuc, khoiLuong,
+      hangMuc,
     });
   } catch (e) {
     // updateProject throw khi tên trùng CT khác hoặc trùng tên Danh Mục

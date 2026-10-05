@@ -212,6 +212,10 @@ async function _bkCollectCloudData() {
         // (03/10/2026) Quyết toán công trình — doc riêng
         if (Array.isArray(d.quyetToan)) data.quyettoan_v1 = d.quyetToan;
         metaDocs++; break;
+      case 'meta_ty_trong':
+        // (05/10/2026) Tỉ trọng chi phí — doc riêng
+        if (Array.isArray(d.tyTrong)) data.tytrong_v1 = d.tyTrong;
+        metaDocs++; break;
     }
   }
   if (!data.customers_v1 && legacyCustomers) data.customers_v1 = legacyCustomers;
