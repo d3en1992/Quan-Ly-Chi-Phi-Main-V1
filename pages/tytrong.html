@@ -6,8 +6,10 @@
        Thanh tab con (ID nút = ID tab con + "-btn"):
          1. PHÂN TÍCH        #tyt-sub-pt : bảng cây ma trận Giai đoạn → Hạng mục → Loại CP (→ từng khoản)
                                           + bảng Theo loại chi phí (góc nhìn toàn nhà)
-         2. PHÂN BỔ CHI PHÍ  #tyt-sub-pb : lọc, tick nhiều dòng, gán vào giai đoạn / hạng mục
-         3. THIẾT LẬP        #tyt-sub-tl : bảng M2 sàn + cây Giai đoạn & Hạng mục (mốc ngày) -->
+         2. PHÂN BỔ CHI PHÍ  #tyt-sub-pb : Luật tự gán + Gắn theo HĐ thầu phụ (tự động) + gán tay hàng loạt
+         3. THIẾT LẬP        #tyt-sub-tl : bảng M2 sàn + cây Giai đoạn & Hạng mục (mốc ngày)
+         4. ĐỊNH MỨC & DỰ TOÁN #tyt-sub-dm : lưu bộ đơn giá đ/m2 + dự toán CT mới, so với thực tế
+         5. SO SÁNH          #tyt-sub-ss : đ/m2 (hoặc % tỉ trọng) nhiều công trình cạnh nhau, xuất Excel -->
 <div class="qt-compact" id="tyt-root">
   <div class="row g-3 mb-3">
     <!-- ══ CHỌN CÔNG TRÌNH ══ -->
@@ -74,6 +76,12 @@
       <button class="nav-link" id="tyt-sub-tl-btn" onclick="tytGoSub('tyt-sub-tl')">
         <span class="material-symbols-outlined msi-gap">tune</span>THIẾT LẬP <span id="tyt-sub-tl-badge" class="badge rounded-pill ms-1"></span>
       </button>
+      <button class="nav-link" id="tyt-sub-dm-btn" onclick="tytGoSub('tyt-sub-dm')">
+        <span class="material-symbols-outlined msi-gap">calculate</span>ĐỊNH MỨC &amp; DỰ TOÁN
+      </button>
+      <button class="nav-link" id="tyt-sub-ss-btn" onclick="tytGoSub('tyt-sub-ss')">
+        <span class="material-symbols-outlined msi-gap">compare_arrows</span>SO SÁNH CÔNG TRÌNH
+      </button>
     </div>
 
     <!-- ════ TAB CON 1: PHÂN TÍCH ════ -->
@@ -135,10 +143,69 @@
 
     <!-- ════ TAB CON 2: PHÂN BỔ CHI PHÍ ════ -->
     <div class="sub-page" id="tyt-sub-pb">
+      <!-- Thứ tự ưu tiên khi xếp 1 khoản chi -->
+      <div class="tyt-uutien mb-3">
+        <b>Thứ tự ưu tiên:</b>
+        <span class="tyt-src tyt-src-tay">① Gán tay</span> →
+        <span class="tyt-src tyt-src-hdtp">② Theo HĐ thầu phụ</span> →
+        <span class="tyt-src tyt-src-luat">③ Theo luật</span> →
+        <span class="tyt-src tyt-src-ngay">④ Theo mốc ngày</span> →
+        <span class="tyt-src">Chưa phân bổ</span>
+        <span class="text-secondary ms-1">· ②③④ là TỰ ĐỘNG: áp cả cho hóa đơn nhập sau này; xóa luật / bỏ gắn = tự hoàn tác.</span>
+      </div>
+      <div class="row g-3 mb-3">
+        <!-- ══ LUẬT TỰ GÁN ══ -->
+        <div class="col-12 col-xl-7">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+              <div class="qt-card-title mb-1"><span class="material-symbols-outlined msi-gap">rule</span>Luật Tự Gán</div>
+              <div class="text-secondary mb-2" style="font-size:11px">Xét từ trên xuống, luật đầu tiên khớp sẽ nhận khoản chi. Nhiều từ khóa cách nhau bằng dấu phẩy. Không phân biệt dấu / hoa thường.</div>
+              <div class="table-responsive border rounded mb-2">
+                <table class="table table-sm align-middle mb-0" style="font-size:12px">
+                  <thead class="table-light"><tr style="font-size:10.5px">
+                    <th style="width:26px">#</th><th>ĐIỀU KIỆN</th><th>GÁN VÀO</th><th class="text-end">ĐANG NHẬN</th><th style="width:56px"></th>
+                  </tr></thead>
+                  <tbody id="tyt-luat-tbody"></tbody>
+                </table>
+              </div>
+              <!-- Thêm luật mới + xem trước -->
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <select id="tyt-luat-truong" class="form-select form-select-sm" style="width:auto" onchange="tytLuatPreview()">
+                  <option value="nd">Nội dung chứa</option>
+                  <option value="dt">NCC / Thầu phụ chứa</option>
+                  <option value="loai">Loại chi phí là</option>
+                </select>
+                <input type="text" id="tyt-luat-gt" class="form-control form-control-sm" style="flex:1 1 160px" placeholder="VD: móng, đà kiềng" oninput="tytLuatPreview()" list="tyt-luat-dl">
+                <datalist id="tyt-luat-dl"></datalist>
+                <select id="tyt-luat-dich" class="form-select form-select-sm" style="width:auto;min-width:180px" onchange="tytLuatPreview()"></select>
+                <button class="btn btn-sm btn-primary fw-bold" onclick="tytLuatAdd()"><span class="material-symbols-outlined msi-gap">add</span>Thêm luật</button>
+              </div>
+              <div id="tyt-luat-xt" class="mt-1" style="font-size:11.5px"></div>
+            </div>
+          </div>
+        </div>
+        <!-- ══ GẮN THEO HỢP ĐỒNG THẦU PHỤ ══ -->
+        <div class="col-12 col-xl-5">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+              <div class="qt-card-title mb-1"><span class="material-symbols-outlined msi-gap">handshake</span>Gắn Theo Hợp Đồng Thầu Phụ</div>
+              <div class="text-secondary mb-2" style="font-size:11px">Chọn nơi cho từng HĐ → mọi khoản ứng / hóa đơn của thầu phụ đó tự đi theo (VD Ép cọc → Móng).</div>
+              <div class="table-responsive border rounded">
+                <table class="table table-sm align-middle mb-0" style="font-size:12px">
+                  <thead class="table-light"><tr style="font-size:10.5px">
+                    <th>THẦU PHỤ</th><th class="text-end">ĐÃ CHI</th><th>GẮN VÀO</th>
+                  </tr></thead>
+                  <tbody id="tyt-hdtp-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
           <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-            <div class="qt-card-title me-2"><span class="material-symbols-outlined msi-gap">move_down</span>Phân Bổ Chi Phí</div>
+            <div class="qt-card-title me-2"><span class="material-symbols-outlined msi-gap">move_down</span>Gán Tay Từng Khoản Chi</div>
             <span id="tyt-pb-count" class="text-secondary" style="font-size:12px"></span>
           </div>
           <div class="text-secondary mb-2" style="font-size:11px">
@@ -150,6 +217,8 @@
             <select id="tyt-pb-tt" class="form-select form-select-sm" style="width:auto" onchange="tytPbFilter()">
               <option value="chua">Chưa phân bổ</option>
               <option value="ngay">Tự xếp theo mốc ngày</option>
+              <option value="luat">Theo luật</option>
+              <option value="hdtp">Theo HĐ thầu phụ</option>
               <option value="tay">Đã gán tay</option>
               <option value="all">Tất cả</option>
             </select>
@@ -249,6 +318,92 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TAB CON 4: ĐỊNH MỨC & DỰ TOÁN ════ -->
+    <div class="sub-page" id="tyt-sub-dm">
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-5 d-flex flex-column gap-3">
+          <!-- Lưu định mức từ CT đang chọn -->
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="qt-card-title mb-1"><span class="material-symbols-outlined msi-gap">bookmark_add</span>Lưu Thành Bộ Đơn Giá Định Mức</div>
+              <div class="text-secondary mb-2" style="font-size:11px">Lấy đơn giá <b>đ/m2</b> theo từng loại chi phí (và giai đoạn) của công trình đang chọn. Nên lưu khi công trình đã <b>quyết toán xong</b> và đang lọc <b>"Tất cả năm"</b>.</div>
+              <div class="d-flex gap-2">
+                <input type="text" id="tyt-dm-ten" class="form-control form-control-sm" placeholder="VD: Nhà phố 3 lầu — Nhà Tình">
+                <button class="btn btn-sm btn-success fw-bold text-nowrap" onclick="tytDmLuu()"><span class="material-symbols-outlined msi-gap">save</span>Lưu định mức</button>
+              </div>
+              <div id="tyt-dm-note" class="mt-2" style="font-size:11.5px"></div>
+            </div>
+          </div>
+          <!-- Danh sách định mức -->
+          <div class="card shadow-sm border-0 flex-fill">
+            <div class="card-body">
+              <div class="qt-card-title mb-2"><span class="material-symbols-outlined msi-gap">library_books</span>Các Bộ Định Mức Đã Lưu</div>
+              <div class="table-responsive border rounded">
+                <table class="table table-sm table-hover align-middle mb-0" style="font-size:12px">
+                  <thead class="table-light"><tr style="font-size:10.5px">
+                    <th>TÊN · NGUỒN</th><th class="text-end">SÀN</th><th class="text-end">ĐƠN GIÁ / M2</th><th style="width:96px"></th>
+                  </tr></thead>
+                  <tbody id="tyt-dm-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Dự toán -->
+        <div class="col-12 col-xl-7">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+              <div class="qt-card-title mb-1"><span class="material-symbols-outlined msi-gap">request_quote</span>Dự Toán &amp; Kiểm Soát Ngân Sách</div>
+              <div class="text-secondary mb-2" style="font-size:11px">Ngân sách dự kiến = <b>diện tích × đơn giá định mức</b>. So với chi phí thực tế của công trình đang chọn để biết loại nào sắp / đã <b>vượt</b>.</div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <select id="tyt-dt-dm" class="form-select form-select-sm" style="width:auto;min-width:220px" onchange="tytRenderDuToan()"></select>
+                <span style="font-size:12px">Diện tích</span>
+                <input type="number" step="any" min="0" id="tyt-dt-dt" class="form-control form-control-sm text-end font-monospace" style="width:110px" oninput="this.dataset.user='1';tytRenderDuToan()" title="Mặc định = tổng sàn công trình đang chọn; gõ số khác để dự toán công trình mới">
+                <span style="font-size:12px">m2</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="tytDtLaySan()" title="Lấy tổng sàn của công trình đang chọn">↺ Sàn CT đang chọn</button>
+              </div>
+              <div class="row g-2 mb-2" id="tyt-dt-kpi"></div>
+              <div style="overflow-x:auto">
+                <table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12px;min-width:620px">
+                  <thead class="table-light"><tr>
+                    <th>Loại chi phí</th><th class="text-end">Đơn giá ĐM</th><th class="text-end">Dự toán</th><th class="text-end">Thực tế</th><th class="text-end">Còn lại / Vượt</th><th class="text-end" style="width:110px">% đã dùng</th>
+                  </tr></thead>
+                  <tbody id="tyt-dt-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TAB CON 5: SO SÁNH CÔNG TRÌNH ════ -->
+    <div class="sub-page" id="tyt-sub-ss">
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+            <div class="qt-card-title"><span class="material-symbols-outlined msi-gap">compare_arrows</span>So Sánh Công Trình</div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="btn-group btn-group-sm" role="group">
+                <input type="radio" class="btn-check" name="tyt-ss-che" id="tyt-ss-che-m2" value="m2" checked onchange="tytRenderSoSanh()">
+                <label class="btn btn-outline-primary" for="tyt-ss-che-m2">đ / m2</label>
+                <input type="radio" class="btn-check" name="tyt-ss-che" id="tyt-ss-che-pct" value="pct" onchange="tytRenderSoSanh()">
+                <label class="btn btn-outline-primary" for="tyt-ss-che-pct">% tỉ trọng</label>
+                <input type="radio" class="btn-check" name="tyt-ss-che" id="tyt-ss-che-tien" value="tien" onchange="tytRenderSoSanh()">
+                <label class="btn btn-outline-primary" for="tyt-ss-che-tien">Tổng tiền</label>
+              </div>
+              <button class="btn btn-sm btn-success" onclick="tytSsExcel()"><span class="material-symbols-outlined msi-gap">download</span>Xuất Excel</button>
+            </div>
+          </div>
+          <div class="text-secondary mb-2" style="font-size:11px">Tick công trình cần so (công trình đã nhập bảng M2 được chọn sẵn). Ô <span class="tyt-ss-max px-1">đỏ</span> = cao nhất, <span class="tyt-ss-min px-1">xanh</span> = thấp nhất trong hàng. Số liệu theo năm đang lọc.</div>
+          <div id="tyt-ss-list" class="d-flex flex-wrap gap-2 mb-2"></div>
+          <div style="overflow-x:auto">
+            <table class="table table-sm table-hover align-middle mb-0 tyt-rpt tyt-ss" style="font-size:12px" id="tyt-ss-table"></table>
           </div>
         </div>
       </div>

@@ -10,21 +10,31 @@
 //     id, projectId,
 //     giaiDoan: [{ id, ten, tu, den }],     // cấp 1 — tu/den (YYYY-MM-DD, tùy chọn) = MỐC NGÀY tự phân bổ
 //     hangMuc:  [{ id, gdId, ten }],        // cấp 2 — thuộc 1 giai đoạn (gdId)
-//     phanBo:   { <khóa dòng chi phí>: { g: gdId, h: hmId | '' } },   // gán TAY (ghi đè mốc ngày)
+//     phanBo:   { <khóa dòng chi phí>: { g: gdId, h: hmId | '' } },   // gán TAY (ghi đè mọi thứ khác)
+//     theoHdtp: { <id HĐ thầu phụ>: { g, h } },   // (Lần 2) gán theo HĐ thầu phụ → mọi khoản của TP đó
+//     luat:     [{ id, truong: 'nd'|'dt'|'loai', giaTri, g, h }],    // (Lần 2) luật tự gán, xét theo thứ tự
 //     createdAt, updatedAt, deletedAt, deviceId
 //   }
 //   ⚠️ KHÔNG ghi gì vào hóa đơn / tiền ứng: hóa đơn, ứng TP/NCC giữ nguyên 100%.
 //      Việc phân bổ chỉ nằm trong store này (khóa = loại + id bản ghi gốc).
+//
+//   (Lần 2) Cùng store còn chứa BỘ ĐƠN GIÁ ĐỊNH MỨC — bản ghi kind:'dinhmuc' (KHÔNG có projectId,
+//   nên tytRecordOf không bao giờ lẫn): { id, kind:'dinhmuc', ten, loaiCT, nguonPid, nguonTen, nam,
+//   tongSan, tongChi, dgTong, dgLoai: { <loại CP>: đ/m2 }, dgGd: { <tên giai đoạn>: đ/m2 }, ...meta }
+//   → không phải đăng ký thêm store / doc cloud mới.
 //
 // ── TỔNG CHI PHÍ = TIỀN CHI THỰC TẾ (khớp _ctTongChi ở projects.ui.js = số trên thẻ công trình) ──
 //   = hóa đơn (kể cả nhân công từ chấm công) + ứng thầu phụ + ứng NCC
 //     − hóa đơn của các NCC đã có ứng (vì đã tính bằng tiền ứng, tránh đếm 2 lần)
 //   Theo NĂM ĐANG LỌC như mọi tab khác ("Tất cả năm" = trọn vòng đời công trình).
 //
-// ── CÁCH 1 DÒNG CHI PHÍ ĐƯỢC XẾP VÀO GIAI ĐOẠN / HẠNG MỤC (tytResolve) ──
-//   1. Có gán TAY trong phanBo (còn hợp lệ)          → theo gán tay
-//   2. Không → ngày chi rơi vào MỐC NGÀY của giai đoạn → giai đoạn đó (chưa rõ hạng mục)
-//   3. Không khớp gì                                  → "Chưa phân bổ"
+// ── CÁCH 1 DÒNG CHI PHÍ ĐƯỢC XẾP VÀO GIAI ĐOẠN / HẠNG MỤC (tytResolve) — ưu tiên từ trên xuống ──
+//   1. Gán TAY trong phanBo (còn hợp lệ)                → src 'tay'
+//   2. Thuộc HĐ thầu phụ đã gắn (theoHdtp)              → src 'hdtp'
+//   3. Khớp LUẬT đầu tiên (luat — theo thứ tự danh sách) → src 'luat'
+//   4. Ngày chi rơi vào MỐC NGÀY của giai đoạn          → src 'ngay' (chưa rõ hạng mục)
+//   5. Không khớp gì                                     → "Chưa phân bổ"
+//   Luật / HĐ TP / mốc ngày là lớp TỰ ĐỘNG: áp cho cả hóa đơn nhập sau này; xóa luật = tự hoàn tác.
 
 // ─── Biến global (nạp lại ở _reloadGlobals / _refreshGlobal sau khi sync) ───
 let tyTrongRecords = load('tytrong_v1', []);
@@ -47,7 +57,7 @@ function _tytMatch(r, p) {
 // Lấy bản ghi còn hiệu lực MỚI NHẤT (2 máy lỡ cùng tạo → dùng bản sửa sau cùng)
 function tytRecordOf(pid) {
   if (!pid) return null;
-  const list = (tyTrongRecords || []).filter(r => r && !r.deletedAt && r.projectId === pid);
+  const list = (tyTrongRecords || []).filter(r => r && !r.deletedAt && r.kind !== 'dinhmuc' && r.projectId === pid);
   if (!list.length) return null;
   return list.reduce((a, b) => ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a));
 }
@@ -59,7 +69,21 @@ function tytStructOf(pid) {
     giaiDoan: (r && Array.isArray(r.giaiDoan)) ? r.giaiDoan.map(g => ({ ...g })) : [],
     hangMuc:  (r && Array.isArray(r.hangMuc))  ? r.hangMuc.map(h => ({ ...h }))  : [],
     phanBo:   (r && r.phanBo && typeof r.phanBo === 'object') ? { ...r.phanBo } : {},
+    theoHdtp: (r && r.theoHdtp && typeof r.theoHdtp === 'object') ? { ...r.theoHdtp } : {},
+    luat:     (r && Array.isArray(r.luat)) ? r.luat.map(l => ({ ...l })) : [],
   };
+}
+
+// Đích gán {g, h} còn hợp lệ với cấu trúc hiện tại không → trả {g, h} chuẩn hóa hoặc null.
+// Hạng mục còn sống → lấy giai đoạn theo hạng mục; chỉ giai đoạn → h = ''.
+function _tytDich(v, st) {
+  if (!v) return null;
+  if (v.h) {
+    const hm = st.hangMuc.find(h => h.id === v.h);
+    if (hm && st.giaiDoan.some(g => g.id === hm.gdId)) return { g: hm.gdId, h: hm.id };
+  }
+  if (v.g && st.giaiDoan.some(g => g.id === v.g)) return { g: v.g, h: '' };
+  return null;
 }
 
 // Ghi cấu trúc của 1 công trình (tạo mới nếu chưa có). changes: { giaiDoan?, hangMuc?, phanBo? }
@@ -159,6 +183,7 @@ function tytCostLines(p) {
       key: 'ung:' + r.id, kind: isTP ? 'ungtp' : 'ungncc', ngay: r.ngay || '',
       loai: isTP ? TYT_LOAI_UNG_TP : (_topLoai(tp) || TYT_LOAI_UNG_NCC),
       nd: r.nd || (isTP ? 'Ứng thầu phụ' : 'Ứng nhà cung cấp'), doiTuong: tp, tien: r.tien || 0,
+      hdtpId: r.hdtpId || '',   // phiếu ứng ghi từ HĐ thầu phụ (tab Công Nợ) → gắn thẳng HĐ
     });
   });
 
@@ -167,21 +192,63 @@ function tytCostLines(p) {
   return lines;
 }
 
+// ══ HỢP ĐỒNG THẦU PHỤ CỦA 1 CÔNG TRÌNH (để gắn theo HĐ) ═══════════════
+// Trả về [{ id, ten, tenKey (không dấu, thường), giaTri, ngay, nd }] — bỏ HĐ đã xóa
+function tytHdtpOf(p) {
+  return (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
+    .filter(r => r && !r.deletedAt && _tytMatch(r, p))
+    .map(r => ({
+      id: r.id, ten: (r.thauphu || '').trim(), tenKey: _tytBoDau(r.thauphu),
+      giaTri: (r.giaTri || 0) + (r.phatSinh || 0), ngay: r.ngay || '', nd: r.nd || '',
+    }));
+}
+
+// ══ LUẬT TỰ GÁN ══════════════════════════════════════════════════
+// truong: 'nd' = Nội dung chứa · 'dt' = NCC / Thầu phụ / Người chứa · 'loai' = Loại chi phí là
+// giaTri: có thể nhiều từ, cách nhau bằng dấu phẩy → khớp 1 trong các từ. So KHÔNG DẤU, không phân biệt hoa thường.
+const TYT_LUAT_TRUONG = { nd: 'Nội dung chứa', dt: 'NCC / Thầu phụ chứa', loai: 'Loại chi phí là' };
+function tytLuatKhop(luat, line) {
+  const tus = String(luat.giaTri || '').split(',').map(_tytBoDau).filter(Boolean);
+  if (!tus.length) return false;
+  if (luat.truong === 'loai') return tus.includes(_tytBoDau(line.loai));
+  const nguon = _tytBoDau(luat.truong === 'dt' ? line.doiTuong : line.nd);
+  return tus.some(t => nguon.includes(t));
+}
+
 // ══ XẾP 1 DÒNG CHI PHÍ VÀO GIAI ĐOẠN / HẠNG MỤC ═════════════════════
-// Trả về { g, h, src } — src: 'tay' (gán tay) | 'ngay' (theo mốc ngày) | '' (chưa phân bổ)
-function tytResolve(line, st) {
-  const gdIds = new Set(st.giaiDoan.map(g => g.id));
-  const hmById = new Map(st.hangMuc.map(h => [h.id, h]));
-  const pb = st.phanBo[line.key];
-  if (pb) {
-    // Gán tay còn hợp lệ (giai đoạn / hạng mục chưa bị xóa)
-    if (pb.h && hmById.has(pb.h) && gdIds.has(hmById.get(pb.h).gdId)) {
-      return { g: hmById.get(pb.h).gdId, h: pb.h, src: 'tay' };
+// ctx: { hdtp: tytHdtpOf(p) } — truyền sẵn để khỏi tính lại mỗi dòng
+// Trả về { g, h, src, ref } — src: 'tay' | 'hdtp' | 'luat' | 'ngay' | '' (chưa phân bổ)
+//   ref: id HĐ thầu phụ (src 'hdtp') hoặc id luật (src 'luat')
+function tytResolve(line, st, ctx) {
+  // 1. Gán tay
+  let d = _tytDich(st.phanBo[line.key], st);
+  if (d) return { ...d, src: 'tay', ref: '' };
+
+  // 2. Theo HĐ thầu phụ: phiếu gắn thẳng HĐ (hdtpId) → HĐ đó; còn lại khớp TÊN thầu phụ
+  //    (1 TP có nhiều HĐ trong cùng CT → lấy HĐ đầu tiên đã được gắn)
+  const hdtps = (ctx && ctx.hdtp) || [];
+  if (hdtps.length && Object.keys(st.theoHdtp).length) {
+    if (line.hdtpId && st.theoHdtp[line.hdtpId] && hdtps.some(h => h.id === line.hdtpId)) {
+      d = _tytDich(st.theoHdtp[line.hdtpId], st);
+      if (d) return { ...d, src: 'hdtp', ref: line.hdtpId };
     }
-    if (pb.g && gdIds.has(pb.g)) return { g: pb.g, h: '', src: 'tay' };
+    const k = _tytBoDau(line.doiTuong);
+    if (k) {
+      const hd = hdtps.find(h => h.tenKey === k && _tytDich(st.theoHdtp[h.id], st));
+      if (hd) return { ..._tytDich(st.theoHdtp[hd.id], st), src: 'hdtp', ref: hd.id };
+    }
   }
+
+  // 3. Luật — luật đứng trước được ưu tiên
+  for (const lu of st.luat) {
+    if (!tytLuatKhop(lu, line)) continue;
+    d = _tytDich(lu, st);
+    if (d) return { ...d, src: 'luat', ref: lu.id };
+  }
+
+  // 4. Mốc ngày của giai đoạn
   const gd = tytGdTheoNgay(line.ngay, st);
-  return gd ? { g: gd.id, h: '', src: 'ngay' } : { g: '', h: '', src: '' };
+  return gd ? { g: gd.id, h: '', src: 'ngay', ref: '' } : { g: '', h: '', src: '', ref: '' };
 }
 
 // Giai đoạn có mốc ngày chứa ngày này (giai đoạn đứng trước được ưu tiên nếu mốc chồng nhau)
@@ -202,7 +269,8 @@ function tytGdTheoNgay(ngay, st) {
 function tytTongHop(p) {
   const st    = tytStructOf(p.id);
   const lines = tytCostLines(p);
-  lines.forEach(l => { l.pb = tytResolve(l, st); });
+  const ctx   = { hdtp: tytHdtpOf(p) };
+  lines.forEach(l => { l.pb = tytResolve(l, st, ctx); });
 
   const tongChi = lines.reduce((s, l) => s + l.tien, 0);
   let tongKhop = true;
@@ -236,7 +304,34 @@ function tytTongHop(p) {
     if (hmo) hmo.tien += l.tien; else o.chung += l.tien;
   });
 
-  return { st, lines, tongChi, tongKhop, tongSan, cpM2, daPhanBo: tongChi - chuaPB, chuaPB, theoLoai, theoGD };
+  return { st, ctx, lines, tongChi, tongKhop, tongSan, cpM2, daPhanBo: tongChi - chuaPB, chuaPB, theoLoai, theoGD };
+}
+
+// Xem trước 1 luật (đang soạn hoặc đã có): khớp bao nhiêu khoản, bao nhiêu tiền.
+//   tong     : mọi khoản khớp điều kiện
+//   nhan     : số khoản luật này THỰC SỰ nhận (không bị gán tay / HĐ TP / luật đứng trước giành)
+function tytLuatXemTruoc(r, luat) {
+  let tong = 0, tien = 0, nhan = 0, tienNhan = 0;
+  r.lines.forEach(l => {
+    if (!tytLuatKhop(luat, l)) return;
+    tong++; tien += l.tien;
+    if (luat.id ? (l.pb.src === 'luat' && l.pb.ref === luat.id)
+                : (!l.pb.g || l.pb.src === 'ngay')) { nhan++; tienNhan += l.tien; }
+  });
+  return { tong, tien, nhan, tienNhan };
+}
+
+// Tổng tiền / số khoản đang được xếp theo từng HĐ thầu phụ (src 'hdtp') + tổng khoản của TP đó
+function tytHdtpThongKe(r) {
+  const m = new Map();
+  r.ctx.hdtp.forEach(h => m.set(h.id, { soKhoan: 0, tien: 0, nhan: 0, tienNhan: 0 }));
+  r.lines.forEach(l => {
+    if (l.pb.src === 'hdtp' && m.has(l.pb.ref)) { const o = m.get(l.pb.ref); o.nhan++; o.tienNhan += l.tien; }
+    const hd = (l.hdtpId && m.has(l.hdtpId)) ? l.hdtpId
+      : (r.ctx.hdtp.find(h => h.tenKey && h.tenKey === _tytBoDau(l.doiTuong)) || {}).id;
+    if (hd && m.has(hd)) { const o = m.get(hd); o.soKhoan++; o.tien += l.tien; }
+  });
+  return m;
 }
 
 // ══ CÂY MA TRẬN cho bảng PHÂN TÍCH (05/10/2026 — Lần 2) ════════════════════
@@ -327,4 +422,72 @@ function tytMauGoiY(p) {
   (tenSan.length ? tenSan : ['Sàn Trệt', 'Sàn Lầu 1', 'Mái'])
     .forEach(t => hm.push({ id: tytNewId('h'), gdId: gd[1].id, ten: t }));
   return { giaiDoan: gd, hangMuc: hm };
+}
+
+// ══ BỘ ĐƠN GIÁ ĐỊNH MỨC (05/10/2026 — Lần 2) ═══════════════════════════
+// Lưu ngay trong store tytrong_v1 dưới dạng bản ghi kind:'dinhmuc' (xem đầu file).
+// Đơn giá = tiền ÷ tổng diện tích sàn quy đổi của công trình nguồn, làm tròn đồng.
+function tytDinhMucList() {
+  return (tyTrongRecords || []).filter(r => r && r.kind === 'dinhmuc' && !r.deletedAt)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+function tytDinhMucById(id) { return tytDinhMucList().find(r => r.id === id) || null; }
+
+// Nhãn năm đang lọc (ghi vào định mức để biết số liệu lấy theo năm nào)
+function tytNhanNam() {
+  if (typeof activeYears !== 'undefined' && activeYears && activeYears.size) return [...activeYears].sort().join(', ');
+  return 'Tất cả năm';
+}
+
+// Tạo định mức từ kết quả tytTongHop(p) của công trình nguồn. Trả về bản ghi vừa tạo.
+function tytTaoDinhMuc(p, r, ten) {
+  const san = r.tongSan;
+  const dgLoai = {};
+  r.theoLoai.forEach(o => { dgLoai[o.loai] = Math.round(o.tien / san); });
+  const dgGd = {};
+  r.theoGD.forEach(o => { if (o.tien) dgGd[o.gd.ten] = Math.round(o.tien / san); });
+  if (r.chuaPB) dgGd['Chưa phân bổ'] = Math.round(r.chuaPB / san);
+  const rec = mkRecord({
+    kind: 'dinhmuc', ten: (ten || '').trim() || ('Định mức ' + p.name),
+    loaiCT: p.loaiCongTrinh || '', nguonPid: p.id, nguonTen: p.name, nam: tytNhanNam(),
+    tongSan: Math.round(san * 100) / 100, tongChi: r.tongChi, dgTong: Math.round(r.tongChi / san), dgLoai, dgGd,
+  });
+  tyTrongRecords.unshift(rec);
+  save('tytrong_v1', tyTrongRecords);
+  return rec;
+}
+
+// Đổi tên / xóa mềm định mức
+function tytSuaDinhMuc(id, changes) {
+  const i = tyTrongRecords.findIndex(r => r && r.id === id);
+  if (i < 0) return;
+  tyTrongRecords[i] = mkUpdate(tyTrongRecords[i], changes);
+  save('tytrong_v1', tyTrongRecords);
+}
+function tytXoaDinhMuc(id) { tytSuaDinhMuc(id, { deletedAt: Date.now() }); }
+
+// DỰ TOÁN = diện tích × đơn giá định mức, so với THỰC TẾ (r = tytTongHop của CT đang theo dõi, có thể null)
+// Trả về { rows: [{ loai, dg, duToan, thucTe, conLai, pct }], tong: {...} } — loại có ở định mức HOẶC thực tế
+function tytDuToan(dm, dienTich, r) {
+  const thucTe = new Map(r ? r.theoLoai.map(o => [o.loai, o.tien]) : []);
+  const loais = [...new Set([...Object.keys(dm.dgLoai || {}), ...thucTe.keys()])];
+  const rows = loais.map(loai => {
+    const dg = (dm.dgLoai || {})[loai] || 0;
+    const duToan = Math.round(dg * dienTich);
+    const tt = thucTe.get(loai) || 0;
+    return { loai, dg, duToan, thucTe: tt, conLai: duToan - tt, pct: duToan ? tt / duToan * 100 : (tt ? Infinity : 0) };
+  }).sort((a, b) => (b.duToan - a.duToan) || (b.thucTe - a.thucTe));
+  const duToan = rows.reduce((s, x) => s + x.duToan, 0);
+  const tt = rows.reduce((s, x) => s + x.thucTe, 0);
+  return { rows, tong: { dg: dm.dgTong || 0, duToan, thucTe: tt, conLai: duToan - tt, pct: duToan ? tt / duToan * 100 : 0 } };
+}
+
+// ══ SO SÁNH NHIỀU CÔNG TRÌNH (05/10/2026 — Lần 2) ══════════════════════
+// cots: mảng project. Trả về { cots: [{ p, r }], loais: [tên loại — sắp theo tổng tiền giảm dần] }
+function tytSoSanh(projs) {
+  const cots = projs.map(p => ({ p, r: tytTongHop(p) }));
+  const tong = new Map();
+  cots.forEach(c => c.r.theoLoai.forEach(o => tong.set(o.loai, (tong.get(o.loai) || 0) + o.tien)));
+  const loais = [...tong.keys()].sort((a, b) => tong.get(b) - tong.get(a));
+  return { cots, loais };
 }
