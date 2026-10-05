@@ -198,6 +198,7 @@ function tytGdTheoNgay(ngay, st) {
 //   daPhanBo  : số tiền đã vào giai đoạn, theoLoai: [{ loai, tien, soDong }],
 //   theoGD    : [{ gd, tien, hms: [{ hm, tien }], chung }], chuaPB
 // }
+// (bảng Phân Tích dạng cây dùng tytCay(r) bên dưới)
 function tytTongHop(p) {
   const st    = tytStructOf(p.id);
   const lines = tytCostLines(p);
@@ -238,6 +239,77 @@ function tytTongHop(p) {
   return { st, lines, tongChi, tongKhop, tongSan, cpM2, daPhanBo: tongChi - chuaPB, chuaPB, theoLoai, theoGD };
 }
 
+// ══ CÂY MA TRẬN cho bảng PHÂN TÍCH (05/10/2026 — Lần 2) ════════════════════
+// Tách bạch 2 chiều dữ liệu:
+//   • "Ở ĐÂU"  = Giai đoạn → Hạng mục (người dùng gán)
+//   • "LÀ GÌ"  = Loại chi phí (đã có sẵn trên hóa đơn — KHÔNG phải gán)
+// Mỗi khoản chi chỉ nằm ở 01 nhánh → không bao giờ đếm trùng. Bấm [+] một hạng mục thì
+// hệ thống tự chẻ nhỏ theo loại chi phí, bấm tiếp loại chi phí thì ra từng khoản chi.
+// Node: { key, kind: 'gd'|'hm'|'chung'|'chua'|'loai'|'line', ten, tien, soDong?, line?, children[] }
+//   key ổn định (để nhớ trạng thái mở/đóng): 'G:<gdId>' · '…|H:<hmId>' · '…|H:_' (chưa rõ hạng mục)
+//                                           · 'G:_' (chưa phân bổ) · '…|L:<loại>' · '…|K:<khóa khoản chi>'
+function _tytSum(lines) { return lines.reduce((s, l) => s + l.tien, 0); }
+
+// Nhóm các khoản chi theo loại chi phí → node 'loai' (con = từng khoản chi, mới nhất trước)
+function _tytNhomLoai(lines, prefix) {
+  const m = new Map();
+  lines.forEach(l => {
+    const o = m.get(l.loai) || { loai: l.loai, tien: 0, lines: [] };
+    o.tien += l.tien; o.lines.push(l);
+    m.set(l.loai, o);
+  });
+  return [...m.values()].sort((a, b) => b.tien - a.tien).map(o => {
+    const k = prefix + '|L:' + o.loai;
+    return {
+      key: k, kind: 'loai', ten: o.loai, tien: o.tien, soDong: o.lines.length,
+      children: o.lines.slice().sort((a, b) => String(b.ngay).localeCompare(String(a.ngay)))
+        .map(l => ({ key: k + '|K:' + l.key, kind: 'line', ten: l.nd, tien: l.tien, line: l, children: [] })),
+    };
+  });
+}
+
+// r = kết quả tytTongHop(p). Trả về mảng node cấp 1 (các giai đoạn + "Chưa phân bổ" cuối cùng)
+function tytCay(r) {
+  const st = r.st;
+  const nodes = st.giaiDoan.map(gd => {
+    const gk  = 'G:' + gd.id;
+    const gl  = r.lines.filter(l => l.pb.g === gd.id);
+    const hms = st.hangMuc.filter(h => h.gdId === gd.id);
+    let children;
+    if (hms.length) {
+      children = hms.map(h => {
+        const hk = gk + '|H:' + h.id;
+        const hl = gl.filter(l => l.pb.h === h.id);
+        return { key: hk, kind: 'hm', ten: h.ten, tien: _tytSum(hl), children: _tytNhomLoai(hl, hk) };
+      });
+      // Đã vào giai đoạn (VD theo mốc ngày) nhưng chưa gán hạng mục nào
+      const chung = gl.filter(l => !l.pb.h);
+      if (chung.length) children.push({ key: gk + '|H:_', kind: 'chung', ten: '(chưa rõ hạng mục)', tien: _tytSum(chung), children: _tytNhomLoai(chung, gk + '|H:_') });
+    } else {
+      children = _tytNhomLoai(gl, gk);   // giai đoạn không chia hạng mục → tách thẳng theo loại
+    }
+    return { key: gk, kind: 'gd', ten: gd.ten, tien: _tytSum(gl), children };
+  });
+  const chua = r.lines.filter(l => !l.pb.g);
+  if (chua.length) nodes.push({ key: 'G:_', kind: 'chua', ten: 'Chưa phân bổ', tien: _tytSum(chua), children: _tytNhomLoai(chua, 'G:_') });
+  return nodes;
+}
+
+// Tên hạng mục có giống TÊN LOẠI CHI PHÍ không (VD "Nhân công thô", "Sắt thép móng")
+// → cảnh báo nhẹ ở tab Thiết lập: hạng mục nên là VỊ TRÍ, loại chi phí đã có trên hóa đơn.
+const _TYT_TU_LOAI = ['sat thep', 'nhan cong', 'be tong', 'thau phu', 'vat lieu', 'vat tu', 'dien nuoc', 'copha', 'xi mang', 'gach', 'cat da'];
+function _tytBoDau(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd').toLowerCase().trim();
+}
+function tytGiongLoaiCP(ten) {
+  const t = _tytBoDau(ten);
+  if (!t) return '';
+  const tu = new Set(_TYT_TU_LOAI);
+  const ds = (typeof cats !== 'undefined' && cats && Array.isArray(cats.loaiChiPhi)) ? cats.loaiChiPhi : [];
+  ds.forEach(n => _tytBoDau(n).split(/\s*[-\/]\s*/).forEach(w => { if (w.length >= 4) tu.add(w); }));
+  return [...tu].find(w => t.includes(w)) || '';
+}
+
 // ══ GỢI Ý CẤU TRÚC MẪU (nút "Dùng mẫu gợi ý") ═══════════════════════
 // 4 giai đoạn phổ biến của nhà phố; hạng mục của "Thi công thô" lấy từ tên các dòng bảng M2
 // (Trệt, Lầu 1, Mái...) → người dùng sửa lại cho đúng công trình.
@@ -248,6 +320,7 @@ function tytMauGoiY(p) {
     { id: tytNewId('g'), ten: 'Hoàn thiện',      tu: '', den: '' },
     { id: tytNewId('g'), ten: 'Nội thất',        tu: '', den: '' },
   ];
+  // Hạng mục = VỊ TRÍ (không đặt theo loại chi phí — loại chi phí đã có trên hóa đơn)
   const hm = [{ id: tytNewId('h'), gdId: gd[0].id, ten: 'Móng & Đà kiềng' }];
   const tenSan = (p && Array.isArray(p.khoiLuong) ? p.khoiLuong : [])
     .map(r => (r.ten || '').trim()).filter(Boolean);

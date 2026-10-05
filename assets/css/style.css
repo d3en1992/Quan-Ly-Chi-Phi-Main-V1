@@ -2220,3 +2220,22 @@ td.action-col > div {
 .tyt-rpt .tyt-rpt-chua td { color: var(--bs-warning-text-emphasis); background: var(--bs-warning-bg-subtle); font-weight: 600; }
 .tyt-rpt .tyt-rpt-total td { font-weight: 700; border-top: 2px solid var(--bs-border-color); }
 .tyt-rpt .tyt-rpt-zero td { opacity: .5; }
+/* (05/10/2026 — Lần 2) Tab Tỉ Trọng: bảng CÂY MA TRẬN (tab con Phân Tích) */
+.tyt-cay .tyt-cay-name { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.tyt-cay-tg { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0;
+  padding: 0; border: 1px solid var(--bs-border-color); border-radius: 4px; background: var(--bs-body-bg); color: var(--bs-secondary-color); }
+.tyt-cay-tg:hover { border-color: var(--bs-primary); color: var(--bs-primary); }
+.tyt-cay-tg .material-symbols-outlined { font-size: 14px; }
+.tyt-cay-tg-sp { display: inline-block; width: 18px; flex-shrink: 0; }
+.tyt-cay .tyt-cay-gd td { font-weight: 700; background: var(--bs-tertiary-bg); }
+.tyt-cay .tyt-cay-chua td { color: var(--bs-warning-text-emphasis); background: var(--bs-warning-bg-subtle); }
+.tyt-cay .tyt-cay-hm td:first-child { font-weight: 600; }
+.tyt-cay .tyt-cay-chung td:first-child { font-weight: 400; color: var(--bs-secondary-color); }
+.tyt-cay .tyt-cay-loai td { color: var(--bs-body-color); }
+.tyt-cay .tyt-cay-line td { font-size: 11.5px; color: var(--bs-secondary-color); background: var(--bs-body-bg); }
+.tyt-cay-note { font-size: 11px; color: var(--bs-secondary-color); font-weight: 400; }
+.tyt-cay-date { font-family: 'IBM Plex Mono', monospace; font-size: 11px; margin-right: 4px; }
+/* Hướng dẫn "Ở đâu" (hạng mục) vs "Là gì" (loại chi phí) ở tab con Thiết lập */
+.tyt-guide { font-size: 11.5px; line-height: 1.5; padding: 8px 10px; border-radius: 8px;
+  background: var(--bs-info-bg-subtle); border: 1px solid var(--bs-info-border-subtle); color: var(--bs-info-text-emphasis); }
+.tyt-hm-warn { font-size: 11px; color: var(--bs-warning-text-emphasis); white-space: nowrap; cursor: help; }
