@@ -2195,3 +2195,10 @@ td.action-col > div {
 .ct-kl-table th { font-weight: 700; color: var(--bs-secondary-color); letter-spacing: .4px; padding: 6px 8px; }
 .ct-kl-table td { padding: 4px 6px; }
 .ct-kl-table input.form-control-sm { font-size: 13px; }
+
+/* (05/10/2026) Tab Quyết Toán: ô chọn công trình gõ để tìm chiếm trọn khung + form chỉ xem */
+#qtf-ct-ss, #qt-sub-congtrinh .ss-wrap { width: 100% !important; }
+#qt-sub-congtrinh .ss-wrap { display: block; min-width: 0 !important; }
+#qtf-card.qtf-locked .form-control:disabled,
+#qtf-card.qtf-locked .form-select:disabled { background-color: var(--bs-tertiary-bg); color: var(--bs-body-color); opacity: 1; }
+#qtf-card.qtf-locked .btn-check:disabled + .btn { opacity: 1; }   /* loại đã chốt vẫn rõ màu */

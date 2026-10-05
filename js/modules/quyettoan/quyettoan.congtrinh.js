@@ -25,15 +25,18 @@
 let _qthPage     = 0;   // trang hiện tại của bảng lịch sử
 let _qthCtFilter = '';  // projectId công trình đang chọn ở Block 1 ('' = chưa chọn)
 let _qthSearch   = '';  // từ khóa tìm kiếm trong lịch sử (chữ thường)
+// (05/10/2026) CHẾ ĐỘ CHỈ XEM: chọn công trình ĐÃ CÓ quyết toán → form khóa (read-only), chỉ hiện
+// loại quyết toán đã chốt; bấm nút "Sửa Quyết toán" mới mở khóa. CT chưa có quyết toán → nhập bình thường.
+let _qtLocked    = false;
 
 // Chú thích từng loại hiển thị dưới nhóm nút chọn loại
 const _QT_HINT = {
-  tang:    'Cộng thêm vào doanh thu (VD: phát sinh hạng mục ngoài hợp đồng).',
+  tang:    'Cộng thêm vào doanh thu (VD: phát sinh hạng mục ngoài hợp đồng). Thi công đúng HĐ gốc, không phát sinh → để trống hoặc nhập 0.',
   giam:    'Trừ bớt khỏi doanh thu (VD: cắt giảm hạng mục không thi công).',
   thaythe: 'Số nhập vào là TỔNG DOANH THU MỚI của công trình — thay cho HĐ gốc và mọi phát sinh trước ngày này.',
 };
 const _QT_SOTIEN_LABEL = {
-  tang:    'Số tiền tăng thêm (đ) *',
+  tang:    'Số tiền tăng thêm (đ) — để trống / 0 nếu đúng HĐ gốc',
   giam:    'Số tiền giảm trừ (đ) *',
   thaythe: 'Tổng giá trị mới thay thế HĐ (đ) *',
 };
@@ -210,10 +213,11 @@ function _qtClearSummary() {
 function _qtFin(f) {
   const opt = { qtExcludeId: f.editId || undefined, qtExtra: f.fake };
   if (typeof ctTaiChinh === 'function') {
-    return { truoc: ctTaiChinh(f.proj), sau: f.soTien > 0 ? ctTaiChinh(f.proj, opt) : null };
+    // f.forceSau (qtSave): luôn tính "sau quyết toán" kể cả số tiền = 0 (Phát sinh tăng = 0 → đúng HĐ gốc)
+    return { truoc: ctTaiChinh(f.proj), sau: (f.soTien > 0 || f.forceSau) ? ctTaiChinh(f.proj, opt) : null };
   }
   const a = calcTongDoanhThu(f.proj);
-  const b = f.soTien > 0 ? calcTongDoanhThu(f.proj, { excludeId: opt.qtExcludeId, extra: f.fake }) : null;
+  const b = (f.soTien > 0 || f.forceSau) ? calcTongDoanhThu(f.proj, { excludeId: opt.qtExcludeId, extra: f.fake }) : null;
   const map = d => d && ({ X: d.hdGoc, Y: d.qt, tongThu: d.daThu, doanhThu: d.daThu, giaTriHD: d.tongDT, conPhaiThu: d.conPhaiThu,
                            chiThucTe: 0, chiChung: 0, hieuQua: 0, laiHienTai: 0, isActive: true, soDotThu: 0, qtSum: d });
   return { truoc: map(a), sau: map(b) };
@@ -243,6 +247,9 @@ function qtPopulateSels() {
     ctSel.innerHTML = '<option value="">-- Chọn công trình --</option>' +
       _qtProjList(cur).map(p => `<option value="${x(p.id)}">${x(p.name)}${p.status === 'closed' ? ' (đã QT)' : ''}</option>`).join('');
     if (cur) ctSel.value = cur;
+    // (05/10/2026) Ô chọn có GÕ ĐỂ TÌM — dùng chung _ssEnhance của form Hóa Đơn (idempotent:
+    // gọi lại không tạo trùng; option dựng lại / gán .value đều tự cập nhật ô hiển thị)
+    if (typeof _ssEnhance === 'function') _ssEnhance(ctSel);
   }
   const nguoiSel = document.getElementById('qtf-nguoi');
   if (nguoiSel) {
@@ -291,6 +298,47 @@ function _qtClearInputs() {
   if (card) card.style.outline = '';
   const dup = document.getElementById('qtf-dup');
   if (dup) dup.innerHTML = '';
+  _qtSetLocked(false, false);   // chế độ Thêm: nhập được ngay, không có nút "Sửa Quyết toán"
+}
+
+// ══ CHẾ ĐỘ CHỈ XEM / SỬA (05/10/2026) ═══════════════════════════════
+// locked = true  → khóa mọi ô nhập của form (disabled), ẩn Lưu/Hủy, CHỈ HIỆN loại quyết toán đã chốt
+//                  (ẩn 2 lựa chọn còn lại), hiện nút "Sửa Quyết toán" ở góc dưới phải.
+// locked = false → mở khóa: hiện đủ 3 loại (cho phép đổi loại khi sửa), hiện Lưu (+ Hủy nếu đang sửa).
+// hasRec: công trình đã có bản quyết toán (để quyết định có nút "Hủy thay đổi" / "Sửa Quyết toán").
+// Người không có quyền ghi (_qtCanEdit = false) → không có nút "Sửa Quyết toán".
+function _qtSetLocked(locked, hasRec) {
+  _qtLocked = !!locked;
+  const card = document.getElementById('qtf-card');
+  if (card) {
+    card.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(el => { el.disabled = _qtLocked; });
+    card.classList.toggle('qtf-locked', _qtLocked);
+  }
+  // Loại quyết toán: chế độ xem chỉ để lại đúng loại đã chốt
+  const cur = _qtGetLoai();
+  Object.keys(QT_LOAI).forEach(l => {
+    const inp = document.getElementById('qtf-loai-' + l);
+    const lb  = document.querySelector(`label[for="qtf-loai-${l}"]`);
+    const show = !_qtLocked || l === cur;
+    if (inp) inp.style.display = show ? '' : 'none';
+    if (lb)  lb.style.display  = show ? '' : 'none';
+  });
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('qtf-save-btn',   !_qtLocked);
+  show('qtf-cancel-btn', !_qtLocked && !!hasRec);                 // đang sửa bản đã lưu → "Hủy thay đổi"
+  show('qtf-unlock-btn', _qtLocked && _qtCanEdit());
+  show('qtf-loai-hint',  !_qtLocked);
+  const title = document.getElementById('qtf-title');
+  if (title && hasRec) title.textContent = _qtLocked ? 'Quyết Toán Đã Chốt (chỉ xem)' : 'Sửa Quyết Toán';
+  const blk = document.getElementById('qt-blk-form');
+  if (blk && hasRec) blk.style.outline = _qtLocked ? '' : '2px solid var(--bs-warning)';
+}
+
+// Nút "Sửa Quyết toán" → mở khóa form để chỉnh sửa bản đã lưu
+function qtUnlockEdit() {
+  if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được sửa quyết toán', 'error'); return; }
+  _qtSetLocked(false, true);
+  document.getElementById('qtf-sotien')?.focus();
 }
 
 // ── Nạp 1 bản quyết toán lên form → chế độ "Sửa Quyết Toán" ──
@@ -318,15 +366,14 @@ function _qtFillForm(r, count) {
   if (title) title.textContent = 'Sửa Quyết Toán';
   const saveBtn = document.getElementById('qtf-save-btn');
   if (saveBtn) saveBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">edit</span>Cập nhật Quyết Toán';
-  const cancelBtn = document.getElementById('qtf-cancel-btn');
-  if (cancelBtn) cancelBtn.style.display = '';       // "Hủy thay đổi" → nạp lại bản đã lưu
-  const card = document.getElementById('qt-blk-form');
-  if (card) card.style.outline = '2px solid var(--bs-warning)';
+  // (05/10/2026) Bản đã lưu → mặc định CHỈ XEM; nút "Sửa Quyết toán" mới mở khóa (_qtSetLocked).
+  // "Hủy thay đổi" (khi đang sửa) → nạp lại bản đã lưu và khóa lại.
   // Dữ liệu cũ lỡ có nhiều bản cho cùng 1 CT → nhắc dọn về 1 bản
   const dup = document.getElementById('qtf-dup');
   if (dup) dup.innerHTML = count > 1
     ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:12px">⚠ Công trình này đang có <strong>${count} bản quyết toán</strong> (dữ liệu cũ). Theo quy tắc mỗi công trình chỉ 01 bản — đang sửa bản ngày ${fmtISODate(r.ngay)}; hãy xóa các bản thừa ở bảng Lịch Sử Quyết Toán.</div>`
-    : `<div class="text-secondary mb-2" style="font-size:11px">Công trình đã có quyết toán — mỗi công trình chỉ 01 bản, mọi điều chỉnh được cập nhật trên bản này.</div>`;
+    : `<div class="text-secondary mb-2" style="font-size:11px">Công trình đã có quyết toán — mỗi công trình chỉ 01 bản. Bấm <b>Sửa Quyết toán</b> (góc dưới phải) để điều chỉnh trên bản này.</div>`;
+  _qtSetLocked(true, true);
 }
 
 // ── Reset form ──
@@ -340,6 +387,7 @@ function qtResetForm(keepCt) {
 
 // ── Đổi loại quyết toán ──
 function qtOnLoaiChange() {
+  if (_qtLocked) return;
   const loai = _qtGetLoai();
   _qtApplyLoaiText(loai);
   // Gợi ý: "Thay thế" thường là bản chốt cuối → tự tick ô Chốt sổ (khi nhập MỚI).
@@ -450,7 +498,9 @@ function qtUpdatePreview() {
   if (!sau) {
     hint.className = 'mt-1 text-secondary';
     hint.style.fontSize = '12px';
-    hint.textContent = 'Gõ số tiền để xem doanh thu mới ngay tại đây.';
+    hint.textContent = (f.loai === 'tang')
+      ? 'Để trống / 0 = quyết toán ĐÚNG HĐ GỐC (không phát sinh). Gõ số tiền để xem doanh thu mới ngay tại đây.'
+      : 'Gõ số tiền để xem doanh thu mới ngay tại đây.';
     if (warnB) warnB.innerHTML = '';
     return;
   }
@@ -484,6 +534,7 @@ function qtUpdatePreview() {
 // ══ LƯU / SỬA / XÓA ══════════════════════════════════════════════
 function qtSave() {
   if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được lưu quyết toán', 'error'); return; }
+  if (_qtLocked) { toast('Bấm "Sửa Quyết toán" để mở khóa trước khi lưu', 'error'); return; }
   const f = _qtReadForm();
   if (!f.proj)    { toast('Vui lòng chọn Công Trình!', 'error'); return; }
   // QUY TẮC 1-1: CT đã có quyết toán mà form đang ở chế độ Thêm → chuyển thành CẬP NHẬT bản hiện có
@@ -495,13 +546,18 @@ function qtSave() {
     }
   }
   if (!f.ngay)    { toast('Vui lòng chọn Ngày thực hiện!', 'error'); return; }
-  if (!(f.soTien > 0)) { toast('Vui lòng nhập Số tiền lớn hơn 0!', 'error'); return; }
+  // (05/10/2026) Phát sinh TĂNG được để trống / 0 = công trình hoàn thiện ĐÚNG HĐ gốc, không phát sinh.
+  //   → vẫn lưu 1 bản quyết toán giaTri = 0 (đánh dấu "đã quyết toán", doanh thu = HĐ gốc).
+  //   Giảm / Thay thế vẫn bắt buộc số tiền > 0.
+  if (f.loai === 'tang') { if (!(f.soTien >= 0)) f.soTien = 0; }
+  else if (!(f.soTien > 0)) { toast('Vui lòng nhập Số tiền lớn hơn 0!', 'error'); return; }
   const nd = (document.getElementById('qtf-nd')?.value || '').trim();
   if (!nd) { toast('Vui lòng nhập Nội dung / lý do quyết toán!', 'error'); return; }
   const nguoi = (document.getElementById('qtf-nguoi')?.value || '').trim();
   const chot  = !!document.getElementById('qtf-chot')?.checked;
 
   // Kiểm tra kết quả trước khi ghi (cùng công thức với preview)
+  f.forceSau = true;
   const { sau } = _qtFin(f);
   if (sau.giaTriHD < 0) { toast('Doanh thu sau quyết toán bị âm — kiểm tra lại số tiền!', 'error'); return; }
   if (sau.conPhaiThu < 0 &&

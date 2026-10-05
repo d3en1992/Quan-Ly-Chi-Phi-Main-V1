@@ -21,6 +21,7 @@
                   <label for="qtf-ct" class="qt-card-title mb-2 d-block">
                     <span class="material-symbols-outlined msi-gap">apartment</span>Chọn Công Trình Cần Quyết Toán
                   </label>
+                  <!-- (05/10/2026) Gõ để tìm — _ssEnhance gắn lúc qtPopulateSels() -->
                   <select id="qtf-ct" class="form-select form-select-sm" onchange="qtOnCtChange()">
                     <option value="">-- Chọn công trình --</option>
                   </select>
@@ -144,6 +145,8 @@
                   <div class="d-flex justify-content-end gap-2 mt-2">
                     <button class="btn btn-sm btn-outline-secondary" id="qtf-cancel-btn" style="display:none" onclick="qtResetForm(true)" title="Bỏ các thay đổi chưa lưu, nạp lại bản quyết toán đã lưu"><span class="material-symbols-outlined msi-gap">undo</span>Hủy thay đổi</button>
                     <button class="btn btn-sm btn-warning fw-bold px-3" id="qtf-save-btn" onclick="qtSave()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Quyết Toán</button>
+                    <!-- (05/10/2026) CT đã có quyết toán → form khóa chỉ xem; nút này mở khóa để sửa (qtUnlockEdit) -->
+                    <button class="btn btn-sm btn-primary fw-bold px-3" id="qtf-unlock-btn" style="display:none" onclick="qtUnlockEdit()"><span class="material-symbols-outlined msi-gap">edit</span>Sửa Quyết toán</button>
                   </div>
                 </div>
               </div>

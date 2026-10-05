@@ -64,6 +64,7 @@ function qtSoTienTxt(r, fmt) {
   const loai = qtLoaiOf(r);
   const v = qtSoTien(r);
   if (loai === 'thaythe') return '= ' + fmt(v);
+  if (loai === 'tang' && !v) return 'Đúng HĐ gốc';   // (05/10/2026) phát sinh tăng = 0 → không phát sinh
   return (loai === 'giam' ? '-' : '+') + fmt(v);
 }
 
