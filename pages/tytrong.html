@@ -22,9 +22,12 @@
           <select id="tytf-ct" class="form-select form-select-sm" onchange="tytOnCtChange()">
             <option value="">-- Chọn công trình --</option>
           </select>
-          <div class="text-secondary mt-2" style="font-size:11px;font-style:italic">
-            Chi phí theo <b>năm đang lọc</b> (giống thẻ công trình). Chọn "Tất cả năm" để xem trọn vòng đời.
+          <!-- (Lần 3) Phạm vi: trọn vòng đời CT (mặc định, bỏ qua bộ lọc năm — tự tải năm còn thiếu) -->
+          <div class="form-check form-switch mt-2 mb-0" style="font-size:12px">
+            <input class="form-check-input" type="checkbox" id="tyt-vongdoi" checked onchange="tytSetVongDoi(this.checked)">
+            <label class="form-check-label fw-semibold" for="tyt-vongdoi">Trọn vòng đời công trình (bỏ qua bộ lọc năm)</label>
           </div>
+          <div id="tyt-vongdoi-st" class="text-secondary" style="font-size:11px"></div>
         </div>
       </div>
     </div>
@@ -158,7 +161,13 @@
         <div class="col-12 col-xl-7">
           <div class="card shadow-sm border-0 h-100">
             <div class="card-body">
-              <div class="qt-card-title mb-1"><span class="material-symbols-outlined msi-gap">rule</span>Luật Tự Gán</div>
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                <div class="qt-card-title"><span class="material-symbols-outlined msi-gap">rule</span>Luật Tự Gán</div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytCopy('luat')" title="Sao chép toàn bộ luật của công trình này để dán sang công trình khác"><span class="material-symbols-outlined msi-gap" style="font-size:16px">content_copy</span>Sao chép luật</button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="tyt-paste-luat" style="display:none" onclick="tytPaste('luat')"><span class="material-symbols-outlined msi-gap" style="font-size:16px">content_paste</span>Dán luật từ <b class="tyt-paste-from"></b></button>
+                </div>
+              </div>
               <div class="text-secondary mb-2" style="font-size:11px">Xét từ trên xuống, luật đầu tiên khớp sẽ nhận khoản chi. Nhiều từ khóa cách nhau bằng dấu phẩy. Không phân biệt dấu / hoa thường.</div>
               <div class="table-responsive border rounded mb-2">
                 <table class="table table-sm align-middle mb-0" style="font-size:12px">
@@ -308,9 +317,11 @@
               </div>
               <div id="tyt-ct-body"></div>
               <div class="d-flex justify-content-between flex-wrap gap-2 mt-2">
-                <div class="d-flex gap-2">
+                <div class="d-flex flex-wrap gap-2">
                   <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytGdAdd()">+ Giai đoạn</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytCtMau()" title="Tạo nhanh 4 giai đoạn phổ biến, hạng mục lấy từ bảng M2">Dùng mẫu gợi ý</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytCtMau()" title="Mẫu chuẩn: Tiền thi công → Thi công thô → Thi công hoàn thiện → Hoàn thiện nội & ngoại thất">Dùng mẫu gợi ý</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytCopy('cautruc')" title="Sao chép cấu trúc của công trình này để dán sang công trình khác"><span class="material-symbols-outlined msi-gap" style="font-size:16px">content_copy</span>Sao chép</button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="tyt-paste-ct" style="display:none" onclick="tytPaste('cautruc')"><span class="material-symbols-outlined msi-gap" style="font-size:16px">content_paste</span>Dán từ <b class="tyt-paste-from"></b></button>
                 </div>
                 <div class="d-flex gap-2">
                   <button class="btn btn-sm btn-outline-secondary" onclick="tytCtReset()" title="Bỏ thay đổi chưa lưu">Hủy</button>
@@ -380,6 +391,18 @@
           </div>
         </div>
       </div>
+      <!-- (Lần 3) ĐỐI CHIẾU NHÓM CÔNG TRÌNH CÙNG CẤU TRÚC Giai đoạn & Hạng mục -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <div class="qt-card-title mb-1"><span class="material-symbols-outlined msi-gap">stacked_line_chart</span>Đối Chiếu Nhóm Công Trình Cùng Cấu Trúc</div>
+          <div class="text-secondary mb-2" style="font-size:11px">Gom các công trình có <b>cùng mẫu Giai đoạn &amp; Hạng mục</b> (dùng "Sao chép / Dán cấu trúc" hoặc "Dùng mẫu gợi ý" để các CT giống nhau) → so đơn giá đ/m2 từng phần việc với một chuẩn để thấy CT nào trượt giá / vượt chi.</div>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            <select id="tyt-nh-sel" class="form-select form-select-sm" style="width:auto;max-width:100%" onchange="tytNhomChon(this.value)"></select>
+            <select id="tyt-nh-chuan" class="form-select form-select-sm" style="width:auto" onchange="tytRenderNhom()"></select>
+          </div>
+          <div id="tyt-nh-body"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ════ TAB CON 5: SO SÁNH CÔNG TRÌNH ════ -->
@@ -397,10 +420,14 @@
                 <input type="radio" class="btn-check" name="tyt-ss-che" id="tyt-ss-che-tien" value="tien" onchange="tytRenderSoSanh()">
                 <label class="btn btn-outline-primary" for="tyt-ss-che-tien">Tổng tiền</label>
               </div>
+              <div class="form-check form-switch mb-0 me-1" style="font-size:12px" title="Ẩn các công trình sửa chữa / cải tạo nhỏ (mã SC, SN, không mã)">
+                <input class="form-check-input" type="checkbox" id="tyt-ss-chict" checked onchange="tytRenderSoSanh()">
+                <label class="form-check-label" for="tyt-ss-chict">Chỉ CT xây mới</label>
+              </div>
               <button class="btn btn-sm btn-success" onclick="tytSsExcel()"><span class="material-symbols-outlined msi-gap">download</span>Xuất Excel</button>
             </div>
           </div>
-          <div class="text-secondary mb-2" style="font-size:11px">Tick công trình cần so (công trình đã nhập bảng M2 được chọn sẵn). Ô <span class="tyt-ss-max px-1">đỏ</span> = cao nhất, <span class="tyt-ss-min px-1">xanh</span> = thấp nhất trong hàng. Số liệu theo năm đang lọc.</div>
+          <div class="text-secondary mb-2" style="font-size:11px">Tick công trình cần so (công trình đã nhập bảng M2 được chọn sẵn). Ô <span class="tyt-ss-max px-1">đỏ</span> = cao nhất, <span class="tyt-ss-min px-1">xanh</span> = thấp nhất trong hàng. Số liệu theo phạm vi đang chọn ở khung "Chọn Công Trình" (trọn vòng đời / năm đang lọc).</div>
           <div id="tyt-ss-list" class="d-flex flex-wrap gap-2 mb-2"></div>
           <div style="overflow-x:auto">
             <table class="table table-sm table-hover align-middle mb-0 tyt-rpt tyt-ss" style="font-size:12px" id="tyt-ss-table"></table>
