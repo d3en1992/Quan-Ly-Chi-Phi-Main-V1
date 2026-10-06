@@ -22,6 +22,8 @@
 //   nên tytRecordOf không bao giờ lẫn): { id, kind:'dinhmuc', ten, loaiCT, nguonPid, nguonTen, nam,
 //   tongSan, tongChi, dgTong, dgLoai: { <loại CP>: đ/m2 }, dgGd: { <tên giai đoạn>: đ/m2 }, ...meta }
 //   → không phải đăng ký thêm store / doc cloud mới.
+//   (Phần B) định mức có thêm: dgRo1 (Rổ 1 ÷ sàn), ro1: { sat, bt, nc, tp, quy, khac } (đ/m2 từng TRỤ CỘT
+//   của Rổ 1), dgGdR1 / dgHmR1 (đơn giá giai đoạn / hạng mục chỉ tính Rổ 1), nhapTay (định mức nhập tay).
 //
 // ── TỔNG CHI PHÍ = TIỀN CHI THỰC TẾ (khớp _ctTongChi ở projects.ui.js = số trên thẻ công trình) ──
 //   = hóa đơn (kể cả nhân công từ chấm công) + ứng thầu phụ + ứng NCC
@@ -57,7 +59,7 @@ function _tytMatch(r, p) {
 // Lấy bản ghi còn hiệu lực MỚI NHẤT (2 máy lỡ cùng tạo → dùng bản sửa sau cùng)
 function tytRecordOf(pid) {
   if (!pid) return null;
-  const list = (tyTrongRecords || []).filter(r => r && !r.deletedAt && r.kind !== 'dinhmuc' && r.projectId === pid);
+  const list = (tyTrongRecords || []).filter(r => r && !r.deletedAt && !r.kind && r.projectId === pid);
   if (!list.length) return null;
   return list.reduce((a, b) => ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a));
 }
@@ -71,6 +73,7 @@ function tytStructOf(pid) {
     phanBo:   (r && r.phanBo && typeof r.phanBo === 'object') ? { ...r.phanBo } : {},
     theoHdtp: (r && r.theoHdtp && typeof r.theoHdtp === 'object') ? { ...r.theoHdtp } : {},
     luat:     (r && Array.isArray(r.luat)) ? r.luat.map(l => ({ ...l })) : [],
+    roTay:    (r && r.roTay && typeof r.roTay === 'object') ? { ...r.roTay } : {},   // (Phần A) { khóa khoản: 1|2|3 }
   };
 }
 
@@ -176,6 +179,7 @@ function tytCostLines(p, opts) {
     lines.push({
       key, kind: isCC ? 'cc' : 'inv', ngay: inv.ngay || '', loai,
       nd: inv.nd || '', doiTuong: ncc || inv.nguoi || '', tien,
+      items: Array.isArray(inv.items) ? inv.items : null,   // (Phần A) món hàng — tách rổ theo món
     });
   });
 
@@ -252,7 +256,7 @@ function tytLuatKhop(luat, line) {
 
 // ══ XẾP 1 DÒNG CHI PHÍ VÀO GIAI ĐOẠN / HẠNG MỤC ═════════════════════
 // ctx: { hdtp: tytHdtpOf(p) } — truyền sẵn để khỏi tính lại mỗi dòng
-// Trả về { g, h, src, ref } — src: 'tay' | 'hdtp' | 'luat' | 'ngay' | '' (chưa phân bổ)
+// Trả về { g, h, src, ref } — src: 'tay' | 'hdtp' | 'tiento' | 'luat' | 'ngay' | '' (chưa phân bổ)
 //   ref: id HĐ thầu phụ (src 'hdtp') hoặc id luật (src 'luat')
 function tytResolve(line, st, ctx) {
   // 1. Gán tay
@@ -272,6 +276,18 @@ function tytResolve(line, st, ctx) {
       const hd = hdtps.find(h => h.tenKey === k && _tytDich(st.theoHdtp[h.id], st));
       if (hd) return { ..._tytDich(st.theoHdtp[hd.id], st), src: 'hdtp', ref: hd.id };
     }
+  }
+
+  // 2b. (Phần A) Tiền tố [ ] đầu nội dung: "[Móng] Mua xi măng" → hạng mục / giai đoạn có tên trùng
+  //     (hoặc BẮT ĐẦU bằng chữ trong ngoặc, VD [Móng] → "Móng & Nền trệt"). Không cần tạo luật.
+  const tt = /^\s*\[([^\]]+)\]/.exec(line.nd || '');
+  if (tt) {
+    const t = _tytBoDau(tt[1]);
+    const khop = arr => arr.find(z => _tytBoDau(z.ten) === t) || arr.find(z => _tytBoDau(z.ten).startsWith(t));
+    const hm = khop(st.hangMuc.filter(h => st.giaiDoan.some(g => g.id === h.gdId)));
+    if (hm) return { g: hm.gdId, h: hm.id, src: 'tiento', ref: '' };
+    const gd = khop(st.giaiDoan);
+    if (gd) return { g: gd.id, h: '', src: 'tiento', ref: '' };
   }
 
   // 3. Luật — luật đứng trước được ưu tiên
@@ -341,7 +357,9 @@ function tytTongHop(p, opts) {
     if (hmo) hmo.tien += l.tien; else o.chung += l.tien;
   });
 
-  return { st, ctx, allYears, lines, tongChi, tongKhop, tongSan, cpM2, daPhanBo: tongChi - chuaPB, chuaPB, theoLoai, theoGD };
+  const r = { st, ctx, allYears, lines, tongChi, tongKhop, tongSan, cpM2, daPhanBo: tongChi - chuaPB, chuaPB, theoLoai, theoGD };
+  _tytGanRo(r);   // (Phần A) chiều RỔ — xem khối "RỔ CHI PHÍ"
+  return r;
 }
 
 // Xem trước 1 luật (đang soạn hoặc đã có): khớp bao nhiêu khoản, bao nhiêu tiền.
@@ -371,6 +389,234 @@ function tytHdtpThongKe(r) {
   return m;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ══ RỔ CHI PHÍ — CHIỀU THỨ 2 "TAG KÉP" (07/10/2026 — Cải tiến Phần A) ═══════════
+// ══════════════════════════════════════════════════════════════════════════════
+// Mỗi khoản chi mang 2 nhãn ĐỘC LẬP:
+//   • Giai đoạn / Hạng mục (ở đâu — bóc tách kỹ thuật)  → tytResolve (như cũ)
+//   • RỔ (thuộc gói nào — lãi lỗ / giá khoán)           → _tytRoPart (dưới đây)
+// 3 rổ:  1 = Gói thô & nhân công hoàn thiện (CHUẨN tính đ/m2 báo giá)
+//        2 = Phần chủ nhà & ngoài gói chuẩn (ép cọc, tháo dỡ, gạch ốp lát, thiết kế...)
+//        3 = Chi phí hoạt động công ty lỡ nhập vào công trình (mua / sửa máy, văn phòng...)
+//        0 = Chưa xếp rổ (chấm đỏ — phải xử lý)
+// Chi phí chung thật của công ty nằm ở công trình "CÔNG TY" — KHÔNG trộn vào đây.
+//
+// CẤU HÌNH RỔ DÙNG CHUNG MỌI CÔNG TRÌNH — 1 bản ghi kind:'cauhinh' trong tytrong_v1 (không projectId):
+//   { kind:'cauhinh', roLoai: { <tên loại không dấu>: 0|1|2|3 },   // người dùng chỉnh (ghi đè mặc định)
+//     roLuat: [{ id, loai, tuKhoa, ro }] }                          // luật rổ theo từ khóa, xét theo thứ tự
+// Chưa có bản ghi → dùng mặc định (tytRoMacDinh + TYT_RO_LUAT_MAC_DINH).
+//
+// THỨ TỰ XẾP RỔ cho 1 khoản (hoặc 1 MÓN của hóa đơn chi tiết):
+//   ① gán tay (st.roTay[khóa khoản]) → ② HĐ thầu phụ (theoHdtp[id].ro) → ③ luật rổ từ khóa
+//   → ④ bảng Loại chi phí → Rổ (người dùng chỉnh) → ⑤ mặc định theo tên loại → Chưa xếp.
+// HÓA ĐƠN CHI TIẾT có ≥ 2 món → tách từng MÓN (tiền chia theo thành tiền món, khớp đúng tổng hóa đơn)
+//   để 1 bill điện nước có cả "ống" (Rổ 1) lẫn "bóng đèn" (Rổ 2) được xếp đúng. Giai đoạn vẫn tính
+//   theo nguyên hóa đơn.
+
+const TYT_RO = {
+  1: { ten: 'Rổ 1 · Gói thô & NC hoàn thiện', ngan: 'Rổ 1', mo: 'Chuẩn tính đ/m2 báo giá' },
+  2: { ten: 'Rổ 2 · Chủ nhà & ngoài gói',     ngan: 'Rổ 2', mo: 'Ép cọc, tháo dỡ, gạch ốp lát, thiết kế…' },
+  3: { ten: 'Rổ 3 · Chi phí công ty',          ngan: 'Rổ 3', mo: 'Mua / sửa máy, văn phòng… lỡ nhập vào CT' },
+  0: { ten: 'Chưa xếp rổ',                     ngan: 'Chưa xếp', mo: 'Cần chọn rổ' },
+};
+
+// Khóa so sánh tên loại chi phí: không dấu, thường, gộp khoảng trắng
+function tytLoaiKey(loai) { return _tytBoDau(loai).replace(/\s+/g, ' ').trim(); }
+
+// Rổ MẶC ĐỊNH theo tên loại (dựa trên danh mục thật của công ty). Không chắc → 0 (Chưa xếp).
+// Xét Rổ 3 → Rổ 2 → Rổ 1 (VD "Mua Máy - Thiết Bị" là Rổ 3 dù có chữ "thiết bị").
+const _TYT_RO_TU = [
+  [3, ['mua may', 'sua may', 'khau hao', 'van phong', 'bao hiem xa hoi']],
+  [2, ['ep coc', 'thao do', 'gach op', 'op lat', 'gia dung', 'thiet ke', 'xin phep', 'da hoa cuong']],
+  [1, ['sat thep', 'be tong', 'dao dat', 'san lap', 'nhan cong', 'copha', 'vat lieu', 'vat tu', 'dien nuoc',
+       'thau phu', 'van chuyen', 'thue may', 'giai khat', 'xa ban', 'giu cong trinh', 'hoa don le', 'do thi', 'ngoai giao']],
+];
+function tytRoMacDinh(loai) {
+  const k = tytLoaiKey(loai);
+  if (!k) return 0;
+  for (const [ro, tus] of _TYT_RO_TU) if (tus.some(t => k.includes(t))) return ro;
+  return 0;
+}
+
+// Luật rổ mặc định (theo file "Cải tiến tab tỉ trọng") — loai: điều kiện loại chi phí (chứa, không dấu; '' = mọi loại)
+const TYT_RO_LUAT_MAC_DINH = [
+  { loai: 'Điện Nước',          tuKhoa: 'bóng đèn, đèn led, công tắc, ổ cắm, bồn cầu, vòi sen, lavabo, máy bơm, máy nước nóng', ro: 2 },
+  { loai: '',                   tuKhoa: 'ép cọc, tháo dỡ, thang máy', ro: 2 },   // (Phần B) + thang máy: thiết bị của chủ nhà
+  { loai: 'Vật Liệu Xây Dựng',  tuKhoa: 'gạch ốp, gạch lát, gạch men, gạch granite, đá hoa cương, granite', ro: 2 },
+  { loai: 'Khác',               tuKhoa: 'xà bần, giải khát, đô thị, giữ công trình', ro: 1 },
+];
+
+// Bản ghi cấu hình (mới nhất) — null nếu chưa có
+function _tytRoCfgRec() {
+  const list = (tyTrongRecords || []).filter(r => r && !r.deletedAt && r.kind === 'cauhinh');
+  return list.length ? list.reduce((a, b) => ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a)) : null;
+}
+// Cấu hình đang dùng (bản sao an toàn): { roLoai, roLuat, truLoai, quyMuc, coBanGhi }
+//   (Phần B) truLoai: { <tên loại không dấu>: 'sat'|'bt'|'nc'|'tp'|'quy'|'' } — trụ cột Rổ 1 người dùng chỉnh
+//            quyMuc : mức Quỹ phụ phí đ/m2 dùng chung (mặc định 50.000)
+function tytRoCfg() {
+  const r = _tytRoCfgRec();
+  return {
+    roLoai: (r && r.roLoai && typeof r.roLoai === 'object') ? { ...r.roLoai } : {},
+    roLuat: (r && Array.isArray(r.roLuat)) ? r.roLuat.map(l => ({ ...l }))
+      : TYT_RO_LUAT_MAC_DINH.map((l, i) => ({ id: 'rd' + i, ...l })),
+    truLoai: (r && r.truLoai && typeof r.truLoai === 'object') ? { ...r.truLoai } : {},
+    quyMuc: (r && +r.quyMuc >= 0 && r.quyMuc !== '' && r.quyMuc !== null && r.quyMuc !== undefined) ? +r.quyMuc : TYT_QUY_MUC_MAC_DINH,
+    coBanGhi: !!r,
+  };
+}
+function tytSaveRoCfg(changes) {
+  const cur = _tytRoCfgRec();
+  if (cur) {
+    const i = tyTrongRecords.findIndex(r => r.id === cur.id);
+    tyTrongRecords[i] = mkUpdate(tyTrongRecords[i], changes);
+  } else {
+    const base = tytRoCfg();
+    tyTrongRecords.unshift(mkRecord({ kind: 'cauhinh', roLoai: base.roLoai, roLuat: base.roLuat,
+      truLoai: base.truLoai, quyMuc: base.quyMuc, ...changes }));
+  }
+  save('tytrong_v1', tyTrongRecords);
+}
+
+// Rổ của 1 LOẠI theo bảng ánh xạ: { ro, src: 'loai' (người dùng chỉnh) | 'macdinh' }
+function tytRoCuaLoai(loai, cfg) {
+  const k = tytLoaiKey(loai);
+  if (cfg && Object.prototype.hasOwnProperty.call(cfg.roLoai, k)) return { ro: +cfg.roLoai[k] || 0, src: 'loai' };
+  return { ro: tytRoMacDinh(loai), src: 'macdinh' };
+}
+
+// Luật rổ có khớp 1 món không
+function tytRoLuatKhop(lu, line, part) {
+  if (lu.loai && !tytLoaiKey(line.loai).includes(tytLoaiKey(lu.loai))) return false;
+  const tus = String(lu.tuKhoa || '').split(',').map(_tytBoDau).filter(Boolean);
+  if (!tus.length) return false;
+  const txt = _tytBoDau((part.ten || '') + ' ' + (line.doiTuong || '') + (part.mon ? '' : ' ' + (line.nd || '')));
+  return tus.some(t => txt.includes(t));
+}
+
+// HĐ thầu phụ của 1 khoản có cấu hình trường `field` ('ro') — dùng chung quy tắc khớp với giai đoạn
+function _tytHdtpCo(line, st, ctx, ok) {
+  const hdtps = (ctx && ctx.hdtp) || [];
+  if (!hdtps.length) return null;
+  if (line.hdtpId && hdtps.some(h => h.id === line.hdtpId) && ok(st.theoHdtp[line.hdtpId])) return line.hdtpId;
+  const k = _tytBoDau(line.doiTuong);
+  const hd = k ? hdtps.find(h => h.tenKey === k && ok(st.theoHdtp[h.id])) : null;
+  return hd ? hd.id : null;
+}
+
+// Rổ của 1 MÓN: { ro, src, ref }
+function _tytRoPart(line, part, st, ctx, cfg) {
+  const tay = st.roTay[line.key];
+  const c = v => ([1, 2, 3].includes(+v) ? +v : 0);
+  if (tay) return { ro: c(tay), src: 'tay', ref: '' };
+  const hd = _tytHdtpCo(line, st, ctx, v => v && v.ro);
+  if (hd) return { ro: c(st.theoHdtp[hd].ro), src: 'hdtp', ref: hd };
+  for (const lu of cfg.roLuat) if (tytRoLuatKhop(lu, line, part)) return { ro: c(lu.ro), src: 'luat', ref: lu.id };
+  const m = tytRoCuaLoai(line.loai, cfg);
+  return { ro: m.ro, src: m.src, ref: '' };
+}
+
+// Tách 1 khoản thành các MÓN để xếp rổ. Hóa đơn chi tiết ≥ 2 món → chia tiền theo thành tiền món
+// (món cuối nhận phần lẻ → tổng khớp đúng hóa đơn). Còn lại → 1 món = cả khoản.
+function tytTachMon(line) {
+  const its = (line.items || []).map(it => ({ ten: it.ten || '', v: +(it.thanhtien || (it.sl || 0) * (it.dongia || 0)) || 0 }))
+    .filter(it => it.v > 0);
+  const sum = its.reduce((s, it) => s + it.v, 0);
+  if (its.length < 2 || !sum) return [{ ten: line.nd || '', tien: line.tien, mon: false }];
+  let du = line.tien;
+  return its.map((it, i) => {
+    const t = i === its.length - 1 ? du : Math.round(line.tien * it.v / sum);
+    du -= t;
+    return { ten: it.ten, tien: t, mon: true };
+  });
+}
+
+// Gắn rổ cho mọi khoản của kết quả tytTongHop + tổng theo rổ. Ghi vào r: r.cfg, r.theoRo, r.theoTru (Phần B),
+//   r.cpM2Ro1, line.parts[] (mỗi món: { ten, tien, mon, ro, roSrc, roRef, tru, truSrc }), line.roChinh (rổ chiếm nhiều tiền nhất)
+function _tytGanRo(r) {
+  const cfg = tytRoCfg();
+  const theoRo = { 0: 0, 1: 0, 2: 0, 3: 0 };
+  const theoTru = { sat: 0, bt: 0, nc: 0, tp: 0, quy: 0, '': 0 };   // (Phần B) tiền Rổ 1 theo trụ cột
+  r.lines.forEach(l => {
+    l.parts = tytTachMon(l).map(pt => {
+      const x = _tytRoPart(l, pt, r.st, r.ctx, cfg);
+      theoRo[x.ro] = (theoRo[x.ro] || 0) + pt.tien;
+      const o = { ...pt, ro: x.ro, roSrc: x.src, roRef: x.ref, tru: null, truSrc: '' };
+      if (x.ro === 1) {
+        const t = _tytTruPart(l, pt, cfg);
+        o.tru = t.tru; o.truSrc = t.src;
+        theoTru[t.tru] += pt.tien;
+      }
+      return o;
+    });
+    const by = {};
+    l.parts.forEach(pt => { by[pt.ro] = (by[pt.ro] || 0) + pt.tien; });
+    l.roChinh = +Object.keys(by).sort((a, b) => by[b] - by[a])[0];
+    l.roNhieu = Object.keys(by).length > 1;
+  });
+  r.cfg = cfg;
+  r.theoRo = theoRo;
+  r.theoTru = theoTru;
+  r.cpM2Ro1 = r.tongSan > 0 ? theoRo[1] / r.tongSan : 0;
+  r.chuaRo = r.lines.filter(l => l.parts.some(pt => pt.ro === 0));
+}
+
+// ── CẤU THÀNH: nhóm loại chi phí theo bản chất — dùng cho cột "Tách cấu thành" (góc nhìn Giai đoạn)
+//   vt = Vật tư · nc = Nhân công · tp = Khoán thầu phụ · khac = Phụ phí / khác
+function tytCauThanh(loai) {
+  const k = tytLoaiKey(loai);
+  if (k.includes('nhan cong')) return 'nc';
+  if (k.includes('thau phu') || k.startsWith('thi cong')) return 'tp';
+  if (['giai khat', 'xa ban', 'giu cong trinh', 'hoa don le', 'do thi', 'ngoai giao', 'thiet ke', 'xin phep',
+       'khao sat', 'van phong', 'bao hiem', 'khac'].some(t => k.includes(t))) return 'khac';
+  return 'vt';
+}
+const TYT_CT_TEN = { vt: 'Vật tư', nc: 'Nhân công', tp: 'Khoán TP', khac: 'Khác' };
+
+// ── CÂY THEO RỔ (góc nhìn Lợi nhuận): Rổ → Loại chi phí → từng khoản (hoặc món).
+//   (Phần B) Rổ 1 chèn thêm cấp TRỤ CỘT: Rổ 1 → Sắt thép / Bê tông / Nhân công / Thầu phụ phụ trợ /
+//   Quỹ phụ phí (/ Chưa xếp trụ cột) → Loại → khoản.
+// Node như tytCay; kind 'ro' có .ro, kind 'tru' có .tru. Rổ 0 (Chưa xếp) chỉ hiện khi có tiền.
+function tytCayRo(r) {
+  // Nhóm các món theo loại chi phí → node 'loai' (con = từng khoản / món, mới nhất trước)
+  const nhomLoai = (ks, prefix, ro) => {
+    const m = new Map();
+    ks.forEach(k => {
+      const o = m.get(k.l.loai) || { loai: k.l.loai, tien: 0, ks: [] };
+      o.tien += k.pt.tien; o.ks.push(k);
+      m.set(k.l.loai, o);
+    });
+    return [...m.values()].sort((a, b) => b.tien - a.tien).map(o => {
+      const lk = prefix + '|L:' + o.loai;
+      return {
+        key: lk, kind: 'loai', ten: o.loai, tien: o.tien, soDong: o.ks.length, ro,
+        children: o.ks.sort((a, b) => String(b.l.ngay).localeCompare(String(a.l.ngay))).map(k => ({
+          key: lk + '|K:' + k.l.key + '#' + k.i, kind: 'line', ten: k.pt.mon ? k.pt.ten : k.l.nd,
+          tien: k.pt.tien, line: k.l, part: k.pt, ro, children: [],
+        })),
+      };
+    });
+  };
+  const out = [];
+  [1, 2, 3, 0].forEach(ro => {
+    const rk = 'R:' + ro;
+    const ks = [];
+    r.lines.forEach(l => l.parts.forEach((pt, i) => { if (pt.ro === ro) ks.push({ l, pt, i }); }));
+    let children;
+    if (ro === 1) {
+      children = TYT_TRU_THU_TU.map(t => {
+        const tk = rk + '|T:' + t;
+        const kt = ks.filter(k => k.pt.tru === t);
+        return { key: tk, kind: 'tru', tru: t, ro, ten: TYT_TRU[t].ten, tien: kt.reduce((s, k) => s + k.pt.tien, 0), children: nhomLoai(kt, tk, ro) };
+      }).filter(n => n.tien || TYT_TRU_DS.includes(n.tru));   // 4 trụ cột luôn hiện; Quỹ / Chưa xếp chỉ khi có tiền
+    } else children = nhomLoai(ks, rk, ro);
+    const tien = r.theoRo[ro] || 0;
+    if (ro === 0 && !tien) return;
+    out.push({ key: rk, kind: 'ro', ro, ten: TYT_RO[ro].ten, tien, children });
+  });
+  return out;
+}
+
 // ══ CÂY MA TRẬN cho bảng PHÂN TÍCH (05/10/2026 — Lần 2) ════════════════════
 // Tách bạch 2 chiều dữ liệu:
 //   • "Ở ĐÂU"  = Giai đoạn → Hạng mục (người dùng gán)
@@ -394,6 +640,7 @@ function _tytNhomLoai(lines, prefix) {
     const k = prefix + '|L:' + o.loai;
     return {
       key: k, kind: 'loai', ten: o.loai, tien: o.tien, soDong: o.lines.length,
+      ct: { [tytCauThanh(o.loai)]: o.tien },   // (Phần A) cấu thành của loại này
       children: o.lines.slice().sort((a, b) => String(b.ngay).localeCompare(String(a.ngay)))
         .map(l => ({ key: k + '|K:' + l.key, kind: 'line', ten: l.nd, tien: l.tien, line: l, children: [] })),
     };
@@ -424,6 +671,14 @@ function tytCay(r) {
   });
   const chua = r.lines.filter(l => !l.pb.g);
   if (chua.length) nodes.push({ key: 'G:_', kind: 'chua', ten: 'Chưa phân bổ', tien: _tytSum(chua), children: _tytNhomLoai(chua, 'G:_') });
+  // (Phần A) cộng dồn cấu thành từ cấp Loại lên Hạng mục / Giai đoạn
+  const cong = n => {
+    if (n.kind === 'loai' || n.kind === 'line') return n.ct || {};
+    n.ct = {};
+    n.children.forEach(c => { const x = cong(c); Object.keys(x).forEach(k => { n.ct[k] = (n.ct[k] || 0) + x[k]; }); });
+    return n.ct;
+  };
+  nodes.forEach(cong);
   return nodes;
 }
 
@@ -543,26 +798,57 @@ function tytNhanNam() {
   return 'Tất cả năm';
 }
 
-// Tạo định mức từ kết quả tytTongHop(p) của công trình nguồn. Trả về bản ghi vừa tạo.
-function tytTaoDinhMuc(p, r, ten) {
+// Đơn giá đ/m2 theo giai đoạn + hạng mục từ 1 kết quả gom { theoGD, chuaPB } (xem tytGomGd)
+//   dgGd: { <tên GĐ>: đ/m2, 'Chưa phân bổ': đ/m2 } · dgHm: { 'Tên GĐ › Tên HM': đ/m2 } — chỉ ghi ô có tiền
+function _tytDgGdHm(g, san) {
+  const dgGd = {}, dgHm = {};
+  g.theoGD.forEach(o => { if (o.tien) dgGd[o.gd.ten] = Math.round(o.tien / san); });
+  if (g.chuaPB) dgGd['Chưa phân bổ'] = Math.round(g.chuaPB / san);
+  g.theoGD.forEach(o => o.hms.forEach(x => { if (x.tien) dgHm[o.gd.ten + ' › ' + x.hm.ten] = Math.round(x.tien / san); }));
+  return { dgGd, dgHm };
+}
+
+// Các trường số liệu của 1 định mức lấy từ kết quả tytTongHop(p) của công trình nguồn
+function _tytDmFields(p, r) {
   const san = r.tongSan;
   const dgLoai = {};
   r.theoLoai.forEach(o => { dgLoai[o.loai] = Math.round(o.tien / san); });
-  const dgGd = {};
-  r.theoGD.forEach(o => { if (o.tien) dgGd[o.gd.ten] = Math.round(o.tien / san); });
-  if (r.chuaPB) dgGd['Chưa phân bổ'] = Math.round(r.chuaPB / san);
-  // (Lần 3) đơn giá theo hạng mục — khóa "Tên GĐ › Tên HM" (để đối chiếu nhóm cùng cấu trúc)
-  const dgHm = {};
-  r.theoGD.forEach(o => o.hms.forEach(x => { if (x.tien) dgHm[o.gd.ten + ' › ' + x.hm.ten] = Math.round(x.tien / san); }));
-  const rec = mkRecord({
-    kind: 'dinhmuc', ten: (ten || '').trim() || ('Định mức ' + p.name),
+  // Toàn bộ chi phí (như cũ) — (Lần 3) đơn giá theo hạng mục khóa "Tên GĐ › Tên HM"
+  const all = _tytDgGdHm(r, san);
+  // (Phần B) chỉ Rổ 1: tổng, 4 trụ cột + quỹ phụ phí, giai đoạn / hạng mục
+  const r1 = _tytDgGdHm(tytGomGd(r, pt => pt.ro === 1), san);
+  const ro1 = {};
+  TYT_TRU_THU_TU.forEach(t => { ro1[t === '' ? 'khac' : t] = Math.round((r.theoTru[t] || 0) / san); });
+  return {
     loaiCT: p.loaiCongTrinh || '', nguonPid: p.id, nguonTen: p.name, nam: r.allYears ? 'Trọn vòng đời' : tytNhanNam(),
-    tongSan: Math.round(san * 100) / 100, tongChi: r.tongChi, dgTong: Math.round(r.tongChi / san), dgLoai, dgGd, dgHm,
+    tongSan: Math.round(san * 100) / 100, tongChi: r.tongChi, dgTong: Math.round(r.tongChi / san), dgLoai,
+    dgGd: all.dgGd, dgHm: all.dgHm,
+    dgRo1: Math.round(r.theoRo[1] / san), ro1, dgGdR1: r1.dgGd, dgHmR1: r1.dgHm, nhapTay: false,
+  };
+}
+
+// Tạo định mức từ kết quả tytTongHop(p) của công trình nguồn. Trả về bản ghi vừa tạo.
+function tytTaoDinhMuc(p, r, ten) {
+  const rec = mkRecord({ kind: 'dinhmuc', ten: (ten || '').trim() || ('Định mức ' + p.name), ..._tytDmFields(p, r) });
+  tyTrongRecords.unshift(rec);
+  save('tytrong_v1', tyTrongRecords);
+  return rec;
+}
+
+// (Phần B) Định mức NHẬP TAY (định mức an toàn): chỉ có 4 trụ cột Rổ 1 (đ/m2). ro1 = { sat, bt, nc, tp }
+function tytTaoDinhMucTay(ten, ro1) {
+  const rec = mkRecord({
+    kind: 'dinhmuc', ten: (ten || '').trim() || 'Định mức nhập tay', nhapTay: true, nam: 'Nhập tay',
+    loaiCT: '', nguonPid: '', nguonTen: '', tongSan: 0, tongChi: 0, dgTong: 0, dgLoai: {}, dgGd: {}, dgHm: {},
+    ro1: { ...ro1 }, dgRo1: TYT_TRU_DS.reduce((s, t) => s + (+ro1[t] || 0), 0), dgGdR1: {}, dgHmR1: {},
   });
   tyTrongRecords.unshift(rec);
   save('tytrong_v1', tyTrongRecords);
   return rec;
 }
+
+// (Phần B) Cập nhật lại số liệu định mức từ CT nguồn (giữ tên + id) — dùng cho định mức lưu trước Phần B
+function tytCapNhatDinhMuc(id, p, r) { tytSuaDinhMuc(id, _tytDmFields(p, r)); }
 
 // Đổi tên / xóa mềm định mức
 function tytSuaDinhMuc(id, changes) {
@@ -573,21 +859,6 @@ function tytSuaDinhMuc(id, changes) {
 }
 function tytXoaDinhMuc(id) { tytSuaDinhMuc(id, { deletedAt: Date.now() }); }
 
-// DỰ TOÁN = diện tích × đơn giá định mức, so với THỰC TẾ (r = tytTongHop của CT đang theo dõi, có thể null)
-// Trả về { rows: [{ loai, dg, duToan, thucTe, conLai, pct }], tong: {...} } — loại có ở định mức HOẶC thực tế
-function tytDuToan(dm, dienTich, r) {
-  const thucTe = new Map(r ? r.theoLoai.map(o => [o.loai, o.tien]) : []);
-  const loais = [...new Set([...Object.keys(dm.dgLoai || {}), ...thucTe.keys()])];
-  const rows = loais.map(loai => {
-    const dg = (dm.dgLoai || {})[loai] || 0;
-    const duToan = Math.round(dg * dienTich);
-    const tt = thucTe.get(loai) || 0;
-    return { loai, dg, duToan, thucTe: tt, conLai: duToan - tt, pct: duToan ? tt / duToan * 100 : (tt ? Infinity : 0) };
-  }).sort((a, b) => (b.duToan - a.duToan) || (b.thucTe - a.thucTe));
-  const duToan = rows.reduce((s, x) => s + x.duToan, 0);
-  const tt = rows.reduce((s, x) => s + x.thucTe, 0);
-  return { rows, tong: { dg: dm.dgTong || 0, duToan, thucTe: tt, conLai: duToan - tt, pct: duToan ? tt / duToan * 100 : 0 } };
-}
 
 // ══ SO SÁNH NHIỀU CÔNG TRÌNH (05/10/2026 — Lần 2) ══════════════════════
 // cots: mảng project. Trả về { cots: [{ p, r }], loais: [tên loại — sắp theo tổng tiền giảm dần] }
@@ -597,4 +868,299 @@ function tytSoSanh(projs, opts) {
   cots.forEach(c => c.r.theoLoai.forEach(o => tong.set(o.loai, (tong.get(o.loai) || 0) + o.tien)));
   const loais = [...tong.keys()].sort((a, b) => tong.get(b) - tong.get(a));
   return { cots, loais };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ══ KIỂM SOÁT ĐỊNH MỨC RỔ 1 (07/10/2026 — Cải tiến Phần B) ═══════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// Chỉ xét RỔ 1 (gói thô & NC hoàn thiện). Rổ 1 chia thành 4 TRỤ CỘT + 1 QUỸ PHỤ PHÍ:
+//   sat = Sắt thép · bt = Bê tông (kèm VLXD thô: cát, đá, xi măng, gạch xây, copha, đào đất, vận chuyển)
+//   nc  = Nhân công · tp = Thầu phụ phụ trợ (khoán TP + vật tư hệ thống: điện nước, sơn, điện lạnh…)
+//   quy = Quỹ phụ phí — CHỈ 6 loại lặt vặt: Giải Khát, Xà Bần - Đổ Rác, Giữ Công Trình, Hóa Đơn Lẻ,
+//         Đô Thị, Ngoại Giao (người dùng chốt: vật tư phụ KHÔNG vào quỹ, phải thuộc 4 trụ cột)
+//   ''  = Chưa xếp trụ cột (loại lạ) — chọn ở bảng Loại chi phí → Rổ (tab Thiết lập)
+// Trụ cột theo LOẠI CHI PHÍ: bảng người dùng chỉnh (cfg.truLoai) → mặc định theo tên loại.
+// Quỹ phụ phí kiểm soát bằng 1 MỨC đ/m2 dùng chung (cfg.quyMuc, mặc định 50.000) — chỉ báo đỏ khi
+// TỔNG các khoản lặt vặt vượt mức, không canh từng ly cà phê.
+const TYT_TRU = {
+  sat: { ten: 'Sắt thép',          mo: 'Sắt thép, thi công sắt thép' },
+  bt:  { ten: 'Bê tông',           mo: 'Bê tông, copha, VLXD thô (cát, đá, xi măng, gạch xây), đào đất, vận chuyển' },
+  nc:  { ten: 'Nhân công',         mo: 'Nhân công chấm công, phụ cấp' },
+  tp:  { ten: 'Thầu phụ phụ trợ',  mo: 'Khoán thầu phụ + vật tư hệ thống (điện nước, sơn, điện lạnh…)' },
+  quy: { ten: 'Quỹ phụ phí',       mo: 'Giải khát, xà bần, giữ CT, hóa đơn lẻ, đô thị, ngoại giao' },
+  '':  { ten: 'Chưa xếp trụ cột',  mo: 'Chọn trụ cột ở tab Thiết lập' },
+};
+const TYT_TRU_DS = ['sat', 'bt', 'nc', 'tp'];               // 4 trụ cột có định mức riêng
+const TYT_TRU_THU_TU = ['sat', 'bt', 'nc', 'tp', 'quy', ''];  // thứ tự hiển thị
+const TYT_QUY_MUC_MAC_DINH = 50000;
+
+// Từ khóa (không dấu) trong TÊN LOẠI → trụ cột. Xét từ trên xuống (VD "Thi Công Sắt Thép" → Sắt thép
+// trước khi gặp "thi cong" của Thầu phụ; "Đổ Bê Tông" → Bê tông).
+const _TYT_QUY_TU = ['giai khat', 'xa ban', 'giu cong trinh', 'hoa don le', 'do thi', 'ngoai giao'];
+const _TYT_TRU_TU = [
+  ['quy', _TYT_QUY_TU],
+  ['nc',  ['nhan cong', 'phu cap', 'bao hiem tai nan']],
+  ['sat', ['sat thep']],
+  ['bt',  ['be tong', 'copha', 'vat lieu', 'dao dat', 'san lap', 'van chuyen', 'thue may', 'xi mang']],
+  ['tp',  ['thau phu', 'thi cong', 'dien nuoc', 'vat tu', 'tiep dia', 'dien lanh']],
+];
+function tytTruMacDinh(loai) {
+  const k = tytLoaiKey(loai);
+  if (!k) return '';
+  for (const [t, tus] of _TYT_TRU_TU) if (tus.some(w => k.includes(w))) return t;
+  return '';
+}
+// Trụ cột của 1 LOẠI: { tru, src: 'loai' (người dùng chỉnh) | 'macdinh' }
+function tytTruCuaLoai(loai, cfg) {
+  const k = tytLoaiKey(loai);
+  if (cfg && cfg.truLoai && Object.prototype.hasOwnProperty.call(cfg.truLoai, k)) {
+    const t = cfg.truLoai[k];
+    return { tru: Object.prototype.hasOwnProperty.call(TYT_TRU, t) ? t : '', src: 'loai' };
+  }
+  return { tru: tytTruMacDinh(loai), src: 'macdinh' };
+}
+// Trụ cột của 1 MÓN thuộc Rổ 1. Loại chưa có trụ cột (VD "Khác" được luật rổ kéo vào Rổ 1 vì "xà bần")
+// → nội dung có chữ lặt vặt của quỹ thì vào Quỹ phụ phí (src 'tukhoa').
+function _tytTruPart(line, part, cfg) {
+  const m = tytTruCuaLoai(line.loai, cfg);
+  if (m.tru) return m;
+  const txt = _tytBoDau((part.ten || '') + ' ' + (part.mon ? '' : (line.nd || '')));
+  if (_TYT_QUY_TU.some(w => txt.includes(w))) return { tru: 'quy', src: 'tukhoa' };
+  return m;
+}
+
+// Gom tiền theo Giai đoạn → Hạng mục nhưng CHỈ lấy các món thỏa loc(part, line) (VD chỉ Rổ 1).
+// Trả về { theoGD: [{ gd, tien, chung, hms: [{ hm, tien }] }], chuaPB, tong } — cùng dạng r.theoGD.
+function tytGomGd(r, loc) {
+  const st = r.st;
+  const theoGD = st.giaiDoan.map(gd => ({
+    gd, tien: 0, chung: 0, hms: st.hangMuc.filter(h => h.gdId === gd.id).map(hm => ({ hm, tien: 0 })),
+  }));
+  const idx = new Map(theoGD.map((o, i) => [o.gd.id, i]));
+  let chuaPB = 0, tong = 0;
+  r.lines.forEach(l => {
+    const t = (l.parts || []).reduce((s, pt) => s + (loc(pt, l) ? pt.tien : 0), 0);
+    if (!t) return;
+    tong += t;
+    if (!l.pb.g || !idx.has(l.pb.g)) { chuaPB += t; return; }
+    const o = theoGD[idx.get(l.pb.g)];
+    o.tien += t;
+    const h = l.pb.h ? o.hms.find(z => z.hm.id === l.pb.h) : null;
+    if (h) h.tien += t; else o.chung += t;
+  });
+  return { theoGD, chuaPB, tong };
+}
+
+// Định mức có số liệu Rổ 1 theo trụ cột chưa (định mức lưu trước Phần B thì chưa)
+function tytDmCoRo1(dm) { return !!(dm && dm.ro1 && TYT_TRU_DS.some(t => +dm.ro1[t] > 0)); }
+
+// KIỂM SOÁT RỔ 1 của 1 công trình: ngân sách = diện tích × định mức đ/m2 từng trụ cột
+//   (Quỹ phụ phí dùng mức chung cfg.quyMuc; "Chưa xếp trụ cột" dùng số của định mức nếu có).
+// r = tytTongHop của CT đang theo dõi. Trả về {
+//   rows: [{ k, ten, dg, ns, tt, conLai, pct, vuot, loais: [{ loai, tien }] }],
+//   tong: { dg, ns, tt, conLai, pct, vuot }, soVuot }
+function tytKiemSoat(dm, dienTich, r) {
+  const ro1 = (dm && dm.ro1) || {};
+  const quyMuc = r.cfg ? r.cfg.quyMuc : TYT_QUY_MUC_MAC_DINH;
+  // Tiền Rổ 1 của từng trụ cột tách theo loại (để bung xem trong bảng)
+  const loaiTheoTru = {};
+  r.lines.forEach(l => l.parts.forEach(pt => {
+    if (pt.ro !== 1) return;
+    const m = loaiTheoTru[pt.tru] || (loaiTheoTru[pt.tru] = new Map());
+    m.set(l.loai, (m.get(l.loai) || 0) + pt.tien);
+  }));
+  const mk = (k, dg) => {
+    const ns = Math.round((+dg || 0) * dienTich);
+    const tt = r.theoTru[k] || 0;
+    const vuot = tt - ns >= 1000;   // lệch < 1.000 đ chỉ do làm tròn → không tính vượt
+    return {
+      k, ten: TYT_TRU[k].ten, dg: +dg || 0, ns, tt, conLai: ns - tt, vuot,
+      pct: ns ? tt / ns * 100 : (tt ? Infinity : 0),
+      loais: [...(loaiTheoTru[k] || new Map()).entries()].map(([loai, tien]) => ({ loai, tien })).sort((a, b) => b.tien - a.tien),
+    };
+  };
+  const rows = TYT_TRU_DS.map(k => mk(k, ro1[k]));
+  rows.push(mk('quy', quyMuc));
+  const khac = mk('', ro1.khac);
+  if (khac.tt || khac.dg) rows.push(khac);
+  const ns = rows.reduce((s, x) => s + x.ns, 0), tt = rows.reduce((s, x) => s + x.tt, 0);
+  return {
+    rows, soVuot: rows.filter(x => x.vuot).length,
+    tong: { dg: rows.reduce((s, x) => s + x.dg, 0), ns, tt, conLai: ns - tt, vuot: tt - ns >= 1000, pct: ns ? tt / ns * 100 : 0 },
+  };
+}
+
+// THƯ VIỆN ĐƠN GIÁ MODULE: danh sách module (giai đoạn / hạng mục) kèm đ/m2 từ 1 định mức.
+//   phamVi 'all' = toàn bộ chi phí (dgGd/dgHm — có cả module ngoài gói như Ép cọc) · 'r1' = chỉ Rổ 1.
+// Trả về [{ key, gd, ten, cap: 'gd'|'hm'|'chung'|'chua', dg }] — module 'gd' chỉ là dòng tiêu đề nhóm
+// (dg = tổng giai đoạn), các dòng còn lại mới là module tick chọn. GĐ không có hạng mục → 1 module 'chung'.
+function tytModules(dm, phamVi) {
+  const dgGd = (phamVi === 'r1' ? dm.dgGdR1 : dm.dgGd) || {};
+  const dgHm = (phamVi === 'r1' ? dm.dgHmR1 : dm.dgHm) || {};
+  const out = [];
+  Object.keys(dgGd).forEach(gd => {
+    if (gd === 'Chưa phân bổ') return;
+    out.push({ key: 'G:' + gd, gd, ten: gd, cap: 'gd', dg: dgGd[gd] || 0 });
+    let conLai = dgGd[gd] || 0;
+    Object.keys(dgHm).filter(k => k.startsWith(gd + ' › ')).forEach(k => {
+      out.push({ key: 'H:' + k, gd, ten: k.slice(gd.length + 3), cap: 'hm', dg: dgHm[k] });
+      conLai -= dgHm[k];
+    });
+    // Phần của giai đoạn chưa rõ hạng mục (hoặc GĐ không chia hạng mục) → 1 module "chung"
+    if (conLai > 0) out.push({ key: 'C:' + gd, gd, ten: '(chung cả giai đoạn)', cap: 'chung', dg: conLai });
+  });
+  if (dgGd['Chưa phân bổ']) out.push({ key: 'U:', gd: '', ten: 'Dùng chung / Chưa phân bổ', cap: 'chua', dg: dgGd['Chưa phân bổ'] });
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ══ XU HƯỚNG & BIẾN ĐỘNG (07/10/2026 — Cải tiến Phần C) ══════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// 3 nguồn số liệu, đều CHỈ ĐỌC (không ghi gì):
+//   1. đ/m2 Rổ 1 theo NĂM CÔNG TRÌNH (tytXuHuongM2) — chỉ CT có bảng M2. Năm của CT = năm HOÀN THÀNH
+//      (ngày quyết toán → hoàn thành → kết thúc); CT đang thi công lấy năm hiện tại.
+//      Gộp các CT cùng năm theo Σ tiền ÷ Σ sàn (CT to nặng ký hơn CT nhỏ).
+//   2. Đơn giá VẬT TƯ theo kỳ (tytGiaVatTu) — từ các MÓN của hóa đơn chi tiết (tên + ĐVT, bỏ dấu),
+//      giá kỳ = Σ thành tiền ÷ Σ số lượng (bình quân gia quyền). Thước đo trượt giá chuẩn hơn đ/m2
+//      vì không phụ thuộc thiết kế từng nhà.
+//   3. Đơn giá CÔNG NHẬT theo kỳ (tytGiaCong) — từ chấm công: Σ(công × lương ngày) ÷ Σ công (không tính
+//      phụ cấp / HĐ mua lẻ), bỏ CT "CÔNG TY".
+// DỰ BÁO (tytHoiQuy): đường thẳng bình phương nhỏ nhất qua các điểm; CHỈ dự báo khi có ≥ 3 điểm,
+//   luôn ghi là ƯỚC TÍNH.
+const TYT_DB_MIN = 3;   // số điểm tối thiểu để dự báo
+
+// Năm của 1 công trình (để xếp lên trục năm)
+function tytNamCT(p) {
+  const d = (p && (p.closedDate || p.completedDate || p.endDate)) || '';
+  if (/^\d{4}/.test(d)) return d.slice(0, 4);
+  return String(new Date().getFullYear());
+}
+
+// Xu hướng đ/m2 theo năm. projs: công trình (đã lọc sẵn: CT xây mới…); opts → tytTongHop.
+// Trả về { cts: [{ p, nam, san, ro1, tru, dongXong }], nams: [{ nam, soCT, dangLam, san, ro1, tru: {sat..}, m2: { ro1, sat, bt, nc, tp, quy } }] }
+function tytXuHuongM2(projs, opts) {
+  const cts = projs.filter(p => tytTongSan(p) > 0).map(p => {
+    const r = tytTongHop(p, opts);
+    return { p, nam: tytNamCT(p), san: r.tongSan, ro1: r.theoRo[1], tru: { ...r.theoTru }, dongXong: p.status === 'closed' || p.status === 'completed' };
+  });
+  const m = new Map();
+  cts.forEach(c => {
+    const o = m.get(c.nam) || { nam: c.nam, soCT: 0, dangLam: 0, san: 0, ro1: 0, tru: { sat: 0, bt: 0, nc: 0, tp: 0, quy: 0 } };
+    o.soCT++; if (!c.dongXong) o.dangLam++;
+    o.san += c.san; o.ro1 += c.ro1;
+    Object.keys(o.tru).forEach(t => { o.tru[t] += c.tru[t] || 0; });
+    m.set(c.nam, o);
+  });
+  const nams = [...m.values()].sort((a, b) => a.nam.localeCompare(b.nam)).map(o => {
+    const m2 = { ro1: o.ro1 / o.san };
+    Object.keys(o.tru).forEach(t => { m2[t] = o.tru[t] / o.san; });
+    return { ...o, m2 };
+  });
+  return { cts, nams };
+}
+
+// Hồi quy tuyến tính y = a + b·x. pts: [{ x, y }] (x là số: năm, hoặc chỉ số kỳ).
+// Trả về null nếu < TYT_DB_MIN điểm; ngược lại { a, b, n, du: x => y, pctNam: % tăng mỗi bước so với điểm cuối }
+function tytHoiQuy(pts) {
+  const p = (pts || []).filter(z => isFinite(z.x) && isFinite(z.y) && z.y > 0);
+  if (p.length < TYT_DB_MIN) return null;
+  const n = p.length;
+  const mx = p.reduce((s2, z) => s2 + z.x, 0) / n, my = p.reduce((s2, z) => s2 + z.y, 0) / n;
+  const sxx = p.reduce((s2, z) => s2 + (z.x - mx) ** 2, 0);
+  if (!sxx) return null;
+  const b = p.reduce((s2, z) => s2 + (z.x - mx) * (z.y - my), 0) / sxx;
+  const a = my - b * mx;
+  const cuoi = p[p.length - 1];
+  return { a, b, n, du: x => Math.max(0, a + b * x), pctNam: cuoi.y ? b / cuoi.y * 100 : 0 };
+}
+
+// Kỳ của 1 ngày: che 'm' → '2026-07' · 'q' → '2026-Q3' · 'y' → '2026'
+function tytKy(ngay, che) {
+  const d = String(ngay || '');
+  if (!/^\d{4}-\d{2}/.test(d)) return '';
+  if (che === 'y') return d.slice(0, 4);
+  if (che === 'm') return d.slice(0, 7);
+  return d.slice(0, 4) + '-Q' + Math.ceil(+d.slice(5, 7) / 3);
+}
+// Danh sách kỳ liên tục từ kỳ đầu tới kỳ cuối (để trục thời gian không bị nhảy)
+function tytDayKy(dau, cuoi, che) {
+  if (!dau || !cuoi) return [];
+  const out = [];
+  const tach = k => che === 'y' ? [+k, 0] : (che === 'm' ? [+k.slice(0, 4), +k.slice(5, 7)] : [+k.slice(0, 4), +k.slice(6)]);
+  let [y, i] = tach(dau);
+  const [y2, i2] = tach(cuoi);
+  const max = che === 'm' ? 12 : 4;
+  for (let n = 0; n < 400; n++) {
+    out.push(che === 'y' ? String(y) : (che === 'm' ? y + '-' + String(i).padStart(2, '0') : y + '-Q' + i));
+    if (y > y2 || (y === y2 && (che === 'y' || i >= i2))) break;
+    if (che === 'y') y++; else if (++i > max) { i = 1; y++; }
+  }
+  return out;
+}
+
+// Kỳ kế tiếp của 1 kỳ (cho điểm dự báo): '2026-Q4' → '2027-Q1' · '2026-12' → '2027-01' · '2026' → '2027'
+function tytKyKe(k, che) {
+  if (che === 'y') return String(+k + 1);
+  let y = +k.slice(0, 4), i = che === 'm' ? +k.slice(5, 7) : +k.slice(6);
+  if (++i > (che === 'm' ? 12 : 4)) { i = 1; y++; }
+  return che === 'm' ? y + '-' + String(i).padStart(2, '0') : y + '-Q' + i;
+}
+
+// Đơn giá VẬT TƯ theo kỳ từ các món hóa đơn chi tiết (mọi công trình, mọi năm ĐÃ TẢI vào máy).
+// Trả về [{ key, ten, dv, loai, soLan, tien, ky: { <kỳ>: { sl, tien, gia } }, kys: [kỳ có mua] }] — nhiều lần mua nhất trước
+function tytGiaVatTu(che) {
+  const raw = (typeof load === 'function') ? load('inv_v3', []) : [];
+  const m = new Map();
+  raw.forEach(inv => {
+    if (!inv || inv.deletedAt || !Array.isArray(inv.items) || !inv.items.length) return;
+    const ky = tytKy(inv.ngay, che);
+    if (!ky) return;
+    inv.items.forEach(it => {
+      const ten = String(it.ten || '').trim();
+      const sl = +it.sl || 0;
+      const tien = +(it.thanhtien || sl * (+it.dongia || 0)) || 0;
+      if (!ten || !(sl > 0) || !(tien > 0)) return;
+      const dv = String(it.dv || '').trim();
+      const key = _tytBoDau(ten).replace(/\s+/g, ' ') + '|' + _tytBoDau(dv);
+      const o = m.get(key) || { key, ten, dv, loai: inv.loai || '', soLan: 0, tien: 0, ky: {} };
+      o.soLan++; o.tien += tien;
+      const k = o.ky[ky] || (o.ky[ky] = { sl: 0, tien: 0, gia: 0 });
+      k.sl += sl; k.tien += tien; k.gia = k.tien / k.sl;
+      m.set(key, o);
+    });
+  });
+  return [...m.values()].map(o => ({ ...o, kys: Object.keys(o.ky).sort() }))
+    .sort((a, b) => (b.soLan - a.soLan) || (b.tien - a.tien));
+}
+
+// Đơn giá CÔNG NHẬT bình quân theo kỳ (chấm công, bỏ CT "CÔNG TY"): { <kỳ>: { cong, tien, gia } }
+function tytGiaCong(che) {
+  const raw = (typeof load === 'function') ? load('cc_v2', []) : [];
+  const out = {};
+  raw.forEach(w => {
+    if (!w || w.deletedAt || !Array.isArray(w.workers) || w.projectId === 'COMPANY') return;
+    const ky = tytKy(w.toDate || w.fromDate, che);
+    if (!ky) return;
+    w.workers.forEach(wk => {
+      const cong = (wk.d || []).reduce((s2, v) => s2 + (+v || 0), 0);
+      const luong = +wk.luong || 0;
+      if (!(cong > 0) || !(luong > 0)) return;
+      const o = out[ky] || (out[ky] = { cong: 0, tien: 0, gia: 0 });
+      o.cong += cong; o.tien += cong * luong; o.gia = o.tien / o.cong;
+    });
+  });
+  return out;
+}
+
+// Biến động 1 chuỗi giá theo kỳ: { dau, cuoi, kyDau, kyCuoi, pct (cuối so với đầu), db: giá dự báo kỳ kế tiếp | null }
+//   kyMap: { <kỳ>: { gia } } · kys: các kỳ có số (đã sắp)
+function tytBienDong(kyMap, kys) {
+  if (!kys.length) return null;
+  const dau = kyMap[kys[0]].gia, cuoi = kyMap[kys[kys.length - 1]].gia;
+  // Trục x = vị trí kỳ trên dãy liên tục (kỳ không mua vẫn được tính khoảng cách)
+  const che = /Q/.test(kys[0]) ? 'q' : (kys[0].length === 7 ? 'm' : 'y');
+  const day = tytDayKy(kys[0], kys[kys.length - 1], che);
+  const hq = tytHoiQuy(kys.map(k => ({ x: day.indexOf(k), y: kyMap[k].gia })));
+  return { dau, cuoi, kyDau: kys[0], kyCuoi: kys[kys.length - 1], pct: dau ? (cuoi - dau) / dau * 100 : 0,
+    db: hq ? hq.du(day.length) : null, hq, day };
 }

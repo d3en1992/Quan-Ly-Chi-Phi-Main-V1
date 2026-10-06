@@ -2263,3 +2263,34 @@ td.action-col > div {
 .tyt-ss .tyt-ss-avg { background: var(--bs-tertiary-bg); font-weight: 600; }
 .tyt-ss-max { background: var(--bs-danger-bg-subtle) !important; color: var(--bs-danger-text-emphasis); }
 .tyt-ss-min { background: var(--bs-success-bg-subtle) !important; color: var(--bs-success-text-emphasis); }
+/* (07/10/2026 — Cải tiến Phần A) Tab Tỉ Trọng: RỔ CHI PHÍ (tag kép) */
+.tyt-ro { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; white-space: nowrap; border: 1px solid transparent; }
+.tyt-ro-sm { font-size: 10px; padding: 0 6px; }
+.tyt-ro-1 { background: var(--bs-primary-bg-subtle); border-color: var(--bs-primary-border-subtle); color: var(--bs-primary-text-emphasis); }
+.tyt-ro-2 { background: #fff1e0; border-color: #fdc78a; color: #9a4b00; }
+.tyt-ro-3 { background: var(--bs-secondary-bg); border-color: var(--bs-border-color); color: var(--bs-secondary-color); }
+.tyt-ro-0 { background: var(--bs-danger-bg-subtle); border-color: var(--bs-danger-border-subtle); color: var(--bs-danger-text-emphasis); }
+[data-bs-theme="dark"] .tyt-ro-2 { background: #4a2a05; border-color: #9a4b00; color: #ffd8a8; }
+.tyt-rpt .tyt-ro1-total td { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); border-top: 1px dashed var(--bs-primary-border-subtle); }
+/* Thanh "Tách cấu thành" (góc nhìn Giai đoạn): Vật tư / Nhân công / Khoán TP / Khác */
+.tyt-ct-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--bs-secondary-bg); }
+.tyt-ct-bar > span { display: block; height: 100%; }
+.tyt-ct-vt { background: #0d6efd; } .tyt-ct-nc { background: #fd7e14; } .tyt-ct-tp { background: #6f42c1; } .tyt-ct-khac { background: #adb5bd; }
+/* (07/10/2026 — Cải tiến Phần B) Kiểm soát định mức Rổ 1: chấm màu 4 trụ cột + Quỹ phụ phí, dòng vượt */
+.tyt-tru { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; background: #adb5bd; }
+.tyt-tru-sat { background: #495057; } .tyt-tru-bt { background: #0d6efd; } .tyt-tru-nc { background: #fd7e14; }
+.tyt-tru-tp { background: #6f42c1; } .tyt-tru-quy { background: #20c997; } .tyt-tru-x { background: var(--bs-danger); }
+.tyt-rpt tr.tyt-ks-vuot > td { background: var(--bs-danger-bg-subtle); }
+/* (07/10/2026 — Cải tiến Phần C) Xu hướng & biến động: biểu đồ đường SVG, chú thích, so sánh theo trụ cột */
+.tyt-chart { width: 100%; height: auto; display: block; max-height: 300px; }
+.tyt-ch-grid { stroke: var(--bs-border-color); stroke-width: 1; }
+.tyt-ch-base { stroke: var(--bs-secondary-color); stroke-width: 1; stroke-dasharray: 3 3; }
+.tyt-ch-txt { font-size: 11px; fill: var(--bs-secondary-color); }
+.tyt-ch-db { font-style: italic; fill: var(--bs-warning-text-emphasis); }
+.tyt-ch-dbzone { fill: var(--bs-warning-bg-subtle); opacity: .5; }
+.tyt-lg { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 9px; border-radius: 12px; cursor: pointer; border: 1px solid var(--bs-border-color); user-select: none; }
+.tyt-lg i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.tyt-lg.off { opacity: .4; text-decoration: line-through; }
+.tyt-ss .tyt-ss-tru td { font-weight: 700; background: var(--bs-tertiary-bg); }
+.tyt-ss .tyt-ss-sub td:first-child { padding-left: 22px; color: var(--bs-secondary-color); }
+.tyt-rpt tr.tyt-xh-db > td { background: var(--bs-warning-bg-subtle); font-style: italic; }
