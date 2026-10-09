@@ -66,6 +66,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.73 Tỉ Trọng Chi Phí — Cải tiến Phần A: Rổ chi phí (tag kép), góc nhìn Theo Rổ / Theo Giai đoạn (07/10/2026)](#973-tỉ-trọng-chi-phí--cải-tiến-phần-a-rổ-chi-phí-tag-kép-góc-nhìn-theo-rổ--theo-giai-đoạn-07102026)
    - [9.74 Tỉ Trọng Chi Phí — Cải tiến Phần B: Kiểm soát định mức Rổ 1 (4 trụ cột + Quỹ phụ phí), thư viện đơn giá module (07/10/2026)](#974-tỉ-trọng-chi-phí--cải-tiến-phần-b-kiểm-soát-định-mức-rổ-1-4-trụ-cột--quỹ-phụ-phí-thư-viện-đơn-giá-module-07102026)
    - [9.75 Tỉ Trọng Chi Phí — Cải tiến Phần C: Xu hướng & So sánh (so sánh Rổ 1, đ/m2 theo năm, biến động đơn giá vật tư / công nhật, dự báo) (07/10/2026)](#975-tỉ-trọng-chi-phí--cải-tiến-phần-c-xu-hướng--so-sánh-so-sánh-rổ-1-đm2-theo-năm-biến-động-đơn-giá-vật-tư--công-nhật-dự-báo-07102026)
+   - [9.76 Tab Tỉ Trọng đổi tên TỈ TRỌNG & ĐỊNH MỨC, dời dưới Công Nợ TP/NCC, mở cho mọi role (09/10/2026)](#976-tab-tỉ-trọng-đổi-tên-tỉ-trọng--định-mức-dời-dưới-công-nợ-tpncc-mở-cho-mọi-role-09102026)
 
 **Phụ lục**
 
@@ -2293,6 +2294,12 @@ Theo file thiết kế (Tab 3 "Xu hướng & biến động") + gợi ý đã ch
 - **Kiểm thử**: Edge headless 189/189 (thêm 35 bước Phần C); trang chạy bằng dữ liệu thật snapshot để chụp kiểm tra giao diện.
 
 **File đã sửa:** `pages/tytrong.html`, `js/modules/tytrong/tytrong.core.js`, `js/modules/tytrong/tytrong.ui.js`, `assets/css/style.css`.
+
+### 9.76 Tab Tỉ Trọng đổi tên TỈ TRỌNG & ĐỊNH MỨC, dời dưới Công Nợ TP/NCC, mở cho mọi role (09/10/2026)
+- Nút menu `data-page="tytrong"` đổi nhãn **TỈ TRỌNG & ĐỊNH MỨC** và dời lên ngay dưới **CÔNG NỢ TP/NCC** (index.html); tiêu đề trang ở `main.js` → "🥧 Tỉ Trọng & Định Mức". ID page / hàm / store giữ nguyên (`tytrong`).
+- `applyRoleUI` (auth.js): bỏ `tytrong` khỏi danh sách ẩn với Kế toán → **mọi role xem + sửa** (tab không có kiểm tra quyền sửa riêng).
+
+**File đã sửa:** `index.html`, `js/app/main.js`, `js/app/auth.js`.
 
 ---
 

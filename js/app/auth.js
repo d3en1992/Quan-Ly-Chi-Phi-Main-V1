@@ -755,8 +755,8 @@ function applyRoleUI() {
     // + tab QUYẾT TOÁN (chỉ Admin + Giám đốc được chốt sổ quyết toán công trình)
     // (03/10/2026) Tất toán TP/NCC đã chuyển vào tab CÔNG NỢ TP/NCC → Kế toán cũng được tất toán
     // + tab LỢI NHUẬN (02/10/2026 — tách từ Doanh Thu nên giữ cùng quyền: Kế toán không xem)
-    // + tab TỈ TRỌNG CHI PHÍ (05/10/2026 — số liệu quản trị như Lợi Nhuận: Kế toán không xem)
-    if (user.role === 'ketoan' && ['dashboard', 'doanhthu', 'loinhuan', 'quyettoan', 'tytrong'].includes(page)) {
+    // (09/10/2026) Tab TỈ TRỌNG & ĐỊNH MỨC (tytrong) mở cho MỌI role (kể cả Kế toán) — xem + sửa
+    if (user.role === 'ketoan' && ['dashboard', 'doanhthu', 'loinhuan', 'quyettoan'].includes(page)) {
       visible = false;
     }
     btn.style.display = visible ? '' : 'none';

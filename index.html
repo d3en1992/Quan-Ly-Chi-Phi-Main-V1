@@ -988,6 +988,14 @@
                     data-bs-dismiss="offcanvas">
               <span class="material-symbols-outlined msi-gap">credit_card</span>CÔNG NỢ TP/NCC
             </button>
+            <!-- (09/10/2026) Tab TỈ TRỌNG & ĐỊNH MỨC (trước là TỈ TRỌNG CHI PHÍ) — dời xuống ngay dưới CÔNG NỢ TP/NCC,
+                 mọi role đều xem + sửa được -->
+            <button class="nav-btn"
+                    data-page="tytrong"
+                    onclick="goPage(this,'tytrong')"
+                    data-bs-dismiss="offcanvas">
+              <span class="material-symbols-outlined msi-gap">pie_chart</span>TỈ TRỌNG &amp; ĐỊNH MỨC
+            </button>
             <button class="nav-btn"
                     data-page="thietbi"
                     onclick="goPage(this,'thietbi')"
@@ -1020,14 +1028,6 @@
                     onclick="goPage(this,'quyettoan')"
                     data-bs-dismiss="offcanvas">
               <span class="material-symbols-outlined msi-gap">fact_check</span>QUYẾT TOÁN
-            </button>
-            <!-- (05/10/2026) Tab TỈ TRỌNG CHI PHÍ — chi phí theo loại / giai đoạn / hạng mục, đ/m2 sàn
-                 (ẩn với Kế toán giống Lợi Nhuận, xem applyRoleUI) -->
-            <button class="nav-btn"
-                    data-page="tytrong"
-                    onclick="goPage(this,'tytrong')"
-                    data-bs-dismiss="offcanvas">
-              <span class="material-symbols-outlined msi-gap">pie_chart</span>TỈ TRỌNG CHI PHÍ
             </button>
             <button class="nav-btn"
                     data-page="dashboard"
@@ -1201,7 +1201,7 @@
       <!-- PAGE: QUYẾT TOÁN (chỉ còn Quyết toán công trình — Tất toán TP/NCC đã chuyển sang tab CÔNG NỢ TP/NCC, 03/10/2026) -->
       <div class="page" id="page-quyettoan" data-partial="pages/quyettoan.html"></div>
 
-      <!-- PAGE: TỈ TRỌNG CHI PHÍ (05/10/2026) -->
+      <!-- PAGE: TỈ TRỌNG & ĐỊNH MỨC (05/10/2026, đổi tên 09/10/2026) -->
       <div class="page" id="page-tytrong" data-partial="pages/tytrong.html"></div>
 
       <!-- ════════════════════════════════════════════════════════════ -->

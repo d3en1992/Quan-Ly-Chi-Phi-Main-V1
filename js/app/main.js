@@ -196,7 +196,7 @@ function goPage(btn, id) {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',
     thongkecphd: '📊 Thống Kê CP/HĐ', chamcong: '📅 Chấm Công',
     nhapung: '💰 Ứng TP/NCC', thietbi: '🔧 Theo Dõi TB',
-    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', loinhuan: '📈 Lợi Nhuận', quyettoan: '🧾 Quyết Toán', tytrong: '🥧 Tỉ Trọng Chi Phí', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
+    danhmuc: '⚙ Danh Mục', doanhthu: '💵 Doanh Thu', loinhuan: '📈 Lợi Nhuận', quyettoan: '🧾 Quyết Toán', tytrong: '🥧 Tỉ Trọng & Định Mức', congno: '💳 Công Nợ TP/NCC', dashboard: '📊 Dashboard',
     thungrac: '🗑️ Thùng Rác'
   };
   _setTopbarTabTitle(_PAGE_LABELS[id] || '');
