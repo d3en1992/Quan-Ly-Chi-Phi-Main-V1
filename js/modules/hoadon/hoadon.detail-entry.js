@@ -297,17 +297,17 @@ function saveDetailInvoice() {
 
   clearInvoiceCache(); save('inv_v3', invoices);
   buildYearSelect(); updateTop();
-  // (01/10/2026) Lưu xong → làm sạch TOÀN BỘ form + Ngày về hôm nay, chống bấm lưu 2 lần /
-  // sửa form cũ rồi lưu tiếp tạo HĐ trùng. Muốn nhập HĐ tương tự → dùng Sao chép / Dán form.
-  clearDetailForm(true);
+  // Lưu/Cập nhật xong → làm sạch form (bảng + mọi dropdown), chống bấm lưu 2 lần / sửa form cũ
+  // rồi lưu tiếp tạo HĐ trùng. (09/10/2026) GIỮ NGUYÊN Ngày đang chọn — không nhảy về hôm nay.
+  clearDetailForm();
   renderTodayInvoices();
   buildFilters(); filterAndRender();
 }
 
-// Xóa form Hóa đơn chi tiết.
-//   full = false (nút "Xóa form"): xóa dòng hàng, nội dung, NCC, Người TH — giữ Ngày/Loại/CT
-//   full = true  (sau khi Lưu/Cập nhật thành công): xóa SẠCH mọi ô + Ngày về hôm nay
-function clearDetailForm(full) {
+// Xóa form Hóa đơn chi tiết (nút "Xóa form" + sau khi Lưu/Cập nhật thành công).
+// (09/10/2026) Xóa trắng bảng dòng hàng, Nội dung và reset TẤT CẢ dropdown (Loại, Công trình,
+// NCC, Người TH) — CHỈ giữ lại Ngày. Ngày chỉ về hôm nay khi mở app / F5 (main.js).
+function clearDetailForm() {
   document.getElementById('detail-tbody').innerHTML = '';
   for(let i=0; i<5; i++) addDetailRow();
   _initDetailSheetGrid();
@@ -317,14 +317,10 @@ function clearDetailForm(full) {
   if(nccEl) nccEl.value = '';
   const nguoiEl = document.getElementById('detail-nguoi');
   if(nguoiEl) nguoiEl.value = '';
-  if (full === true) {
-    const dEl = document.getElementById('detail-ngay');
-    if (dEl) dEl.value = today();
-    const lEl = document.getElementById('detail-loai');
-    if (lEl) lEl.value = '';
-    const cEl = document.getElementById('detail-ct');
-    if (cEl) cEl.value = '';
-  }
+  const lEl = document.getElementById('detail-loai');
+  if (lEl) lEl.value = '';
+  const cEl = document.getElementById('detail-ct');
+  if (cEl) cEl.value = '';
   // Bỏ "giá trị gốc" của HĐ cũ (nếu vừa sửa) + bỏ tô đỏ
   ['detail-loai', 'detail-ct', 'detail-ncc', 'detail-nguoi'].forEach(id => {
     const el = document.getElementById(id);
@@ -473,53 +469,33 @@ function _detailFormItems() {
   return items;
 }
 
-// Sao chép: Ngày + Loại + Công trình (kèm projectId) + NCC + Người TH + các dòng hàng + Nội dung
+// Sao chép CHỈ các dòng hàng hóa trong bảng (Tên, ĐV, SL, Đơn giá, CK).
+// (09/10/2026) KHÔNG sao chép Ngày và các dropdown (Loại, Công trình, NCC, Người TH).
 function copyDetailForm() {
-  const v = id => (document.getElementById(id)?.value || '').trim();
   const items = _detailFormItems();
-  const ctSel = document.getElementById('detail-ct');
-  const clip = {
-    ngay: v('detail-ngay'), loai: v('detail-loai'), ct: v('detail-ct'),
-    ctPid: ctSel?.selectedOptions?.[0]?.dataset?.pid || '',
-    ncc: v('detail-ncc'), nguoi: v('detail-nguoi'), nd: v('detail-nd'), items,
-  };
-  if (!clip.loai && !clip.ct && !clip.ncc && !clip.nguoi && !items.length) {
-    toast('Form đang trống — chưa có gì để sao chép', 'error'); return;
-  }
-  _hdClipSet('detail', clip);
-  toast(`📋 Đã sao chép form (${items.length} dòng hàng). Lưu xong bấm "Dán form" để nhập HĐ tương tự.`, 'success');
+  if (!items.length) { toast('Bảng đang trống — chưa có dòng hàng nào để sao chép', 'error'); return; }
+  _hdClipSet('detail', { items });
+  toast(`📋 Đã sao chép ${items.length} dòng hàng. Bấm "Dán form" để dán vào bảng.`, 'success');
 }
 
-// Dán form đã sao chép (tạo HĐ MỚI — thoát chế độ sửa HĐ cũ nếu đang sửa)
+// Dán các dòng hàng đã sao chép vào bảng — CHỈ thay bảng dòng hàng.
+// (09/10/2026) KHÔNG đè Ngày và các dropdown đang chọn (bản sao chép cũ có lưu ngày/loại/CT...
+// cũng bị bỏ qua). Nội dung tự sinh lại từ tên hàng (generateDetailNd).
 function pasteDetailForm() {
   const clip = _hdClipGet('detail');
-  if (!clip) { toast('Chưa có form nào được sao chép — bấm "Sao chép form" trước', 'error'); return; }
-  const hasData = _detailFormItems().length
-    || ['detail-loai', 'detail-ct', 'detail-ncc', 'detail-nguoi'].some(id => document.getElementById(id)?.value);
-  if (hasData && !confirm('Form đang có dữ liệu. Thay bằng form đã sao chép?')) return;
-
-  _initDetailFormSelects(); // đảm bảo dropdown có đủ danh mục mới nhất
-  clearDetailForm(true);    // xóa sạch + thoát chế độ sửa (editId, giá trị gốc)
-  if (clip.ngay) document.getElementById('detail-ngay').value = clip.ngay;
-  _setSelectFlexible(document.getElementById('detail-loai'),  clip.loai);
-  const ctSel = document.getElementById('detail-ct');
-  _setSelectFlexible(ctSel, clip.ct);
-  // CT không còn trong danh sách (option tạm "(*)") → gắn lại projectId đã sao chép
-  const ctOpt = ctSel?.selectedOptions?.[0];
-  if (ctOpt && !ctOpt.dataset.pid && clip.ctPid) ctOpt.dataset.pid = clip.ctPid;
-  _setSelectFlexible(document.getElementById('detail-ncc'),   clip.ncc);
-  _setSelectFlexible(document.getElementById('detail-nguoi'), clip.nguoi);
+  const items = clip && Array.isArray(clip.items) ? clip.items : [];
+  if (!items.length) { toast('Chưa có dòng hàng nào được sao chép — bấm "Sao chép form" trước', 'error'); return; }
+  if (_detailFormItems().length && !confirm('Bảng đang có dòng hàng. Thay bằng các dòng đã sao chép?')) return;
 
   const tbody = document.getElementById('detail-tbody');
   tbody.innerHTML = '';
-  const items = Array.isArray(clip.items) ? clip.items : [];
   items.forEach(it => addDetailRow({ ...it }));
   for (let i = items.length; i < 5; i++) addDetailRow();
+  _initDetailSheetGrid();
   getDetailRows().forEach(tr => calcDetailRow(tr));
   calcDetailTotals();
-  document.getElementById('detail-nd').value = clip.nd || '';
-  renderTodayInvoices();
-  toast(`📥 Đã dán form sao chép lúc ${_hdClipTime(clip)} — sửa số tiền/nội dung rồi Lưu`, 'success');
+  generateDetailNd();
+  toast(`📥 Đã dán ${items.length} dòng hàng sao chép lúc ${_hdClipTime(clip)} — kiểm tra rồi Lưu`, 'success');
 }
 
 // ══════════════════════════════════════════════════════════════════

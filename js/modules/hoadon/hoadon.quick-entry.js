@@ -196,17 +196,19 @@ function calcSummary() {
   document.getElementById('entry-total').textContent = fmtM(total);
 }
 
+// Nút "Xóa bảng": xóa trắng mọi dòng (kể cả các ô Loại/CT/Người TH/NCC trong bảng).
+// Ngày (entry-date) nằm ngoài bảng → giữ nguyên, không reset.
 function clearTable() {
   if(!confirm('Xóa toàn bộ bảng nhập hiện tại?')) return;
   initTable(5);
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SAO CHÉP / DÁN TOÀN BỘ FORM (01/10/2026) — dùng chung cho Nhập nhanh + HĐ chi tiết
+//  SAO CHÉP / DÁN DỮ LIỆU BẢNG (01/10/2026, sửa 09/10/2026) — dùng chung Nhập nhanh + HĐ chi tiết
 // ══════════════════════════════════════════════════════════════
-// "Bộ nhớ tạm" riêng của app (không phải clipboard hệ điều hành) để giữ được cả Ngày,
-// các ô dropdown/danh mục, projectId công trình. Lưu thêm vào localStorage để F5 vẫn còn
-// (chỉ là tiện ích trên máy này — không đồng bộ cloud). Mỗi tab 1 ngăn riêng: quick / detail.
+// "Bộ nhớ tạm" riêng của app (không phải clipboard hệ điều hành) — (09/10/2026) CHỈ chứa
+// dữ liệu trong bảng (dòng chi phí / dòng hàng hóa), không chứa Ngày và dropdown đầu form.
+// Lưu thêm vào localStorage để F5 vẫn còn (chỉ là tiện ích trên máy này — không đồng bộ cloud). Mỗi tab 1 ngăn riêng: quick / detail.
 const _HD_CLIP_KEY = 'hd_form_clip_v1';
 const _hdClipMem = {};
 function _hdClipSet(kind, data) {
@@ -247,23 +249,24 @@ function _quickFormRows() {
   return rows;
 }
 
-// Sao chép toàn bộ form Nhập nhanh: Ngày + mọi dòng (Loại, CT, Số tiền, Nội dung, Người TH, NCC)
+// Sao chép CÁC DÒNG trong bảng Nhập nhanh (Loại, CT, Số tiền, Nội dung, Người TH, NCC).
+// (09/10/2026) KHÔNG sao chép Ngày — Ngày là của form, không thuộc dữ liệu bảng.
 function copyQuickForm() {
   const rows = _quickFormRows();
-  if (!rows.length) { toast('Form đang trống — chưa có gì để sao chép', 'error'); return; }
-  _hdClipSet('quick', { ngay: document.getElementById('entry-date')?.value || '', rows });
-  toast(`📋 Đã sao chép form (${rows.length} dòng). Lưu xong bấm "Dán form" để nhập HĐ tương tự.`, 'success');
+  if (!rows.length) { toast('Bảng đang trống — chưa có gì để sao chép', 'error'); return; }
+  _hdClipSet('quick', { rows });
+  toast(`📋 Đã sao chép ${rows.length} dòng. Bấm "Dán form" để dán vào bảng.`, 'success');
 }
 
-// Dán form đã sao chép vào bảng Nhập nhanh (tạo HĐ MỚI — không mang chế độ sửa HĐ cũ)
+// Dán các dòng đã sao chép vào bảng Nhập nhanh (tạo HĐ MỚI — không mang chế độ sửa HĐ cũ).
+// (09/10/2026) KHÔNG đụng tới Ngày — giữ nguyên ngày đang chọn trên form
+// (bản sao chép cũ có lưu "ngay" cũng bị bỏ qua).
 function pasteQuickForm() {
   const clip = _hdClipGet('quick');
   if (!clip || !Array.isArray(clip.rows) || !clip.rows.length) {
-    toast('Chưa có form nào được sao chép — bấm "Sao chép form" trước', 'error'); return;
+    toast('Chưa có dữ liệu nào được sao chép — bấm "Sao chép form" trước', 'error'); return;
   }
-  if (_quickFormRows().length && !confirm('Bảng đang có dữ liệu. Thay bằng form đã sao chép?')) return;
-  const dEl = document.getElementById('entry-date');
-  if (dEl && clip.ngay) dEl.value = clip.ngay;
+  if (_quickFormRows().length && !confirm('Bảng đang có dữ liệu. Thay bằng các dòng đã sao chép?')) return;
   document.getElementById('entry-tbody').innerHTML = '';
   clip.rows.forEach(r => addRow({ ...r }));
   for (let i = clip.rows.length; i < 5; i++) addRow({ _blank: true }); // dòng đệm trống
@@ -272,7 +275,7 @@ function pasteQuickForm() {
   const btn = document.getElementById('entry-save-btn');
   if (btn) btn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
   renderTodayInvoices();
-  toast(`📥 Đã dán form sao chép lúc ${_hdClipTime(clip)} — sửa số tiền/nội dung rồi Lưu`, 'success');
+  toast(`📥 Đã dán ${clip.rows.length} dòng sao chép lúc ${_hdClipTime(clip)} — sửa số tiền/nội dung rồi Lưu`, 'success');
 }
 
 function saveAllRows(skipDupCheck) {
@@ -536,11 +539,9 @@ function _doSaveRows(rows) {
   const _eBtn = document.getElementById('entry-save-btn');
   if (_eBtn) _eBtn.innerHTML = '<span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn';
 
-  // (01/10/2026) Lưu/Cập nhật xong → làm SẠCH bảng nhập + Ngày về hôm nay.
-  // Chống lỗi thao tác: bấm lưu 2 lần, hoặc giữ form cũ sửa chút rồi lưu tiếp → HĐ trùng /
-  // sai ngày. Cần nhập HĐ tương tự → bấm "Sao chép form" TRƯỚC khi lưu rồi "Dán form".
-  const _dEl = document.getElementById('entry-date');
-  if (_dEl) _dEl.value = today();
+  // Lưu/Cập nhật xong → làm SẠCH bảng nhập (chống bấm lưu 2 lần / sửa form cũ lưu tiếp → HĐ trùng).
+  // (09/10/2026) GIỮ NGUYÊN Ngày đang chọn — không tự nhảy về hôm nay. Ngày chỉ về hôm nay
+  // khi mở app / F5 (main.js). Cần nhập HĐ tương tự → "Sao chép form" TRƯỚC khi lưu rồi "Dán form".
   initTable(5);
 
   // Tự động refresh sub-tab "HĐ/CP nhập trong ngày"

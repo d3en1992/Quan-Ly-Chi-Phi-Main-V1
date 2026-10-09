@@ -25,11 +25,11 @@
                 <span class="dot"></span>Nhập Hóa Đơn
               </div>
               <div class="d-flex gap-2 flex-wrap align-items-center">
-                <!-- Sao chép / Dán toàn bộ form (Ngày + mọi ô kể cả danh mục) — copyQuickForm / pasteQuickForm -->
-                <button class="btn btn-outline-primary" onclick="copyQuickForm()" title="Sao chép Ngày + toàn bộ các dòng đang nhập">
+                <!-- Sao chép / Dán CHỈ các dòng trong bảng (không gồm Ngày) — copyQuickForm / pasteQuickForm -->
+                <button class="btn btn-outline-primary" onclick="copyQuickForm()" title="Sao chép các dòng đang nhập trong bảng (không gồm Ngày)">
                   <span class="material-symbols-outlined msi-gap">content_copy</span>Sao chép form
                 </button>
-                <button class="btn btn-outline-primary" onclick="pasteQuickForm()" title="Dán form đã sao chép để nhập hóa đơn tương tự">
+                <button class="btn btn-outline-primary" onclick="pasteQuickForm()" title="Dán các dòng đã sao chép vào bảng (giữ nguyên Ngày và dropdown)">
                   <span class="material-symbols-outlined msi-gap">content_paste</span>Dán form
                 </button>
                 <button class="btn btn-outline-secondary" onclick="clearTable()">
@@ -108,14 +108,14 @@
                 <span class="dot"></span>Hóa Đơn Chi Tiết
               </div>
               <div class="d-flex gap-2 flex-wrap align-items-center">
-                <!-- Sao chép / Dán toàn bộ form (Ngày, Loại, CT, NCC, Người TH, dòng hàng, Nội dung) -->
-                <button class="btn btn-outline-primary" onclick="copyDetailForm()" title="Sao chép toàn bộ hóa đơn đang nhập">
+                <!-- Sao chép / Dán CHỈ các dòng hàng trong bảng (không gồm Ngày và các dropdown) -->
+                <button class="btn btn-outline-primary" onclick="copyDetailForm()" title="Sao chép các dòng hàng trong bảng (không gồm Ngày, Loại, CT, NCC, Người TH)">
                   <span class="material-symbols-outlined msi-gap">content_copy</span>Sao chép form
                 </button>
-                <button class="btn btn-outline-primary" onclick="pasteDetailForm()" title="Dán form đã sao chép để nhập hóa đơn tương tự">
+                <button class="btn btn-outline-primary" onclick="pasteDetailForm()" title="Dán các dòng đã sao chép vào bảng (giữ nguyên Ngày và dropdown)">
                   <span class="material-symbols-outlined msi-gap">content_paste</span>Dán form
                 </button>
-                <button class="btn btn-outline-secondary" onclick="clearDetailForm()">
+                <button class="btn btn-outline-secondary" onclick="clearDetailForm()" title="Xóa trắng bảng và các dropdown — giữ lại Ngày">
                   <span class="material-symbols-outlined msi-gap">delete</span>Xóa form
                 </button>
               </div>

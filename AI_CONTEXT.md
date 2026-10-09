@@ -2301,6 +2301,16 @@ Theo file thiết kế (Tab 3 "Xu hướng & biến động") + gợi ý đã ch
 
 **File đã sửa:** `index.html`, `js/app/main.js`, `js/app/auth.js`.
 
+### 9.77 Nhập Chi Phí: giữ Ngày khi Lưu/Xóa form · Sao chép/Dán chỉ dữ liệu bảng (09/10/2026)
+Thay thế một phần hành vi của 9.34.
+- **Giữ Ngày:** Lưu/Cập nhật không còn đưa Ngày về hôm nay. Nhập nhanh `_doSaveRows` chỉ `initTable(5)`; HĐ chi tiết `saveDetailInvoice` gọi `clearDetailForm()`.
+- **`clearDetailForm()`** (bỏ tham số `full`): nút "Xóa form" và sau khi lưu đều xóa trắng bảng dòng hàng, Nội dung và reset **mọi** dropdown (Loại, CT, NCC, Người TH, `dataset.orig`, editId), **chỉ giữ Ngày**. Nhập nhanh "Xóa bảng" (`clearTable`) vốn đã giữ Ngày.
+- **Sao chép/Dán chỉ dữ liệu bảng:** `copyQuickForm` lưu `{rows}` (không còn `ngay`); `pasteQuickForm` không đè Ngày. `copyDetailForm` lưu `{items}` (không Ngày/Loại/CT/NCC/Người TH/Nội dung); `pasteDetailForm` chỉ thay `#detail-tbody`, giữ nguyên header và chế độ sửa, Nội dung tự sinh lại bằng `generateDetailNd`. Bản sao chép cũ trong `hd_form_clip_v1` có `ngay`/`loai`... sẽ bị bỏ qua.
+- **Ngày mặc định = hôm nay** chỉ khi mở app / F5 (`main.js` gán `entry-date = today()`; `detail-ngay` lấy theo `entry-date` lần đầu mở tab con).
+- Tooltip các nút Sao chép/Dán/Xóa form trong `pages/nhap.html` được cập nhật cho đúng hành vi mới.
+
+**File đã sửa:** `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`, `pages/nhap.html`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code
