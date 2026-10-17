@@ -402,9 +402,9 @@
                 <div class="mb-3">
                   <label class="form-label small fw-bold d-block">Loại giao dịch</label>
                   <div class="btn-group w-100" role="group" id="cc-ung-m-kind-group">
-                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-ung" value="ung" checked onchange="_ccUngSyncTLLabel()" />
+                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-ung" value="ung" checked onchange="_ccUngOnKindChange()" />
                     <label class="btn btn-outline-warning btn-sm fw-bold" for="cc-ung-m-kind-ung"><span class="material-symbols-outlined msi-gap">add_circle</span>Ứng tiền</label>
-                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-tra" value="tra" onchange="_ccUngSyncTLLabel()" />
+                    <input type="radio" class="btn-check" name="cc-ung-m-kind" id="cc-ung-m-kind-tra" value="tra" onchange="_ccUngOnKindChange()" />
                     <label class="btn btn-outline-success btn-sm fw-bold" for="cc-ung-m-kind-tra"><span class="material-symbols-outlined msi-gap">remove_circle</span>Trả nợ</label>
                   </div>
                 </div>
@@ -422,7 +422,7 @@
                   <label class="form-label small fw-bold">Tên công nhân</label>
                   <!-- Ô chọn tên + badge Vai trò (T/P/C) tối giản, cập nhật động khi chọn CN -->
                   <div class="d-flex align-items-center gap-2">
-                    <input type="text" id="cc-ung-m-name" class="form-control form-control-sm" list="cc-name-dl" placeholder="Chọn / gõ tên công nhân..." autocomplete="off" oninput="_ccUngSyncRoleBadge()" onchange="_ccUngSyncRoleBadge()" />
+                    <input type="text" id="cc-ung-m-name" class="form-control form-control-sm" list="cc-ung-m-name-dl" placeholder="Chọn / gõ tên công nhân..." autocomplete="off" oninput="_ccUngSyncRoleBadge()" onchange="_ccUngSyncRoleBadge()" />
                     <span id="cc-ung-m-role" title="Vai trò công nhân"
                       style="display:none;flex:0 0 auto;min-width:28px;text-align:center;font-size:12px;font-weight:700;line-height:1;padding:6px 10px;border-radius:6px;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);background:var(--bs-tertiary-bg)"></span>
                   </div>

@@ -2311,6 +2311,16 @@ Thay thế một phần hành vi của 9.34.
 
 **File đã sửa:** `js/modules/hoadon/hoadon.quick-entry.js`, `js/modules/hoadon/hoadon.detail-entry.js`, `pages/nhap.html`.
 
+### 9.78 Popup Tiền ứng CN: lọc tên công nhân theo Loại giao dịch (18/10/2026)
+- Ô Tên công nhân (`#cc-ung-m-name`) dùng datalist riêng **`#cc-ung-m-name-dl`** (không dùng chung `cc-name-dl` nữa), dựng bởi `_ccUngBuildNameList()`:
+  - **Ứng tiền** → CN trong danh mục của năm đang chọn, cùng quy tắc tab Danh mục: có phát sinh trong năm (`_isDmItemUsedInYear`) hoặc chưa từng phát sinh ở năm nào (`!_isDmItemUsedAnytime`).
+  - **Trả nợ** → chỉ CN đang còn nợ (`_ccUngCurrentDebt(name) = ccWorkerDebtUpTo(name,'9999-12-31') > 0`), mỗi gợi ý kèm nhãn "Nợ: …".
+  - Khi SỬA giao dịch luôn giữ tên của giao dịch đang sửa trong danh sách.
+- Radio Loại giao dịch gọi `_ccUngOnKindChange()` (đồng bộ nhãn checkbox + dựng lại danh sách; xóa tên đang nhập nếu không thuộc danh sách mới).
+- `saveCCUng`: Trả nợ thêm mới bị chặn nếu CN không còn nợ (phòng gõ tay).
+
+**File đã sửa:** `js/modules/chamcong/chamcong.ung-ledger.js`, `pages/chamcong.html`.
+
 ---
 
 ## Phụ lục A — Di sản V2 đã xóa khỏi code

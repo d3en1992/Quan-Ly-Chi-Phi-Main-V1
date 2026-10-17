@@ -242,6 +242,7 @@ function openCCUngModal(prefillName, editRec) {
     saveTxt.textContent = editRec ? "Cập nhật giao dịch" : "Lưu giao dịch";
 
   _ccUngSyncTLLabel();   // đồng bộ text checkbox theo loại giao dịch
+  _ccUngBuildNameList(); // gợi ý tên theo loại giao dịch (Ứng: CN trong năm · Trả: CN đang nợ)
   _ccUngSyncRoleBadge(); // đồng bộ badge vai trò theo tên (nếu có prefill)
 
   if (tienEl)
@@ -269,6 +270,74 @@ function _ccUngSyncTLLabel() {
       kind === "tra"
         ? "− Trừ vào Thực lãnh tuần giao dịch"
         : "+ Cộng vào Thực lãnh tuần giao dịch";
+}
+
+// Dư nợ hiện tại (tính hết mọi giao dịch) của 1 công nhân
+function _ccUngCurrentDebt(name) {
+  return ccWorkerDebtUpTo(name, "9999-12-31");
+}
+
+// Danh sách tên gợi ý trong popup theo Loại giao dịch:
+//   Ứng tiền → CN thuộc danh mục của năm đang chọn (cùng quy tắc tab Danh mục:
+//              có phát sinh trong năm, hoặc chưa từng phát sinh ở năm nào)
+//   Trả nợ   → chỉ CN đang còn nợ (dư nợ > 0)
+// Khi SỬA giao dịch, luôn giữ tên của giao dịch đang sửa trong danh sách.
+function _ccUngNameCandidates(kind) {
+  const all = cats.congNhan || [];
+  const keep = (document.getElementById("cc-ung-m-name")?.value || "").trim();
+  const keepKey = _ccUngEditId && keep ? normalizeKey(keep) : "";
+  const list = all.filter((n) => {
+    if (keepKey && normalizeKey(n) === keepKey) return true;
+    if (kind === "tra") return _ccUngCurrentDebt(n) > 0;
+    if (typeof _isDmItemUsedInYear !== "function") return true;
+    return (
+      _isDmItemUsedInYear("congNhan", n) ||
+      !_isDmItemUsedAnytime("congNhan", n)
+    );
+  });
+  return list.sort((a, b) => a.localeCompare(b, "vi"));
+}
+
+function _ccUngBuildNameList() {
+  const kind =
+    document.querySelector('input[name="cc-ung-m-kind"]:checked')?.value ||
+    "ung";
+  let dl = document.getElementById("cc-ung-m-name-dl");
+  if (!dl) {
+    dl = document.createElement("datalist");
+    dl.id = "cc-ung-m-name-dl";
+    document.body.appendChild(dl);
+  }
+  const names = _ccUngNameCandidates(kind);
+  dl.innerHTML = names
+    .map((n) =>
+      kind === "tra"
+        ? `<option value="${x(n)}" label="Nợ: ${numFmt(_ccUngCurrentDebt(n))}">`
+        : `<option value="${x(n)}">`,
+    )
+    .join("");
+  const nameEl = document.getElementById("cc-ung-m-name");
+  if (nameEl)
+    nameEl.placeholder =
+      kind === "tra"
+        ? names.length
+          ? "Chọn công nhân đang nợ..."
+          : "Không có công nhân nào đang nợ"
+        : "Chọn / gõ tên công nhân...";
+  return names;
+}
+
+// Đổi Loại giao dịch → đổi text checkbox + dựng lại danh sách tên;
+// tên đang nhập không nằm trong danh sách mới thì xóa đi.
+function _ccUngOnKindChange() {
+  _ccUngSyncTLLabel();
+  const names = _ccUngBuildNameList();
+  const nameEl = document.getElementById("cc-ung-m-name");
+  const cur = (nameEl?.value || "").trim();
+  if (cur && !names.some((n) => normalizeKey(n) === normalizeKey(cur))) {
+    nameEl.value = "";
+    _ccUngSyncRoleBadge();
+  }
 }
 
 // Cập nhật badge Vai trò (T/P/C) theo công nhân đang chọn trong popup.
@@ -328,6 +397,9 @@ function saveCCUng() {
       "error",
     );
   if (tien <= 0) return toast("Nhập số tiền > 0!", "error");
+  // Trả nợ (thêm mới) chỉ áp dụng cho CN đang còn nợ
+  if (kind === "tra" && !_ccUngEditId && _ccUngCurrentDebt(canonical) <= 0)
+    return toast('⚠️ "' + canonical + '" hiện không còn nợ!', "error");
 
   // Dữ liệu chung cho cả thêm mới lẫn cập nhật
   const fields = {
