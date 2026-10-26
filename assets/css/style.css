@@ -2203,24 +2203,21 @@ td.action-col > div {
 #qtf-card.qtf-locked .form-select:disabled { background-color: var(--bs-tertiary-bg); color: var(--bs-body-color); opacity: 1; }
 #qtf-card.qtf-locked .btn-check:disabled + .btn { opacity: 1; }   /* loại đã chốt vẫn rõ màu */
 
-/* ── (05/10/2026) Tab TỈ TRỌNG CHI PHÍ (pages/tytrong.html) ── */
+/* ── (05/10/2026 · tái cấu trúc 3.0 ngày 27/10/2026) Tab TỈ TRỌNG & ĐỊNH MỨC (pages/tytrong.html) ── */
 #tyt-root .ss-wrap { display: block; width: 100% !important; min-width: 0 !important; }
-/* Khối 1 giai đoạn trong khung "Giai Đoạn & Hạng Mục" */
-.tyt-gd-box { border: 1px solid var(--bs-border-color); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: var(--bs-tertiary-bg); }
-.tyt-gd-no { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
-  background: var(--bs-primary); color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-.tyt-hm-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0 30px; }
-.tyt-hm-list input { max-width: 320px; }
-/* Thanh tỉ trọng nhỏ dưới số % */
+/* Thanh tỉ trọng nhỏ dưới số % (màu theo nhóm nếu có class .tyt-nh-N) */
 .tyt-bar { height: 4px; border-radius: 2px; background: var(--bs-secondary-bg); margin-top: 3px; overflow: hidden; }
 .tyt-bar > span { display: block; height: 100%; background: var(--bs-primary); }
-/* Phân cấp dòng trong 2 bảng báo cáo */
-.tyt-rpt .tyt-rpt-gd td { font-weight: 700; background: var(--bs-tertiary-bg); }
-.tyt-rpt .tyt-rpt-hm td:first-child { padding-left: 22px; }
-.tyt-rpt .tyt-rpt-chua td { color: var(--bs-warning-text-emphasis); background: var(--bs-warning-bg-subtle); font-weight: 600; }
+.tyt-bar[class*="tyt-nh-"] > span { background: var(--tyt-nh); }
 .tyt-rpt .tyt-rpt-total td { font-weight: 700; border-top: 2px solid var(--bs-border-color); }
 .tyt-rpt .tyt-rpt-zero td { opacity: .5; }
-/* (05/10/2026 — Lần 2) Tab Tỉ Trọng: bảng CÂY MA TRẬN (tab con Phân Tích) */
+/* Biểu tượng (?) — chữ hướng dẫn chỉ hiện khi rê chuột */
+.tyt-help { cursor: help; color: var(--bs-secondary-color); font-weight: 400; }
+.tyt-help .material-symbols-outlined { font-size: 15px; vertical-align: -3px; }
+/* Thẻ KPI "Tổng diện tích sàn" bấm được → popup Bảng M2 */
+.tyt-kpi-click { cursor: pointer; transition: box-shadow .15s; }
+.tyt-kpi-click:hover, .tyt-kpi-click:focus { box-shadow: 0 0 0 2px var(--bs-primary-border-subtle); outline: none; }
+/* Bảng CÂY 4 nhóm (tab con Tổng quan & Phân bổ) */
 .tyt-cay .tyt-cay-name { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .tyt-cay-tg { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0;
   padding: 0; border: 1px solid var(--bs-border-color); border-radius: 4px; background: var(--bs-body-bg); color: var(--bs-secondary-color); }
@@ -2228,31 +2225,48 @@ td.action-col > div {
 .tyt-cay-tg .material-symbols-outlined { font-size: 14px; }
 .tyt-cay-tg-sp { display: inline-block; width: 18px; flex-shrink: 0; }
 .tyt-cay .tyt-cay-gd td { font-weight: 700; background: var(--bs-tertiary-bg); }
-.tyt-cay .tyt-cay-chua td { color: var(--bs-warning-text-emphasis); background: var(--bs-warning-bg-subtle); }
 .tyt-cay .tyt-cay-hm td:first-child { font-weight: 600; }
-.tyt-cay .tyt-cay-chung td:first-child { font-weight: 400; color: var(--bs-secondary-color); }
 .tyt-cay .tyt-cay-loai td { color: var(--bs-body-color); }
 .tyt-cay .tyt-cay-line td { font-size: 11.5px; color: var(--bs-secondary-color); background: var(--bs-body-bg); }
 .tyt-cay-note { font-size: 11px; color: var(--bs-secondary-color); font-weight: 400; }
 .tyt-cay-date { font-family: 'IBM Plex Mono', monospace; font-size: 11px; margin-right: 4px; }
-/* Hướng dẫn "Ở đâu" (hạng mục) vs "Là gì" (loại chi phí) ở tab con Thiết lập */
-.tyt-guide { font-size: 11.5px; line-height: 1.5; padding: 8px 10px; border-radius: 8px;
-  background: var(--bs-info-bg-subtle); border: 1px solid var(--bs-info-border-subtle); color: var(--bs-info-text-emphasis); }
-.tyt-hm-warn { font-size: 11px; color: var(--bs-warning-text-emphasis); white-space: nowrap; cursor: help; }
-/* (05/10/2026 — Lần 2) Tab Tỉ Trọng: nhãn NGUỒN xếp khoản chi (tay / HĐ TP / luật / mốc ngày / chưa PB) */
-.tyt-src { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; white-space: nowrap;
-  border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); color: var(--bs-secondary-color); }
-.tyt-src-tay  { background: var(--bs-primary-bg-subtle); border-color: var(--bs-primary-border-subtle); color: var(--bs-primary-text-emphasis); }
-.tyt-src-hdtp { background: #f3e8ff; border-color: #d8b4fe; color: #6b21a8; }
-.tyt-src-luat { background: var(--bs-success-bg-subtle); border-color: var(--bs-success-border-subtle); color: var(--bs-success-text-emphasis); }
-.tyt-src-ngay { background: var(--bs-info-bg-subtle); border-color: var(--bs-info-border-subtle); color: var(--bs-info-text-emphasis); }
-[data-bs-theme="dark"] .tyt-src-hdtp { background: #3b1d5a; border-color: #6b21a8; color: #e9d5ff; }
 .tyt-uutien { font-size: 12px; padding: 8px 12px; border-radius: 8px; background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); }
-/* Dự toán: % đã dùng gần / vượt ngân sách */
-.tyt-dt-gan { color: var(--bs-warning-text-emphasis); }
-.tyt-dt-gan .tyt-bar > span { background: var(--bs-warning); }
+/* 4 NHÓM CHI PHÍ — màu nhận diện xuyên suốt: 1 xanh dương · 2 xanh ngọc · 3 tím · 4 cam · 0 (chưa xếp) đỏ */
+.tyt-nh-1 { --tyt-nh: #0d6efd; } .tyt-nh-2 { --tyt-nh: #0f9d76; } .tyt-nh-3 { --tyt-nh: #7c4dce; }
+.tyt-nh-4 { --tyt-nh: #e8730c; } .tyt-nh-0 { --tyt-nh: #dc3545; }
+[data-bs-theme="dark"] .tyt-nh-1 { --tyt-nh: #6ea8fe; } [data-bs-theme="dark"] .tyt-nh-2 { --tyt-nh: #3fd1a4; }
+[data-bs-theme="dark"] .tyt-nh-3 { --tyt-nh: #b197fc; } [data-bs-theme="dark"] .tyt-nh-4 { --tyt-nh: #ffa94d; }
+[data-bs-theme="dark"] .tyt-nh-0 { --tyt-nh: #ea868f; }
+.tyt-nh { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; white-space: nowrap;
+  color: var(--tyt-nh); background: color-mix(in srgb, var(--tyt-nh) 13%, transparent); border: 1px solid color-mix(in srgb, var(--tyt-nh) 40%, transparent); }
+.tyt-nh-sm { font-size: 10px; padding: 0 6px; }
+.tyt-nh-so { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  margin-right: 6px; background: var(--tyt-nh); color: #fff; font-size: 11px; font-weight: 700; }
+.tyt-nh-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--tyt-nh); }
+.tyt-cay tr.tyt-nhrow > td:first-child { box-shadow: inset 4px 0 0 var(--tyt-nh); }
+.tyt-ss tr.tyt-ss-nh > td:first-child { box-shadow: inset 4px 0 0 var(--tyt-nh); }
+/* Nút gán hàng loạt 4 màu */
+.tyt-nh-btn { color: #fff; background: var(--tyt-nh); border: 1px solid var(--tyt-nh); font-weight: 600; }
+.tyt-nh-btn:hover, .tyt-nh-btn:focus { color: #fff; background: var(--tyt-nh); filter: brightness(.9); }
+/* Ô đổi nhóm 1-click 1·2·3·4 trên dòng khoản chi (mờ, rê chuột vào dòng mới rõ) */
+.tyt-nh-pick { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; flex-shrink: 0; }
+.tyt-nh-pk { width: 20px; height: 20px; padding: 0; font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center; border-radius: 4px;
+  cursor: pointer; color: var(--tyt-nh); background: transparent; border: 1px solid color-mix(in srgb, var(--tyt-nh) 45%, transparent); }
+.tyt-nh-pk:hover { background: color-mix(in srgb, var(--tyt-nh) 20%, transparent); }
+.tyt-nh-pk.on { background: var(--tyt-nh); color: #fff; }
+.tyt-nh-auto { --tyt-nh: #6c757d; }
+[data-bs-theme="dark"] .tyt-nh-btn, [data-bs-theme="dark"] .tyt-nh-btn:hover, [data-bs-theme="dark"] .tyt-nh-so,
+[data-bs-theme="dark"] .tyt-nh-pk.on { color: #16181b; }
+.tyt-cay tr .tyt-nh-pk:not(.on) { opacity: .45; }
+.tyt-cay tr:hover .tyt-nh-pk { opacity: 1; }
+.tyt-nh-src { font-size: 10px; color: var(--bs-secondary-color); margin-left: 3px; font-style: italic; }
+/* Kiểm soát định mức Nhóm 1: chấm màu 4 trụ cột + Quỹ phụ phí, dòng vượt */
 .tyt-dt-vuot { color: var(--bs-danger); font-weight: 700; }
 .tyt-dt-vuot .tyt-bar > span { background: var(--bs-danger); }
+.tyt-tru { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; background: #adb5bd; }
+.tyt-tru-sat { background: #495057; } .tyt-tru-bt { background: #0d6efd; } .tyt-tru-nc { background: #fd7e14; }
+.tyt-tru-tp { background: #6f42c1; } .tyt-tru-quy { background: #20c997; } .tyt-tru-x { background: var(--bs-danger); }
+.tyt-rpt tr.tyt-ks-vuot > td { background: var(--bs-danger-bg-subtle); }
 /* So sánh công trình */
 .tyt-ss-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 3px 10px; border-radius: 16px; cursor: pointer;
   border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2261,27 +2275,11 @@ td.action-col > div {
 .tyt-ss .tyt-ss-key td { font-weight: 700; background: var(--bs-primary-bg-subtle); }
 .tyt-ss .tyt-ss-info td { color: var(--bs-secondary-color); }
 .tyt-ss .tyt-ss-avg { background: var(--bs-tertiary-bg); font-weight: 600; }
+.tyt-ss .tyt-ss-tru td { font-weight: 700; background: var(--bs-tertiary-bg); }
+.tyt-ss .tyt-ss-sub td:first-child { padding-left: 22px; color: var(--bs-secondary-color); }
 .tyt-ss-max { background: var(--bs-danger-bg-subtle) !important; color: var(--bs-danger-text-emphasis); }
 .tyt-ss-min { background: var(--bs-success-bg-subtle) !important; color: var(--bs-success-text-emphasis); }
-/* (07/10/2026 — Cải tiến Phần A) Tab Tỉ Trọng: RỔ CHI PHÍ (tag kép) */
-.tyt-ro { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; white-space: nowrap; border: 1px solid transparent; }
-.tyt-ro-sm { font-size: 10px; padding: 0 6px; }
-.tyt-ro-1 { background: var(--bs-primary-bg-subtle); border-color: var(--bs-primary-border-subtle); color: var(--bs-primary-text-emphasis); }
-.tyt-ro-2 { background: #fff1e0; border-color: #fdc78a; color: #9a4b00; }
-.tyt-ro-3 { background: var(--bs-secondary-bg); border-color: var(--bs-border-color); color: var(--bs-secondary-color); }
-.tyt-ro-0 { background: var(--bs-danger-bg-subtle); border-color: var(--bs-danger-border-subtle); color: var(--bs-danger-text-emphasis); }
-[data-bs-theme="dark"] .tyt-ro-2 { background: #4a2a05; border-color: #9a4b00; color: #ffd8a8; }
-.tyt-rpt .tyt-ro1-total td { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); border-top: 1px dashed var(--bs-primary-border-subtle); }
-/* Thanh "Tách cấu thành" (góc nhìn Giai đoạn): Vật tư / Nhân công / Khoán TP / Khác */
-.tyt-ct-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--bs-secondary-bg); }
-.tyt-ct-bar > span { display: block; height: 100%; }
-.tyt-ct-vt { background: #0d6efd; } .tyt-ct-nc { background: #fd7e14; } .tyt-ct-tp { background: #6f42c1; } .tyt-ct-khac { background: #adb5bd; }
-/* (07/10/2026 — Cải tiến Phần B) Kiểm soát định mức Rổ 1: chấm màu 4 trụ cột + Quỹ phụ phí, dòng vượt */
-.tyt-tru { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; background: #adb5bd; }
-.tyt-tru-sat { background: #495057; } .tyt-tru-bt { background: #0d6efd; } .tyt-tru-nc { background: #fd7e14; }
-.tyt-tru-tp { background: #6f42c1; } .tyt-tru-quy { background: #20c997; } .tyt-tru-x { background: var(--bs-danger); }
-.tyt-rpt tr.tyt-ks-vuot > td { background: var(--bs-danger-bg-subtle); }
-/* (07/10/2026 — Cải tiến Phần C) Xu hướng & biến động: biểu đồ đường SVG, chú thích, so sánh theo trụ cột */
+/* Xu hướng & biến động: biểu đồ đường SVG, chú thích */
 .tyt-chart { width: 100%; height: auto; display: block; max-height: 300px; }
 .tyt-ch-grid { stroke: var(--bs-border-color); stroke-width: 1; }
 .tyt-ch-base { stroke: var(--bs-secondary-color); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -2291,6 +2289,4 @@ td.action-col > div {
 .tyt-lg { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 9px; border-radius: 12px; cursor: pointer; border: 1px solid var(--bs-border-color); user-select: none; }
 .tyt-lg i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
 .tyt-lg.off { opacity: .4; text-decoration: line-through; }
-.tyt-ss .tyt-ss-tru td { font-weight: 700; background: var(--bs-tertiary-bg); }
-.tyt-ss .tyt-ss-sub td:first-child { padding-left: 22px; color: var(--bs-secondary-color); }
 .tyt-rpt tr.tyt-xh-db > td { background: var(--bs-warning-bg-subtle); font-style: italic; }

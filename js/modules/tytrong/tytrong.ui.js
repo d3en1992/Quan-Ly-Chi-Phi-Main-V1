@@ -1,40 +1,31 @@
-// tytrong.ui.js — Tab TỈ TRỌNG CHI PHÍ · GIAO DIỆN + THAO TÁC (05/10/2026)
+// tytrong.ui.js — Tab TỈ TRỌNG & ĐỊNH MỨC · GIAO DIỆN + THAO TÁC (05/10/2026 · tái cấu trúc 3.0 ngày 27/10/2026)
 // Load order: sau tytrong.core.js. Giao diện: pages/tytrong.html (tiền tố ID tyt-).
 //
 // Các khối:
-//   LUÔN HIỆN: Chọn công trình (#tytf-ct — cùng danh sách tab Quyết Toán, _qtProjList: năm đang lọc)
-//              + KPI (#tyt-kpi-*): Tổng chi · Tổng sàn · Chi phí/m2 · Đã phân bổ
+//   ĐẦU TRANG: Chọn công trình (#tytf-ct — cùng danh sách tab Quyết Toán, _qtProjList) + công tắc Trọn vòng đời
+//              + nút "⚙ Cấu hình phân nhóm" (tytCfgMo — popup dùng chung mọi CT: Loại → Nhóm / Trụ cột, Luật từ khóa)
+//              + 4 KPI (#tyt-kpi-*): Tổng chi · Tổng sàn (bấm → popup Bảng M2, tytM2Mo) · Đơn giá Thô & NC/m2 · Toàn bộ/m2
+//              + nút đỏ "Chưa xếp nhóm" (#tyt-chuanhom-btn → tytMoChuaNhom)
 //   3 TAB CON (tytGoSub — nút có ID = ID tab con + "-btn"):
-//   1. PHÂN TÍCH  #tyt-sub-pt — bảng CÂY MA TRẬN (#tyt-cay-tbody, tytRenderCay):
-//        Giai đoạn → Hạng mục → Loại chi phí (tự tách từ hóa đơn) → từng khoản chi
-//        cột: Tổng · % Toàn CT · % Cấp trên · đ/m2. Trạng thái mở/đóng: _tytOpen.
-//      + bảng Theo loại chi phí toàn nhà (#tyt-loai-tbody)
-//   2. PHÂN BỔ    #tyt-sub-pb — (Lần 2) Luật tự gán (#tyt-luat-*) + Gắn theo HĐ thầu phụ (#tyt-hdtp-tbody)
-//        + gán tay hàng loạt: lọc, tick nhiều dòng, gán vào giai đoạn / hạng mục (#tyt-pb-*)
-//   4. KIỂM SOÁT ĐỊNH MỨC #tyt-sub-dm — (Phần B) CHỈ RỔ 1: bảng kiểm soát 4 trụ cột + Quỹ phụ phí
-//        (#tyt-dt-*, tytRenderKiemSoat), bộ định mức lưu từ CT / nhập tay / cập nhật (#tyt-dm-*, tytDmSua),
-//        thư viện đơn giá module (#tyt-tv-*, tytRenderThuVien), đối chiếu nhóm (#tyt-nh-*, công tắc Chỉ Rổ 1)
-//   5. XU HƯỚNG & SO SÁNH #tyt-sub-ss — (Lần 2) đ/m2 | % | tổng tiền nhiều CT cạnh nhau, tô cao/thấp nhất, xuất Excel
-//        (Phần C) mặc định CHỈ RỔ 1 theo trụ cột (#tyt-ss-r1) + xu hướng đ/m2 Rổ 1 theo năm (#tyt-xh-*,
-//        tytRenderXuHuong) + biến động đơn giá vật tư / công nhật (#tyt-gv-*, tytRenderGiaVt) — biểu đồ SVG tự vẽ
-//   3. THIẾT LẬP  #tyt-sub-tl — Bảng M2 sàn (#tyt-kl-tbody → project.khoiLuong qua updateProject;
-//        form Sửa công trình chỉ còn TỔNG read-only + nút dẫn sang đây)
-//        + Giai đoạn & Hạng mục (#tyt-ct-body) sửa trên BẢN NHÁP (_tytDraft), "Lưu Cấu Trúc" mới ghi.
-//        Hạng mục = VỊ TRÍ (Móng, Lầu 1...) — tên giống loại chi phí → cảnh báo (tytGiongLoaiCP).
-// Quyền: tab ẩn với Kế toán (auth.js) — ai thấy tab thì được sửa.
-// Không sửa hóa đơn / tiền ứng: mọi gán tay lưu ở store tytrong_v1 (xem tytrong.core.js).
+//   1. TỔNG QUAN & PHÂN BỔ #tyt-sub-pt — cây 4 Nhóm (#tyt-cay-tbody, tytRenderCay): Nhóm → (Nhóm 1: Trụ cột) → Loại
+//        → từng khoản; dòng khoản có ô 1·2·3·4 đổi nhóm 1-click (tytDoiNhom). Trạng thái mở/đóng: _tytOpen.
+//      + Theo loại chi phí (#tyt-loai-tbody) + Gán nhóm theo HĐ thầu phụ (#tyt-hdtp-tbody)
+//      + Tra cứu & gán hàng loạt (#tyt-pb-*, tytPbGan)
+//   2. KIỂM SOÁT ĐỊNH MỨC #tyt-sub-dm — Nhóm 1: 4 trụ cột + Quỹ phụ phí (#tyt-dt-*, tytRenderKiemSoat)
+//        + bộ định mức mẫu: lưu từ CT / nhập tay / sửa / cập nhật / xóa (#tyt-dm-*, tytDmSua)
+//   3. XU HƯỚNG & SO SÁNH #tyt-sub-ss — so sánh CT theo 4 Nhóm (+ trụ cột Nhóm 1) hoặc chỉ Nhóm 1 (#tyt-ss-n1), xuất Excel
+//        + xu hướng đ/m2 Nhóm 1 theo năm (#tyt-xh-*) + biến động đơn giá vật tư / công nhật (#tyt-gv-*) — biểu đồ SVG tự vẽ
+// Popup dùng chung #ct-modal (closeModal). Không sửa hóa đơn / tiền ứng: mọi phân nhóm lưu ở store tytrong_v1.
 
 // ─── State ─────────────────────────────────────────────────────
 let _tytPid      = '';      // projectId đang chọn
-let _tytDraft    = null;    // bản nháp cấu trúc { giaiDoan, hangMuc } — null = chưa sửa gì
-let _tytKlDirty  = false;   // bảng M2 có thay đổi chưa lưu
-let _tytPbPage   = 0;       // trang hiện tại của bảng phân bổ
+let _tytPbPage   = 0;       // trang hiện tại của bảng gán hàng loạt
 const _tytPbSel  = new Set();   // khóa các dòng chi phí đang tick
 let _tytLast     = null;    // kết quả tytTongHop lần vẽ gần nhất (dùng cho lọc / chọn tất cả)
-const TYT_PB_PG  = 30;      // số dòng / trang bảng phân bổ
+const TYT_PB_PG  = 30;      // số dòng / trang bảng gán hàng loạt
 let _tytSub      = 'tyt-sub-pt';   // tab con đang mở (giữ khi đổi công trình / sync)
-const _tytOpen   = new Set();      // key các node đang MỞ trong bảng cây Phân Tích
-let _tytOpenPid  = '';             // công trình đã khởi tạo trạng thái mở mặc định
+const _tytOpen   = new Set();      // key các node đang MỞ trong bảng cây
+let _tytMoM2     = false;   // mở popup Bảng M2 ngay khi vào tab (tytOpenFor từ form Sửa công trình)
 
 // ══ KHỞI TẠO ════════════════════════════════════════════════════
 // Vào tab (goPage) → nạp dropdown, GIỮ công trình đang chọn (nếu còn), vẽ lại
@@ -42,21 +33,22 @@ function initTyTrong() {
   tytPopulateSels();
   tytRenderAll();
 }
-// Đổi năm / sync xong (renderActiveTab) → vẽ lại, giữ bản nháp + bảng M2 đang sửa
+// Đổi năm / sync xong (renderActiveTab) → vẽ lại
 function tytRefresh() {
   tytPopulateSels();
-  tytRenderAll({ keepKl: _tytKlDirty });
+  tytRenderAll();
 }
 
-// Mở tab và chọn sẵn 1 công trình (gọi từ form Sửa công trình)
+// Mở tab, chọn sẵn 1 công trình và mở popup Bảng M2 (gọi từ form Sửa công trình)
 function tytOpenFor(pid) {
   if (typeof closeModal === 'function') closeModal();
   if (pid !== _tytPid) { _tytPid = pid; _tytResetEdits(); }
+  _tytMoM2 = true;
   goPage(null, 'tytrong');
 }
 
 function _tytResetEdits() {
-  _tytDraft = null; _tytKlDirty = false; _tytPbPage = 0; _tytPbSel.clear();
+  _tytPbPage = 0; _tytPbSel.clear();
 }
 
 function _tytProj() {
@@ -76,144 +68,156 @@ function tytPopulateSels() {
   if (typeof _ssEnhance === 'function') _ssEnhance(sel);   // ô chọn gõ-để-tìm (idempotent)
 }
 
-// Có thay đổi chưa lưu không (để hỏi trước khi đổi công trình)
-function _tytHasUnsaved() { return _tytKlDirty || !!_tytDraft; }
-
 function tytOnCtChange() {
   const sel = document.getElementById('tytf-ct');
   const v = sel ? sel.value : '';
   if (v === _tytPid) return;
-  if (_tytHasUnsaved() && !confirm('Bảng M2 / cấu trúc giai đoạn đang có thay đổi CHƯA LƯU.\nĐổi công trình sẽ bỏ các thay đổi đó. Tiếp tục?')) {
-    if (sel) sel.value = _tytPid;
-    return;
-  }
   _tytPid = v;
   _tytResetEdits();
   tytRenderAll();
 }
 
 // ══ VẼ TOÀN BỘ ══════════════════════════════════════════════════
-// opts.keepKl: không vẽ lại bảng M2 (đang sửa dở)
-function tytRenderAll(opts) {
-  opts = opts || {};
+function tytRenderAll() {
   const p = _tytProj();
   const empty = document.getElementById('tyt-empty');
   const main  = document.getElementById('tyt-main');
   if (empty) empty.style.display = p ? 'none' : '';
   if (main)  main.style.display  = p ? '' : 'none';
-  if (!p) { _tytLast = null; _tytRenderKpi(null); return; }
-
-  if (!opts.keepKl) _tytRenderKl(p);
-  _tytRenderCauTruc();
-  // Lần đầu xem 1 công trình → mặc định MỞ cấp Giai đoạn (thấy ngay các hạng mục)
-  if (_tytOpenPid !== p.id) {
-    _tytOpenPid = p.id;
-    _tytOpen.clear();
-    tytStructOf(p.id).giaiDoan.forEach(g => _tytOpen.add('G:' + g.id));
-  }
+  if (!p) { _tytLast = null; _tytRenderKpi(null); _tytRenderScope(); return; }
   tytGoSub(_tytSub);
   _tytRecalc();
+  if (_tytMoM2) { _tytMoM2 = false; tytM2Mo(); }
 }
 
-// Tính lại + vẽ các phần phụ thuộc số liệu (KPI, 2 bảng báo cáo, bảng phân bổ)
+// Tính lại + vẽ các phần phụ thuộc số liệu
 function _tytRecalc() {
   const p = _tytProj();
   if (!p) return;
-  // (Lần 3) Trọn vòng đời: tải các năm còn thiếu của CT (tải xong tự gọi lại hàm này)
+  // Trọn vòng đời: tải các năm còn thiếu của CT (tải xong tự gọi lại hàm này)
   if (_tytAllYears) _tytEnsureYears(tytNamVongDoi(p));
   _tytLast = tytTongHop(p, _tytOpts());
-  // Bảng M2 đang sửa dở → KPI dùng tổng sàn trên màn hình cho người dùng thấy ngay
-  if (_tytKlDirty) {
-    _tytLast.tongSan = tytTongSanRows(_tytKlRead());
-    _tytLast.cpM2 = _tytLast.tongSan > 0 ? _tytLast.tongChi / _tytLast.tongSan : 0;
-    _tytLast.cpM2Ro1 = _tytLast.tongSan > 0 ? _tytLast.theoRo[1] / _tytLast.tongSan : 0;
-  }
   _tytRenderKpi(_tytLast);
   _tytRenderLoai(_tytLast);
   tytRenderCay();
-  _tytRenderPbDich(_tytLast);
+  _tytRenderHdtp(_tytLast);
   _tytRenderPbLoai(_tytLast);
   tytRenderPb(_tytPbPage);
-  _tytRenderLuat(_tytLast);
-  _tytRenderHdtp(_tytLast);
-  _tytRenderRoCfg(_tytLast);   // (Phần A) bảng Loại → Rổ + luật rổ
   _tytRenderDm(_tytLast);
   if (_tytSub === 'tyt-sub-ss') _tytRenderTabSs();   // so sánh / xu hướng tính nhiều CT → chỉ vẽ khi đang mở
-  if (_tytSub === 'tyt-sub-dm') tytRenderNhom();     // đối chiếu nhóm cũng tính nhiều CT
-  _tytRenderSubBadges();
   _tytRenderScope();
-  _tytRenderClipBtns();
+  _tytCfgFill();   // popup cấu hình đang mở → cập nhật cột "CT này"
 }
 
 // ══ TAB CON ═════════════════════════════════════════════════════
 function tytGoSub(id) {
-  if (!document.getElementById(id)) return;
+  if (!document.getElementById(id)) id = 'tyt-sub-pt';
   _tytSub = id;
   document.querySelectorAll('#tyt-main .sub-page').forEach(pg => pg.classList.toggle('active', pg.id === id));
   document.querySelectorAll('#tyt-sub-nav .nav-link').forEach(b => b.classList.toggle('active', b.id === id + '-btn'));
   if (id === 'tyt-sub-ss' && _tytLast) _tytRenderTabSs();
-  if (id === 'tyt-sub-dm' && _tytLast) tytRenderNhom();
-}
-
-// Huy hiệu trên nút tab con: PHÂN BỔ = % còn chưa phân bổ · THIẾT LẬP = "!" khi thiếu M2 / giai đoạn
-function _tytRenderSubBadges() {
-  const r = _tytLast;
-  const pb = document.getElementById('tyt-sub-pb-badge');
-  if (pb) {
-    if (!r || !r.tongChi) { pb.textContent = ''; pb.className = 'badge rounded-pill ms-1'; }
-    else if (r.chuaPB > 0) { pb.textContent = 'chưa PB ' + _tytPctTxt(r.chuaPB, r.tongChi); pb.className = 'badge rounded-pill ms-1 text-bg-warning'; }
-    else { pb.textContent = '✓'; pb.className = 'badge rounded-pill ms-1 text-bg-success'; }
-  }
-  const tl = document.getElementById('tyt-sub-tl-badge');
-  if (tl) {
-    const thieu = r && (!(r.tongSan > 0) || !r.st.giaiDoan.length);
-    tl.textContent = thieu ? '!' : '';
-    tl.className = 'badge rounded-pill ms-1' + (thieu ? ' text-bg-danger' : '');
-    tl.title = !r ? '' : (!(r.tongSan > 0) ? 'Chưa nhập bảng M2 sàn' : (!r.st.giaiDoan.length ? 'Chưa tạo giai đoạn' : ''));
-  }
 }
 
 // ── Định dạng dùng chung ──
 function _tytPct(v, tong) { return tong ? (v / tong * 100) : 0; }
 function _tytPctTxt(v, tong) { return tong ? _tytPct(v, tong).toFixed(1).replace('.', ',') + '%' : '—'; }
 function _tytM2Txt(v, san) { return san > 0 ? fmtM(Math.round(v / san)) : '—'; }
-// Ô tỉ trọng có thanh ngang nhỏ minh họa
-function _tytPctCell(v, tong) {
+// Ô tỉ trọng có thanh ngang nhỏ minh họa (màu theo nhóm nếu có)
+function _tytPctCell(v, tong, nhom) {
   const w = Math.max(0, Math.min(100, _tytPct(v, tong)));
   return `<td class="text-end font-monospace" style="white-space:nowrap">
     <div>${_tytPctTxt(v, tong)}</div>
-    <div class="tyt-bar"><span style="width:${w.toFixed(1)}%"></span></div>
+    <div class="tyt-bar${nhom !== undefined ? ' tyt-nh-' + nhom : ''}"><span style="width:${w.toFixed(1)}%"></span></div>
   </td>`;
+}
+// Hiện popup dùng chung #ct-modal
+function _tytModal(title, body) {
+  document.getElementById('modal-title').innerHTML = title;
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('ct-modal').classList.add('open');
+}
+// Popup #ct-modal đang mở và đang chứa phần tử id này không
+function _tytModalCo(id) {
+  return !!(document.getElementById('ct-modal')?.classList.contains('open') && document.getElementById(id));
+}
+
+// ── Chip nhóm (màu theo nhóm) ──
+const _TYT_NHOM_SRC = { tay: 'gán tay', hdtp: 'theo HĐ thầu phụ', luat: 'theo luật từ khóa', loai: 'theo bảng Loại → Nhóm', macdinh: 'mặc định theo tên loại' };
+function _tytNhomChip(n, src, nho) {
+  const t = TYT_NHOM[n] || TYT_NHOM[0];
+  return `<span class="tyt-nh tyt-nh-${n}${nho ? ' tyt-nh-sm' : ''}" title="${n ? 'Nhóm ' + n + ': ' : ''}${x(t.ten)}${src ? ' — ' + (_TYT_NHOM_SRC[src] || src) : ''}">${n ? n + ' · ' : ''}${t.ngan}</span>`;
+}
+// Chip nhóm của 1 khoản (nhiều món khác nhóm → nhiều chip)
+function _tytNhomChipLine(l) {
+  const seen = new Map();
+  (l.parts || []).forEach(pt => { if (!seen.has(pt.nhom)) seen.set(pt.nhom, pt.nhomSrc); });
+  return [...seen.entries()].map(([n, src]) => _tytNhomChip(n, src, true)).join(' ');
+}
+// Biểu tượng (?) — rê chuột xem hướng dẫn
+function _tytHelp(txt) {
+  return `<span class="tyt-help" title="${x(txt)}"><span class="material-symbols-outlined">help</span></span>`;
 }
 
 // ══ KPI ═════════════════════════════════════════════════════════
 function _tytRenderKpi(r) {
   const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  const btn = document.getElementById('tyt-chuanhom-btn');
   if (!r) {
-    ['tyt-kpi-chi', 'tyt-kpi-san', 'tyt-kpi-m2', 'tyt-kpi-pb'].forEach(id => set(id, '—'));
-    set('tyt-kpi-m2-sub', '');
-    ['tyt-kpi-chi-sub', 'tyt-kpi-san-sub', 'tyt-kpi-pb-sub', 'tyt-kpi-warn'].forEach(id => set(id, ''));
+    ['tyt-kpi-chi', 'tyt-kpi-san', 'tyt-kpi-m2n1', 'tyt-kpi-m2all'].forEach(id => set(id, '—'));
+    ['tyt-kpi-chi-sub', 'tyt-kpi-warn'].forEach(id => set(id, ''));
+    if (btn) btn.style.display = 'none';
     return;
   }
   set('tyt-kpi-chi', fmtM(r.tongChi));
   set('tyt-kpi-chi-sub', `${r.lines.length} khoản chi · ${r.allYears ? 'trọn vòng đời' : 'năm ' + x(tytNhanNam())}`);
   set('tyt-kpi-san', r.tongSan > 0 ? `${tytFmtM2(r.tongSan)} m2` : '<span class="text-warning">Chưa nhập</span>');
-  set('tyt-kpi-san-sub', _tytKlDirty ? 'Đang sửa — chưa lưu' : 'Quy đổi theo hệ số');
-  // (Phần A) Góc nhìn Theo Rổ: đ/m2 CHỈ lấy Rổ 1 (gói thô) ÷ sàn; Theo Giai đoạn: toàn bộ ÷ sàn
-  const roView = typeof _tytView === 'undefined' || _tytView === 'ro';
-  set('tyt-kpi-m2-lb', roView ? 'Chi phí / m2 sàn · Rổ 1' : 'Chi phí / m2 sàn · toàn bộ');
-  set('tyt-kpi-m2', r.tongSan > 0 ? fmtM(Math.round(roView ? r.cpM2Ro1 : r.cpM2)) : '—');
-  set('tyt-kpi-m2-sub', r.tongSan > 0
-    ? (roView ? `Rổ 1 ÷ sàn · toàn bộ: ${fmtM(Math.round(r.cpM2))}` : `Tổng chi ÷ sàn · Rổ 1: ${fmtM(Math.round(r.cpM2Ro1))}`)
-    : 'Nhập bảng M2 ở tab Thiết lập');
-  set('tyt-kpi-pb', _tytPctTxt(r.daPhanBo, r.tongChi));
-  set('tyt-kpi-pb-sub', r.chuaPB > 0 ? `Còn ${fmtM(r.chuaPB)} chưa phân bổ` : (r.tongChi ? 'Đã phân bổ hết' : ''));
+  set('tyt-kpi-san-sub', r.tongSan > 0 ? 'Bấm để xem / sửa bảng M2' : 'Bấm để nhập bảng M2');
+  set('tyt-kpi-m2n1', r.tongSan > 0 ? fmtM(Math.round(r.cpM2N1)) : '—');
+  set('tyt-kpi-m2n1-sub', `Nhóm 1: ${fmtM(r.theoNhom[1])} ÷ sàn`);
+  set('tyt-kpi-m2all', r.tongSan > 0 ? fmtM(Math.round(r.cpM2)) : '—');
+  set('tyt-kpi-m2all-sub', 'Tổng chi ÷ sàn (cả 4 nhóm)');
+  if (btn) {
+    btn.style.display = r.chuaNhom.length ? '' : 'none';
+    set('tyt-chuanhom-n', `${r.chuaNhom.length} khoản · ${fmtM(r.theoNhom[0])}`);
+  }
   // Tự kiểm tra: tổng các dòng phải khớp "Tổng chi" trên thẻ công trình
   set('tyt-kpi-warn', r.tongKhop ? '' :
-    '<div class="text-danger mt-2" style="font-size:11.5px">⚠ Tổng các khoản chi chưa khớp "Tổng chi" ở thẻ công trình — báo lại cho người lập trình kiểm tra.</div>');
+    '<div class="text-danger" style="font-size:11.5px">⚠ Tổng các khoản chi chưa khớp "Tổng chi" ở thẻ công trình — báo lại cho người lập trình kiểm tra.</div>');
 }
 
-// ══ BẢNG M2 SÀN ═════════════════════════════════════════════════
+// ══ POPUP BẢNG M2 SÀN (bấm thẻ KPI "Tổng diện tích sàn") ══════════════
+// Ghi vào project.khoiLuong qua updateProject (form Sửa công trình chỉ còn TỔNG read-only + nút dẫn sang đây)
+function tytM2Mo() {
+  const p = _tytProj();
+  if (!p) { toast('Chọn công trình trước!', 'error'); return; }
+  const rows = Array.isArray(p.khoiLuong) && p.khoiLuong.length ? p.khoiLuong : [{}, {}, {}];
+  _tytModal(`<span class="material-symbols-outlined msi-gap">square_foot</span>Bảng Tính M2 Sàn — ${x(p.name)}`, `
+    <div class="table-responsive border rounded">
+      <table class="table table-sm align-middle mb-0" style="font-size:12.5px">
+        <thead class="table-light">
+          <tr style="font-size:10.5px">
+            <th>TÊN (Trệt, Lầu 1, Sân thượng, Mái...)</th>
+            <th style="width:62px">ĐVT</th>
+            <th style="width:90px" class="text-end">KL</th>
+            <th style="width:66px" class="text-end" title="Hệ số quy đổi diện tích — VD mái, sân: 0,5. Mặc định 1">Hệ số</th>
+            <th style="width:44px" class="text-center" title="Bỏ tick = không cộng vào Tổng diện tích sàn">Tính</th>
+            <th style="width:30px"></th>
+          </tr>
+        </thead>
+        <tbody id="tyt-kl-tbody">${rows.map(_tytKlRowHtml).join('')}</tbody>
+      </table>
+    </div>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tytKlAddRow()">+ 1 dòng</button>
+      <span>Tổng sàn quy đổi: <b id="tyt-kl-tong" class="font-monospace">${tytFmtM2(tytTongSanRows(rows))}</b> m2
+        <span id="tyt-kl-dirty" class="badge text-bg-warning ms-1" style="display:none">Chưa lưu</span></span>
+    </div>
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <button class="btn btn-sm btn-secondary" onclick="closeModal()">Hủy</button>
+      <button class="btn btn-sm btn-primary fw-bold" onclick="tytKlSave()"><span class="material-symbols-outlined msi-gap">save</span>Lưu Bảng M2</button>
+    </div>`);
+}
+
 function _tytKlRowHtml(r) {
   r = r || {};
   const kl = (r.kl === 0 || r.kl) ? r.kl : '';
@@ -228,16 +232,7 @@ function _tytKlRowHtml(r) {
   </tr>`;
 }
 
-function _tytRenderKl(p) {
-  const tb = document.getElementById('tyt-kl-tbody');
-  if (!tb) return;
-  const rows = Array.isArray(p.khoiLuong) && p.khoiLuong.length ? p.khoiLuong : [{}, {}, {}];
-  tb.innerHTML = rows.map(_tytKlRowHtml).join('');
-  _tytKlDirty = false;
-  _tytKlUpdateTotal();
-}
-
-// Đọc bảng M2 trên màn hình → [{ ten, dvt, kl, heSo, tinh }]. keepEmpty: giữ cả dòng trống
+// Đọc bảng M2 trên popup → [{ ten, dvt, kl, heSo, tinh }]. keepEmpty: giữ cả dòng trống
 function _tytKlRead(keepEmpty) {
   const out = [];
   document.querySelectorAll('#tyt-kl-tbody tr').forEach(tr => {
@@ -253,23 +248,12 @@ function _tytKlRead(keepEmpty) {
   return out;
 }
 
-function _tytKlUpdateTotal() {
+// Gõ vào bảng M2 → cập nhật tổng + đánh dấu chưa lưu
+function _tytKlChanged() {
   const el = document.getElementById('tyt-kl-tong');
   if (el) el.textContent = tytFmtM2(tytTongSanRows(_tytKlRead(true)));
   const b = document.getElementById('tyt-kl-dirty');
-  if (b) b.style.display = _tytKlDirty ? '' : 'none';
-}
-
-// Gõ vào bảng M2 → đánh dấu chưa lưu + cập nhật tổng + KPI ngay
-function _tytKlChanged() {
-  _tytKlDirty = true;
-  _tytKlUpdateTotal();
-  if (_tytLast) {
-    _tytLast.tongSan = tytTongSanRows(_tytKlRead());
-    _tytLast.cpM2 = _tytLast.tongSan > 0 ? _tytLast.tongChi / _tytLast.tongSan : 0;
-    _tytLast.cpM2Ro1 = _tytLast.tongSan > 0 ? _tytLast.theoRo[1] / _tytLast.tongSan : 0;
-    _tytRenderKpi(_tytLast); _tytRenderLoai(_tytLast); tytRenderCay(); _tytRenderSubBadges();
-  }
+  if (b) b.style.display = '';
 }
 
 function tytKlAddRow() {
@@ -282,12 +266,6 @@ function tytKlDelRow(btn) {
   btn?.closest('tr')?.remove();
   _tytKlChanged();
 }
-function tytKlReset() {
-  const p = _tytProj();
-  if (!p) return;
-  _tytRenderKl(p);
-  _tytRecalc();
-}
 function tytKlSave() {
   const p = _tytProj();
   if (!p) return;
@@ -298,178 +276,9 @@ function tytKlSave() {
     toast('❌ ' + e.message, 'error');
     return;
   }
-  _tytKlDirty = false;
   toast(`✅ Đã lưu bảng M2 — tổng sàn ${tytFmtM2(tytTongSanRows(khoiLuong))} m2`, 'success');
+  if (typeof closeModal === 'function') closeModal();
   tytRenderAll();
-}
-
-// ══ CẤU TRÚC GIAI ĐOẠN → HẠNG MỤC (sửa trên bản nháp) ══════════════
-// Cấu trúc đang hiển thị: bản nháp nếu đang sửa, không thì bản đã lưu
-function _tytCtCur() {
-  if (_tytDraft) return _tytDraft;
-  const st = tytStructOf(_tytPid);
-  return { giaiDoan: st.giaiDoan, hangMuc: st.hangMuc };
-}
-// Bắt đầu sửa → tạo bản nháp từ bản đã lưu
-function _tytCtEdit() {
-  if (!_tytDraft) {
-    const st = tytStructOf(_tytPid);
-    _tytDraft = { giaiDoan: st.giaiDoan, hangMuc: st.hangMuc };
-  }
-  const b = document.getElementById('tyt-ct-dirty');
-  if (b) b.style.display = '';
-  return _tytDraft;
-}
-
-function _tytRenderCauTruc() {
-  const box = document.getElementById('tyt-ct-body');
-  if (!box) return;
-  const cur = _tytCtCur();
-  const b = document.getElementById('tyt-ct-dirty');
-  if (b) b.style.display = _tytDraft ? '' : 'none';
-  if (!cur.giaiDoan.length) {
-    box.innerHTML = `<div class="text-secondary text-center border rounded py-3" style="font-size:12.5px">
-      Chưa có giai đoạn nào. Bấm <b>+ Giai đoạn</b> hoặc <b>Dùng mẫu gợi ý</b>.</div>`;
-    return;
-  }
-  box.innerHTML = cur.giaiDoan.map((g, i) => {
-    const hms = cur.hangMuc.filter(h => h.gdId === g.id);
-    return `<div class="tyt-gd-box">
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <span class="tyt-gd-no">${i + 1}</span>
-        <input type="text" class="form-control form-control-sm fw-semibold" style="flex:1 1 160px" value="${x(g.ten)}" placeholder="Tên giai đoạn" oninput="tytGdSet('${g.id}','ten',this.value)">
-        <span class="text-secondary" style="font-size:11px">Từ</span>
-        <input type="date" class="form-control form-control-sm" style="width:140px" value="${x(g.tu || '')}" onchange="tytGdSet('${g.id}','tu',this.value)">
-        <span class="text-secondary" style="font-size:11px">đến</span>
-        <input type="date" class="form-control form-control-sm" style="width:140px" value="${x(g.den || '')}" onchange="tytGdSet('${g.id}','den',this.value)">
-        <button type="button" class="btn btn-link btn-sm p-0 text-secondary" title="Lên trên" onclick="tytGdMove('${g.id}',-1)" ${i === 0 ? 'disabled' : ''}><span class="material-symbols-outlined" style="font-size:18px">arrow_upward</span></button>
-        <button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Xóa giai đoạn" onclick="tytGdDel('${g.id}')"><span class="material-symbols-outlined" style="font-size:18px">delete</span></button>
-      </div>
-      <div class="tyt-hm-list">
-        ${hms.map(h => `<div class="d-flex align-items-center gap-1">
-          <span class="text-secondary">└</span>
-          <input type="text" class="form-control form-control-sm" value="${x(h.ten)}" placeholder="Vị trí: Móng, Sàn trệt, Lầu 1..." oninput="tytHmSet('${h.id}',this.value,this)">
-          <button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Xóa hạng mục" onclick="tytHmDel('${h.id}')"><span class="material-symbols-outlined" style="font-size:16px">close</span></button>
-          ${_tytHmWarnHtml(h.ten)}
-        </div>`).join('')}
-        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:12px" onclick="tytHmAdd('${g.id}')">+ Hạng mục</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function tytGdAdd() {
-  const d = _tytCtEdit();
-  d.giaiDoan.push({ id: tytNewId('g'), ten: '', tu: '', den: '' });
-  _tytRenderCauTruc();
-  // con trỏ vào ô tên giai đoạn vừa thêm (ô text đầu tiên của khối cuối)
-  document.querySelector('#tyt-ct-body .tyt-gd-box:last-child input[type="text"]')?.focus();
-}
-// Gõ / chọn ngày: chỉ cập nhật bản nháp (KHÔNG vẽ lại để khỏi mất con trỏ)
-function tytGdSet(id, field, val) {
-  const g = _tytCtEdit().giaiDoan.find(z => z.id === id);
-  if (g) g[field] = field === 'ten' ? val : (val || '');
-}
-function tytGdMove(id, dir) {
-  const arr = _tytCtEdit().giaiDoan;
-  const i = arr.findIndex(z => z.id === id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
-  _tytRenderCauTruc();
-}
-function tytGdDel(id) {
-  const d = _tytCtEdit();
-  const g = d.giaiDoan.find(z => z.id === id);
-  const soHm = d.hangMuc.filter(h => h.gdId === id).length;
-  if ((g && g.ten) || soHm) {
-    if (!confirm(`Xóa giai đoạn "${(g && g.ten) || '(chưa đặt tên)'}"${soHm ? ` cùng ${soHm} hạng mục` : ''}?\nCác khoản chi đã gán vào đây sẽ quay về "Chưa phân bổ" (sau khi Lưu Cấu Trúc).`)) return;
-  }
-  d.giaiDoan = d.giaiDoan.filter(z => z.id !== id);
-  d.hangMuc  = d.hangMuc.filter(h => h.gdId !== id);
-  _tytRenderCauTruc();
-}
-function tytHmAdd(gdId) {
-  _tytCtEdit().hangMuc.push({ id: tytNewId('h'), gdId, ten: '' });
-  _tytRenderCauTruc();
-  // con trỏ vào ô hạng mục vừa thêm
-  const boxes = document.querySelectorAll('#tyt-ct-body .tyt-gd-box');
-  const idx = _tytCtCur().giaiDoan.findIndex(g => g.id === gdId);
-  const ins = boxes[idx]?.querySelectorAll('.tyt-hm-list input');
-  if (ins && ins.length) ins[ins.length - 1].focus();
-}
-// el: ô input đang gõ → cập nhật cảnh báo "giống loại chi phí" ngay bên cạnh (không vẽ lại cả khung)
-function tytHmSet(id, val, el) {
-  const h = _tytCtEdit().hangMuc.find(z => z.id === id);
-  if (h) h.ten = val;
-  const row = el && el.parentElement;
-  if (row) {
-    row.querySelector('.tyt-hm-warn')?.remove();
-    row.insertAdjacentHTML('beforeend', _tytHmWarnHtml(val));
-  }
-}
-// Cảnh báo nhẹ khi tên hạng mục giống loại chi phí (VD "Nhân công thô") — không chặn lưu
-function _tytHmWarnHtml(ten) {
-  const w = tytGiongLoaiCP(ten);
-  return w ? `<span class="tyt-hm-warn" title="Hạng mục nên là VỊ TRÍ (Móng, Lầu 1...). Loại chi phí như &quot;${x(w)}&quot; đã có sẵn trên hóa đơn và được tách tự động ở tab Phân Tích — đặt hạng mục theo loại sẽ làm 1 hóa đơn phải chọn giữa 'vị trí' và 'loại'."><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px">warning</span> giống loại chi phí</span>` : '';
-}
-function tytHmDel(id) {
-  const d = _tytCtEdit();
-  d.hangMuc = d.hangMuc.filter(h => h.id !== id);
-  _tytRenderCauTruc();
-}
-// Tạo nhanh cấu trúc mẫu (thay thế cấu trúc đang có trên bản nháp)
-function tytCtMau() {
-  const p = _tytProj();
-  if (!p) return;
-  if (_tytCtCur().giaiDoan.length && !confirm('Thay cấu trúc hiện tại bằng mẫu gợi ý?\n(Chỉ áp dụng khi bấm Lưu Cấu Trúc)')) return;
-  const m = tytMauGoiY(p);
-  _tytDraft = { giaiDoan: m.giaiDoan, hangMuc: m.hangMuc };
-  _tytRenderCauTruc();
-}
-function tytCtReset() {
-  _tytDraft = null;
-  _tytRenderCauTruc();
-}
-
-function tytCtSave() {
-  const p = _tytProj();
-  if (!p) return;
-  if (!_tytDraft) { toast('Cấu trúc không có thay đổi', 'info'); return; }
-  const d = _tytDraft;
-  // Chuẩn hóa + kiểm tra
-  d.giaiDoan.forEach(g => { g.ten = (g.ten || '').trim(); });
-  d.hangMuc.forEach(h => { h.ten = (h.ten || '').trim(); });
-  d.hangMuc = d.hangMuc.filter(h => h.ten);               // hạng mục để trống tên → bỏ
-  const thieuTen = d.giaiDoan.findIndex(g => !g.ten);
-  if (thieuTen >= 0) { toast(`Giai đoạn thứ ${thieuTen + 1} chưa có tên!`, 'error'); return; }
-  const saiNgay = d.giaiDoan.find(g => g.tu && g.den && g.den < g.tu);
-  if (saiNgay) { toast(`"${saiNgay.ten}": Đến ngày phải sau Từ ngày!`, 'error'); return; }
-
-  // Dọn các gán tay trỏ tới giai đoạn / hạng mục đã xóa
-  const gdIds = new Set(d.giaiDoan.map(g => g.id));
-  const hmIds = new Set(d.hangMuc.map(h => h.id));
-  const phanBo = tytStructOf(p.id).phanBo;
-  let mat = 0;
-  Object.keys(phanBo).forEach(k => {
-    const v = phanBo[k];
-    if ((v.h && !hmIds.has(v.h)) || (v.g && !gdIds.has(v.g)) || (!v.h && !v.g)) {
-      // hạng mục bị xóa nhưng giai đoạn còn → giữ ở cấp giai đoạn
-      if (v.g && gdIds.has(v.g)) phanBo[k] = { g: v.g, h: '' };
-      else { delete phanBo[k]; mat++; }
-    }
-  });
-  if (mat && !confirm(`${mat} khoản chi đang gán vào giai đoạn bị xóa sẽ quay về "Chưa phân bổ". Lưu?`)) return;
-
-  // Giai đoạn MỚI tạo → mở sẵn trong bảng cây Phân Tích (giai đoạn cũ giữ trạng thái người dùng chọn)
-  const cuIds = new Set(tytStructOf(p.id).giaiDoan.map(g => g.id));
-  d.giaiDoan.forEach(g => { if (!cuIds.has(g.id)) _tytOpen.add('G:' + g.id); });
-
-  tytSaveStruct(p.id, { giaiDoan: d.giaiDoan, hangMuc: d.hangMuc, phanBo });
-  _tytDraft = null;
-  toast('✅ Đã lưu cấu trúc giai đoạn / hạng mục', 'success');
-  _tytRenderCauTruc();
-  _tytRecalc();
 }
 
 // ══ BẢNG THEO LOẠI CHI PHÍ (toàn nhà) ════════════════════════════
@@ -482,161 +291,101 @@ function _tytRenderLoai(r) {
   }
   tb.innerHTML = r.theoLoai.map(o => `<tr>
       <td>${x(o.loai)} <span class="text-secondary" style="font-size:11px">(${o.soDong})</span></td>
-      <td>${_tytRoChipLoai(r, o.loai)}</td>
+      <td>${_tytNhomChipLoai(r, o.loai)}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(o.tien)}</td>
       ${_tytPctCell(o.tien, r.tongChi)}
       <td class="text-end font-monospace" style="white-space:nowrap">${_tytM2Txt(o.tien, r.tongSan)}</td>
-    </tr>`).join('') + _tytTongRow(r);
+    </tr>`).join('') + `<tr class="tyt-rpt-total">
+      <td>TỔNG</td><td></td>
+      <td class="text-end font-monospace">${fmtM(r.tongChi)}</td>
+      <td class="text-end font-monospace">${r.tongChi ? '100%' : '—'}</td>
+      <td class="text-end font-monospace">${_tytM2Txt(r.tongChi, r.tongSan)}</td>
+    </tr>`;
 }
 
-// Chip rổ THỰC TẾ của 1 loại chi phí ở CT này (các khoản có thể vào rổ khác nhau do luật / HĐ TP / gán tay
-// / tách món) — rổ nào có tiền thì hiện, sắp theo tiền giảm dần; tooltip ghi số tiền từng rổ
-function _tytRoChipLoai(r, loai) {
+// Chip nhóm THỰC TẾ của 1 loại chi phí ở CT này (các khoản có thể vào nhóm khác nhau do luật / HĐ TP /
+// gán tay / tách món) — nhóm nào có tiền thì hiện, sắp theo tiền giảm dần; tooltip ghi số tiền từng nhóm
+function _tytNhomChipLoai(r, loai) {
   const by = {};
-  r.lines.forEach(l => { if (l.loai === loai) l.parts.forEach(pt => { by[pt.ro] = (by[pt.ro] || 0) + pt.tien; }); });
-  return Object.keys(by).sort((a, b) => by[b] - by[a]).map(ro => {
-    const t = TYT_RO[ro];
-    return `<span class="tyt-ro tyt-ro-${ro} tyt-ro-sm" title="${x(t.ten)}: ${fmtM(by[ro])}">${t.ngan}</span>`;
-  }).join(" ");
+  r.lines.forEach(l => { if (l.loai === loai) l.parts.forEach(pt => { by[pt.nhom] = (by[pt.nhom] || 0) + pt.tien; }); });
+  return Object.keys(by).sort((a, b) => by[b] - by[a]).map(n => {
+    const t = TYT_NHOM[n];
+    return `<span class="tyt-nh tyt-nh-${n} tyt-nh-sm" title="${+n ? 'Nhóm ' + n + ': ' : ''}${x(t.ten)}: ${fmtM(by[n])}">${+n ? n : '!'}</span>`;
+  }).join(' ');
 }
 
-function _tytTongRow(r) {
-  return `<tr class="tyt-rpt-total">
-    <td>TỔNG</td><td></td>
-    <td class="text-end font-monospace">${fmtM(r.tongChi)}</td>
-    <td class="text-end font-monospace">${r.tongChi ? '100%' : '—'}</td>
-    <td class="text-end font-monospace">${_tytM2Txt(r.tongChi, r.tongSan)}</td>
-  </tr>`;
-}
-
-// ══ BẢNG CÂY — 2 GÓC NHÌN (tab con TỔNG QUAN) ═══════════════════════
-// Nút gạt #tyt-view-ro / #tyt-view-gd (tytSetView, nhớ ở localStorage 'tyt_view'):
-//   • 'ro' THEO RỔ (Lợi nhuận / giá khoán) — tytCayRo(): Rổ → Loại chi phí → từng khoản (hoặc MÓN).
-//       Rổ 1: Số tiền · % · đ/m2 | Rổ 2: Số tiền · % | Rổ 3: chỉ Số tiền (đúng file thiết kế).
-//       Mặc định chỉ 3 dòng lớn (thu gọn) — bấm [+] mới bung.
-//   • 'gd' THEO GIAI ĐOẠN (Kỹ thuật) — tytCay(): Giai đoạn → Hạng mục → Loại → khoản,
-//       thêm cột TÁCH CẤU THÀNH (Vật tư / Nhân công / Khoán TP / Khác) để biết tỉ lệ VT/NC từng phần việc.
-// Cột "% Cấp trên" = tiền dòng ÷ tiền dòng cha ngay trên; cấp 1 → "—".
-const _TYT_KIND_CLS = { gd: 'tyt-cay-gd', ro: 'tyt-cay-gd', tru: 'tyt-cay-hm', chua: 'tyt-cay-chua', hm: 'tyt-cay-hm', chung: 'tyt-cay-hm tyt-cay-chung', loai: 'tyt-cay-loai', line: 'tyt-cay-line' };
-let _tytView = (() => { try { return localStorage.getItem('tyt_view') === 'gd' ? 'gd' : 'ro'; } catch (e) { return 'ro'; } })();
-
-function tytSetView(v) {
-  _tytView = v === 'gd' ? 'gd' : 'ro';
-  try { localStorage.setItem('tyt_view', _tytView); } catch (e) { /* bỏ qua */ }
-  if (_tytLast) _tytRenderKpi(_tytLast);
-  tytRenderCay();
-}
-
-// Chip rổ (màu theo rổ). src: nguồn xếp (tooltip)
-const _TYT_RO_SRC = { tay: 'gán tay', hdtp: 'theo HĐ thầu phụ', luat: 'theo luật từ khóa', loai: 'theo bảng Loại → Rổ', macdinh: 'mặc định theo tên loại' };
-function _tytRoChip(ro, src, nho) {
-  const t = TYT_RO[ro] || TYT_RO[0];
-  return `<span class="tyt-ro tyt-ro-${ro}${nho ? ' tyt-ro-sm' : ''}" title="${x(t.ten)}${src ? ' — ' + (_TYT_RO_SRC[src] || src) : ''}">${t.ngan}</span>`;
-}
-// Chip rổ của 1 khoản (nhiều món khác rổ → nhiều chip)
-function _tytRoChipLine(l) {
-  const seen = new Map();
-  (l.parts || []).forEach(pt => { if (!seen.has(pt.ro)) seen.set(pt.ro, pt.roSrc); });
-  return [...seen.entries()].map(([ro, src]) => _tytRoChip(ro, src, true)).join(' ');
-}
-
-// Ô "Tách cấu thành": thanh chồng + chữ ngắn
-function _tytCauThanhCell(ct, tong) {
-  if (!ct || !tong) return '<td></td>';
-  const ks = ['vt', 'nc', 'tp', 'khac'].filter(k => ct[k] > 0);
-  const bar = ks.map(k => `<span class="tyt-ct-${k}" style="width:${(ct[k] / tong * 100).toFixed(1)}%"></span>`).join('');
-  const txt = ks.map(k => `${TYT_CT_TEN[k]} ${Math.round(ct[k] / tong * 100)}%`).join(' · ');
-  return `<td style="min-width:150px"><div class="tyt-ct-bar" title="${txt}">${bar}</div><div class="tyt-cay-note" style="white-space:nowrap">${txt}</div></td>`;
-}
+// ══ BẢNG CÂY 4 NHÓM (tab con TỔNG QUAN & PHÂN BỔ) ═══════════════════
+// tytCayNhom(): Nhóm → (Nhóm 1: Trụ cột) → Loại chi phí → từng khoản (hoặc MÓN của hóa đơn chi tiết).
+// 4 cột: Nhóm / Chi tiết · Số tiền · Tỷ trọng (% tổng CT) · Đơn giá / m2 sàn. Mặc định chỉ 4 dòng nhóm (thu gọn).
+// Dòng khoản chi: ô 1·2·3·4 để ĐỔI NHÓM 1-CLICK (gán tay cả khoản) + ↺ trả về tự động.
+const _TYT_KIND_CLS = { nhom: 'tyt-cay-gd', tru: 'tyt-cay-hm', loai: 'tyt-cay-loai', line: 'tyt-cay-line' };
 
 function tytRenderCay() {
   const tb = document.getElementById('tyt-cay-tbody');
-  const th = document.getElementById('tyt-cay-thead');
   if (!tb || !_tytLast) return;
   const r = _tytLast;
-  const ro = _tytView === 'ro';
   const an0 = !!document.getElementById('tyt-cay-an0')?.checked;
-  document.querySelectorAll('input[name="tyt-view"]').forEach(i => { i.checked = i.value === _tytView; });
-  const title = document.getElementById('tyt-cay-title');
-  if (title) title.innerHTML = ro
-    ? '<span class="material-symbols-outlined msi-gap">shopping_basket</span>Tổng Quan Theo Rổ Chi Phí'
-    : '<span class="material-symbols-outlined msi-gap">account_tree</span>Phân Tích Theo Giai Đoạn → Hạng Mục';
-  const hint = document.getElementById('tyt-cay-hint');
-  if (hint) hint.innerHTML = ro
-    ? '<b>Rổ 1</b> là gói chuẩn để tính đ/m2 báo giá (chia 4 trụ cột + Quỹ phụ phí) · <b>Rổ 2</b> phần chủ nhà / ngoài gói · <b>Rổ 3</b> chi phí công ty lỡ nhập vào CT. Bấm <b>[+]</b> để xem rổ gồm những trụ cột / loại chi phí / khoản nào. Cấu hình rổ ở tab <b>Thiết lập</b>.'
-    : 'Bấm <b>[+]</b> để tách nhỏ: Hạng mục → các <b>loại chi phí</b> → từng khoản chi. <b>% Cấp trên</b> = so với dòng cha · <b>Tách cấu thành</b> = tỉ lệ Vật tư / Nhân công / Khoán thầu phụ của phần việc.';
-  const ncot = ro ? 5 : 6;
-  if (th) th.innerHTML = `<tr>
-      <th>${ro ? 'Rổ / Chi tiết' : 'Giai đoạn / Chi tiết'}</th><th class="text-end">Số tiền</th>
-      <th class="text-end" style="width:110px">% Toàn CT</th><th class="text-end" style="width:96px">% Cấp trên</th>
-      <th class="text-end">đ / m2 sàn</th>${ro ? '' : '<th>Tách cấu thành</th>'}</tr>`;
-
-  const nodes = ro ? tytCayRo(r) : tytCay(r);
   let html = '';
-  const walk = (n, depth, parentTien) => {
+  const walk = (n, depth) => {
     if (an0 && !n.tien) return;
     const has  = n.children.length > 0;
     const open = has && _tytOpen.has(n.key);
     const toggle = has
       ? `<button type="button" class="tyt-cay-tg" onclick="tytCayToggle(this)" title="${open ? 'Thu gọn' : 'Mở rộng'}"><span class="material-symbols-outlined">${open ? 'remove' : 'add'}</span></button>`
       : '<span class="tyt-cay-tg-sp"></span>';
-    let ten;
-    if (n.kind === 'gd')        ten = `<b>${x(n.ten).toUpperCase()}</b>`;
-    else if (n.kind === 'ro')   ten = `${_tytRoChip(n.ro)} <b>${x(n.ten.replace(/^Rổ \d · /, '').toUpperCase())}</b> <span class="tyt-cay-note">${x(TYT_RO[n.ro].mo)}</span>`;
-    else if (n.kind === 'chua') ten = `<span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px">help</span> <b>Chưa phân bổ</b> <span class="tyt-cay-note">→ gán ở tab Phân Bổ</span>`;
-    else if (n.kind === 'tru')  ten = `<span class="tyt-tru tyt-tru-${n.tru || 'x'}"></span><b>${x(n.ten)}</b> <span class="tyt-cay-note">${x(TYT_TRU[n.tru].mo)}</span>`;
-    else if (n.kind === 'chung') ten = `<i>${x(n.ten)}</i>`;
-    else if (n.kind === 'loai') ten = `${x(n.ten)} <span class="tyt-cay-note">(${n.soDong} ${n.ro !== undefined ? 'mục' : 'khoản'})</span>`;
-    else if (n.kind === 'line') {
-      const l = n.line;
-      const mon = n.part && n.part.mon ? `<span class="tyt-cay-note">món</span> <b>${x(n.part.ten)}</b> <span class="tyt-cay-note">— HĐ: ${x((l.nd || '').slice(0, 50))}</span>` : x(l.nd || '—');
-      const nguon = n.part ? ` <span class="tyt-cay-note" title="Nguồn xếp rổ">[${x(_TYT_RO_SRC[n.part.roSrc] || '')}]</span>` : '';
-      ten = `<span class="tyt-cay-date">${fmtISODate(l.ngay)}</span> ${mon}${l.doiTuong ? ` <span class="tyt-cay-note">· ${x(l.doiTuong)}</span>` : ''}${nguon}`;
-    } else ten = x(n.ten);
-    // Cột theo rổ: Rổ 1 đủ · Rổ 2 không đ/m2 · Rổ 3 chỉ số tiền
-    const nro = n.ro;
-    const anPct = ro && nro === 3;
-    const anM2  = ro && nro !== 1;
-    const pctCha = parentTien === null ? '<span class="text-secondary">—</span>' : _tytPctTxt(n.tien, parentTien);
-    const gach = '<td class="text-end text-secondary">—</td>';
-    html += `<tr class="${_TYT_KIND_CLS[n.kind] || ''}${n.kind === 'ro' && nro === 0 ? ' tyt-cay-chua' : ''}${n.tien ? '' : ' tyt-rpt-zero'}" data-k="${x(n.key)}">
-      <td><div class="tyt-cay-name" style="padding-left:${depth * 20}px">${toggle}<span>${ten}</span></div></td>
+    let ten, pick = '';
+    if (n.kind === 'nhom') {
+      ten = n.nhom
+        ? `<span class="tyt-nh-so tyt-nh-${n.nhom}">${n.nhom}</span><b title="${x(TYT_NHOM[n.nhom].mo)}">${x(n.ten.toUpperCase())}</b>`
+        : `<span class="tyt-nh-so tyt-nh-0">!</span><b>CHƯA XẾP NHÓM</b> <span class="tyt-cay-note">→ bấm ô 1·2·3·4 ở từng khoản, hoặc nút đỏ "Chưa xếp nhóm"</span>`;
+    } else if (n.kind === 'tru') {
+      ten = `<span class="tyt-tru tyt-tru-${n.tru || 'x'}"></span><b title="${x(TYT_TRU[n.tru].mo)}">${x(n.ten)}</b>`;
+    } else if (n.kind === 'loai') {
+      ten = `${x(n.ten)} <span class="tyt-cay-note">(${n.soDong} khoản)</span>`;
+    } else {
+      const l = n.line, pt = n.part;
+      const mon = pt.mon ? `<span class="tyt-cay-note">món</span> <b>${x(pt.ten)}</b> <span class="tyt-cay-note">— HĐ: ${x((l.nd || '').slice(0, 50))}</span>` : x(l.nd || '—');
+      ten = `<span class="tyt-cay-date">${fmtISODate(l.ngay)}</span> ${mon}${l.doiTuong ? ` <span class="tyt-cay-note">· ${x(l.doiTuong)}</span>` : ''}`;
+      pick = _tytNhomPick(l, pt);
+    }
+    const lineAttr = n.kind === 'line' ? ` data-lk="${x(n.line.key)}"` : '';
+    html += `<tr class="${_TYT_KIND_CLS[n.kind] || ''}${n.kind === 'nhom' ? ' tyt-nhrow tyt-nh-' + n.nhom : ''}${n.tien ? '' : ' tyt-rpt-zero'}" data-k="${x(n.key)}"${lineAttr}>
+      <td><div class="tyt-cay-name" style="padding-left:${depth * 20}px">${toggle}<span>${ten}</span>${pick}</div></td>
       <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(n.tien)}</td>
-      ${anPct ? gach : (n.kind === 'line' ? `<td class="text-end font-monospace">${_tytPctTxt(n.tien, r.tongChi)}</td>` : _tytPctCell(n.tien, r.tongChi))}
-      ${anPct ? gach : `<td class="text-end font-monospace" style="white-space:nowrap">${pctCha}</td>`}
-      ${anM2 ? gach : `<td class="text-end font-monospace" style="white-space:nowrap">${_tytM2Txt(n.tien, r.tongSan)}</td>`}
-      ${ro ? '' : (n.kind === 'line' ? '<td></td>' : _tytCauThanhCell(n.ct, n.tien))}
+      ${n.kind === 'line' ? `<td class="text-end font-monospace">${_tytPctTxt(n.tien, r.tongChi)}</td>` : _tytPctCell(n.tien, r.tongChi, n.kind === 'nhom' ? n.nhom : undefined)}
+      <td class="text-end font-monospace" style="white-space:nowrap">${_tytM2Txt(n.tien, r.tongSan)}</td>
     </tr>`;
-    if (open) n.children.forEach(c => walk(c, depth + 1, n.tien));
+    if (open) n.children.forEach(c => walk(c, depth + 1));
   };
-  nodes.forEach(n => walk(n, 0, null));
-
-  if (!ro && !r.st.giaiDoan.length) {
-    html = `<tr><td colspan="${ncot}" class="py-3 text-center" style="font-size:12.5px">
-      <div class="text-secondary mb-2">Công trình chưa có giai đoạn / hạng mục — toàn bộ chi phí đang ở "Chưa phân bổ".</div>
-      <button class="btn btn-sm btn-outline-primary" onclick="tytGoSub('tyt-sub-tl')"><span class="material-symbols-outlined msi-gap">tune</span>Sang tab Thiết lập</button>
-    </td></tr>` + html;
-  }
-  if (!r.lines.length) html = `<tr><td colspan="${ncot}" class="text-center text-secondary py-3">Chưa có khoản chi nào</td></tr>`;
+  tytCayNhom(r).forEach(n => walk(n, 0));
+  if (!r.lines.length) html = '<tr><td colspan="4" class="text-center text-secondary py-3">Chưa có khoản chi nào</td></tr>';
   tb.innerHTML = html + `<tr class="tyt-rpt-total">
     <td>TỔNG CÔNG TRÌNH</td>
     <td class="text-end font-monospace">${fmtM(r.tongChi)}</td>
     <td class="text-end font-monospace">${r.tongChi ? '100%' : '—'}</td>
-    <td class="text-end font-monospace"></td>
-    <td class="text-end font-monospace">${_tytM2Txt(r.tongChi, r.tongSan)}</td>${ro ? '' : '<td></td>'}
-  </tr>` + (ro && r.tongSan > 0 ? `<tr class="tyt-rpt-total tyt-ro1-total">
-    <td>RỔ 1 ÷ TỔNG SÀN <span class="tyt-cay-note">(con số báo giá phần thô)</span></td>
-    <td class="text-end font-monospace">${fmtM(r.theoRo[1])}</td><td class="text-end font-monospace">${_tytPctTxt(r.theoRo[1], r.tongChi)}</td><td></td>
-    <td class="text-end font-monospace">${fmtM(Math.round(r.cpM2Ro1))}</td>
-  </tr>` : '');
+    <td class="text-end font-monospace">${_tytM2Txt(r.tongChi, r.tongSan)}</td>
+  </tr>`;
+}
 
-  // Chấm đỏ "Chưa xếp rổ"
-  const btn = document.getElementById('tyt-chuaro-btn');
-  if (btn) {
-    btn.style.display = r.chuaRo.length ? '' : 'none';
-    const n = document.getElementById('tyt-chuaro-n');
-    if (n) n.textContent = r.chuaRo.length;
-  }
+// Ô đổi nhóm 1-click trên dòng khoản chi: 1 · 2 · 3 · 4 (+ ↺ khi đang gán tay)
+function _tytNhomPick(l, pt) {
+  const ca = l.parts.length > 1 ? ' (cả hóa đơn, mọi món)' : '';
+  return `<span class="tyt-nh-pick">${TYT_NHOM_DS.map(n =>
+    `<button type="button" class="tyt-nh-pk tyt-nh-${n}${n === pt.nhom ? ' on' : ''}" onclick="tytDoiNhom(this, ${n})" title="Chuyển khoản này sang Nhóm ${n}: ${x(TYT_NHOM[n].ten)}${ca}">${n}</button>`).join('')}${
+    pt.nhomSrc === 'tay' ? '<button type="button" class="tyt-nh-pk tyt-nh-auto" onclick="tytDoiNhom(this, 0)" title="Đang gán tay — bấm để trả về tự động">↺</button>'
+      : `<span class="tyt-nh-src" title="Đang xếp ${x(_TYT_NHOM_SRC[pt.nhomSrc] || '')}">tự động</span>`}</span>`;
+}
+
+// Bấm ô nhóm trên dòng khoản chi → gán tay cả khoản (n = 0 → bỏ gán tay)
+function tytDoiNhom(btn, n) {
+  const key = btn?.closest('tr')?.dataset.lk;
+  const p = _tytProj();
+  if (!key || !p) return;
+  const st = tytStructOf(p.id);
+  if (n) st.nhomTay[key] = n; else delete st.nhomTay[key];
+  tytSaveStruct(p.id, { nhomTay: st.nhomTay });
+  toast(n ? `✅ Đã chuyển sang Nhóm ${n}: ${TYT_NHOM[n].ten}` : 'Đã trả khoản chi về tự động xếp nhóm', 'success');
+  _tytRecalc();
 }
 
 // Bấm [+]/[−] ở 1 dòng
@@ -647,7 +396,7 @@ function tytCayToggle(btn) {
   tytRenderCay();
 }
 
-// Mở hết (tới cấp Loại chi phí — chưa bung từng khoản chi) / Thu gọn hết — theo góc nhìn đang chọn
+// Mở hết (tới cấp Loại chi phí — chưa bung từng khoản chi) / Thu gọn hết
 function tytCayAll(open) {
   _tytOpen.clear();
   if (open && _tytLast) {
@@ -656,243 +405,262 @@ function tytCayAll(open) {
       _tytOpen.add(n.key);
       n.children.forEach(walk);
     };
-    (_tytView === 'ro' ? tytCayRo(_tytLast) : tytCay(_tytLast)).forEach(walk);
+    tytCayNhom(_tytLast).forEach(walk);
   }
   tytRenderCay();
 }
 
-// ══ POPUP "CHƯA XẾP RỔ" (chấm đỏ — Phần A) ═════════════════════════
-// Nhóm các khoản chưa có rổ theo LOẠI CHI PHÍ: xếp cả loại 1 lần (ghi vào bảng Loại → Rổ dùng chung)
-// hoặc xếp từng khoản (gán tay rổ — chỉ công trình này). Xử lý hết → popup tự đóng.
-function tytMoChuaRo() {
+// ══ POPUP "CHƯA XẾP NHÓM" (nút cảnh báo đỏ) ═══════════════════════════
+// Nhóm các khoản chưa có nhóm theo LOẠI CHI PHÍ: xếp cả loại 1 lần (ghi vào bảng Loại → Nhóm dùng chung)
+// hoặc xếp từng khoản (gán tay — chỉ công trình này). Xử lý hết → popup tự đóng.
+let _tytChuaNhomDs = [];
+function tytMoChuaNhom() {
   const r = _tytLast;
   if (!r) return;
-  if (!r.chuaRo.length) { if (typeof closeModal === 'function') closeModal(); toast('✅ Không còn khoản nào chưa xếp rổ', 'success'); return; }
+  if (!r.chuaNhom.length) { if (typeof closeModal === 'function') closeModal(); toast('✅ Không còn khoản nào chưa xếp nhóm', 'success'); return; }
   const m = new Map();
-  r.chuaRo.forEach(l => {
-    const tien = l.parts.filter(pt => pt.ro === 0).reduce((s, pt) => s + pt.tien, 0);
+  r.chuaNhom.forEach(l => {
+    const tien = l.parts.filter(pt => pt.nhom === 0).reduce((s, pt) => s + pt.tien, 0);
     const o = m.get(l.loai) || { loai: l.loai, tien: 0, ls: [] };
     o.tien += tien; o.ls.push({ l, tien });
     m.set(l.loai, o);
   });
-  const nut = (fn, arg) => [1, 2, 3].map(ro => `<button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="${fn}(${arg}, ${ro})" title="${x(TYT_RO[ro].ten)}">${TYT_RO[ro].ngan}</button>`).join(' ');
+  const nut = (fn, arg) => TYT_NHOM_DS.map(n => `<button class="tyt-nh-pk tyt-nh-${n}" onclick="${fn}(${arg}, ${n})" title="Nhóm ${n}: ${x(TYT_NHOM[n].ten)}">${n}</button>`).join('');
   const nhom = [...m.values()].sort((a, b) => b.tien - a.tien);
-  const body = `<div class="text-secondary mb-2" style="font-size:12px">${r.chuaRo.length} khoản chưa có rổ. Xếp <b>cả loại</b> (áp cho mọi công trình, lưu vào bảng Loại → Rổ) hoặc xếp <b>từng khoản</b> (chỉ công trình này).</div>
+  _tytChuaNhomDs = nhom.map(o => o.loai);
+  _tytModal('<span class="material-symbols-outlined msi-gap">priority_high</span>Khoản Chưa Xếp Nhóm', `
+    <div class="text-secondary mb-2" style="font-size:12px">${r.chuaNhom.length} khoản chưa có nhóm. Xếp <b>cả loại</b> (áp cho mọi công trình) hoặc xếp <b>từng khoản</b> (chỉ công trình này).
+      <span class="ms-1">${TYT_NHOM_DS.map(n => _tytNhomChip(n, '', true)).join(' ')}</span></div>
     ${nhom.map((o, gi) => `<div class="border rounded mb-2">
       <div class="d-flex align-items-center flex-wrap gap-2 px-2 py-1" style="background:var(--bs-tertiary-bg)">
         <b>${x(o.loai)}</b> <span class="text-secondary" style="font-size:12px">${o.ls.length} khoản · ${fmtM(o.tien)}</span>
-        <span class="ms-auto" style="font-size:12px">Xếp cả loại vào: ${nut('tytChuaRoLoai', gi)}</span>
+        <span class="ms-auto d-flex align-items-center gap-1" style="font-size:12px">Xếp cả loại vào: <span class="tyt-nh-pick">${nut('tytChuaNhomLoai', gi)}</span></span>
       </div>
       <table class="table table-sm align-middle mb-0" style="font-size:12px"><tbody>
-        ${o.ls.slice(0, 40).map(({ l, tien }) => `<tr>
+        ${o.ls.slice(0, 40).map(({ l, tien }) => `<tr data-lk="${x(l.key)}">
           <td class="text-secondary" style="white-space:nowrap">${fmtISODate(l.ngay)}</td>
           <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(l.nd)}">${x(l.nd || '—')}</td>
           <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(l.doiTuong || '')}</td>
           <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(tien)}</td>
-          <td class="text-end" style="white-space:nowrap">${nut('tytChuaRoKhoan', `'${x(l.key)}'`)}</td></tr>`).join('')}
-        ${o.ls.length > 40 ? `<tr><td colspan="5" class="text-secondary text-center">… và ${o.ls.length - 40} khoản nữa — xếp cả loại hoặc dùng bộ lọc "Chưa xếp rổ" ở tab Phân Bổ</td></tr>` : ''}
-      </tbody></table></div>`).join('')}`;
-  _tytChuaRoNhom = nhom.map(o => o.loai);
-  document.getElementById('modal-title').innerHTML = '<span class="material-symbols-outlined msi-gap">priority_high</span>Khoản Chưa Xếp Rổ';
-  document.getElementById('modal-body').innerHTML = body;
-  document.getElementById('ct-modal').classList.add('open');
+          <td class="text-end" style="white-space:nowrap"><span class="tyt-nh-pick">${nut('tytChuaNhomKhoan', 'this')}</span></td></tr>`).join('')}
+        ${o.ls.length > 40 ? `<tr><td colspan="5" class="text-secondary text-center">… và ${o.ls.length - 40} khoản nữa — xếp cả loại hoặc lọc "Chưa xếp nhóm" ở bảng Tra cứu &amp; gán hàng loạt</td></tr>` : ''}
+      </tbody></table></div>`).join('')}`);
 }
-let _tytChuaRoNhom = [];
-function tytChuaRoLoai(gi, ro) {
-  const loai = _tytChuaRoNhom[gi];
+function tytChuaNhomLoai(gi, n) {
+  const loai = _tytChuaNhomDs[gi];
   if (loai === undefined) return;
-  const cfg = tytRoCfg();
-  cfg.roLoai[tytLoaiKey(loai)] = ro;
-  tytSaveRoCfg({ roLoai: cfg.roLoai });
-  toast(`✅ Loại "${loai}" → ${TYT_RO[ro].ngan} (áp cho mọi công trình)`, 'success');
-  _tytRecalc(); tytMoChuaRo();
+  const cfg = tytNhomCfg();
+  cfg.nhomLoai[tytLoaiKey(loai)] = n;
+  tytSaveNhomCfg({ nhomLoai: cfg.nhomLoai });
+  toast(`✅ Loại "${loai}" → Nhóm ${n} (áp cho mọi công trình)`, 'success');
+  _tytRecalc(); tytMoChuaNhom();
 }
-function tytChuaRoKhoan(key, ro) {
+function tytChuaNhomKhoan(btn, n) {
+  const key = btn?.closest('tr')?.dataset.lk;
   const p = _tytProj();
-  if (!p) return;
+  if (!key || !p) return;
   const st = tytStructOf(p.id);
-  st.roTay[key] = ro;
-  tytSaveStruct(p.id, { roTay: st.roTay });
-  _tytRecalc(); tytMoChuaRo();
+  st.nhomTay[key] = n;
+  tytSaveStruct(p.id, { nhomTay: st.nhomTay });
+  _tytRecalc(); tytMoChuaNhom();
 }
 
-// ══ CẤU HÌNH RỔ — tab Thiết lập (dùng chung mọi công trình) ════════════
-function _tytRenderRoCfg(r) {
-  const tb = document.getElementById('tyt-roloai-tbody');
-  const cfg = r.cfg;
-  // Danh sách loại: danh mục + loại đang có ở CT này
+// ══ POPUP "⚙ CẤU HÌNH PHÂN NHÓM MẶC ĐỊNH" (dùng chung mọi công trình) ═════════
+// 1. Bảng Loại chi phí → Nhóm (+ Trụ cột nếu thuộc Nhóm 1)   2. Bảng Luật từ khóa tự động DUY NHẤT
+// Khung popup vẽ 1 lần (giữ chữ đang gõ ở ô thêm luật); 2 bảng vẽ lại bằng _tytCfgFill sau mỗi thay đổi.
+let _tytCfgLoaiDs = [];
+function tytCfgMo() {
+  const opt = n => `<option value="${n}">→ Nhóm ${n} · ${TYT_NHOM[n].ngan}</option>`;
+  _tytModal('<span class="material-symbols-outlined msi-gap">settings</span>Cấu Hình Phân Nhóm Mặc Định', `
+    <div id="tyt-cfg-box">
+      <div class="text-secondary mb-2" style="font-size:12px">Cài 1 lần, dùng cho <b>mọi công trình</b>. Thứ tự xếp 1 khoản chi:
+        <b>Gán tay</b> → <b>HĐ thầu phụ</b> → <b>Luật từ khóa</b> (bảng 2) → <b>Loại chi phí</b> (bảng 1). Hóa đơn chi tiết được xếp theo từng món.</div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="qt-lb mb-1">1. Loại chi phí → Nhóm ${_tytHelp('Nhóm mặc định của mỗi loại chi phí. Dòng tô đỏ = chưa xếp nhóm. Cột Trụ cột chỉ có ý nghĩa với Nhóm 1 (dùng cho Kiểm soát định mức). "mặc định" = app tự đoán theo tên loại.')}</div>
+          <div class="table-responsive border rounded" style="max-height:440px;overflow-y:auto">
+            <table class="table table-sm align-middle mb-0" style="font-size:12px">
+              <thead class="table-light" style="position:sticky;top:0;z-index:1"><tr style="font-size:10.5px">
+                <th>LOẠI CHI PHÍ</th><th class="text-end">CT NÀY</th><th style="width:140px">NHÓM</th><th style="width:140px">TRỤ CỘT (NHÓM 1)</th>
+              </tr></thead>
+              <tbody id="tyt-cfg-loai"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="qt-lb mb-1">2. Luật từ khóa tự động ${_tytHelp('Xét từ trên xuống, luật đầu tiên khớp sẽ xếp nhóm. Nhiều từ khóa cách nhau bằng dấu phẩy, không phân biệt dấu / hoa thường. Áp cho cả từng món của hóa đơn chi tiết. VD: "ép cọc" → Nhóm 4 · "bồn cầu, đèn" → Nhóm 2 · "thang máy" → Nhóm 3.')}</div>
+          <div class="table-responsive border rounded mb-2">
+            <table class="table table-sm align-middle mb-0" style="font-size:12px">
+              <thead class="table-light"><tr style="font-size:10.5px">
+                <th style="width:26px">#</th><th>LOẠI CHỨA</th><th>NỘI DUNG / MÓN / NCC CHỨA</th><th>→ NHÓM</th><th class="text-end">CT NÀY</th><th style="width:56px"></th>
+              </tr></thead>
+              <tbody id="tyt-cfg-luat"></tbody>
+            </table>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <input type="text" id="tyt-luat-loai" class="form-control form-control-sm" style="width:150px" placeholder="Loại (trống = mọi loại)" list="tyt-luat-dl">
+            <datalist id="tyt-luat-dl"></datalist>
+            <input type="text" id="tyt-luat-tk" class="form-control form-control-sm" style="flex:1 1 160px" placeholder="Từ khóa: bồn cầu, đèn led">
+            <select id="tyt-luat-nhom" class="form-select form-select-sm" style="width:auto">${TYT_NHOM_DS.map(opt).join('')}</select>
+            <button class="btn btn-sm btn-primary fw-bold" onclick="tytLuatAdd()"><span class="material-symbols-outlined msi-gap">add</span>Thêm</button>
+          </div>
+          <div class="text-end mt-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="tytLuatMacDinh()" title="Thay toàn bộ luật bằng bộ luật mặc định">Khôi phục luật mặc định</button>
+          </div>
+        </div>
+      </div>
+    </div>`);
+  _tytCfgFill();
+}
+
+// Vẽ 2 bảng trong popup cấu hình (bỏ qua nếu popup không mở)
+function _tytCfgFill() {
+  if (!_tytModalCo('tyt-cfg-box')) return;
+  const cfg = tytNhomCfg();
+  const r = _tytLast;
+  // Danh sách loại: danh mục + loại đang có ở CT đang chọn
   const tienCT = new Map();
-  r.lines.forEach(l => tienCT.set(l.loai, (tienCT.get(l.loai) || 0) + l.tien));
+  (r ? r.lines : []).forEach(l => tienCT.set(l.loai, (tienCT.get(l.loai) || 0) + l.tien));
   const ds = new Map();
   ((typeof cats !== 'undefined' && cats && Array.isArray(cats.loaiChiPhi)) ? cats.loaiChiPhi : []).forEach(n => { if (n) ds.set(tytLoaiKey(n), n); });
-  tienCT.forEach((_, n) => { if (!ds.has(tytLoaiKey(n))) ds.set(tytLoaiKey(n), n); });
+  [TYT_LOAI_UNG_TP, ...tienCT.keys()].forEach(n => { if (!ds.has(tytLoaiKey(n))) ds.set(tytLoaiKey(n), n); });
   const list = [...ds.values()].sort((a, b) => ((tienCT.get(b) || 0) - (tienCT.get(a) || 0)) || a.localeCompare(b, 'vi'));
-  if (tb) {
-    tb.innerHTML = list.map((n, i) => {
-      const m = tytRoCuaLoai(n, cfg);
-      return `<tr class="${m.ro === 0 ? 'table-danger' : ''}">
-        <td>${x(n)}</td>
-        <td class="text-end font-monospace text-secondary" style="white-space:nowrap">${tienCT.get(n) ? fmtM(tienCT.get(n)) : ''}</td>
-        <td><select class="form-select form-select-sm py-0" onchange="tytRoLoaiSet(${i}, this.value)">
-          ${[1, 2, 3, 0].map(ro => `<option value="${ro}"${m.ro === ro ? ' selected' : ''}>${ro ? TYT_RO[ro].ngan + ' · ' + ['', 'Gói thô', 'Chủ nhà', 'Công ty'][ro] : 'Chưa xếp'}</option>`).join('')}
-        </select>${m.src === 'macdinh' ? '<div class="tyt-cay-note">mặc định</div>' : ''}</td>
-        ${_tytTruSelHtml(n, i, cfg, m.ro)}
-      </tr>`;
-    }).join('');
-  }
-  _tytRoLoaiDs = list;
-  const dl = document.getElementById('tyt-roluat-dl');
+  _tytCfgLoaiDs = list;
+  const tl = document.getElementById('tyt-cfg-loai');
+  if (tl) tl.innerHTML = list.map((n, i) => {
+    const m = tytNhomCuaLoai(n, cfg);
+    const t = tytTruCuaLoai(n, cfg);
+    return `<tr class="${m.nhom === 0 ? 'table-danger' : ''}">
+      <td><span class="tyt-nh-dot tyt-nh-${m.nhom}"></span>${x(n)}</td>
+      <td class="text-end font-monospace text-secondary" style="white-space:nowrap">${tienCT.get(n) ? fmtM(tienCT.get(n)) : ''}</td>
+      <td><select class="form-select form-select-sm py-0" onchange="tytNhomLoaiSet(${i}, this.value)">
+        ${[1, 2, 3, 4, 0].map(k => `<option value="${k}"${m.nhom === k ? ' selected' : ''}>${k ? k + ' · ' + TYT_NHOM[k].ngan : 'Chưa xếp'}</option>`).join('')}
+      </select>${m.src === 'macdinh' ? '<div class="tyt-cay-note">mặc định</div>' : ''}</td>
+      <td style="${m.nhom === 1 ? '' : 'opacity:.4'}"><select class="form-select form-select-sm py-0${m.nhom === 1 && !t.tru ? ' border-danger' : ''}" onchange="tytTruLoaiSet(${i}, this.value)">
+        ${TYT_TRU_THU_TU.map(k => `<option value="${k}"${t.tru === k ? ' selected' : ''}>${k ? TYT_TRU[k].ten : '— Chưa xếp —'}</option>`).join('')}
+      </select></td>
+    </tr>`;
+  }).join('');
+  const dl = document.getElementById('tyt-luat-dl');
   if (dl) dl.innerHTML = list.map(n => `<option value="${x(n)}">`).join('');
 
-  // Luật rổ
-  const tl = document.getElementById('tyt-roluat-tbody');
-  if (tl) {
-    const nhan = new Map();
-    r.lines.forEach(l => l.parts.forEach(pt => {
-      if (pt.roSrc !== 'luat') return;
-      const o = nhan.get(pt.roRef) || { n: 0, tien: 0 };
-      o.n++; o.tien += pt.tien; nhan.set(pt.roRef, o);
-    }));
-    tl.innerHTML = cfg.roLuat.length ? cfg.roLuat.map((lu, i) => {
-      const o = nhan.get(lu.id) || { n: 0, tien: 0 };
-      return `<tr>
-        <td class="text-secondary">${i + 1}</td>
-        <td>${lu.loai ? x(lu.loai) : '<span class="text-secondary">mọi loại</span>'}</td>
-        <td>"${x(lu.tuKhoa)}"</td>
-        <td>${_tytRoChip(+lu.ro)}</td>
-        <td class="text-end font-monospace" style="white-space:nowrap">${o.n ? `${o.n} mục · ${fmtM(o.tien)}` : '<span class="text-secondary">0</span>'}</td>
-        <td class="text-end" style="white-space:nowrap">
-          <button type="button" class="btn btn-link btn-sm p-0 text-secondary" title="Ưu tiên lên trên" onclick="tytRoLuatMove('${lu.id}',-1)" ${i === 0 ? 'disabled' : ''}><span class="material-symbols-outlined" style="font-size:17px">arrow_upward</span></button>
-          <button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Xóa luật" onclick="tytRoLuatDel('${lu.id}')"><span class="material-symbols-outlined" style="font-size:17px">delete</span></button>
-        </td></tr>`;
-    }).join('') : '<tr><td colspan="6" class="text-secondary text-center py-2">Chưa có luật rổ.</td></tr>';
-  }
+  // Luật: đếm số món / tiền luật đang nhận ở CT đang chọn
+  const nhan = new Map();
+  (r ? r.lines : []).forEach(l => l.parts.forEach(pt => {
+    if (pt.nhomSrc !== 'luat') return;
+    const o = nhan.get(pt.nhomRef) || { n: 0, tien: 0 };
+    o.n++; o.tien += pt.tien; nhan.set(pt.nhomRef, o);
+  }));
+  const tb = document.getElementById('tyt-cfg-luat');
+  if (tb) tb.innerHTML = cfg.nhomLuat.length ? cfg.nhomLuat.map((lu, i) => {
+    const o = nhan.get(lu.id) || { n: 0, tien: 0 };
+    return `<tr>
+      <td class="text-secondary">${i + 1}</td>
+      <td>${lu.loai ? x(lu.loai) : '<span class="text-secondary">mọi loại</span>'}</td>
+      <td>"${x(lu.tuKhoa)}"</td>
+      <td>${_tytNhomChip(_tytNhomHopLe(lu.nhom), '', true)}</td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${o.n ? `${o.n} · ${fmtM(o.tien)}` : '<span class="text-secondary">0</span>'}</td>
+      <td class="text-end" style="white-space:nowrap">
+        <button type="button" class="btn btn-link btn-sm p-0 text-secondary" title="Ưu tiên lên trên" onclick="tytLuatMove('${x(lu.id)}',-1)" ${i === 0 ? 'disabled' : ''}><span class="material-symbols-outlined" style="font-size:17px">arrow_upward</span></button>
+        <button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Xóa luật" onclick="tytLuatDel('${x(lu.id)}')"><span class="material-symbols-outlined" style="font-size:17px">delete</span></button>
+      </td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="text-secondary text-center py-2">Chưa có luật.</td></tr>';
 }
-let _tytRoLoaiDs = [];
 
-// (Phần B) Ô chọn TRỤ CỘT Rổ 1 của 1 loại — mờ đi khi loại không thuộc Rổ 1 (vẫn chọn được vì luật rổ
-// có thể kéo từng khoản của loại đó vào Rổ 1, VD loại "Khác" có chữ "xà bần")
-function _tytTruSelHtml(n, i, cfg, ro) {
-  const t = tytTruCuaLoai(n, cfg);
-  return `<td style="${ro === 1 ? '' : 'opacity:.45'}"><select class="form-select form-select-sm py-0${ro === 1 && !t.tru ? ' border-danger' : ''}" onchange="tytTruLoaiSet(${i}, this.value)">
-      ${TYT_TRU_THU_TU.map(k => `<option value="${k}"${t.tru === k ? ' selected' : ''}>${k ? TYT_TRU[k].ten : '— Chưa xếp —'}</option>`).join('')}
-    </select>${t.src === 'macdinh' && t.tru ? '<div class="tyt-cay-note">mặc định</div>' : ''}</td>`;
+// Sau khi đổi cấu hình: tính lại CT đang chọn (nếu có) + vẽ lại popup
+function _tytSauCfg() {
+  if (_tytProj()) _tytRecalc(); else _tytCfgFill();
+}
+function tytNhomLoaiSet(i, v) {
+  const n = _tytCfgLoaiDs[i];
+  if (n === undefined) return;
+  const cfg = tytNhomCfg();
+  cfg.nhomLoai[tytLoaiKey(n)] = +v;
+  tytSaveNhomCfg({ nhomLoai: cfg.nhomLoai });
+  toast(`✅ "${n}" → ${+v ? 'Nhóm ' + v : 'Chưa xếp'} (áp cho mọi công trình)`, 'success');
+  _tytSauCfg();
 }
 function tytTruLoaiSet(i, v) {
-  const n = _tytRoLoaiDs[i];
+  const n = _tytCfgLoaiDs[i];
   if (n === undefined) return;
-  const cfg = tytRoCfg();
+  const cfg = tytNhomCfg();
   cfg.truLoai[tytLoaiKey(n)] = v;
-  tytSaveRoCfg({ truLoai: cfg.truLoai });
+  tytSaveNhomCfg({ truLoai: cfg.truLoai });
   toast(`✅ "${n}" → trụ cột ${TYT_TRU[v] ? TYT_TRU[v].ten : ''} (áp cho mọi công trình)`, 'success');
-  _tytRecalc();
+  _tytSauCfg();
 }
-function tytRoLoaiSet(i, v) {
-  const n = _tytRoLoaiDs[i];
-  if (n === undefined) return;
-  const cfg = tytRoCfg();
-  cfg.roLoai[tytLoaiKey(n)] = +v;
-  tytSaveRoCfg({ roLoai: cfg.roLoai });
-  toast(`✅ "${n}" → ${TYT_RO[+v].ngan} (áp cho mọi công trình)`, 'success');
-  _tytRecalc();
-}
-function tytRoLuatAdd() {
-  const loai = (document.getElementById('tyt-roluat-loai')?.value || '').trim();
-  const tkEl = document.getElementById('tyt-roluat-tk');
+function tytLuatAdd() {
+  const loai = (document.getElementById('tyt-luat-loai')?.value || '').trim();
+  const tkEl = document.getElementById('tyt-luat-tk');
   const tk = (tkEl?.value || '').trim();
-  const ro = +(document.getElementById('tyt-roluat-ro')?.value || 1);
-  if (!tk) { toast('Nhập từ khóa cho luật rổ!', 'error'); tkEl?.focus(); return; }
-  const cfg = tytRoCfg();
-  cfg.roLuat.push({ id: tytNewId('q'), loai, tuKhoa: tk, ro });
-  tytSaveRoCfg({ roLuat: cfg.roLuat });
+  const nhom = +(document.getElementById('tyt-luat-nhom')?.value || 1);
+  if (!tk) { toast('Nhập từ khóa cho luật!', 'error'); tkEl?.focus(); return; }
+  const cfg = tytNhomCfg();
+  cfg.nhomLuat.push({ id: tytNewId('q'), loai, tuKhoa: tk, nhom });
+  tytSaveNhomCfg({ nhomLuat: cfg.nhomLuat });
   if (tkEl) tkEl.value = '';
-  toast('✅ Đã thêm luật rổ (áp cho mọi công trình)', 'success');
-  _tytRecalc();
+  toast(`✅ Đã thêm luật "${tk}" → Nhóm ${nhom} (áp cho mọi công trình)`, 'success');
+  _tytSauCfg();
 }
-function tytRoLuatDel(id) {
-  const cfg = tytRoCfg();
-  const lu = cfg.roLuat.find(z => z.id === id);
-  if (!lu || !confirm(`Xóa luật rổ "${lu.tuKhoa}" → ${TYT_RO[+lu.ro].ngan}?\n(Áp dụng cho mọi công trình)`)) return;
-  tytSaveRoCfg({ roLuat: cfg.roLuat.filter(z => z.id !== id) });
-  _tytRecalc();
+function tytLuatDel(id) {
+  const cfg = tytNhomCfg();
+  const lu = cfg.nhomLuat.find(z => z.id === id);
+  if (!lu || !confirm(`Xóa luật "${lu.tuKhoa}" → Nhóm ${lu.nhom}?\n(Áp dụng cho mọi công trình)`)) return;
+  tytSaveNhomCfg({ nhomLuat: cfg.nhomLuat.filter(z => z.id !== id) });
+  _tytSauCfg();
 }
-function tytRoLuatMove(id, dir) {
-  const cfg = tytRoCfg();
-  const a = cfg.roLuat, i = a.findIndex(z => z.id === id), j = i + dir;
+function tytLuatMove(id, dir) {
+  const cfg = tytNhomCfg();
+  const a = cfg.nhomLuat, i = a.findIndex(z => z.id === id), j = i + dir;
   if (i < 0 || j < 0 || j >= a.length) return;
   [a[i], a[j]] = [a[j], a[i]];
-  tytSaveRoCfg({ roLuat: a });
-  _tytRecalc();
+  tytSaveNhomCfg({ nhomLuat: a });
+  _tytSauCfg();
 }
-function tytRoLuatMacDinh() {
-  if (!confirm('Thay TOÀN BỘ luật rổ hiện tại bằng bộ luật mặc định?\n(Áp dụng cho mọi công trình — bảng Loại → Rổ giữ nguyên)')) return;
-  tytSaveRoCfg({ roLuat: TYT_RO_LUAT_MAC_DINH.map(l => ({ id: tytNewId('q'), ...l })) });
-  _tytRecalc();
-}
-
-// Gán RỔ tay cho các dòng đang tick ở bảng Gán tay (0 = bỏ gán tay → tự động)
-function tytPbGanRo() {
-  const p = _tytProj();
-  if (!p) return;
-  if (!_tytPbSel.size) { toast('Chưa tick khoản chi nào!', 'error'); return; }
-  const ro = +(document.getElementById('tyt-pb-ro')?.value || 0);
-  const st = tytStructOf(p.id);
-  _tytPbSel.forEach(k => { if (ro) st.roTay[k] = ro; else delete st.roTay[k]; });
-  const n = _tytPbSel.size;
-  tytSaveStruct(p.id, { roTay: st.roTay });
-  _tytPbSel.clear();
-  toast(ro ? `✅ Đã xếp ${n} khoản vào ${TYT_RO[ro].ngan}` : `Đã bỏ gán tay rổ ${n} khoản (về tự động)`, 'success');
-  _tytRecalc();
+function tytLuatMacDinh() {
+  if (!confirm('Thay TOÀN BỘ luật từ khóa hiện tại bằng bộ luật mặc định?\n(Áp dụng cho mọi công trình — bảng Loại → Nhóm giữ nguyên)')) return;
+  tytSaveNhomCfg({ nhomLuat: TYT_NHOM_LUAT_MAC_DINH.map(l => ({ id: tytNewId('q'), ...l })) });
+  _tytSauCfg();
 }
 
-// Rổ của HĐ thầu phụ ('' = theo loại chi phí)
-function tytHdtpSetRo(id, v) {
+// ══ GÁN NHÓM THEO HỢP ĐỒNG THẦU PHỤ ══════════════════════════════
+function _tytRenderHdtp(r) {
+  const tb = document.getElementById('tyt-hdtp-tbody');
+  if (!tb) return;
+  const st = r.st, ds = r.ctx.hdtp;
+  if (!ds.length) {
+    tb.innerHTML = '<tr><td colspan="3" class="text-secondary text-center py-2" style="font-size:12px">Công trình chưa có hợp đồng thầu phụ (tab Công Nợ → Hợp đồng thầu phụ).</td></tr>';
+    return;
+  }
+  const tk = tytHdtpThongKe(r);
+  const md = tytNhomCuaLoai(TYT_LOAI_UNG_TP, r.cfg).nhom;   // nhóm mặc định theo loại "Thầu Phụ"
+  tb.innerHTML = ds.map(h => {
+    const o = tk.get(h.id) || { soKhoan: 0, tien: 0, nhan: 0 };
+    const cur = st.theoHdtp[h.id] ? +st.theoHdtp[h.id].nhom : 0;
+    return `<tr>
+      <td><div class="fw-semibold">${cur ? `<span class="tyt-nh-dot tyt-nh-${cur}"></span>` : ''}${x(h.ten || '—')}</div>
+        <div class="text-secondary text-truncate" style="font-size:10.5px;max-width:200px" title="${x(h.nd)}">HĐ ${fmtM(h.giaTri)}${h.nd ? ' · ' + x(h.nd) : ''}</div></td>
+      <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(o.tien)}<div class="text-secondary" style="font-size:10.5px">${o.soKhoan} khoản</div></td>
+      <td><select class="form-select form-select-sm" onchange="tytHdtpSetNhom('${x(h.id)}', this.value)">
+          <option value="0">Theo loại chi phí${md ? ' (Nhóm ' + md + ')' : ''}</option>
+          ${TYT_NHOM_DS.map(n => `<option value="${n}"${cur === n ? ' selected' : ''}>Nhóm ${n} · ${TYT_NHOM[n].ngan}</option>`).join('')}
+        </select>
+        ${cur && o.nhan < o.soKhoan ? `<div class="text-secondary" style="font-size:10.5px">${o.soKhoan - o.nhan} khoản đã gán tay nhóm khác</div>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function tytHdtpSetNhom(id, v) {
   const p = _tytProj();
   if (!p) return;
   const st = tytStructOf(p.id);
-  const cu = st.theoHdtp[id] || { g: '', h: '' };
-  if (+v) st.theoHdtp[id] = { ...cu, ro: +v };
-  else { const { ro, ...con } = cu; if (con.g || con.h) st.theoHdtp[id] = con; else delete st.theoHdtp[id]; }
+  if (+v) st.theoHdtp[id] = { nhom: +v }; else delete st.theoHdtp[id];
   tytSaveStruct(p.id, { theoHdtp: st.theoHdtp });
-  toast(+v ? `✅ HĐ thầu phụ → ${TYT_RO[+v].ngan}` : 'HĐ thầu phụ: rổ theo loại chi phí', 'success');
+  toast(+v ? `✅ HĐ thầu phụ → Nhóm ${v}: ${TYT_NHOM[+v].ten}` : 'HĐ thầu phụ: nhóm theo loại chi phí', 'success');
   _tytRecalc();
 }
 
-// ══ PHÂN BỔ CHI PHÍ ═════════════════════════════════════════════
-// <option> "gán vào": mỗi giai đoạn 1 nhóm — [cả giai đoạn] + từng hạng mục. Dùng chung cho
-// dropdown gán tay, luật mới, HĐ thầu phụ. cur: giá trị đang chọn ("g:<id>" | "h:<id>"); ph: dòng đầu.
-function _tytDichOpts(st, cur, ph) {
-  if (!st.giaiDoan.length) return '<option value="">(Chưa có giai đoạn — tạo ở tab Thiết lập)</option>';
-  return `<option value="">${x(ph || "-- Gán vào --")}</option>` + st.giaiDoan.map(g => {
-    const hms = st.hangMuc.filter(h => h.gdId === g.id);
-    return `<optgroup label="${x(g.ten)}">
-      <option value="g:${g.id}"${cur === "g:" + g.id ? " selected" : ""}>${x(g.ten)} (cả giai đoạn)</option>
-      ${hms.map(h => `<option value="h:${h.id}"${cur === "h:" + h.id ? " selected" : ""}>${x(g.ten)} › ${x(h.ten)}</option>`).join("")}
-    </optgroup>`;
-  }).join("");
-}
-// "g:<id>" | "h:<id>" ↔ { g, h } (đích lưu trong luật / theoHdtp / phanBo)
-function _tytDichParse(v, st) {
-  if (!v) return null;
-  if (v.startsWith("h:")) { const h = st.hangMuc.find(z => z.id === v.slice(2)); return h ? { g: h.gdId, h: h.id } : null; }
-  if (v.startsWith("g:")) return { g: v.slice(2), h: "" };
-  return null;
-}
-function _tytDichVal(d) { return !d ? "" : (d.h ? "h:" + d.h : (d.g ? "g:" + d.g : "")); }
-// Tên hiển thị của 1 đích ("Phần thô › Lầu 1"); đích đã bị xóa → null
-function _tytDichTen(d, st) {
-  const v = _tytDich(d, st);
-  if (!v) return null;
-  const g = st.giaiDoan.find(z => z.id === v.g);
-  const h = v.h ? st.hangMuc.find(z => z.id === v.h) : null;
-  return (g ? g.ten : "?") + (h ? " › " + h.ten : "");
-}
-
-function _tytRenderPbDich(r) {
-  const sel = document.getElementById("tyt-pb-dich");
-  if (sel) { const cur = sel.value; sel.innerHTML = _tytDichOpts(r.st, cur); }
-}
-
+// ══ TRA CỨU & GÁN NHÓM HÀNG LOẠT ═════════════════════════════════
 // Dropdown lọc loại chi phí
 function _tytRenderPbLoai(r) {
   const sel = document.getElementById('tyt-pb-loai');
@@ -906,15 +674,15 @@ function _tytRenderPbLoai(r) {
 // Các dòng chi phí theo bộ lọc đang chọn
 function _tytPbFiltered() {
   if (!_tytLast) return [];
-  const tt   = document.getElementById("tyt-pb-tt")?.value || "chua";
-  const loai = document.getElementById("tyt-pb-loai")?.value || "";
-  const q    = (document.getElementById("tyt-pb-q")?.value || "").trim().toLowerCase();
+  const nhom = document.getElementById('tyt-pb-nhom')?.value ?? '';
+  const src  = document.getElementById('tyt-pb-src')?.value || '';
+  const loai = document.getElementById('tyt-pb-loai')?.value || '';
+  const q    = _tytBoDau(document.getElementById('tyt-pb-q')?.value || '');
   return _tytLast.lines.filter(l => {
-    if (tt === "chua" && l.pb.g) return false;
-    if (tt === "chuaro") { if (!l.parts.some(pt => pt.ro === 0)) return false; }        // (Phần A)
-    else if (tt !== "chua" && tt !== "all" && l.pb.src !== tt) return false;   // ngay | tiento | luat | hdtp | tay
+    if (nhom !== '' && !l.parts.some(pt => pt.nhom === +nhom)) return false;
+    if (src && !l.parts.some(pt => pt.nhomSrc === src || (src === 'loai' && pt.nhomSrc === 'macdinh'))) return false;
     if (loai && l.loai !== loai) return false;
-    if (q && !(`${l.nd} ${l.doiTuong} ${l.loai}`.toLowerCase().includes(q))) return false;
+    if (q && !_tytBoDau(`${l.nd} ${l.doiTuong} ${l.loai} ${(l.items || []).map(it => it.ten || '').join(' ')}`).includes(q)) return false;
     return true;
   });
 }
@@ -923,16 +691,6 @@ function _tytPbFiltered() {
 function tytPbFilter() {
   _tytPbSel.clear();
   tytRenderPb(0);
-}
-
-// Nhãn "Thuộc" của 1 dòng — màu theo NGUỒN xếp (class .tyt-src-*: tay / hdtp / luat / ngay)
-const _TYT_SRC_TXT = { tay: "", hdtp: "theo HĐ TP", tiento: "theo [ ]", luat: "theo luật", ngay: "theo ngày" };
-const _TYT_SRC_TIP = { tiento: "Tự xếp theo tiền tố [ ] đầu nội dung", tay: "Đã gán tay", hdtp: "Tự xếp theo HĐ thầu phụ đã gắn", luat: "Tự xếp theo luật", ngay: "Tự xếp theo mốc ngày của giai đoạn" };
-function _tytPbLabel(l) {
-  if (!l.pb.g) return '<span class="tyt-src">Chưa phân bổ</span>';
-  const ten = x(_tytDichTen(l.pb, _tytLast.st) || "?");
-  const sub = _TYT_SRC_TXT[l.pb.src];
-  return `<span class="tyt-src tyt-src-${l.pb.src}" title="${_TYT_SRC_TIP[l.pb.src] || ""}">${ten}${sub ? " · " + sub : ""}</span>`;
 }
 
 const _TYT_KIND_TXT = { cc: 'Chấm công', ungtp: 'Ứng TP', ungncc: 'Ứng NCC' };
@@ -951,21 +709,21 @@ function tytRenderPb(page) {
   _tytPbPage = page;
   const slice = list.slice(page * TYT_PB_PG, (page + 1) * TYT_PB_PG);
   if (!total) {
-    tb.innerHTML = '<tr><td colspan="8" class="text-center text-secondary py-4">Không có khoản chi nào khớp bộ lọc</td></tr>';
+    tb.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-4">Không có khoản chi nào khớp bộ lọc</td></tr>';
   } else {
     tb.innerHTML = slice.map(l => {
       const k = x(l.key);
       const on = _tytPbSel.has(l.key);
       const kindTxt = _TYT_KIND_TXT[l.kind] ? `<span class="badge text-bg-secondary bg-opacity-25 text-secondary-emphasis ms-1" style="font-size:9.5px">${_TYT_KIND_TXT[l.kind]}</span>` : '';
+      const tay = l.parts.some(pt => pt.nhomSrc === 'tay') ? ' <span class="tyt-cay-note" title="Đã gán tay">✋</span>' : '';
       return `<tr style="${on ? 'background:var(--bs-primary-bg-subtle)' : ''}">
         <td class="text-center"><input type="checkbox" class="form-check-input" data-k="${k}" ${on ? 'checked' : ''} onchange="tytPbToggle(this)"></td>
         <td class="text-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(l.ngay)}</td>
         <td style="white-space:nowrap">${x(l.loai)}${kindTxt}</td>
-        <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(l.nd)}">${x(l.nd || '—')}</td>
-        <td class="text-secondary" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(l.doiTuong)}">${x(l.doiTuong || '—')}</td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(l.nd)}">${x(l.nd || '—')}</td>
+        <td class="text-secondary" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(l.doiTuong)}">${x(l.doiTuong || '—')}</td>
         <td class="text-end font-monospace fw-semibold" style="white-space:nowrap">${fmtM(l.tien)}</td>
-        <td style="white-space:nowrap">${_tytRoChipLine(l)}</td>
-        <td style="white-space:nowrap">${_tytPbLabel(l)}</td>
+        <td style="white-space:nowrap">${_tytNhomChipLine(l)}${tay}</td>
       </tr>`;
     }).join('');
   }
@@ -1002,188 +760,28 @@ function tytPbSelectAll(on) {
   tytRenderPb(_tytPbPage);
 }
 
-// Gán các dòng đã chọn vào giai đoạn / hạng mục
-function tytPbAssign() {
-  const p = _tytProj();
-  if (!p) return;
-  if (_tytDraft) { toast('Hãy Lưu (hoặc Hủy) thay đổi cấu trúc giai đoạn trước khi gán', 'error'); return; }
-  const dich = document.getElementById('tyt-pb-dich')?.value || '';
-  if (!dich) { toast('Chọn giai đoạn / hạng mục cần gán vào!', 'error'); return; }
-  if (!_tytPbSel.size) { toast('Chưa tick khoản chi nào!', 'error'); return; }
-  const st = tytStructOf(p.id);
-  let val;
-  if (dich.startsWith('h:')) {
-    const h = st.hangMuc.find(z => z.id === dich.slice(2));
-    if (!h) return;
-    val = { g: h.gdId, h: h.id };
-  } else {
-    val = { g: dich.slice(2), h: '' };
-  }
-  const n = _tytPbSel.size;
-  _tytPbSel.forEach(k => { st.phanBo[k] = { ...val }; });
-  tytSaveStruct(p.id, { phanBo: st.phanBo });
-  _tytPbSel.clear();
-  toast(`✅ Đã gán ${n} khoản chi`, 'success');
-  _tytRecalc();
-}
-
-// Bỏ gán tay → dòng quay về tự xếp theo mốc ngày (nếu có) hoặc Chưa phân bổ
-function tytPbUnassign() {
+// Gán tay NHÓM cho các dòng đang tick (n = 0 → bỏ gán tay, trả về tự động)
+function tytPbGan(n) {
   const p = _tytProj();
   if (!p) return;
   if (!_tytPbSel.size) { toast('Chưa tick khoản chi nào!', 'error'); return; }
   const st = tytStructOf(p.id);
-  let n = 0;
-  _tytPbSel.forEach(k => { if (st.phanBo[k]) { delete st.phanBo[k]; n++; } });
-  if (!n) { toast('Các dòng đã chọn không có gán tay nào', 'info'); return; }
-  tytSaveStruct(p.id, { phanBo: st.phanBo });
+  let dem = 0;
+  _tytPbSel.forEach(k => {
+    if (n) { st.nhomTay[k] = n; dem++; }
+    else if (st.nhomTay[k]) { delete st.nhomTay[k]; dem++; }
+  });
+  if (!dem) { toast('Các dòng đã chọn không có gán tay nào', 'info'); return; }
+  tytSaveStruct(p.id, { nhomTay: st.nhomTay });
   _tytPbSel.clear();
-  toast(`Đã bỏ gán tay ${n} khoản chi`, 'success');
+  toast(n ? `✅ Đã gán ${dem} khoản vào Nhóm ${n}: ${TYT_NHOM[n].ten}` : `Đã trả ${dem} khoản về tự động xếp nhóm`, 'success');
   _tytRecalc();
 }
 
-// ══ LUẬT TỰ GÁN (tab con PHÂN BỔ — Lần 2) ═════════════════════════
-// Luật lưu ở st.luat (tytrong_v1) — lớp TỰ ĐỘNG, xét theo thứ tự; xóa luật = tự hoàn tác.
-function _tytRenderLuat(r) {
-  const st = r.st;
-  const tb = document.getElementById('tyt-luat-tbody');
-  if (tb) {
-    tb.innerHTML = st.luat.length ? st.luat.map((lu, i) => {
-      const xt  = tytLuatXemTruoc(r, lu);
-      const ten = _tytDichTen(lu, st);
-      const bi  = xt.tong - xt.nhan;   // khớp nhưng bị gán tay / HĐ TP / luật trước giành
-      return `<tr>
-        <td class="text-secondary">${i + 1}</td>
-        <td>${TYT_LUAT_TRUONG[lu.truong] || ''} <b>"${x(lu.giaTri)}"</b></td>
-        <td>${ten ? `<span class="tyt-src tyt-src-luat">${x(ten)}</span>` : '<span class="text-danger" title="Giai đoạn / hạng mục đã bị xóa — luật đang tạm ngưng">⚠ đích đã xóa</span>'}</td>
-        <td class="text-end font-monospace" style="white-space:nowrap">${xt.nhan} khoản · ${fmtM(xt.tienNhan)}
-          ${bi ? `<div class="text-secondary" style="font-size:10.5px" title="Các khoản này đã được gán tay / theo HĐ thầu phụ / luật đứng trước">+${bi} khoản khớp nhưng ưu tiên khác giữ</div>` : ''}</td>
-        <td class="text-end" style="white-space:nowrap">
-          <button type="button" class="btn btn-link btn-sm p-0 text-secondary" title="Ưu tiên lên trên" onclick="tytLuatMove('${lu.id}',-1)" ${i === 0 ? 'disabled' : ''}><span class="material-symbols-outlined" style="font-size:17px">arrow_upward</span></button>
-          <button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Xóa luật (các khoản luật này đang nhận sẽ tự quay về như cũ)" onclick="tytLuatDel('${lu.id}')"><span class="material-symbols-outlined" style="font-size:17px">delete</span></button>
-        </td>
-      </tr>`;
-    }).join('') : `<tr><td colspan="5" class="text-secondary text-center py-2" style="font-size:12px">
-        Chưa có luật. VD: <i>Nội dung chứa</i> "móng, đà kiềng" → Móng · <i>NCC chứa</i> "thạch cao" → Hoàn thiện.</td></tr>`;
-  }
-  const sel = document.getElementById('tyt-luat-dich');
-  if (sel) { const cur = sel.value; sel.innerHTML = _tytDichOpts(st, cur); }
-  tytLuatPreview();
-}
-
-// Gợi ý giá trị (datalist) + xem trước số khoản luật đang soạn sẽ nhận
-function tytLuatPreview() {
-  const truong = document.getElementById('tyt-luat-truong')?.value || 'nd';
-  const gt     = (document.getElementById('tyt-luat-gt')?.value || '').trim();
-  const dl     = document.getElementById('tyt-luat-dl');
-  const box    = document.getElementById('tyt-luat-xt');
-  if (!_tytLast) return;
-  if (dl) {
-    const vals = truong === 'loai' ? _tytLast.theoLoai.map(o => o.loai)
-      : truong === 'dt' ? [...new Set(_tytLast.lines.map(l => l.doiTuong).filter(Boolean))] : [];
-    dl.innerHTML = vals.map(v => `<option value="${x(v)}">`).join('');
-  }
-  if (!box) return;
-  if (!gt) { box.innerHTML = ''; return; }
-  const xt = tytLuatXemTruoc(_tytLast, { truong, giaTri: gt });
-  box.innerHTML = xt.tong
-    ? `<span class="text-success">Khớp <b>${xt.tong}</b> khoản (${fmtM(xt.tien)})</span> → sẽ nhận <b>${xt.nhan}</b> khoản (${fmtM(xt.tienNhan)}) đang chưa phân bổ / theo ngày.` +
-      (xt.tong > xt.nhan ? ` <span class="text-secondary">${xt.tong - xt.nhan} khoản còn lại đã có ưu tiên cao hơn.</span>` : '')
-    : '<span class="text-warning-emphasis">Chưa khớp khoản chi nào — kiểm tra lại từ khóa.</span>';
-}
-
-function tytLuatAdd() {
-  const p = _tytProj();
-  if (!p || !_tytLast) return;
-  const truong = document.getElementById('tyt-luat-truong')?.value || 'nd';
-  const gtEl   = document.getElementById('tyt-luat-gt');
-  const gt     = (gtEl?.value || '').trim();
-  const st     = tytStructOf(p.id);
-  const d      = _tytDichParse(document.getElementById('tyt-luat-dich')?.value || '', st);
-  if (!gt) { toast('Nhập từ khóa / giá trị cho luật!', 'error'); gtEl?.focus(); return; }
-  if (!d)  { toast('Chọn giai đoạn / hạng mục cần gán vào!', 'error'); return; }
-  const xt = tytLuatXemTruoc(_tytLast, { truong, giaTri: gt });
-  st.luat.push({ id: tytNewId('r'), truong, giaTri: gt, g: d.g, h: d.h });
-  tytSaveStruct(p.id, { luat: st.luat });
-  if (gtEl) gtEl.value = '';
-  toast(`✅ Đã thêm luật — nhận ${xt.nhan} khoản (${fmtM(xt.tienNhan)})`, 'success');
-  _tytRecalc();
-}
-
-function tytLuatDel(id) {
-  const p = _tytProj();
-  if (!p) return;
-  const st = tytStructOf(p.id);
-  const lu = st.luat.find(z => z.id === id);
-  if (!lu) return;
-  if (!confirm(`Xóa luật ${TYT_LUAT_TRUONG[lu.truong]} "${lu.giaTri}"?\nCác khoản luật này đang nhận sẽ tự quay về như trước (mốc ngày / chưa phân bổ).`)) return;
-  tytSaveStruct(p.id, { luat: st.luat.filter(z => z.id !== id) });
-  toast('Đã xóa luật', 'success');
-  _tytRecalc();
-}
-
-function tytLuatMove(id, dir) {
-  const p = _tytProj();
-  if (!p) return;
-  const arr = tytStructOf(p.id).luat;
-  const i = arr.findIndex(z => z.id === id), j = i + dir;
-  if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
-  tytSaveStruct(p.id, { luat: arr });
-  _tytRecalc();
-}
-
-// ══ GẮN THEO HỢP ĐỒNG THẦU PHỤ (tab con PHÂN BỔ — Lần 2) ═══════════════
-function _tytRenderHdtp(r) {
-  const tb = document.getElementById('tyt-hdtp-tbody');
-  if (!tb) return;
-  const st = r.st, ds = r.ctx.hdtp;
-  if (!ds.length) {
-    tb.innerHTML = '<tr><td colspan="4" class="text-secondary text-center py-2" style="font-size:12px">Công trình chưa có hợp đồng thầu phụ (tab Công Nợ → Hợp đồng thầu phụ).</td></tr>';
-    return;
-  }
-  const tk = tytHdtpThongKe(r);
-  tb.innerHTML = ds.map(h => {
-    const o = tk.get(h.id) || { soKhoan: 0, tien: 0, nhan: 0 };
-    const cur = st.theoHdtp[h.id];
-    const daXoa = cur && (cur.g || cur.h) && !_tytDich(cur, st);
-    const roHd = cur && cur.ro ? +cur.ro : 0;
-    const roMd = tytRoCuaLoai(TYT_LOAI_UNG_TP, r.cfg).ro;   // rổ mặc định theo loại "Thầu Phụ"
-    return `<tr>
-      <td><div class="fw-semibold">${x(h.ten || '—')}</div>
-        <div class="text-secondary text-truncate" style="font-size:10.5px;max-width:200px" title="${x(h.nd)}">HĐ ${fmtM(h.giaTri)}${h.nd ? ' · ' + x(h.nd) : ''}</div></td>
-      <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(o.tien)}<div class="text-secondary" style="font-size:10.5px">${o.soKhoan} khoản</div></td>
-      <td><select class="form-select form-select-sm" style="min-width:110px" onchange="tytHdtpSetRo('${h.id}', this.value)">
-          <option value="0">Theo loại (${TYT_RO[roMd].ngan})</option>
-          ${[1, 2, 3].map(ro => `<option value="${ro}"${roHd === ro ? ' selected' : ''}>${TYT_RO[ro].ngan} · ${['', 'Gói thô', 'Chủ nhà', 'Công ty'][ro]}</option>`).join('')}
-        </select></td>
-      <td><select class="form-select form-select-sm" style="min-width:150px" onchange="tytHdtpSet('${h.id}', this.value)">${_tytDichOpts(st, _tytDichVal(_tytDich(cur, st)), '— Không gắn —')}</select>
-        ${daXoa ? '<div class="text-danger" style="font-size:10.5px">⚠ nơi gắn cũ đã bị xóa</div>' : ''}
-        ${cur && !daXoa && o.nhan < o.soKhoan ? `<div class="text-secondary" style="font-size:10.5px">${o.soKhoan - o.nhan} khoản đã gán tay nơi khác</div>` : ''}</td>
-    </tr>`;
-  }).join('');
-}
-
-function tytHdtpSet(id, v) {
-  const p = _tytProj();
-  if (!p) return;
-  const st = tytStructOf(p.id);
-  const d = _tytDichParse(v, st);
-  const ro = st.theoHdtp[id] && st.theoHdtp[id].ro;   // (Phần A) giữ rổ đã chọn của HĐ
-  if (d) st.theoHdtp[id] = ro ? { ...d, ro } : d;
-  else if (ro) st.theoHdtp[id] = { g: '', h: '', ro };
-  else delete st.theoHdtp[id];
-  tytSaveStruct(p.id, { theoHdtp: st.theoHdtp });
-  toast(d ? '✅ Đã gắn HĐ thầu phụ' : 'Đã bỏ gắn HĐ thầu phụ', 'success');
-  _tytRecalc();
-}
-
-// ══ KIỂM SOÁT ĐỊNH MỨC (tab con 4 — Lần 2, làm lại 07/10/2026 — Cải tiến Phần B: CHỈ RỔ 1) ══════
-// • Bảng kiểm soát (#tyt-dt-*): 4 trụ cột Rổ 1 + Quỹ phụ phí — ngân sách = diện tích × định mức đ/m2,
+// ══ KIỂM SOÁT ĐỊNH MỨC NHÓM 1 (tab con 2) ═══════════════════════════════
+// • Bảng kiểm soát (#tyt-dt-*): 4 trụ cột Nhóm 1 + Quỹ phụ phí — ngân sách = diện tích × định mức đ/m2,
 //   so với thực tế CT đang chọn; CHỈ tô đỏ khi vượt (quản trị ngoại lệ). Bấm [+] xem loại chi phí trong trụ cột.
-// • Bộ định mức (#tyt-dm-*): lưu từ CT · nhập tay 4 trụ cột (định mức an toàn) · sửa · cập nhật lại từ CT nguồn
-//   (cho định mức lưu trước Phần B chưa có số Rổ 1) · xóa.
-// • Thư viện đơn giá module (#tyt-tv-*): tick giai đoạn / hạng mục của 1 định mức → giá vốn + giá báo.
+// • Bộ định mức mẫu (#tyt-dm-*): lưu từ CT · nhập tay 4 trụ cột (định mức an toàn) · sửa · cập nhật lại từ CT nguồn · xóa.
 let _tytDtDm = '';             // id định mức đang chọn ở bảng Kiểm soát
 const _tytKsOpen = new Set();  // trụ cột đang bung xem loại chi phí
 
@@ -1193,18 +791,18 @@ function _tytRenderDm(r) {
   const note = document.getElementById('tyt-dm-note');
   if (note && p) {
     const ws = [];
-    if (!(r.tongSan > 0)) ws.push('<span class="text-danger">✗ Chưa có tổng diện tích sàn — nhập bảng M2 ở tab Thiết lập.</span>');
+    if (!(r.tongSan > 0)) ws.push('<span class="text-danger">✗ Chưa có tổng diện tích sàn — bấm thẻ "Tổng diện tích sàn" để nhập.</span>');
     if (p.status !== 'closed') ws.push('<span class="text-warning-emphasis">⚠ Công trình chưa quyết toán — đơn giá có thể chưa đủ.</span>');
     if (!r.allYears && tytNhanNam() !== 'Tất cả năm') ws.push(`<span class="text-warning-emphasis">⚠ Đang lọc năm ${x(tytNhanNam())} — bật "Trọn vòng đời" để lấy đủ chi phí.</span>`);
-    if (r.theoRo[0] > 0) ws.push(`<span class="text-warning-emphasis">⚠ Còn ${fmtM(r.theoRo[0])} chưa xếp rổ — xếp xong số Rổ 1 mới đủ.</span>`);
-    if (r.theoTru[''] > 0) ws.push(`<span class="text-warning-emphasis">⚠ Còn ${fmtM(r.theoTru[''])} Rổ 1 chưa xếp trụ cột (tab Thiết lập).</span>`);
-    if (r.tongSan > 0) ws.unshift(`Sẽ lưu: <b>Rổ 1 ${fmtM(Math.round(r.cpM2Ro1))}/m2</b> (toàn bộ ${fmtM(Math.round(r.cpM2))}/m2, sàn ${tytFmtM2(r.tongSan)} m2).`);
+    if (r.theoNhom[0] > 0) ws.push(`<span class="text-warning-emphasis">⚠ Còn ${fmtM(r.theoNhom[0])} chưa xếp nhóm.</span>`);
+    if (r.theoTru[''] > 0) ws.push(`<span class="text-warning-emphasis">⚠ Còn ${fmtM(r.theoTru[''])} Nhóm 1 chưa xếp trụ cột (nút ⚙ Cấu hình phân nhóm).</span>`);
+    if (r.tongSan > 0) ws.unshift(`Sẽ lưu: <b>Nhóm 1 ${fmtM(Math.round(r.cpM2N1))}/m2</b> (toàn bộ ${fmtM(Math.round(r.cpM2))}/m2, sàn ${tytFmtM2(r.tongSan)} m2).`);
     note.innerHTML = ws.map(w => `<div>${w}</div>`).join('');
   }
   const tenEl = document.getElementById('tyt-dm-ten');
   if (tenEl && p && tenEl.dataset.pid !== p.id) { tenEl.value = 'Định mức — ' + p.name; tenEl.dataset.pid = p.id; }
 
-  // Danh sách định mức: Rổ 1 đ/m2 là số chính, 4 trụ cột ghi nhỏ bên dưới
+  // Danh sách định mức: Nhóm 1 đ/m2 là số chính, 4 trụ cột ghi nhỏ bên dưới
   const list = tytDinhMucList();
   const tb = document.getElementById('tyt-dm-tbody');
   if (tb) {
@@ -1215,7 +813,7 @@ function _tytRenderDm(r) {
         <td><div class="fw-semibold">${x(dm.ten)}${dm.nhapTay ? ' <span class="badge text-bg-secondary" style="font-size:9.5px">nhập tay</span>' : ''}</div>
           <div class="text-secondary" style="font-size:10.5px">${dm.nhapTay ? 'Định mức an toàn' : x(dm.nguonTen || '') + ' · ' + tytFmtM2(dm.tongSan) + ' m2'} · ${x(dm.nam || '')}${dm.createdAt > 1e12 ? ' · lưu ' + new Date(dm.createdAt).toLocaleDateString('vi-VN') : ''}</div>
           ${co ? `<div class="text-secondary" style="font-size:10.5px">${tru}</div>`
-            : '<div class="text-warning-emphasis" style="font-size:10.5px">⚠ Lưu trước khi có Rổ 1 — bấm ✎ để cập nhật</div>'}</td>
+            : '<div class="text-warning-emphasis" style="font-size:10.5px">⚠ Chưa có số 4 trụ cột — bấm ✎ để cập nhật</div>'}</td>
         <td class="text-end font-monospace" style="white-space:nowrap"><div class="fw-semibold">${co || dm.dgRo1 ? fmtM(dm.dgRo1) : '—'}</div>
           ${dm.dgTong ? `<div class="text-secondary" style="font-size:10.5px">toàn bộ ${fmtM(dm.dgTong)}</div>` : ''}</td>
         <td class="text-end" style="white-space:nowrap">
@@ -1231,50 +829,43 @@ function _tytRenderDm(r) {
   if (!list.some(dm => dm.id === _tytDtDm)) _tytDtDm = list.length ? list[0].id : '';
   const sel = document.getElementById('tyt-dt-dm');
   if (sel) {
-    sel.innerHTML = list.length ? list.map(dm => `<option value="${dm.id}">${x(dm.ten)}${dm.dgRo1 ? ' — Rổ 1 ' + fmtM(dm.dgRo1) + '/m2' : ''}</option>`).join('')
+    sel.innerHTML = list.length ? list.map(dm => `<option value="${dm.id}">${x(dm.ten)}${dm.dgRo1 ? ' — Nhóm 1 ' + fmtM(dm.dgRo1) + '/m2' : ''}</option>`).join('')
       : '<option value="">(Chưa có định mức)</option>';
     sel.value = _tytDtDm;
   }
   // Ô diện tích: tự theo tổng sàn CT đang chọn cho tới khi người dùng TỰ GÕ số khác (dataset.user = '1');
   // đổi công trình hoặc bấm "↺ Sàn CT" → quay lại tự theo.
-  _tytDtAuto('tyt-dt-dt', p, r);
-  _tytDtAuto('tyt-tv-dt', p, r);
+  const el = document.getElementById('tyt-dt-dt');
+  if (el) {
+    if (el.dataset.pid !== (p && p.id)) el.dataset.user = '';
+    if (el.dataset.user !== '1') el.value = r && r.tongSan > 0 ? Math.round(r.tongSan * 100) / 100 : '';
+    el.dataset.pid = p ? p.id : '';
+  }
   tytRenderKiemSoat();
-  tytRenderThuVien();
-}
-
-// Ô diện tích tự theo tổng sàn CT đang chọn (trừ khi người dùng đã tự gõ)
-function _tytDtAuto(id, p, r) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (el.dataset.pid !== (p && p.id)) el.dataset.user = '';
-  if (el.dataset.user !== '1') el.value = r && r.tongSan > 0 ? Math.round(r.tongSan * 100) / 100 : '';
-  el.dataset.pid = p ? p.id : '';
 }
 
 function tytDmLuu() {
   const p = _tytProj(), r = _tytLast;
   if (!p || !r) return;
-  if (!(r.tongSan > 0)) { toast('Chưa có tổng diện tích sàn — nhập bảng M2 ở tab Thiết lập trước!', 'error'); return; }
+  if (!(r.tongSan > 0)) { toast('Chưa có tổng diện tích sàn — bấm thẻ "Tổng diện tích sàn" để nhập bảng M2!', 'error'); return; }
   if (!r.tongChi) { toast('Công trình chưa có chi phí!', 'error'); return; }
   const canhBao = [];
   if (p.status !== 'closed') canhBao.push('• Công trình CHƯA quyết toán');
   if (!r.allYears && tytNhanNam() !== 'Tất cả năm') canhBao.push(`• Đang lọc năm ${tytNhanNam()} (chưa phải trọn vòng đời)`);
-  if (r.theoRo[0] > 0) canhBao.push(`• Còn ${fmtM(r.theoRo[0])} chưa xếp rổ`);
+  if (r.theoNhom[0] > 0) canhBao.push(`• Còn ${fmtM(r.theoNhom[0])} chưa xếp nhóm`);
   if (canhBao.length && !confirm('Lưu định mức dù:\n' + canhBao.join('\n') + '\n\nVẫn lưu?')) return;
   const ten = document.getElementById('tyt-dm-ten')?.value || '';
   const rec = tytTaoDinhMuc(p, r, ten);
   _tytDtDm = rec.id;
-  toast(`✅ Đã lưu định mức "${rec.ten}" — Rổ 1 ${fmtM(rec.dgRo1)}/m2`, 'success');
+  toast(`✅ Đã lưu định mức "${rec.ten}" — Nhóm 1 ${fmtM(rec.dgRo1)}/m2`, 'success');
   _tytRenderDm(r);
-  tytRenderNhom();   // ô "Chuẩn" của khung đối chiếu nhóm có ngay định mức mới
 }
 function tytDmDung(id) {
   _tytDtDm = id;
   if (_tytLast) _tytRenderDm(_tytLast);
 }
 
-// Popup SỬA định mức (id = '' → TẠO định mức nhập tay): tên + đ/m2 của 4 trụ cột Rổ 1.
+// Popup SỬA định mức (id = '' → TẠO định mức nhập tay): tên + đ/m2 của 4 trụ cột Nhóm 1.
 // Định mức có CT nguồn → thêm nút "Cập nhật lại từ CT nguồn" (tính lại mọi số liệu, giữ tên).
 function tytDmSua(id) {
   const dm = id ? tytDinhMucById(id) : null;
@@ -1285,18 +876,16 @@ function tytDmSua(id) {
       <input type="number" min="0" step="1000" class="form-control form-control-sm text-end font-monospace" id="tyt-dms-${t}" value="${+ro1[t] || ''}" placeholder="0">
       <div class="text-secondary" style="font-size:10.5px">${x(TYT_TRU[t].mo)}</div></div>`).join('');
   const p = dm && dm.nguonPid ? _tytAllProjs().find(z => z.id === dm.nguonPid) : null;
-  document.getElementById('modal-title').innerHTML = `<span class="material-symbols-outlined msi-gap">${dm ? 'edit' : 'edit_note'}</span>${dm ? 'Sửa Bộ Định Mức' : 'Nhập Tay Định Mức An Toàn'}`;
-  document.getElementById('modal-body').innerHTML = `
+  _tytModal(`<span class="material-symbols-outlined msi-gap">${dm ? 'edit' : 'edit_note'}</span>${dm ? 'Sửa Bộ Định Mức' : 'Nhập Tay Định Mức An Toàn'}`, `
     <div class="mb-2"><label class="form-label mb-0" style="font-size:12px">Tên bộ định mức</label>
       <input type="text" class="form-control form-control-sm" id="tyt-dms-ten" value="${x(dm ? dm.ten : 'Định mức an toàn')}"></div>
     <div class="row g-2 mb-2">${o}</div>
-    <div class="text-secondary mb-2" style="font-size:11.5px">Quỹ phụ phí dùng <b>mức chung</b> (đang là ${fmtM(tytRoCfg().quyMuc)} đ/m2) — chỉnh ngay dưới bảng Kiểm soát.${dm && !dm.nhapTay ? ' Sửa số ở đây sẽ ghi đè số tính từ CT nguồn (đơn giá giai đoạn / hạng mục giữ nguyên).' : ''}</div>
+    <div class="text-secondary mb-2" style="font-size:11.5px">Quỹ phụ phí dùng <b>mức chung</b> (đang là ${fmtM(tytNhomCfg().quyMuc)} đ/m2) — chỉnh ngay dưới bảng Kiểm soát.${dm && !dm.nhapTay ? ' Sửa số ở đây sẽ ghi đè số tính từ CT nguồn.' : ''}</div>
     <div class="d-flex flex-wrap gap-2 justify-content-end">
       ${dm && dm.nguonPid ? `<button class="btn btn-sm btn-outline-primary me-auto" onclick="tytDmCapNhat('${dm.id}')" ${p ? '' : 'disabled title="Không còn công trình nguồn"'}><span class="material-symbols-outlined msi-gap">sync</span>Cập nhật lại từ ${x(p ? p.name : 'CT nguồn')}</button>` : ''}
       <button class="btn btn-sm btn-secondary" onclick="closeModal()">Hủy</button>
       <button class="btn btn-sm btn-success fw-bold" onclick="tytDmSuaLuu('${dm ? dm.id : ''}')"><span class="material-symbols-outlined msi-gap">save</span>Lưu</button>
-    </div>`;
-  document.getElementById('ct-modal').classList.add('open');
+    </div>`);
 }
 function tytDmSuaLuu(id) {
   const ten = (document.getElementById('tyt-dms-ten')?.value || '').trim();
@@ -1317,7 +906,6 @@ function tytDmSuaLuu(id) {
   }
   if (typeof closeModal === 'function') closeModal();
   if (_tytLast) _tytRenderDm(_tytLast);
-  tytRenderNhom();
 }
 // Cập nhật lại số liệu định mức từ CT nguồn (trọn vòng đời nếu định mức lưu theo vòng đời)
 function tytDmCapNhat(id) {
@@ -1328,12 +916,11 @@ function tytDmCapNhat(id) {
   const allYears = dm.nam === 'Trọn vòng đời' || _tytAllYears;
   if (allYears && _tytEnsureYears(tytNamVongDoi(p))) { toast('⏳ Đang tải dữ liệu các năm của CT nguồn — tải xong bấm lại "Cập nhật"', 'info'); return; }
   const r = tytTongHop(p, { allYears });
-  if (!confirm(`Cập nhật "${dm.ten}" theo số liệu hiện tại của ${p.name}?\nRổ 1: ${fmtM(Math.round(r.cpM2Ro1))}/m2 · toàn bộ: ${fmtM(Math.round(r.cpM2))}/m2\n(Số nhập tay của 4 trụ cột sẽ bị thay)`)) return;
+  if (!confirm(`Cập nhật "${dm.ten}" theo số liệu hiện tại của ${p.name}?\nNhóm 1: ${fmtM(Math.round(r.cpM2N1))}/m2 · toàn bộ: ${fmtM(Math.round(r.cpM2))}/m2\n(Số nhập tay của 4 trụ cột sẽ bị thay)`)) return;
   tytCapNhatDinhMuc(id, p, r);
   toast('✅ Đã cập nhật định mức từ ' + p.name, 'success');
   if (typeof closeModal === 'function') closeModal();
   if (_tytLast) _tytRenderDm(_tytLast);
-  tytRenderNhom();
 }
 function tytDmXoa(id) {
   const dm = tytDinhMucById(id);
@@ -1341,7 +928,6 @@ function tytDmXoa(id) {
   tytXoaDinhMuc(id);
   toast('Đã xóa định mức', 'success');
   if (_tytLast) _tytRenderDm(_tytLast);
-  tytRenderNhom();
 }
 function tytDtLaySan() {
   const el = document.getElementById('tyt-dt-dt');
@@ -1351,7 +937,7 @@ function tytDtLaySan() {
 // Mức Quỹ phụ phí dùng chung (đ/m2)
 function tytQuyMucSet(v) {
   const n = Math.max(0, Math.round(tytKlNum(v)));
-  tytSaveRoCfg({ quyMuc: n });
+  tytSaveNhomCfg({ quyMuc: n });
   toast(`✅ Mức Quỹ phụ phí = ${fmtM(n)} đ/m2 (dùng chung mọi công trình)`, 'success');
   _tytRecalc();
 }
@@ -1360,7 +946,7 @@ function tytKsToggle(k) {
   tytRenderKiemSoat();
 }
 
-// Bảng KIỂM SOÁT RỔ 1 của CT đang chọn
+// Bảng KIỂM SOÁT NHÓM 1 của CT đang chọn
 function tytRenderKiemSoat() {
   const tb = document.getElementById('tyt-dt-tbody');
   const kpi = document.getElementById('tyt-dt-kpi');
@@ -1377,7 +963,7 @@ function tytRenderKiemSoat() {
   const trong = msg => { tb.innerHTML = `<tr><td colspan="7" class="text-secondary text-center py-3" style="font-size:12px">${msg}</td></tr>`; if (kpi) kpi.innerHTML = ''; setBadge(0); };
   if (!dm) return trong('Chưa có bộ định mức — "Lưu từ CT này" (công trình đã quyết toán) hoặc "Nhập tay" định mức an toàn.');
   if (!(dt > 0)) return trong('Nhập diện tích để tính ngân sách.');
-  if (!tytDmCoRo1(dm)) return trong(`Bộ định mức "${x(dm.ten)}" lưu trước khi có Rổ 1 → chưa có số 4 trụ cột.<br>
+  if (!tytDmCoRo1(dm)) return trong(`Bộ định mức "${x(dm.ten)}" chưa có số 4 trụ cột.<br>
     <button class="btn btn-sm btn-outline-primary mt-2" onclick="tytDmSua('${dm.id}')"><span class="material-symbols-outlined msi-gap">edit</span>Cập nhật / nhập số trụ cột</button>`);
 
   const ks = tytKiemSoat(dm, dt, r);
@@ -1388,7 +974,7 @@ function tytRenderKiemSoat() {
   };
   // Chỉ báo đỏ khi VƯỢT; còn trong ngân sách → chữ thường (không xanh / vàng — quản trị ngoại lệ)
   const conLai = (v, vuot) => Math.abs(v) < 1000 ? '<td class="text-end font-monospace text-secondary">≈ 0</td>'
-    : `<td class="text-end font-monospace ${vuot ? 'text-danger fw-bold' : ''}" style="white-space:nowrap">${vuot ? 'Vượt ' + fmtM(-v) : fmtM(v)}</td>`;
+    : `<td class="text-end font-monospace ${vuot ? 'text-danger fw-bold' : ''}" style="white-space:nowrap">${vuot ? 'Vượt ' + fmtM(-v) : 'Dư ' + fmtM(v)}</td>`;
   const m2 = v => r.tongSan > 0 ? fmtM(Math.round(v / r.tongSan)) : '—';
   let html = '';
   ks.rows.forEach(o => {
@@ -1398,7 +984,7 @@ function tytRenderKiemSoat() {
       ? `<button type="button" class="tyt-cay-tg" onclick="tytKsToggle('${kk}')" title="${open ? 'Thu gọn' : 'Xem loại chi phí'}"><span class="material-symbols-outlined">${open ? 'remove' : 'add'}</span></button>`
       : '<span class="tyt-cay-tg-sp"></span>';
     html += `<tr class="${o.vuot ? 'tyt-ks-vuot' : ''}">
-      <td><div class="tyt-cay-name">${tg}<span><span class="tyt-tru tyt-tru-${kk}"></span><b>${x(o.ten)}</b>${o.k === 'quy' ? ' <span class="tyt-cay-note">mức chung</span>' : ''}
+      <td><div class="tyt-cay-name">${tg}<span><span class="tyt-tru tyt-tru-${kk}"></span><b title="${x(TYT_TRU[o.k].mo)}">${x(o.ten)}</b>${o.k === 'quy' ? ' <span class="tyt-cay-note">mức trần chung</span>' : ''}
         ${o.vuot ? ' <span class="badge text-bg-danger" style="font-size:9.5px">VƯỢT</span>' : ''}</span></div></td>
       <td class="text-end font-monospace" style="white-space:nowrap">${o.dg ? fmtM(o.dg) : '<span class="text-secondary">—</span>'}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(o.ns)}</td>
@@ -1413,90 +999,22 @@ function tytRenderKiemSoat() {
       <td class="text-end font-monospace text-secondary">${_tytPctTxt(z.tien, o.tt)}</td></tr>`; });
   });
   tb.innerHTML = html + `<tr class="tyt-rpt-total" style="white-space:nowrap">
-      <td>TỔNG RỔ 1</td><td class="text-end font-monospace">${fmtM(ks.tong.dg)}</td>
+      <td>TỔNG NHÓM 1</td><td class="text-end font-monospace">${fmtM(ks.tong.dg)}</td>
       <td class="text-end font-monospace">${fmtM(ks.tong.ns)}</td><td class="text-end font-monospace">${fmtM(ks.tong.tt)}</td>
       <td class="text-end font-monospace">${m2(ks.tong.tt)}</td>
       ${conLai(ks.tong.conLai, ks.tong.vuot)}${pctCell(ks.tong.pct, ks.tong.vuot)}</tr>`;
   if (kpi) {
     const cell = (lb, val, cls, sub) => `<div class="col-4"><div class="qt-sum-cell h-100"><div class="qt-sum-lb">${lb}</div>
       <div class="qt-sum-val ${cls}">${val}</div><div class="qt-sum-sub">${sub || ''}</div></div></div>`;
-    kpi.innerHTML = cell('Ngân sách Rổ 1', fmtM(ks.tong.ns), 'text-primary', `${tytFmtM2(dt)} m2 × ${fmtM(ks.tong.dg)}`) +
-      cell('Thực tế Rổ 1', fmtM(ks.tong.tt), '', r.tongSan > 0 ? m2(ks.tong.tt) + '/m2' : '') +
-      cell(ks.tong.vuot ? 'Đã vượt' : 'Còn lại', fmtM(Math.abs(ks.tong.conLai)), ks.tong.vuot ? 'text-danger' : '',
+    kpi.innerHTML = cell('Ngân sách Nhóm 1', fmtM(ks.tong.ns), 'text-primary', `${tytFmtM2(dt)} m2 × ${fmtM(ks.tong.dg)}`) +
+      cell('Thực tế Nhóm 1', fmtM(ks.tong.tt), '', r.tongSan > 0 ? m2(ks.tong.tt) + '/m2' : '') +
+      cell(ks.tong.vuot ? 'Đã vượt' : 'Còn dư', fmtM(Math.abs(ks.tong.conLai)), ks.tong.vuot ? 'text-danger' : '',
         ks.soVuot ? `<span class="text-danger fw-semibold">${ks.soVuot} dòng vượt định mức</span>` : 'Chưa dòng nào vượt');
   }
   setBadge(ks.soVuot);
 }
 
-// ── THƯ VIỆN ĐƠN GIÁ MODULE ──
-let _tytTvDm = '';               // id định mức đang xem ở thư viện
-const _tytTvBo = new Set();      // khóa module BỎ tick (mặc định tick hết)
-let _tytTvMods = [];             // module vừa vẽ (onclick dùng chỉ số)
-
-function tytTvChonDm(id) { _tytTvDm = id; _tytTvBo.clear(); tytRenderThuVien(); }
-function tytTvTick(i, on) {
-  const m = _tytTvMods[i];
-  if (!m) return;
-  // Tick dòng giai đoạn → tick / bỏ cả các module của giai đoạn đó
-  const ks = m.cap === 'gd' ? _tytTvMods.filter(z => z.gd === m.gd && z.cap !== 'gd').map(z => z.key) : [m.key];
-  ks.forEach(k => { if (on) _tytTvBo.delete(k); else _tytTvBo.add(k); });
-  tytRenderThuVien();
-}
-
-function tytRenderThuVien() {
-  const box = document.getElementById('tyt-tv-body');
-  const sel = document.getElementById('tyt-tv-dm');
-  if (!box || !sel) return;
-  // Định mức nhập tay không có giai đoạn / hạng mục → không có module
-  const list = tytDinhMucList().filter(dm => Object.keys(dm.dgGd || {}).length);
-  if (!list.some(dm => dm.id === _tytTvDm)) { _tytTvDm = list.length ? list[0].id : ''; _tytTvBo.clear(); }
-  sel.innerHTML = list.length ? list.map(dm => `<option value="${dm.id}">${x(dm.ten)}</option>`).join('') : '<option value="">(Chưa có định mức lưu từ CT)</option>';
-  sel.value = _tytTvDm;
-  const dm = tytDinhMucById(_tytTvDm);
-  const pv = document.getElementById('tyt-tv-pv')?.value || 'all';
-  const dt = tytKlNum(document.getElementById('tyt-tv-dt')?.value);
-  const ln = Math.max(0, tytKlNum(document.getElementById('tyt-tv-ln')?.value));
-  if (!dm) { box.innerHTML = '<div class="text-secondary text-center py-3" style="font-size:12px">Chưa có bộ định mức lưu từ công trình (có giai đoạn / hạng mục).</div>'; _tytTvMods = []; return; }
-  const mods = tytModules(dm, pv);
-  _tytTvMods = mods;
-  if (!mods.length) {
-    box.innerHTML = `<div class="text-secondary text-center py-3" style="font-size:12px">${pv === 'r1' && !dm.dgGdR1
-      ? `Bộ định mức này lưu trước khi có Rổ 1 → chưa có đơn giá Rổ 1 theo giai đoạn. <a href="#" onclick="tytDmSua('${dm.id}');return false">Cập nhật lại từ CT nguồn</a>.`
-      : 'Bộ định mức này chưa có đơn giá theo giai đoạn / hạng mục.'}</div>`;
-    return;
-  }
-  const chon = m => !_tytTvBo.has(m.key);
-  const items = mods.filter(m => m.cap !== 'gd');
-  const tongDg = items.filter(chon).reduce((s2, m) => s2 + m.dg, 0);
-  const tien = v => dt > 0 ? fmtM(Math.round(v * dt)) : '—';
-  const rows = mods.map((m, i) => {
-    if (m.cap === 'gd') {
-      const con = items.filter(z => z.gd === m.gd);
-      const nChon = con.filter(chon).length;
-      const dgChon = con.filter(chon).reduce((s2, z) => s2 + z.dg, 0);
-      return `<tr class="tyt-cay-gd"><td style="width:30px"><input type="checkbox" class="form-check-input" ${nChon === con.length ? 'checked' : ''} ${nChon && nChon < con.length ? 'data-mot-phan="1"' : ''} onchange="tytTvTick(${i}, this.checked)"></td>
-        <td><b>${x(m.ten.toUpperCase())}</b></td><td class="text-end font-monospace">${fmtM(dgChon)}</td><td class="text-end font-monospace">${tien(dgChon)}</td></tr>`;
-    }
-    return `<tr class="${chon(m) ? '' : 'tyt-rpt-zero'}${m.cap === 'chua' ? ' tyt-cay-chua' : ''}"><td><input type="checkbox" class="form-check-input" ${chon(m) ? 'checked' : ''} onchange="tytTvTick(${i}, this.checked)"></td>
-      <td style="${m.cap === 'chua' ? '' : 'padding-left:22px'}">${m.cap === 'chua' ? '' : '<span class="text-secondary">└</span> '}${m.cap === 'chung' ? '<i>' + x(m.ten) + '</i>' : x(m.ten)}</td>
-      <td class="text-end font-monospace">${fmtM(m.dg)}</td><td class="text-end font-monospace">${tien(m.dg)}</td></tr>`;
-  }).join('');
-  const giaVon = dt > 0 ? Math.round(tongDg * dt) : 0;
-  const giaBao = Math.round(giaVon * (1 + ln / 100));
-  box.innerHTML = `<div style="overflow-x:auto">
-      <table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12px;min-width:520px">
-        <thead class="table-light"><tr><th></th><th>Module (giai đoạn / hạng mục)</th><th class="text-end">đ / m2</th><th class="text-end">Thành tiền ${dt > 0 ? '(' + tytFmtM2(dt) + ' m2)' : ''}</th></tr></thead>
-        <tbody>${rows}
-          <tr class="tyt-rpt-total"><td></td><td>GIÁ VỐN — ${items.filter(chon).length}/${items.length} module</td><td class="text-end font-monospace">${fmtM(tongDg)}</td><td class="text-end font-monospace">${dt > 0 ? fmtM(giaVon) : '—'}</td></tr>
-          <tr class="tyt-rpt-total tyt-ro1-total"><td></td><td>GIÁ BÁO (+ ${String(ln).replace('.', ',')}% lợi nhuận)</td><td class="text-end font-monospace">${fmtM(Math.round(tongDg * (1 + ln / 100)))}</td><td class="text-end font-monospace" id="tyt-tv-giabao">${dt > 0 ? fmtM(giaBao) : '—'}</td></tr>
-        </tbody>
-      </table></div>
-    <div class="text-secondary mt-1" style="font-size:11px">Nguồn: ${x(dm.nguonTen || dm.ten)} · ${pv === 'r1' ? 'chỉ Rổ 1' : 'toàn bộ chi phí'} · đơn giá = tiền giai đoạn / hạng mục ÷ tổng sàn CT nguồn (${tytFmtM2(dm.tongSan)} m2).</div>`;
-  // Ô tick giai đoạn chọn 1 phần → trạng thái "nửa" (indeterminate)
-  box.querySelectorAll('input[data-mot-phan]').forEach(cb => { cb.indeterminate = true; });
-}
-
-// ══ SO SÁNH CÔNG TRÌNH (tab con 5 — Lần 2) ═══════════════════════════
+// ══ SO SÁNH CÔNG TRÌNH (tab con 3) ═══════════════════════════════════
 const _tytSsSel = new Set();   // projectId đang tick để so sánh
 let _tytSsInit  = false;       // đã chọn sẵn mặc định chưa
 let _tytSsLast  = null;        // dữ liệu bảng vừa vẽ (cho Xuất Excel)
@@ -1510,7 +1028,7 @@ function tytRenderSoSanh() {
   const listEl = document.getElementById('tyt-ss-list');
   const tbl = document.getElementById('tyt-ss-table');
   if (!listEl || !tbl) return;
-  // (Lần 3) Vòng đời → mọi công trình; theo năm → CT thuộc năm đang lọc.
+  // Vòng đời → mọi công trình; theo năm → CT thuộc năm đang lọc.
   // Công tắc #tyt-ss-chict (mặc định BẬT): chỉ công trình XÂY MỚI (mã CT), ẩn sửa chữa / cải tạo (SC, SN, Khác)
   const chiCT = document.getElementById('tyt-ss-chict')?.checked !== false;
   const list = (_tytAllYears ? _tytAllProjs() : ((typeof _qtProjList === 'function') ? _qtProjList(_tytPid) : []))
@@ -1531,40 +1049,53 @@ function tytRenderSoSanh() {
   if (_tytAllYears) _tytEnsureYears([...new Set(projs.flatMap(p => tytNamVongDoi(p)))]);
   if (!projs.length) { tbl.innerHTML = '<tbody><tr><td class="text-secondary text-center py-3">Tick ít nhất 1 công trình để so sánh.</td></tr></tbody>'; _tytSsLast = null; return; }
   const che = document.querySelector('input[name="tyt-ss-che"]:checked')?.value || 'm2';
-  // (Phần C) Chỉ Rổ 1 (mặc định): chỉ đặt GÓI CHUẨN lên bàn cân, tách theo 4 trụ cột → loại chi phí.
-  //   % tỉ trọng khi đó = so với tổng Rổ 1. Tắt → như cũ (toàn bộ chi phí theo loại).
-  const r1 = document.getElementById('tyt-ss-r1')?.checked !== false;
-  const { cots, loais } = tytSoSanh(projs, _tytOpts());
-  const tongCT = c => r1 ? c.r.theoRo[1] : c.r.tongChi;
+  // Chỉ Nhóm 1: 4 trụ cột → loại chi phí, % so với tổng Nhóm 1.
+  // Mặc định: cả 4 Nhóm — Nhóm 1 tách theo trụ cột, Nhóm 2-4 tách theo loại chi phí, % so với tổng chi.
+  const n1 = !!document.getElementById('tyt-ss-n1')?.checked;
+  const { cots } = tytSoSanh(projs, _tytOpts());
+  const tongCT = c => n1 ? c.r.theoNhom[1] : c.r.tongChi;
   const conv = (c, t) => {
     if (che === 'tien') return t;
     if (che === 'pct') return tongCT(c) ? t / tongCT(c) * 100 : null;
     return c.r.tongSan > 0 ? t / c.r.tongSan : null;
   };
-  const val = (c, loai) => conv(c, (c.r.theoLoai.find(o => o.loai === loai) || {}).tien || 0);
   const fmt = v => v === null || v === undefined ? '—' : (che === 'pct' ? v.toFixed(1).replace('.', ',') + '%' : fmtM(Math.round(v)));
+  const fm2 = v => v === null ? '—' : fmtM(Math.round(v));
+  // Tiền từng CT theo "nhóm|loại" và "trụ|loại" (Nhóm 1)
+  cots.forEach(c => {
+    c.nl = {}; c.tl = {};
+    c.r.lines.forEach(l => l.parts.forEach(pt => {
+      const k = pt.nhom + '|' + l.loai;
+      c.nl[k] = (c.nl[k] || 0) + pt.tien;
+      if (pt.nhom === 1) { const kt = pt.tru + '|' + l.loai; c.tl[kt] = (c.tl[kt] || 0) + pt.tien; }
+    }));
+  });
+  // Các khóa con của 1 nhánh, sắp theo tổng tiền mọi CT giảm dần
+  const conCua = (map, prefix) => {
+    const tong = new Map();
+    cots.forEach(c => Object.keys(c[map]).forEach(k => { if (k.startsWith(prefix)) tong.set(k, (tong.get(k) || 0) + c[map][k]); }));
+    return [...tong.keys()].sort((a, b) => tong.get(b) - tong.get(a));
+  };
   // Hàng: [nhãn, giá trị từng CT, định dạng, có tô min/max không, class]
   const hang = [
     ['Tổng diện tích sàn (m2)', cots.map(c => c.r.tongSan > 0 ? c.r.tongSan : null), v => v === null ? '—' : tytFmtM2(v), false, 'tyt-ss-info'],
-    [r1 ? 'Tổng chi phí Rổ 1' : 'Tổng chi phí', cots.map(c => tongCT(c)), v => fmtM(v), false, 'tyt-ss-info'],
-    [r1 ? 'RỔ 1 / M2 SÀN' : 'CHI PHÍ / M2 SÀN', cots.map(c => c.r.tongSan > 0 ? (r1 ? c.r.cpM2Ro1 : c.r.cpM2) : null), v => v === null ? '—' : fmtM(Math.round(v)), true, 'tyt-ss-key'],
+    [n1 ? 'Tổng chi phí Nhóm 1' : 'Tổng chi phí', cots.map(c => tongCT(c)), v => fmtM(v), false, 'tyt-ss-info'],
+    ['ĐƠN GIÁ THÔ & NC / M2', cots.map(c => c.r.tongSan > 0 ? c.r.cpM2N1 : null), fm2, true, 'tyt-ss-key'],
   ];
-  if (r1) {
-    // Tiền Rổ 1 của từng CT theo "trụ cột|loại"
-    cots.forEach(c => {
-      c.r1l = {};
-      c.r.lines.forEach(l => l.parts.forEach(pt => { if (pt.ro === 1) { const k = pt.tru + '|' + l.loai; c.r1l[k] = (c.r1l[k] || 0) + pt.tien; } }));
+  if (!n1) hang.push(['ĐƠN GIÁ TOÀN BỘ CT / M2', cots.map(c => c.r.tongSan > 0 ? c.r.cpM2 : null), fm2, true, 'tyt-ss-key']);
+  const truRows = (cls, sub) => TYT_TRU_THU_TU.forEach(t => {
+    if (!cots.some(c => c.r.theoTru[t] > 0)) return;
+    hang.push([(sub ? '└ ' : '') + TYT_TRU[t].ten.toUpperCase(), cots.map(c => conv(c, c.r.theoTru[t] || 0)), fmt, true, cls]);
+    if (!sub) conCua('tl', t + '|').forEach(k => hang.push(['└ ' + k.slice(t.length + 1), cots.map(c => conv(c, c.tl[k] || 0)), fmt, true, 'tyt-ss-sub']));
+  });
+  if (n1) truRows('tyt-ss-tru', false);
+  else {
+    [1, 2, 3, 4, 0].forEach(n => {
+      if (!cots.some(c => c.r.theoNhom[n] > 0)) return;
+      hang.push([(n ? n + '. ' : '') + TYT_NHOM[n].ten.toUpperCase(), cots.map(c => conv(c, c.r.theoNhom[n] || 0)), fmt, true, 'tyt-ss-tru tyt-ss-nh tyt-nh-' + n]);
+      if (n === 1) truRows('tyt-ss-sub', true);
+      else conCua('nl', n + '|').forEach(k => hang.push(['└ ' + k.slice(String(n).length + 1), cots.map(c => conv(c, c.nl[k] || 0)), fmt, true, 'tyt-ss-sub']));
     });
-    TYT_TRU_THU_TU.forEach(t => {
-      if (!cots.some(c => c.r.theoTru[t] > 0)) return;
-      hang.push([TYT_TRU[t].ten.toUpperCase(), cots.map(c => conv(c, c.r.theoTru[t] || 0)), fmt, true, 'tyt-ss-tru']);
-      const tong = new Map();
-      cots.forEach(c => Object.keys(c.r1l).forEach(k => { if (k.startsWith(t + '|')) tong.set(k, (tong.get(k) || 0) + c.r1l[k]); }));
-      [...tong.keys()].sort((a, b) => tong.get(b) - tong.get(a)).forEach(k =>
-        hang.push(['└ ' + k.slice(t.length + 1), cots.map(c => conv(c, c.r1l[k] || 0)), fmt, true, 'tyt-ss-sub']));
-    });
-  } else {
-    loais.forEach(l => hang.push([l, cots.map(c => val(c, l)), fmt, true, '']));
   }
   const tdVals = (vals, f, hl) => {
     const nums = vals.filter(v => v !== null && v !== undefined && v > 0);
@@ -1572,17 +1103,17 @@ function tytRenderSoSanh() {
     const tb = nums.length ? nums.reduce((s, v) => s + v, 0) / nums.length : null;
     return vals.map(v => {
       const cls = hl && mx !== mn && v === mx ? 'tyt-ss-max' : (hl && mx !== mn && v === mn ? 'tyt-ss-min' : '');
-      // CT không có loại chi phí này → "—" (không tính vào cao/thấp nhất & trung bình)
-      if (v === 0) return '<td class="text-end text-secondary" title="Công trình không có loại chi phí này">—</td>';
+      // CT không có khoản này → "—" (không tính vào cao/thấp nhất & trung bình)
+      if (v === 0) return '<td class="text-end text-secondary" title="Công trình không có khoản này">—</td>';
       return `<td class="text-end font-monospace ${cls}" style="white-space:nowrap">${f(v)}</td>`;
     }).join('') + `<td class="text-end font-monospace tyt-ss-avg" style="white-space:nowrap">${tb === null ? '—' : f(tb)}</td>`;
   };
   tbl.innerHTML = `<thead class="table-light"><tr>
-      <th style="min-width:160px">Chỉ tiêu ${che === 'm2' ? '(đ / m2 sàn)' : che === 'pct' ? (r1 ? '(% tổng Rổ 1)' : '(% tổng chi)') : '(tổng tiền)'}${r1 ? ' · <span class="tyt-ro tyt-ro-1 tyt-ro-sm">Rổ 1</span>' : ''}</th>
+      <th style="min-width:180px">Chỉ tiêu ${che === 'm2' ? '(đ / m2 sàn)' : che === 'pct' ? (n1 ? '(% tổng Nhóm 1)' : '(% tổng chi)') : '(tổng tiền)'}${n1 ? ' · ' + _tytNhomChip(1, '', true) : ''}</th>
       ${cots.map(c => `<th class="text-end tyt-ss-th" title="${x(c.p.name)}">${x(c.p.name)}<div class="fw-normal text-secondary" style="font-size:10.5px">năm ${tytNamCT(c.p)}${c.p.status === 'closed' || c.p.status === 'completed' ? '' : ' · đang làm'}</div></th>`).join('')}
       <th class="text-end">Trung bình</th></tr></thead>
     <tbody>${hang.map(([lb, vals, f, hl, cls]) => `<tr class="${cls}"><td>${x(lb)}</td>${tdVals(vals, f, hl)}</tr>`).join('')}</tbody>`;
-  _tytSsLast = { che, r1, ten: cots.map(c => c.p.name), hang };
+  _tytSsLast = { che, n1, ten: cots.map(c => c.p.name), hang };
 }
 
 // Xuất bảng so sánh ra Excel (SheetJS — đã nạp ở index.html cho tab Nhập/Xuất)
@@ -1590,8 +1121,8 @@ function tytSsExcel() {
   if (!_tytSsLast) { toast('Chưa có dữ liệu so sánh', 'error'); return; }
   if (typeof XLSX === 'undefined') { toast('Chưa tải được thư viện Excel — kiểm tra mạng', 'error'); return; }
   const d = _tytSsLast;
-  const donVi = d.che === 'm2' ? 'đ/m2 sàn' : d.che === 'pct' ? '% tổng chi' : 'đồng';
-  const aoa = [[`So sánh tỉ trọng chi phí ${d.r1 ? 'RỔ 1 ' : ''}(${donVi}) — ${_tytAllYears ? 'trọn vòng đời công trình' : 'năm ' + tytNhanNam()}`], [], ['Chỉ tiêu', ...d.ten, 'Trung bình']];
+  const donVi = d.che === 'm2' ? 'đ/m2 sàn' : d.che === 'pct' ? (d.n1 ? '% tổng Nhóm 1' : '% tổng chi') : 'đồng';
+  const aoa = [[`So sánh tỷ trọng chi phí ${d.n1 ? 'NHÓM 1 ' : 'theo 4 nhóm '}(${donVi}) — ${_tytAllYears ? 'trọn vòng đời công trình' : 'năm ' + tytNhanNam()}`], [], ['Chỉ tiêu', ...d.ten, 'Trung bình']];
   d.hang.forEach(([lb, vals]) => {
     const nums = vals.filter(v => v !== null && v !== undefined && v > 0);
     const tb = nums.length ? nums.reduce((s, v) => s + v, 0) / nums.length : null;
@@ -1599,13 +1130,13 @@ function tytSsExcel() {
     aoa.push([lb, ...vals.map(r2), r2(tb)]);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 28 }, ...d.ten.map(() => ({ wch: 18 })), { wch: 16 }];
+  ws['!cols'] = [{ wch: 34 }, ...d.ten.map(() => ({ wch: 18 })), { wch: 16 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'SoSanh');
-  XLSX.writeFile(wb, `so-sanh-ti-trong_${today()}.xlsx`);
+  XLSX.writeFile(wb, `so-sanh-ty-trong_${today()}.xlsx`);
 }
 
-// ══ XU HƯỚNG & BIẾN ĐỘNG (tab con 5 — 07/10/2026 — Cải tiến Phần C) ═══════════════════
+// ══ XU HƯỚNG & BIẾN ĐỘNG (tab con 3 — 07/10/2026 — Cải tiến Phần C) ═══════════════════
 function _tytRenderTabSs() { tytRenderSoSanh(); tytRenderXuHuong(); tytRenderGiaVt(); }
 
 const _TYT_MAU = ['#fd7e14', '#0d6efd', '#198754', '#6f42c1', '#d63384', '#20c997', '#dc3545', '#495057', '#0dcaf0', '#b58900'];
@@ -1688,12 +1219,12 @@ function _tytPctDoi(p) {
 // Mọi năm có dữ liệu của mọi công trình (để tải đủ trước khi vẽ xu hướng / giá)
 function _tytNamMoiCT(projs) { return [...new Set((projs || _tytAllProjs()).flatMap(p => tytNamVongDoi(p)))]; }
 
-// ── XU HƯỚNG đ/m2 RỔ 1 THEO NĂM ──
+// ── XU HƯỚNG đ/m2 NHÓM 1 THEO NĂM ──
 const _TYT_XH_SR = [
-  { k: 'sat', ten: 'Sắt thép', mau: '#495057' }, { k: 'bt', ten: 'Bê tông', mau: '#0d6efd' }, { k: 'nc', ten: 'Nhân công', mau: '#fd7e14' },
-  { k: 'tp', ten: 'Thầu phụ phụ trợ', mau: '#6f42c1' }, { k: 'quy', ten: 'Quỹ phụ phí', mau: '#20c997' }, { k: 'ro1', ten: 'Tổng Rổ 1', mau: '#198754' },
+  { k: 'sat', ten: 'Sắt thép', mau: '#495057' }, { k: 'bt', ten: 'Bê tông & VL thô', mau: '#0d6efd' }, { k: 'nc', ten: 'Nhân công', mau: '#fd7e14' },
+  { k: 'tp', ten: 'Thầu phụ thô & phụ trợ', mau: '#6f42c1' }, { k: 'quy', ten: 'Quỹ phụ phí', mau: '#20c997' }, { k: 'n1', ten: 'Tổng Nhóm 1', mau: '#198754' },
 ];
-const _tytXhAn = new Set(['tp', 'quy', 'ro1']);   // mặc định chỉ hiện Sắt · Bê tông · Nhân công (đúng file thiết kế)
+const _tytXhAn = new Set(['sat', 'bt', 'nc', 'tp', 'quy']);   // mặc định: đường đơn giá Thô & NC bình quân (bấm chú thích để xem từng trụ cột)
 function tytXhSeries(k) { if (_tytXhAn.has(k)) _tytXhAn.delete(k); else _tytXhAn.add(k); tytRenderXuHuong(); }
 
 function tytRenderXuHuong() {
@@ -1708,7 +1239,7 @@ function tytRenderXuHuong() {
   const xh = tytXuHuongM2(coM2.filter(p => !chiXong || xong(p)), _tytOpts());
   // CT xây mới chưa có bảng M2 → chưa lên được biểu đồ (gợi ý nhập để có thêm điểm)
   const thieu = projs.filter(p => !(tytTongSan(p) > 0)).sort((a, b) => tytNamCT(a).localeCompare(tytNamCT(b)));
-  const thieuHtml = thieu.length ? `<div class="tyt-uutien mt-2" style="font-size:11.5px"><b>${thieu.length} công trình xây mới chưa có bảng M2</b> nên chưa lên biểu đồ — nhập M2 (tab Thiết lập) để có thêm điểm các năm: ${
+  const thieuHtml = thieu.length ? `<div class="tyt-uutien mt-2" style="font-size:11.5px"><b>${thieu.length} công trình xây mới chưa có bảng M2</b> nên chưa lên biểu đồ — bấm tên để nhập M2: ${
     thieu.map(p => `<a href="#" onclick="tytXhMoCT('${p.id}');return false">${x(p.name)}</a> <span class="text-secondary">(${tytNamCT(p)})</span>`).join(' · ')}</div>` : '';
   if (!xh.nams.length) {
     chart.innerHTML = '';
@@ -1725,29 +1256,28 @@ function tytRenderXuHuong() {
   }));
   chart.innerHTML = _tytLegend(_TYT_XH_SR.map(sr => ({ ...sr, an: _tytXhAn.has(sr.k) })), 'tytXhSeries') +
     (series.length ? _tytLineSvg({ labels, dbLabel: coDb ? namSau : '', series, fmtTip: v => fmtM(Math.round(v)) + '/m2' }) : '');
-  const cot = ['ro1', 'sat', 'bt', 'nc', 'tp', 'quy'];
-  const ten = { ro1: 'Rổ 1', sat: 'Sắt thép', bt: 'Bê tông', nc: 'Nhân công', tp: 'TP phụ trợ', quy: 'Quỹ PP' };
+  const cot = ['n1', 'sat', 'bt', 'nc', 'tp', 'quy'];
+  const ten = { n1: 'Thô & NC', sat: 'Sắt thép', bt: 'Bê tông', nc: 'Nhân công', tp: 'TP thô', quy: 'Quỹ PP' };
   const rows = xh.nams.map(n => `<tr>
       <td class="fw-semibold">${n.nam}</td>
       <td class="text-end">${n.soCT}${n.dangLam ? ` <span class="text-secondary" style="font-size:10.5px">(${n.dangLam} đang làm)</span>` : ''}</td>
       <td class="text-end font-monospace">${tytFmtM2(n.san)}</td>
-      ${cot.map(k => `<td class="text-end font-monospace${k === 'ro1' ? ' fw-bold' : ''}" style="white-space:nowrap">${fmtM(Math.round(n.m2[k]))}</td>`).join('')}
+      ${cot.map(k => `<td class="text-end font-monospace${k === 'n1' ? ' fw-bold' : ''}" style="white-space:nowrap">${fmtM(Math.round(n.m2[k]))}</td>`).join('')}
     </tr>`).join('');
   const dbRow = coDb ? `<tr class="tyt-xh-db">
       <td class="fw-semibold">${namSau} <span class="badge text-bg-warning" style="font-size:9.5px">ước tính</span></td><td></td><td class="text-end text-secondary" style="font-size:10.5px">dự báo</td>
       ${cot.map(k => hq[k] ? `<td class="text-end font-monospace" style="white-space:nowrap">${fmtM(Math.round(hq[k].du(+namSau)))}<div style="font-size:10.5px">${_tytPctDoi(hq[k].pctNam)}/năm</div></td>` : '<td class="text-end text-secondary">—</td>').join('')}
     </tr>` : '';
-  const ctHtml = xh.cts.sort((a, b) => a.nam.localeCompare(b.nam)).map(c => `${x(c.p.name)} <span class="text-secondary">(${c.nam}${c.dongXong ? '' : ', đang làm'} · ${fmtM(Math.round(c.ro1 / c.san))}/m2)</span>`).join(' · ');
+  const ctHtml = xh.cts.sort((a, b) => a.nam.localeCompare(b.nam)).map(c => `${x(c.p.name)} <span class="text-secondary">(${c.nam}${c.dongXong ? '' : ', đang làm'} · ${fmtM(Math.round(c.n1 / c.san))}/m2)</span>`).join(' · ');
   body.innerHTML = `<div style="overflow-x:auto"><table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12px;min-width:720px">
       <thead class="table-light"><tr><th>Năm</th><th class="text-end">Số CT</th><th class="text-end">Sàn (m2)</th>${cot.map(k => `<th class="text-end">${ten[k]} /m2</th>`).join('')}</tr></thead>
       <tbody>${rows}${dbRow}</tbody></table></div>
     ${coDb ? '' : `<div class="text-secondary mt-1" style="font-size:11px">Mới có ${xh.nams.length} năm dữ liệu — cần ≥ ${TYT_DB_MIN} năm mới dự báo được năm tới.</div>`}
     <div class="text-secondary mt-1" style="font-size:11px">Công trình đã tính: ${ctHtml}</div>${thieuHtml}`;
 }
-// Mở 1 công trình (từ danh sách "chưa có bảng M2") ở tab Thiết lập
+// Mở 1 công trình (từ danh sách "chưa có bảng M2") và mở popup Bảng M2
 function tytXhMoCT(pid) {
-  if (_tytHasUnsaved() && !confirm('Đang có thay đổi chưa lưu ở công trình hiện tại — bỏ qua và chuyển công trình?')) return;
-  _tytPid = pid; _tytResetEdits(); _tytSub = 'tyt-sub-tl';
+  _tytPid = pid; _tytResetEdits();
   tytPopulateSels();
   const sel = document.getElementById('tytf-ct');
   if (sel && ![...sel.options].some(o => o.value === pid)) {
@@ -1755,8 +1285,8 @@ function tytXhMoCT(pid) {
     if (p) sel.insertAdjacentHTML('beforeend', `<option value="${pid}">${x(p.name)}</option>`);
   }
   if (sel) sel.value = pid;
+  _tytMoM2 = true;
   tytRenderAll();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ── BIẾN ĐỘNG ĐƠN GIÁ VẬT TƯ & CÔNG NHẬT ──
@@ -1824,7 +1354,7 @@ function tytRenderGiaVt() {
   body.innerHTML = `<div style="overflow-x:auto"><table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12px;min-width:820px">
       <thead class="table-light"><tr><th></th><th>Mặt hàng</th><th>ĐVT</th><th class="text-end">Đã mua</th><th class="text-end">Giá kỳ đầu</th><th class="text-end">Giá gần nhất</th><th class="text-end">Thay đổi</th><th class="text-end">Dự báo kỳ tới <span class="badge text-bg-warning" style="font-size:9px">ước tính</span></th><th>Diễn biến</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="9" class="text-secondary text-center py-3">Không có mặt hàng phù hợp.</td></tr>'}</tbody></table></div>
-    <div class="text-secondary mt-1" style="font-size:11px">${tim ? 'Kết quả tìm' : `Các mặt hàng mua ở ≥ 2 kỳ, nhiều lần mua nhất trước (tối đa ${TYT_GV_MAX} dòng — gõ ô "Tìm" để xem mặt hàng khác)`}. Tên khác nhau (VD "Xi măng" và "Xi măng Hà Tiên") là 2 mặt hàng. Dự báo = đường thẳng qua các kỳ, cần ≥ ${TYT_DB_MIN} kỳ — chỉ để tham khảo khi chốt giá khoán.</div>`;
+    <div class="text-secondary mt-1" style="font-size:11px">${tim ? 'Kết quả tìm' : `Mặt hàng mua ở ≥ 2 kỳ, nhiều lần mua nhất trước (tối đa ${TYT_GV_MAX} dòng — gõ ô "Tìm" để xem mặt hàng khác)`}.</div>`;
 }
 
 // ══ PHẠM VI: TRỌN VÒNG ĐỜI CÔNG TRÌNH (06/10/2026 — Lần 3) ═════════════════
@@ -1881,7 +1411,7 @@ function _tytRenderScope() {
   if (!el) return;
   const p = _tytProj();
   if (!_tytAllYears) { el.innerHTML = `Đang tính theo <b>năm đang lọc</b> (${x(tytNhanNam())}).`; return; }
-  if (!p) { el.innerHTML = 'Tính <b>trọn vòng đời</b> công trình — bỏ qua bộ lọc năm.'; return; }
+  if (!p) { el.innerHTML = ''; return; }
   const ys = tytNamVongDoi(p);
   const range = ys.length > 1 ? `${ys[0]}–${ys[ys.length - 1]}` : ys[0];
   if (_tytLoading) { el.innerHTML = `<span class="text-primary">⏳ Đang tải dữ liệu năm ${_tytLoadingYrs.join(', ')}…</span>`; return; }
@@ -1894,6 +1424,7 @@ function _tytRenderScope() {
 function tytSetVongDoi(on) {
   _tytAllYears = !!on;
   _tytRecalc();
+  _tytRenderScope();
 }
 function tytTaiLai() {
   const p = _tytProj();
@@ -1902,219 +1433,10 @@ function tytTaiLai() {
   _tytEnsureYears(tytNamVongDoi(p));
 }
 
-// ══ SAO CHÉP / DÁN LUẬT & CẤU TRÚC (06/10/2026 — Lần 3) ════════════════════
-// "Bộ nhớ tạm" riêng của tab (lưu localStorage để chuyển trang / tải lại vẫn còn — chỉ trên máy này):
-//   { kind: 'luat' | 'cautruc', fromPid, fromTen, at, giaiDoan, hangMuc, luat }
-// Dán = GỘP theo tên (tytSaoChep) — không xóa gì của công trình đích.
-//   • Dán cấu trúc → vào BẢN NHÁP (bấm "Lưu Cấu Trúc" mới ghi, Hủy được).
-//   • Dán luật     → ghi ngay; giai đoạn / hạng mục mà luật cần nhưng CT đích chưa có → tự thêm.
-const _TYT_CLIP_KEY = 'tyt_clip_v1';
-function _tytClipGet() {
-  try { return JSON.parse(localStorage.getItem(_TYT_CLIP_KEY) || 'null'); } catch (e) { return null; }
-}
-function _tytClipSet(v) {
-  try { localStorage.setItem(_TYT_CLIP_KEY, JSON.stringify(v)); } catch (e) { /* trình duyệt chặn lưu → chỉ nhớ trong phiên */ }
-  _tytClipMem = v;
-}
-let _tytClipMem = null;
-function _tytClip() { return _tytClipGet() || _tytClipMem; }
-
-function tytCopy(kind) {
-  const p = _tytProj();
-  if (!p) return;
-  const st = tytStructOf(p.id);
-  if (kind === 'luat' && !st.luat.length) { toast('Công trình này chưa có luật nào để sao chép', 'error'); return; }
-  if (kind === 'cautruc' && !st.giaiDoan.length) { toast('Công trình này chưa có giai đoạn nào để sao chép', 'error'); return; }
-  _tytClipSet({ kind, fromPid: p.id, fromTen: p.name, at: Date.now(), giaiDoan: st.giaiDoan, hangMuc: st.hangMuc, luat: st.luat });
-  toast(kind === 'luat'
-    ? `📋 Đã sao chép ${st.luat.length} luật — chọn công trình khác rồi bấm "Dán luật"`
-    : `📋 Đã sao chép cấu trúc (${st.giaiDoan.length} giai đoạn, ${st.hangMuc.length} hạng mục) — chọn công trình khác rồi bấm "Dán cấu trúc"`, 'success');
-  _tytRenderClipBtns();
-}
-
-// Nút "Dán …" chỉ hiện khi bộ nhớ tạm có đúng loại và đến từ công trình KHÁC
-function _tytRenderClipBtns() {
-  const c = _tytClip();
-  [['luat', 'tyt-paste-luat'], ['cautruc', 'tyt-paste-ct']].forEach(([kind, id]) => {
-    const b = document.getElementById(id);
-    if (!b) return;
-    const ok = c && c.kind === kind && c.fromPid !== _tytPid;
-    b.style.display = ok ? '' : 'none';
-    if (ok) b.title = `Dán ${kind === 'luat' ? (c.luat || []).length + ' luật' : 'cấu trúc'} từ "${c.fromTen}" (gộp theo tên, không xóa gì của công trình này)`;
-    const lb = b.querySelector('.tyt-paste-from');
-    if (lb && ok) lb.textContent = c.fromTen;
-  });
-}
-
-function tytPaste(kind) {
-  const p = _tytProj();
-  const c = _tytClip();
-  if (!p || !c || c.kind !== kind) return;
-  if (kind === 'cautruc') {
-    const d = _tytCtEdit();   // dán vào bản nháp
-    const res = tytSaoChep(c, d, { cauTruc: true });
-    _tytRenderCauTruc();
-    toast(res.gdMoi || res.hmMoi
-      ? `📥 Đã dán: +${res.gdMoi} giai đoạn, +${res.hmMoi} hạng mục — bấm "Lưu Cấu Trúc" để ghi`
-      : 'Công trình này đã có đủ các giai đoạn / hạng mục đó', res.gdMoi || res.hmMoi ? 'success' : 'info');
-    return;
-  }
-  // Dán luật: ghi ngay → không được đang sửa dở cấu trúc
-  if (_tytDraft) { toast('Hãy Lưu (hoặc Hủy) thay đổi cấu trúc ở tab Thiết lập trước khi dán luật', 'error'); return; }
-  const st = tytStructOf(p.id);
-  const cuIds = new Set(st.giaiDoan.map(g => g.id));
-  // Thêm trước các giai đoạn / hạng mục mà luật cần (chỉ những cái luật dùng tới)
-  const can = { giaiDoan: c.giaiDoan.filter(g => c.luat.some(l => l.g === g.id)),
-                hangMuc: c.hangMuc.filter(h => c.luat.some(l => l.h === h.id)), luat: [] };
-  // giai đoạn của hạng mục cần cũng phải có
-  can.hangMuc.forEach(h => { if (!can.giaiDoan.some(g => g.id === h.gdId)) { const g = c.giaiDoan.find(z => z.id === h.gdId); if (g) can.giaiDoan.push(g); } });
-  const r1 = tytSaoChep(can, st, { cauTruc: true });
-  const r2 = tytSaoChep(c, st, { luat: true });
-  tytSaveStruct(p.id, { giaiDoan: st.giaiDoan, hangMuc: st.hangMuc, luat: st.luat });
-  st.giaiDoan.forEach(g => { if (!cuIds.has(g.id)) _tytOpen.add('G:' + g.id); });
-  toast(`📥 Đã dán ${r2.luatMoi} luật` + (r1.gdMoi || r1.hmMoi ? ` (tự thêm ${r1.gdMoi} giai đoạn, ${r1.hmMoi} hạng mục)` : '') +
-    (r2.trung ? ` · bỏ qua ${r2.trung} luật trùng` : ''), 'success');
-  _tytRenderCauTruc();
-  _tytRecalc();
-}
-
-// ══ ĐỐI CHIẾU NHÓM CÔNG TRÌNH CÙNG CẤU TRÚC (tab Định mức — 06/10/2026 — Lần 3) ══════
-// Gom các CT có CÙNG mẫu Giai đoạn & Hạng mục (tytNhomCauTruc) → so đ/m2 từng giai đoạn / hạng mục
-// giữa các CT với 1 CHUẨN (định mức đã lưu, hoặc trung bình nhóm) để thấy CT nào trượt giá / vượt chi.
-let _tytNhKey = '';   // khóa nhóm đang xem ('' = nhóm của CT đang chọn)
-const TYT_NH_LECH = 10;   // lệch quá ±10% so với chuẩn → tô màu
-
 function _tytAllProjs() {
   return ((typeof getAllProjects === 'function') ? getAllProjects() : [])
     .filter(p => p && p.id !== 'COMPANY' && !p.deletedAt);
 }
-
-function tytRenderNhom() {
-  const box = document.getElementById('tyt-nh-body');
-  const sel = document.getElementById('tyt-nh-sel');
-  const selC = document.getElementById('tyt-nh-chuan');
-  if (!box || !sel) return;
-  const nhoms = tytNhomCauTruc(_tytAllProjs());
-  if (!nhoms.length) {
-    sel.innerHTML = '<option value="">(Chưa có công trình nào tạo Giai đoạn & Hạng mục)</option>';
-    box.innerHTML = '';
-    return;
-  }
-  // Mặc định: nhóm chứa công trình đang chọn
-  if (!nhoms.some(n => n.key === _tytNhKey)) {
-    const cua = nhoms.find(n => n.projs.some(p => p.id === _tytPid));
-    _tytNhKey = (cua || nhoms[0]).key;
-  }
-  sel.innerHTML = nhoms.map((n, i) => {
-    const soHm = n.st.hangMuc.length;
-    return `<option value="${x(n.key)}">Nhóm ${i + 1}: ${n.st.giaiDoan.length} GĐ · ${soHm} HM — ${n.projs.length} công trình (${x(n.projs.slice(0, 3).map(p => p.name).join(', '))}${n.projs.length > 3 ? '…' : ''})</option>`;
-  }).join('');
-  sel.value = _tytNhKey;
-  // Chuẩn so sánh: trung bình nhóm hoặc 1 bộ định mức
-  if (selC) {
-    const cur = selC.value || 'tb';
-    selC.innerHTML = '<option value="tb">Chuẩn: Trung bình nhóm</option>' +
-      tytDinhMucList().map(dm => `<option value="${dm.id}">Chuẩn: ${x(dm.ten)}</option>`).join('');
-    selC.value = [...selC.options].some(o => o.value === cur) ? cur : 'tb';
-  }
-  const nhom = nhoms.find(n => n.key === _tytNhKey);
-  const opts = _tytOpts();
-  // Bảo đảm dữ liệu các năm của mọi CT trong nhóm (chế độ vòng đời)
-  if (_tytAllYears) _tytEnsureYears([...new Set(nhom.projs.flatMap(p => tytNamVongDoi(p)))]);
-  // (Phần B) Chỉ Rổ 1: tiền giai đoạn / hạng mục chỉ gồm các món Rổ 1 (tytGomGd); chuẩn định mức dùng số Rổ 1
-  const r1 = !!document.getElementById('tyt-nh-r1')?.checked;
-  const cots = nhom.projs.map(p => {
-    const r = tytTongHop(p, opts);
-    return r1 ? { p, r, g: tytGomGd(r, pt => pt.ro === 1), tong: r.theoRo[1], cpM2: r.cpM2Ro1 }
-              : { p, r, g: r, tong: r.tongChi, cpM2: r.cpM2 };
-  });
-  const dm = selC && selC.value !== 'tb' ? tytDinhMucById(selC.value) : null;
-  const dmGd = dm ? ((r1 ? dm.dgGdR1 : dm.dgGd) || {}) : {};
-  const dmHm = dm ? ((r1 ? dm.dgHmR1 : dm.dgHm) || {}) : {};
-  const dmTong = dm ? (r1 ? (dm.dgRo1 || 0) : dm.dgTong) : 0;
-  const k = t => _tytBoDau(t);
-
-  // Hàng ma trận: giai đoạn + hạng mục theo cấu trúc mẫu của nhóm (khớp theo TÊN — id mỗi CT khác nhau)
-  const tienGd = (g, ten) => { const o = g.theoGD.find(z => k(z.gd.ten) === k(ten)); return o ? o.tien : 0; };
-  const tienHm = (g, tenGd, tenHm) => {
-    const o = g.theoGD.find(z => k(z.gd.ten) === k(tenGd));
-    const h = o && o.hms.find(z => k(z.hm.ten) === k(tenHm));
-    return h ? h.tien : 0;
-  };
-  const hang = [];
-  nhom.st.giaiDoan.forEach(g => {
-    hang.push({ cap: 'gd', ten: g.ten, val: c => tienGd(c.g, g.ten), chuanDm: dmGd[g.ten] });
-    nhom.st.hangMuc.filter(h => h.gdId === g.id).forEach(h => hang.push({
-      cap: 'hm', ten: h.ten, val: c => tienHm(c.g, g.ten, h.ten), chuanDm: dmHm[g.ten + ' › ' + h.ten],
-    }));
-  });
-  hang.push({ cap: 'chua', ten: 'Chưa phân bổ', val: c => c.g.chuaPB, chuanDm: dmGd['Chưa phân bổ'] });
-
-  const m2 = (c, tien) => c.r.tongSan > 0 ? tien / c.r.tongSan : null;
-  const tbNhom = vals => { const v = vals.filter(z => z !== null && z > 0); return v.length ? v.reduce((s, z) => s + z, 0) / v.length : null; };
-  const lechCell = (v, chuan) => {
-    if (v === null) return '<td class="text-end text-secondary">—</td>';
-    if (!v) return '<td class="text-end text-secondary">0</td>';
-    let cls = '', sub = '';
-    if (chuan) {
-      const pct = (v - chuan) / chuan * 100;
-      cls = pct > TYT_NH_LECH ? 'tyt-ss-max' : (pct < -TYT_NH_LECH ? 'tyt-ss-min' : '');
-      const p1 = Math.abs(pct) < 0.05 ? 0 : pct;   // tránh hiện "-0,0%"
-      sub = `<div style="font-size:10.5px">${p1 > 0 ? '+' : ''}${p1.toFixed(1).replace('.', ',')}%</div>`;
-    }
-    return `<td class="text-end font-monospace ${cls}" style="white-space:nowrap">${fmtM(Math.round(v))}${sub}</td>`;
-  };
-
-  // Bảng 1: tổng hợp ngân sách từng CT (ngân sách = sàn × đơn giá chuẩn)
-  const dgChuanTong = dm ? dmTong : tbNhom(cots.map(c => c.r.tongSan > 0 ? c.cpM2 : null));
-  const tong = cots.map(c => {
-    const ns = c.r.tongSan > 0 && dgChuanTong ? Math.round(c.r.tongSan * dgChuanTong) : null;
-    return `<tr>
-      <td class="fw-semibold">${x(c.p.name)}${c.p.id === _tytPid ? ' <span class="badge text-bg-primary">đang chọn</span>' : ''}</td>
-      <td class="text-end font-monospace">${c.r.tongSan > 0 ? tytFmtM2(c.r.tongSan) + ' m2' : '<span class="text-warning-emphasis">chưa có M2</span>'}</td>
-      <td class="text-end font-monospace">${ns === null ? '—' : fmtM(ns)}</td>
-      <td class="text-end font-monospace">${fmtM(c.tong)}</td>
-      ${ns === null ? '<td class="text-end">—</td><td class="text-end">—</td>' :
-        `${Math.abs(ns - c.tong) < 1000 ? '<td class="text-end font-monospace text-secondary">≈ 0</td>' : `<td class="text-end font-monospace ${ns - c.tong < 0 ? 'text-danger fw-bold' : 'text-success'}">${ns - c.tong < 0 ? 'Vượt ' + fmtM(c.tong - ns) : fmtM(ns - c.tong)}</td>`}
-         <td class="text-end font-monospace ${c.tong / ns > 1 ? 'tyt-dt-vuot' : (c.tong / ns > 0.85 ? 'tyt-dt-gan' : '')}">${(c.tong / ns * 100).toFixed(1).replace('.', ',')}%</td>`}
-      <td class="text-end font-monospace">${c.r.tongSan > 0 ? fmtM(Math.round(c.cpM2)) : '—'}</td>
-    </tr>`;
-  }).join('');
-
-  // Bảng 2: ma trận đ/m2 theo giai đoạn / hạng mục
-  const head = cots.map(c => `<th class="text-end tyt-ss-th" title="${x(c.p.name)}">${x(c.p.name)}</th>`).join('');
-  const rows = hang.map(h => {
-    const vals = cots.map(c => m2(c, h.val(c)));
-    const chuan = dm ? (h.chuanDm || null) : tbNhom(vals);
-    if (h.cap === 'chua' && !vals.some(v => v)) return '';
-    return `<tr class="${h.cap === 'gd' ? 'tyt-cay-gd' : (h.cap === 'chua' ? 'tyt-cay-chua' : '')}">
-      <td style="${h.cap === 'hm' ? 'padding-left:22px' : ''}">${h.cap === 'hm' ? '<span class="text-secondary">└</span> ' : ''}${x(h.cap === 'gd' ? h.ten.toUpperCase() : h.ten)}</td>
-      <td class="text-end font-monospace tyt-ss-avg">${chuan ? fmtM(Math.round(chuan)) : '—'}</td>
-      ${vals.map(v => lechCell(v, chuan)).join('')}
-    </tr>`;
-  }).join('');
-
-  box.innerHTML = `
-    <div class="qt-lb mb-1">${r1 ? 'Chỉ Rổ 1 · ' : 'Toàn bộ chi phí · '}Ngân sách theo chuẩn (${dm ? x(dm.ten) + ' — ' + fmtM(dmTong) + '/m2' : 'trung bình nhóm' + (dgChuanTong ? ' — ' + fmtM(Math.round(dgChuanTong)) + '/m2' : '')})</div>
-    <div style="overflow-x:auto" class="mb-3">
-      <table class="table table-sm table-hover align-middle mb-0 tyt-rpt" style="font-size:12px;min-width:720px">
-        <thead class="table-light"><tr><th>Công trình</th><th class="text-end">Sàn</th><th class="text-end">Ngân sách chuẩn</th><th class="text-end">Thực tế${r1 ? ' Rổ 1' : ''}</th><th class="text-end">Còn lại / Vượt</th><th class="text-end">% đã dùng</th><th class="text-end">đ / m2 thực tế</th></tr></thead>
-        <tbody>${tong}</tbody>
-      </table>
-    </div>
-    <div class="qt-lb mb-1">Đơn giá thực tế đ/m2 theo giai đoạn / hạng mục — ô <span class="tyt-ss-max px-1">đỏ</span> cao hơn chuẩn &gt; ${TYT_NH_LECH}%, <span class="tyt-ss-min px-1">xanh</span> thấp hơn &gt; ${TYT_NH_LECH}%</div>
-    <div style="overflow-x:auto">
-      <table class="table table-sm table-hover align-middle mb-0 tyt-rpt tyt-ss" style="font-size:12px">
-        <thead class="table-light"><tr><th style="min-width:200px">Giai đoạn / Hạng mục</th><th class="text-end">Chuẩn</th>${head}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    ${!dm ? '' : (r1 && !dm.dgGdR1
-      ? '<div class="text-warning-emphasis mt-1" style="font-size:11px">⚠ Định mức này lưu trước khi có Rổ 1 → chưa có chuẩn Rổ 1 theo giai đoạn / hạng mục. Bấm ✎ ở danh sách định mức → "Cập nhật lại từ CT nguồn", hoặc tắt công tắc "Chỉ Rổ 1".</div>'
-      : '<div class="text-secondary mt-1" style="font-size:11px">Định mức lưu trước ngày 06/10/2026 chưa có đơn giá theo hạng mục → cột Chuẩn của hạng mục để trống (vẫn so được cấp giai đoạn). Cập nhật lại định mức để có đủ.</div>')}`;
-}
-
-function tytNhomChon(key) { _tytNhKey = key; tytRenderNhom(); }
 
 // Cấp ra global (gọi từ onclick trong HTML + main.js + projects.ui.js)
 window.initTyTrong = initTyTrong;

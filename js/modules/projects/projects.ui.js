@@ -1714,8 +1714,8 @@ function _ctKlReadonlyHtml(v, lblStyle) {
     <div class="d-flex align-items-center flex-wrap gap-2 border rounded px-3 py-2" style="background:var(--bs-tertiary-bg)">
       <span class="fw-bold font-monospace" style="font-size:15px">${rows.length ? _ctKlFmt(tong) + ' m2' : '—'}</span>
       <span class="text-secondary" style="font-size:11.5px">${rows.length ? `(${rows.length} dòng)` : '(chưa nhập)'}</span>
-      ${coNut ? `<button type="button" class="btn btn-outline-primary btn-sm ms-auto" onclick="tytOpenFor('${v.id}')" title="Bảng M2 sàn nằm ở tab Tỉ Trọng Chi Phí (đóng form này, thay đổi chưa lưu sẽ mất)">
-        <span class="material-symbols-outlined msi-gap">square_foot</span>Sửa tại tab Tỉ Trọng Chi Phí
+      ${coNut ? `<button type="button" class="btn btn-outline-primary btn-sm ms-auto" onclick="tytOpenFor('${v.id}')" title="Mở tab Tỉ Trọng & Định Mức với popup Bảng M2 sàn của công trình này (đóng form này, thay đổi chưa lưu sẽ mất)">
+        <span class="material-symbols-outlined msi-gap">square_foot</span>Sửa bảng M2 sàn
       </button>` : ''}
     </div>`;
 }
