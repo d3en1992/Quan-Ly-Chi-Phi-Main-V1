@@ -52,6 +52,72 @@ function mbAfterWrite() {
  * nhập desktop id="sa-<catId>" — ô này chỉ có sau renderSettings(), nên nếu
  * chưa có thì tạo tạm một ô ẩn rồi gỡ đi.
  */
+/** Sao chép chữ vào clipboard (navigator.clipboard, máy cũ / http thì dùng execCommand) */
+function mbCopyText(text, okMsg) {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) mbToast(okMsg, 'success');
+    else { mbToast('Máy không cho sao chép tự động — giữ để chọn và sao chép', 'error'); prompt('Sao chép nội dung:', text); }
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => mbToast(okMsg, 'success'), fallback);
+  } else fallback();
+}
+
+// ── Thiết bị: dùng lại helper NƠI của thietbi.js (_tbLocFromSel / _tbLocKey / _tbGhiKey) ──
+/** Tên nơi (tên kho hoặc tên công trình) → { ct, projectId, kho, key } */
+function mbTbLocOf(name) {
+  const pid = (typeof findProjectIdByName === 'function') ? findProjectIdByName(name) : null;
+  if (typeof _tbLocFromSel === 'function') return _tbLocFromSel(name, pid);
+  return { ct: name, projectId: pid || null, kho: null, key: pid || name };
+}
+
+/** Nơi hiện tại của 1 dòng thiết bị (để trả phần còn lại về đúng chỗ khi điều chuyển một phần) */
+function mbTbSrcLoc(r) {
+  const key = (typeof _tbLocKey === 'function') ? _tbLocKey(r) : (r.projectId || r.ct || '');
+  if (r.projectId === 'COMPANY' && typeof TB_KHO !== 'undefined' && typeof _tbKhoCode === 'function') {
+    const code = _tbKhoCode(r);
+    return { ct: TB_KHO[code].name, projectId: 'COMPANY', kho: code, key };
+  }
+  return { ct: r.ct, projectId: r.projectId || null, kho: null, key };
+}
+
+/**
+ * Cộng thiết bị vào 1 nơi: có dòng trùng (Nơi + Tên + Tình trạng + Thông tin máy) → cộng dồn số lượng,
+ * chưa có → tạo dòng mới. keepDate = true: không đổi ngày luân chuyển của dòng đang có.
+ */
+function mbTbAddAt(loc, row, ngay, keepDate) {
+  const key  = (typeof _tbLocKey === 'function') ? _tbLocKey : (t => t.projectId || t.ct || '');
+  const gkey = (typeof _tbGhiKey === 'function') ? _tbGhiKey : (s => String(s || '').trim().toLowerCase());
+  const exist = tbData.find(t => !t.deletedAt && t.ten === row.ten && t.tinhtrang === row.tinhtrang &&
+    gkey(t.ghichu) === gkey(row.ghichu) && key(t) === loc.key);
+  if (exist) {
+    exist.soluong = (exist.soluong || 0) + row.soluong;
+    if (!keepDate) exist.ngay = ngay;
+    exist.updatedAt = Date.now();
+    exist.deviceId  = (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : exist.deviceId;
+  } else {
+    tbData.push(mkRecord({ ct: loc.ct, projectId: loc.projectId, ...(loc.kho ? { kho: loc.kho } : {}), ...row, ngay }));
+  }
+}
+
+/** Thêm 1 mục danh mục rồi trả về tên chuẩn đang có trong cats (prompt → mbAddCat) */
+function mbPromptAddCat(catId, label) {
+  const val = (prompt('Thêm ' + label + ' mới:') || '').trim();
+  if (!val) return '';
+  const find = () => (cats[catId] || []).find(v => String(v).toLowerCase() === val.toLowerCase());
+  if (!find()) mbAddCat(catId, val);
+  return find() || val;
+}
+
 function mbAddCat(catId, val) {
   if (typeof addItem !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
   let inp = document.getElementById('sa-' + catId);
@@ -376,12 +442,32 @@ Object.assign(MB_ACTS, {
   // Trang Tiền Ứng và Công Nợ đều lọc bỏ loại này (giống bản desktop).
   ccUngKind: (arg) => { MB.ccUngForm.kind = arg; mbRender(); },
 
-  // Bấm thẻ công nhân đang nợ → điền tên vào form ghi phiếu ứng/trả phía trên
+  // Bấm thẻ công nhân → điền tên vào form ghi phiếu ứng/trả phía trên + bung/thu lịch sử ứng–trả ngay dưới thẻ
   ccPickWorker: (name) => {
     MB.ccUngForm.tp = name || '';
+    MB.ccUngOpen = MB.ccUngOpen === name ? '' : (name || '');
     mbRender();
-    const body = document.getElementById('mb-body');
-    if (body) body.scrollTop = 0;
+  },
+
+  // Xóa mềm 1 phiếu ứng / trả nợ công nhân nhập nhầm (giống chamcong.ung-ledger.js)
+  delUngCnMb: (id) => {
+    const idx = ungRecords.findIndex(r => String(r.id) === String(id));
+    if (idx < 0) return;
+    const r = ungRecords[idx];
+    if (!confirm(`Xóa phiếu ${r.cnKind === 'tra' ? 'trả nợ' : 'ứng'} ${mbFull(r.tien || 0)} của ${r.tp || ''} (${mbDate(r.ngay)})?`)) return;
+    ungRecords[idx] = mkUpdate(ungRecords[idx], { deletedAt: Date.now() });
+    save('ung_v1', ungRecords);
+    MB.ccWorkers = null;       // thực lãnh của tuần đổi theo → nạp lại bản nháp
+    mbToast('Đã xóa phiếu', 'success');
+    mbAfterWrite();
+  },
+
+  // Bảng lương từng công nhân → sao chép phiếu lương (dán vào Zalo)
+  ccCopyPayslip: (name) => {
+    const { from, to, rows } = mbCcPayroll();
+    const r = rows.find(x => x.name === name);
+    if (!r) { mbToast('Không tìm thấy công nhân trong tuần này', 'error'); return; }
+    mbCopyText(mbCcPayslipText(r, from, to), '📋 Đã sao chép phiếu lương ' + name + ' — dán vào Zalo');
   },
 
   saveUngCN: () => {
@@ -435,11 +521,18 @@ Object.assign(MB_ACTS, {
       tien: mbMoney(f.tien),
       nd:   f.nd.trim() || 'Tạm ứng',
     };
-    ungRecords.unshift(mkRecord(rec));
+    if (f.editId) {
+      const idx = ungRecords.findIndex(u => String(u.id) === String(f.editId));
+      if (idx < 0) { mbToast('Không tìm thấy phiếu đang sửa', 'error'); f.editId = null; mbRender(); return; }
+      ungRecords[idx] = mkUpdate(ungRecords[idx], rec);
+      mbToast('✅ Đã cập nhật phiếu ứng ' + mbFull(rec.tien), 'success');
+    } else {
+      ungRecords.unshift(mkRecord(rec));
+      mbToast('✅ Đã lưu phiếu ứng ' + mbFull(rec.tien), 'success');
+    }
     save('ung_v1', ungRecords);
 
-    Object.assign(MB.ungForm, { tp: '', tien: '', nd: '' });
-    mbToast('✅ Đã lưu phiếu ứng ' + mbFull(rec.tien), 'success');
+    Object.assign(MB.ungForm, { tp: '', tien: '', nd: '', editId: null });
     mbAfterWrite();
   },
 
@@ -517,6 +610,322 @@ Object.assign(MB_ACTS, {
     ttRemoveBatch(id);
     if (MB.ttLast && MB.ttLast.id === id) MB.ttLast = null;
     mbToast('Đã hủy lần tất toán', 'success');
+    mbAfterWrite();
+  },
+
+  // ══════════════════════════════
+  //  V2 (27/10/2026) — chung
+  // ══════════════════════════════
+
+  // Chip ghi vào state lồng nhau: data-arg="đường.dẫn|giá trị" (vd projForm.loai|CT)
+  setPath: (arg) => {
+    const cut = arg.indexOf('|');
+    mbSetPath(arg.slice(0, cut), arg.slice(cut + 1));
+    mbRender();
+  },
+
+  // Khối "⚡ Việc cần chú ý" ở Tổng quan
+  alertGo: (arg) => {
+    if (arg === 'over' || arg === 'completed') { MB.statusFilter = arg; MB.search = ''; mbGo('congtrinh'); }
+    if (arg === 'congno')  mbGo('congno');
+    if (arg === 'thietbi') { MB.tbWarn = '1'; MB.tbCt = ''; mbGo('thietbi'); }
+  },
+
+  // ══════════════════════════════
+  //  CÔNG TRÌNH — tạo mới / sửa (createProject / updateProject của projects.model.js)
+  // ══════════════════════════════
+  toggleProjForm: () => {
+    if (MB.projFormOpen && !MB.projForm.id) { MB.projFormOpen = false; mbRender(); return; }
+    MB.projForm = { id: null, loai: 'CT', kh: '', phone: '', name: '', diachi: '', ngay: mbToday(), heSo: '1' };
+    MB.projFormOpen = true;
+    mbRender();
+  },
+
+  closeProjForm: () => { MB.projFormOpen = false; mbRender(); },
+
+  editProjMb: () => {
+    const p = mbProject(MB.projectId);
+    if (!p) return;
+    const c = mbProjCustomer(p);
+    const loai = (typeof ctLoaiOf === 'function') ? ctLoaiOf(p)
+      : (typeof ctDetectLoai === 'function') ? ctDetectLoai(p.name) : (p.type || 'OTHER');
+    MB.projForm = {
+      id: p.id,
+      loai: (loai === 'CT' || loai === 'SC') ? loai : 'OTHER',
+      kh: (c && c.name) || p.chuDauTu || '',
+      phone: (c && c.phone) || '',
+      name: p.name || '',
+      diachi: p.note || '',
+      ngay: p.startDate || '',
+      heSo: String((typeof getProjectK === 'function') ? getProjectK(p) : (p.heSoTiTrong == null ? 1 : p.heSoTiTrong)),
+    };
+    MB.projFormOpen = true;
+    mbRender();
+  },
+
+  // Chọn Chủ đầu tư có sẵn → điền SĐT / địa chỉ còn trống từ hồ sơ khách hàng
+  projKhPicked: () => {
+    const f = MB.projForm;
+    const c = (typeof findCustomerByName === 'function') ? findCustomerByName(f.kh) : null;
+    if (!c) return;
+    let changed = false;
+    if (!f.phone && c.phone)    { f.phone = c.phone; changed = true; }
+    if (!f.diachi && c.address) { f.diachi = c.address; changed = true; }
+    if (changed) mbRender();
+  },
+
+  // Gợi ý tên kiểu desktop (_ctSuggestName): "<mã loại> <tên Chủ đầu tư>"
+  projSuggestName: () => {
+    const f = MB.projForm;
+    if (!f.kh.trim()) { mbToast('Nhập tên Chủ đầu tư trước', 'error'); return; }
+    const max = (typeof CT_NAME_MAX !== 'undefined') ? CT_NAME_MAX : 45;
+    f.name = ((f.loai === 'CT' || f.loai === 'SC') ? f.loai + ' ' : '') + f.kh.trim();
+    f.name = f.name.slice(0, max).trim();
+    mbRender();
+  },
+
+  saveProjMb: () => {
+    const f = MB.projForm;
+    const kh = (f.kh || '').trim();
+    if (!kh) { mbToast('Nhập tên Chủ đầu tư', 'error'); return; }
+    if (typeof createProject !== 'function' || typeof getOrCreateCustomerByName !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+
+    const detect = (typeof ctDetectLoai === 'function') ? ctDetectLoai
+      : (n => { const m = String(n || '').match(/^\s*\[?\s*(CT|SC|SN)\s*\]?(?![a-zà-ỹ])/i); return m ? m[1].toUpperCase() : 'Khác'; });
+    let name = (f.name || '').trim() || (((f.loai === 'CT' || f.loai === 'SC') ? f.loai + ' ' : '') + kh);
+    if (typeof _ctNormalizeNamePrefix === 'function') name = _ctNormalizeNamePrefix(name);
+    // Chọn chip Công trình mới / Sửa chữa mà tên chưa có mã → gắn mã vào đầu tên (desktop nhận loại từ tiền tố tên)
+    if ((f.loai === 'CT' || f.loai === 'SC') && detect(name) === 'Khác') name = f.loai + ' ' + name;
+    const old = f.id ? mbProject(f.id) : null;
+    const max = (typeof CT_NAME_MAX !== 'undefined') ? CT_NAME_MAX : 45;
+    if (name.length > max && (!old || name !== old.name)) { mbToast(`Tên công trình tối đa ${max} ký tự (đang ${name.length})`, 'error'); return; }
+    const loaiCongTrinh = detect(name);
+    const type = (loaiCongTrinh === 'CT' || loaiCongTrinh === 'SC') ? loaiCongTrinh : 'OTHER';
+    const k = String(f.heSo).trim() === '' ? 1 : mbNum(f.heSo);
+    const heSoTiTrong = (isFinite(k) && k >= 0) ? k : 1;
+    const diachi = (f.diachi || '').trim();
+
+    let projId = f.id;
+    try {
+      const c = getOrCreateCustomerByName(kh);
+      // Cập nhật SĐT (chỉ người được xem SĐT) + địa chỉ khách nếu khách chưa có
+      const canPhone = (typeof khCanSeePhone === 'function') ? khCanSeePhone() : false;
+      const ch = {};
+      if (canPhone && (f.phone || '').trim() && f.phone.trim() !== (c.phone || '')) ch.phone = f.phone.trim();
+      if (diachi && !c.address) ch.address = diachi;
+      if (Object.keys(ch).length && typeof updateCustomer === 'function') updateCustomer(c.id, ch);
+
+      if (old) {
+        const changes = { name, note: diachi, chuDauTu: c.name, customerId: c.id, heSoTiTrong, loaiCongTrinh, type };
+        if (f.ngay && f.ngay !== old.startDate) Object.assign(changes, { startDate: f.ngay, startDateUserEdited: true });
+        updateProject(old.id, changes);
+      } else {
+        const p = createProject({
+          name, type, loaiCongTrinh, status: 'active', startDate: f.ngay || undefined,
+          note: diachi, chuDauTu: c.name, customerId: c.id, heSoTiTrong,
+        });
+        projId = p.id;
+      }
+    } catch (e) {
+      mbToast('❌ ' + ((e && e.message) || 'Không lưu được công trình'), 'error');
+      return;
+    }
+    // Cập nhật dropdown công trình của bản desktop (đang ẩn) cho khớp — như saveCTCreate()
+    ['refreshHoadonCtDropdowns', 'rebuildUngSelects', 'populateCCCtSel'].forEach(fn => {
+      if (typeof window[fn] === 'function') { try { window[fn](); } catch (e) { /* DOM desktop chưa nạp */ } }
+    });
+    MB.projFormOpen = false;
+    mbToast(old ? '✅ Đã cập nhật công trình' : '✅ Đã tạo công trình: ' + name, 'success');
+    mbAfterWrite();
+    if (!old && projId) mbOpenProject(projId);
+  },
+
+  // ══════════════════════════════
+  //  TIỀN ỨNG — sửa / xóa phiếu, thêm đối tác, xem chi tiết theo đối tác
+  // ══════════════════════════════
+  quickAddUngParty: () => {
+    const isTp = MB.ungKind === 'thauphu';
+    const v = mbPromptAddCat(isTp ? 'thauPhu' : 'nhaCungCap', isTp ? 'thầu phụ' : 'nhà cung cấp');
+    if (!v) return;
+    MB.ungForm.tp = v;
+    mbAfterWrite();
+  },
+
+  editUngMb: (id) => {
+    const u = ungRecords.find(r => String(r.id) === String(id) && !r.deletedAt);
+    if (!u) { mbToast('Không tìm thấy phiếu ứng', 'error'); return; }
+    if (u.autoSettle) { mbToast('Phiếu tất toán chỉ xem — hủy ở Công nợ → Tất toán gần đây', 'error'); return; }
+    if (u.loai === 'congnhan') { mbToast('Phiếu ứng công nhân — xem ở Chấm công → Ứng công nhân', 'error'); return; }
+    MB.ungKind = u.loai === 'nhacungcap' ? 'nhacungcap' : 'thauphu';
+    Object.assign(MB.ungForm, { tp: u.tp || '', ct: u.congtrinh || '', ngay: u.ngay || mbToday(), tien: mbGroup(u.tien || 0), nd: u.nd || '', editId: u.id });
+    mbGo('tienung', { seg: Object.assign({}, MB.seg, { tienung: 'nhap' }) });
+  },
+
+  cancelEditUng: () => {
+    Object.assign(MB.ungForm, { tp: '', tien: '', nd: '', editId: null });
+    mbRender();
+  },
+
+  delUngMb: (id) => {
+    const idx = ungRecords.findIndex(r => String(r.id) === String(id));
+    if (idx < 0) return;
+    const u = ungRecords[idx];
+    if (u.autoSettle) { mbToast('Phiếu tất toán chỉ xem — hủy ở Công nợ → Tất toán gần đây', 'error'); return; }
+    if (!confirm(`Xóa phiếu ứng ${mbFull(u.tien || 0)} — ${u.tp || ''} (${mbDate(u.ngay)})?\n(Có thể khôi phục trong Thùng Rác trên máy tính)`)) return;
+    const now = Date.now();
+    const usr = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+    ungRecords[idx] = {
+      ...u, deletedAt: now, updatedAt: now,
+      deviceId: (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : u.deviceId,
+      deletedBy: (usr && usr.username) || 'Không rõ',
+    };
+    save('ung_v1', ungRecords);
+    if (String(MB.ungForm.editId) === String(id)) Object.assign(MB.ungForm, { tp: '', tien: '', nd: '', editId: null });
+    mbToast('Đã xóa phiếu ứng', 'success');
+    mbAfterWrite();
+  },
+
+  toggleUngParty: (name) => { MB.ungOpen = MB.ungOpen === name ? '' : name; mbRender(); },
+
+  // ══════════════════════════════
+  //  CÔNG NỢ — bung chi tiết · thêm hợp đồng thầu phụ
+  // ══════════════════════════════
+  toggleCnDetail: (key) => { MB.cnOpen = MB.cnOpen === key ? '' : key; mbRender(); },
+
+  toggleHdtpForm: () => { MB.hdtpOpen = !MB.hdtpOpen; mbRender(); },
+
+  quickAddHdtpTp: () => {
+    const v = mbPromptAddCat('thauPhu', 'thầu phụ');
+    if (!v) return;
+    MB.hdtpForm.tp = v;
+    mbAfterWrite();
+  },
+
+  // Cùng schema với nhánh 'hdtp' của saveDt cũ / form HĐ thầu phụ desktop (thauphu_v1)
+  saveHdtpMb: () => {
+    const f = MB.hdtpForm;
+    const giaTri = mbMoney(f.giaTri);
+    if (!f.ct)        { mbToast('Chọn công trình', 'error'); return; }
+    if (!f.tp.trim()) { mbToast('Nhập tên thầu phụ', 'error'); return; }
+    if (!giaTri)      { mbToast('Nhập giá trị hợp đồng', 'error'); return; }
+    if (!f.ngay)      { mbToast('Chọn ngày ký', 'error'); return; }
+    if (mbBlockClosed(f.ct)) return;
+    const proj = mbFindProjByName(f.ct);
+    if (!proj) { mbToast('Chỉ được tạo công trình tại tab Công Trình', 'error'); return; }
+    thauPhuContracts.unshift(mkRecord({
+      ngay: f.ngay, congtrinh: proj.name, projectId: proj.id,
+      thauphu: f.tp.trim(), giaTri, phatSinh: mbMoney(f.phatSinh), nd: f.nd.trim(), items: [],
+    }));
+    save('thauphu_v1', thauPhuContracts);
+    mbToast('✅ Đã lưu hợp đồng thầu phụ: ' + f.tp.trim() + ' · ' + mbFull(giaTri), 'success');
+    Object.assign(f, { tp: '', giaTri: '', phatSinh: '', nd: '' });
+    MB.hdtpOpen = false;
+    mbAfterWrite();
+  },
+
+  // ══════════════════════════════
+  //  THIẾT BỊ & KHO — thêm · điều chuyển · đổi tình trạng · xóa
+  //  Giữ đúng luật gộp của thietbi.js: 1 dòng = Nơi + Tên + Tình trạng + Thông tin máy
+  // ══════════════════════════════
+  toggleTbForm: () => {
+    MB.tbFormOpen = !MB.tbFormOpen;
+    if (MB.tbFormOpen) MB.tbForm = { noi: MB.tbForm.noi || '', ten: '', sl: '1', tt: MB_TB_TT[0], ghichu: '' };
+    mbRender();
+  },
+
+  quickAddTbTen: () => {
+    const v = mbPromptAddCat('tbTen', 'tên thiết bị');
+    if (!v) return;
+    MB.tbForm.ten = v;
+    mbAfterWrite();
+  },
+
+  saveTbMb: () => {
+    const f = MB.tbForm;
+    if (!f.noi) { mbToast('Chọn nơi đặt (công trình / kho)', 'error'); return; }
+    const loc = mbTbLocOf(f.noi);
+    if (!loc.kho && mbBlockClosed(f.noi)) return;
+    const names = (typeof tbGetNames === 'function') ? tbGetNames() : (cats.tbTen || []);
+    const norm  = s => (typeof _tbNormQ === 'function') ? _tbNormQ(s) : String(s || '').trim().toLowerCase();
+    const ten   = names.find(n => norm(n) === norm(f.ten));
+    if (!ten) { mbToast(f.ten.trim() ? 'Tên thiết bị chưa có trong danh mục — bấm "+" để thêm' : 'Nhập tên thiết bị', 'error'); return; }
+    const sl = mbNum(f.sl);
+    if (!(sl > 0)) { mbToast('Số lượng phải lớn hơn 0', 'error'); return; }
+    const tt = MB_TB_TT.includes(f.tt) ? f.tt : MB_TB_TT[0];
+    const ghichu = (f.ghichu || '').trim();
+    mbTbAddAt(loc, { ten, soluong: sl, tinhtrang: tt, ghichu }, mbToday());
+    save('tb_v1', tbData);
+    MB.tbFormOpen = false;
+    mbToast(`✅ Đã lưu ${sl} ${ten} vào ${loc.ct}`, 'success');
+    mbAfterWrite();
+  },
+
+  // Mở / đóng khung điều chuyển ngay trên thẻ (data-arg rỗng = đóng)
+  openTbMove: (id) => {
+    if (!id || MB.tbMoveId === id) { MB.tbMoveId = ''; mbRender(); return; }
+    const r = tbData.find(t => t.id === id && !t.deletedAt);
+    MB.tbMoveId = id;
+    MB.tbMove = { noi: '', sl: String((r && r.soluong) || '') };
+    mbRender();
+  },
+
+  // Giống tbSaveEdit(): xóa mềm dòng gốc → cộng dồn phần chuyển vào nơi nhận → phần còn lại giữ ở nơi cũ
+  saveTbMove: (id) => {
+    const idx = tbData.findIndex(t => t.id === id && !t.deletedAt);
+    if (idx < 0) { mbToast('Không tìm thấy thiết bị', 'error'); return; }
+    const r = tbData[idx];
+    const noi = MB.tbMove.noi;
+    const sl  = mbNum(MB.tbMove.sl);
+    const old = r.soluong || 0;
+    if (!noi) { mbToast('Chọn nơi nhận', 'error'); return; }
+    if (!(sl > 0) || sl > old) { mbToast(`Số lượng phải từ 1 đến ${old}`, 'error'); return; }
+    const dest = mbTbLocOf(noi);
+    if (!dest.kho && mbBlockClosed(noi)) return;
+    const srcLoc = mbTbSrcLoc(r);
+    const ngay = mbToday();
+
+    tbData = softDeleteRecord(tbData, id);
+    mbTbAddAt(dest, { ten: r.ten, soluong: sl, tinhtrang: r.tinhtrang, ghichu: r.ghichu || '' }, ngay);
+    if (old - sl > 0) mbTbAddAt(srcLoc, { ten: r.ten, soluong: old - sl, tinhtrang: r.tinhtrang, ghichu: r.ghichu || '' }, r.ngay || ngay, true);
+    save('tb_v1', tbData);
+    MB.tbMoveId = '';
+    mbToast(`✅ Đã chuyển ${sl} ${r.ten} → ${dest.ct}`, 'success');
+    mbAfterWrite();
+  },
+
+  // Đang hoạt động → Cần bảo trì → Cần sửa chữa → … ; trùng dòng cùng nơi thì gộp (giống _tbApplyEdit)
+  cycleTbStatus: (id) => {
+    const r = tbData.find(t => t.id === id && !t.deletedAt);
+    if (!r) return;
+    const i = MB_TB_TT.indexOf(r.tinhtrang);
+    const next = MB_TB_TT[(i + 1) % MB_TB_TT.length];
+    const key  = (typeof _tbLocKey === 'function') ? _tbLocKey : (t => t.projectId || t.ct || '');
+    const gkey = (typeof _tbGhiKey === 'function') ? _tbGhiKey : (s => String(s || '').trim().toLowerCase());
+    const twin = tbData.find(t => t !== r && !t.deletedAt && key(t) === key(r) && t.ten === r.ten &&
+      t.tinhtrang === next && gkey(t.ghichu) === gkey(r.ghichu));
+    const dev = (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : r.deviceId;
+    if (twin) {
+      twin.soluong = (twin.soluong || 0) + (r.soluong || 0);
+      twin.updatedAt = Date.now(); twin.deviceId = dev;
+      tbData = softDeleteRecord(tbData, id);
+    } else {
+      r.tinhtrang = next; r.updatedAt = Date.now(); r.deviceId = dev;
+    }
+    save('tb_v1', tbData);
+    mbToast(`🔧 ${r.ten}: ${next}${twin ? ' (gộp vào dòng trùng)' : ''}`, 'success');
+    mbAfterWrite();
+  },
+
+  // Chỉ xóa được thiết bị trong KHO (giống tbDeleteRow desktop); ở công trình → điều chuyển về kho
+  delTbMb: (id) => {
+    const r = tbData.find(t => t.id === id && !t.deletedAt);
+    if (!r) return;
+    if (r.projectId !== 'COMPANY') { mbToast('Thiết bị ở công trình — hãy điều chuyển về kho trước khi xóa', 'error'); return; }
+    if (!confirm(`Xóa ${r.soluong || 0} ${r.ten || ''} khỏi ${mbTbLoc(r)}?`)) return;
+    const usr = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+    tbData = softDeleteRecord(tbData, id, { deletedBy: (usr && usr.username) || 'Không rõ' });
+    save('tb_v1', tbData);
+    mbToast('Đã xóa thiết bị', 'success');
     mbAfterWrite();
   },
 

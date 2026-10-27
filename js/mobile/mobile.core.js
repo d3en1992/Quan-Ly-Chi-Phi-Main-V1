@@ -68,6 +68,22 @@ const MB = {
   pdSearch:     '',       // chi tiết CT → Chi phí: tìm nội dung
   pdLoai:       '',       // chi tiết CT → Chi phí: chip loại chi phí
   tkCt:         '',       // cơ cấu chi phí: '' = toàn công ty, hoặc tên công trình
+  // (V2 — 27/10/2026)
+  ungSearch:    '',       // thống kê ứng: tìm tên đối tác
+  ungCtFilter:  '',       // thống kê ứng: lọc công trình
+  ungOpen:      '',       // thống kê ứng: đối tác đang bung chi tiết
+  cnOpen:       '',       // công nợ: khóa dòng đang bung chi tiết (r.key của ttBuildRows)
+  hdtpOpen:     false,    // công nợ: đang mở form "Thêm hợp đồng thầu phụ"
+  ccBcView:     'tuan',   // tổng lương: tuan (theo tuần & công trình) | cn (bảng lương từng công nhân)
+  ccUngOpen:    '',       // ứng công nhân: tên công nhân đang bung lịch sử
+  tbWarn:       '0',      // thiết bị: '1' = chỉ hiện thiết bị Cần bảo trì / Cần sửa chữa
+  tbFormOpen:   false,    // thiết bị: đang mở form thêm mới
+  tbMoveId:     '',       // thiết bị: id dòng đang mở khung điều chuyển
+  tbMove:       { noi: '', sl: '' },
+  tbForm:       { noi: '', ten: '', sl: '1', tt: 'Đang hoạt động', ghichu: '' },
+  projFormOpen: false,    // công trình: đang mở form tạo / sửa
+  projForm:     { id: null, loai: 'CT', kh: '', phone: '', name: '', diachi: '', ngay: '', heSo: '1' },
+  hdtpForm:     { ct: '', tp: '', giaTri: '', phatSinh: '', nd: '', ngay: '' },
   ttLast:       null,     // { id, msg } lần tất toán vừa làm trên điện thoại (cho nút Hoàn tác)
   // Loại phiếu ứng — CHỈ thầu phụ / nhà cung cấp.
   // Ứng công nhân cố ý không nằm ở đây: nó là sổ nợ riêng (ung_v1 với
@@ -92,7 +108,7 @@ const MB = {
     calcMode: false,      // false = nhập thẳng Tổng tiền; true = tính theo SL × Đơn giá
     editId: null,         // id hóa đơn đang sửa nhanh
   },
-  ungForm: { tp: '', ct: '', ngay: '', tien: '', nd: '' },
+  ungForm: { tp: '', ct: '', ngay: '', tien: '', nd: '', editId: null },
   dtForm:  { ct: '', tien: '', ngay: '', nd: '' },   // chỉ còn Thu tiền
 };
 
@@ -290,7 +306,7 @@ function mbTitles() {
     chamcong:  ['Chấm Công',      'Sổ công & lương tuần'],
     tienung:   ['Tiền Ứng',       'Thầu phụ · NCC · Công nhân'],
     doanhthu:  ['Thu Tiền & Lợi Nhuận', 'Thu tiền · Tiến độ thu · Lợi nhuận'],
-    congno:    ['Công Nợ TP/NCC', 'Còn phải trả · Tất toán'],
+    congno:    ['Công Nợ Đối Tác', 'Thầu phụ & Nhà cung cấp'],
     thietbi:   ['Thiết Bị & Kho', 'Kho tổng & tại công trình'],
     thongke:   ['Cơ Cấu Chi Phí', 'Chi phí theo loại'],
     more:      ['Thêm',           'Tất cả chức năng'],
@@ -303,11 +319,11 @@ function mbTitles() {
 // (27/10/2026) Bỏ Quyết toán / Danh mục / Thùng rác khỏi điện thoại — làm trên máy tính.
 const MB_MORE_TABS = ['dashboard', 'doanhthu', 'congno', 'thietbi', 'thongke'];
 
-// Bottom nav: [id, nhãn, icon Material Symbols] — 5 mục, "Nhập CP" đặt giữa cho dễ bấm
+// Bottom nav: [id, nhãn, icon Material Symbols] — 5 mục, "Nhập chi phí" đặt giữa cho dễ bấm
 const MB_NAV = [
   ['congtrinh', 'Công trình', 'home_work'],
   ['chamcong',  'Chấm công', 'calendar_month'],
-  ['nhap',      'Nhập CP',   'add_circle'],
+  ['nhap',      'Nhập chi phí', 'add_circle'],
   ['tienung',   'Tiền ứng',  'payments'],
   ['more',      'Thêm',      'menu'],
 ];
@@ -316,8 +332,8 @@ const MB_NAV = [
 // (27/10/2026) Công nợ không còn tab con — vào thẳng danh sách công nợ & tất toán.
 const MB_SEGS = {
   detail:   ['detail',   [['tong', 'Tổng quan'], ['chi', 'Chi phí'], ['cc', 'Chấm công'], ['ung', 'Tiền ứng']]],
-  nhap:     ['nhap',     [['nhanh', 'Nhập hóa đơn'], ['tatca', 'Lịch sử HĐ']]],
-  chamcong: ['chamcong', [['so', 'Sổ chấm công'], ['baocao', 'Tổng lương'], ['ung', 'Ứng CN']]],
+  nhap:     ['nhap',     [['nhanh', 'Nhập hóa đơn'], ['tatca', 'Lịch sử hóa đơn']]],
+  chamcong: ['chamcong', [['so', 'Sổ chấm công'], ['baocao', 'Tổng lương'], ['ung', 'Ứng công nhân']]],
   tienung:  ['tienung',  [['nhap', 'Nhập ứng'], ['thongke', 'Thống kê ứng']]],
   doanhthu: ['doanhthu', [['thu', 'Thu tiền'], ['thongke', 'Tiến độ thu'], ['loinhuan', 'Lợi nhuận']]],
 };
@@ -626,6 +642,7 @@ async function initMobile() {
   if (!MB.form.ngay)       MB.form.ngay       = today;
   if (!MB.ungForm.ngay)    MB.ungForm.ngay    = today;
   if (!MB.dtForm.ngay)     MB.dtForm.ngay     = today;
+  if (!MB.hdtpForm.ngay)   MB.hdtpForm.ngay   = today;
   if (!MB.ccUngForm.ngay)  MB.ccUngForm.ngay  = today;
 
   // Kế toán không vào được Tổng quan → mở thẳng Công trình
