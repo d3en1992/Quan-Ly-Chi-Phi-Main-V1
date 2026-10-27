@@ -94,21 +94,13 @@
               </div>
             </div>
 
-            <!-- NGUY HIỂM -->
-            <div style="margin-bottom: 20px">
-              <div
-                style="
-                  font-size: 11px;
-                  font-weight: 700;
-                  color: var(--bs-danger);
-                  margin-bottom: 8px;
-                  text-transform: uppercase;
-                  letter-spacing: 0.8px;
-                "
-              >
-                <span class="material-symbols-outlined msi-gap">warning</span>Quản Lý Dữ Liệu
-              </div>
-              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <!-- NGUY HIỂM — (27/10/2026) thu gọn mặc định để tránh bấm nhầm khi đang thao tác danh mục -->
+            <details class="dm-danger" style="margin-bottom: 20px">
+              <summary>
+                <span class="material-symbols-outlined dm-danger-caret">chevron_right</span>
+                <span class="material-symbols-outlined msi-gap">warning</span>Quản Lý Dữ Liệu (Nguy hiểm) — bấm để mở
+              </summary>
+              <div class="dm-danger-body" style="display: flex; flex-wrap: wrap; gap: 8px">
                 <button
                   class="btn"
                   style="
@@ -136,7 +128,7 @@
                   <span class="material-symbols-outlined msi-gap">delete</span>Xóa theo công trình
                 </button>
               </div>
-            </div>
+            </details>
 
             <!-- Mô tả -->
             <div

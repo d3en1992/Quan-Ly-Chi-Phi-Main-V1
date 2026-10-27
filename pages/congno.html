@@ -65,6 +65,7 @@
           <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
             <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2 me-2" style="white-space:nowrap">
               <span class="dot"></span><span class="material-symbols-outlined msi-gap">pending_actions</span>Công Nợ Đối Tác
+              <span class="help-tip" title="Chỉ gồm đối tác ĐÃ có phiếu Ứng TP/NCC hoặc ĐÃ có HĐ thầu phụ. Hóa đơn vãng lai của đối tác khác coi như đã trả đứt lúc mua. Số dư tính toàn vòng đời theo Đối tác × Công trình."><span class="material-symbols-outlined">help</span></span>
               <span id="tt-count-badge" style="font-size:12px;font-weight:400;color:var(--bs-secondary-color)"></span>
             </div>
             <select id="tt-filter-group" class="form-select form-select-sm" style="width:auto" onchange="ttApplyFilters()">
@@ -81,10 +82,6 @@
               <input class="form-check-input" type="checkbox" role="switch" id="tt-show-done" onchange="ttToggleShowDone(this.checked)">
               <label class="form-check-label" for="tt-show-done" style="font-size:12.5px">Hiện cả đối tác đã xong</label>
             </div>
-          </div>
-          <div class="text-secondary mb-2" style="font-size:11px">
-            Chỉ gồm đối tác <strong>đã có phiếu Ứng TP/NCC</strong> hoặc <strong>đã có HĐ thầu phụ</strong>.
-            Hóa đơn vãng lai của đối tác khác coi như đã trả đứt lúc mua. Số dư tính <strong>toàn vòng đời</strong> theo Đối tác × Công trình.
           </div>
 
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
@@ -218,11 +215,8 @@
               <option value="">-- Tất cả công trình --</option>
             </select>
             <input type="text" id="dt-tp-search-input" class="form-control form-control-sm" style="max-width:240px" placeholder="Tìm CT, thầu phụ, nội dung..." oninput="dtSetTpSearch(this.value)">
+            <span class="help-tip" title="Bấm vào 1 dòng để xem lịch sử tạm ứng / chi tiền của hợp đồng. Đã Ứng lấy từ phiếu Ứng thầu phụ (tab Tiền Ứng, tất toán, nút Cập nhật tạm ứng) cùng Thầu phụ × Công trình, tính toàn vòng đời — cùng nguồn với tab Công Nợ."><span class="material-symbols-outlined">help</span></span>
             <span id="hdtptk-sum" class="ms-auto text-secondary" style="font-size:12px"></span>
-          </div>
-          <div class="text-secondary mb-2" style="font-size:11px">
-            Bấm vào 1 dòng để xem lịch sử tạm ứng / chi tiền của hợp đồng. <strong>Đã Ứng</strong> lấy từ phiếu Ứng thầu phụ
-            (tab Tiền Ứng, tất toán, nút Cập nhật tạm ứng) cùng Thầu phụ × Công trình, tính toàn vòng đời — cùng nguồn với tab Công Nợ.
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div style="overflow-x:auto">

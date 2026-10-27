@@ -93,7 +93,7 @@ function renderDetailRowHTML(d, num) {
       inputmode="decimal"></td>
     <td><input class="cell-input right" data-f="dongia" data-raw="${d.dongia||''}"
       value="${d.dongia?numFmt(d.dongia):''}" placeholder="0" inputmode="decimal"></td>
-    <td><input class="cell-input" data-f="ck" value="${x(ckFmt)}" placeholder="vd: 5% hoặc 50000"></td>
+    <td><input class="cell-input" data-f="ck" value="${x(ckFmt)}" placeholder="5% hoặc số tiền"></td>
     <td class="tt-cell" data-f="thtien"></td>
     <td><button class="del-btn" onclick="delDetailRow(this)"><span class="material-symbols-outlined">close</span></button></td>
   `;

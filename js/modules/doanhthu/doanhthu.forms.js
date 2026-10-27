@@ -42,24 +42,29 @@ function _dtHdcTong(hd) {
   return (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
 }
 
-// ── 2 nút Sửa / Xóa HĐ chính (key truyền qua data-ct để an toàn với tên có dấu nháy) ──
+// ── Nút Xuất phiếu (🖨️) / Sửa / Xóa HĐ chính (key truyền qua data-ct để an toàn với tên có dấu nháy) ──
 function _dtHdcActions(keyId) {
   return `<div class="d-flex gap-1 justify-content-center">
+    <button class="btn btn-outline-secondary btn-sm" title="Xuất phiếu HĐ chính (ảnh PNG)" onclick="exportHdcToImage(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-printer"></i></button>
     <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
     <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>
   </div>`;
 }
 
-// ── 2 nút Sửa / Xóa phiếu thu (truyền cả bản ghi) ──
-// Phiếu TỰ ĐỘNG từ quyết toán → KHÔNG có nút, chỉ hiện biểu tượng khóa (03/10/2026).
+// ── Nút Xuất phiếu thu (🖨️) / Sửa / Xóa phiếu thu (truyền cả bản ghi) ──
+// Phiếu TỰ ĐỘNG từ quyết toán → KHÔNG có nút Sửa/Xóa, chỉ hiện biểu tượng khóa (03/10/2026) — vẫn xuất phiếu được.
+function _dtThuPrintBtn(r) {
+  return `<button class="btn btn-outline-secondary btn-sm" title="Xuất phiếu thu (ảnh PNG)" onclick="exportThuToImage(this.dataset.id)" data-id="${x(r.id)}"><i class="bi bi-printer"></i></button>`;
+}
 function _dtThuActions(r) {
   if (_dtIsAutoThu(r)) {
-    return `<div class="text-center text-secondary" title="Phiếu thu tự động từ quyết toán — không sửa/xóa được.&#10;Muốn thay đổi: sửa bản quyết toán ở tab QUYẾT TOÁN (bỏ tick &quot;Ghi nhận phiếu thu tiền còn lại&quot; để gỡ phiếu).">
-      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">lock</span>
+    return `<div class="d-flex gap-1 justify-content-center align-items-center">${_dtThuPrintBtn(r)}<span class="text-secondary" title="Phiếu thu tự động từ quyết toán — không sửa/xóa được.&#10;Muốn thay đổi: sửa bản quyết toán ở tab QUYẾT TOÁN (bỏ tick &quot;Ghi nhận phiếu thu tiền còn lại&quot; để gỡ phiếu).">
+      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">lock</span></span>
     </div>`;
   }
   const id = r.id;
   return `<div class="d-flex gap-1 justify-content-center">
+    ${_dtThuPrintBtn(r)}
     <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editThuRecord('${x(id)}')"><i class="bi bi-pencil-fill"></i></button>
     <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delThuRecord('${x(id)}')"><i class="bi bi-trash-fill"></i></button>
   </div>`;

@@ -53,6 +53,8 @@
             >
               <option value="">Tất cả tuần</option>
             </select>
+            <button class="btn btn-sm btn-outline-secondary" id="tc-reset-btn" style="display: none" onclick="tcResetFilters()" title="Bỏ mọi bộ lọc">↺ Xóa lọc</button>
+            <span class="ms-auto badge rounded-pill text-bg-warning fw-normal" id="tc-sum-badge" style="font-size: 12.5px"></span>
           </div>
           <!-- Danh sách hóa đơn hoạt động -->
           <div id="active-inv-wrap">
@@ -60,13 +62,13 @@
               <table class="table table-sm table-hover align-middle mb-0" id="all-table">
                 <thead class="table-light">
                   <tr>
-                    <th>Ngày</th>
+                    <th class="th-sort" onclick="tcSortBy('ngay')" title="Bấm để sắp xếp theo ngày">Ngày <span id="tc-sort-ngay">↓</span></th>
                     <th>Công Trình</th>
                     <th>Loại Chi Phí</th>
                     <th class="hide-mobile">Người TH</th>
                     <th class="hide-mobile">Nhà Cung Cấp</th>
                     <th>Nội Dung</th>
-                    <th style="text-align: right">Số Tiền</th>
+                    <th class="th-sort" style="text-align: right" onclick="tcSortBy('tien')" title="Bấm để sắp xếp theo số tiền">Số Tiền <span id="tc-sort-tien">⇅</span></th>
                     <th></th>
                   </tr>
                 </thead>

@@ -347,6 +347,10 @@ function renderDashboard() {
 
   _dbPopulateCTFilter();
 
+  // (27/10/2026) Bức tranh toàn cảnh (HĐ · Đã thu · Thực chi · Lợi nhuận · Công nợ) + Cảnh báo & việc cần chốt
+  try { const _fr = _dbFinRows(); _dbOverview(_fr); _dbAlerts(_fr); }
+  catch (e) { console.warn('[Dashboard] Toàn cảnh / cảnh báo lỗi:', e); }
+
   // Reset trạng thái khi đổi chế độ năm hoặc đổi sang năm khác
   const modeKey = isSingleYear ? yr : 0;
   if (modeKey !== _dashLastYr) {
@@ -424,6 +428,96 @@ function renderDashboard() {
   _dbUngByCT();
   _dbTBByCT();
   renderCtPage();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BỨC TRANH TOÀN CẢNH CÔNG TY + CẢNH BÁO & VIỆC CẦN CHỐT (27/10/2026 — kế hoạch cải tạo UI)
+// ══════════════════════════════════════════════════════════════════════════════
+// Số liệu lấy từ ctTaiChinh(p) (cùng công thức popup Chi tiết công trình / tab Quyết Toán) cho mọi công
+// trình thuộc năm đang lọc (qtCtInYear) — bỏ CÔNG TY:
+//   Tổng giá trị HĐ = Σ giaTriHD · Đã thu = Σ tongThu (còn phải thu = Σ conPhaiThu > 0)
+//   Tổng thực chi   = Σ chiThucTe (chi trực tiếp + chi phí chung chia tỉ trọng)
+//   Lợi nhuận tạm tính = Đã thu − Thực chi (dòng tiền)
+//   Công nợ phải trả TP/NCC = Σ "Còn phải TT" của tab Công Nợ (_ttBuildRows)
+// Kế toán: ẩn thẻ Doanh thu / Lợi nhuận và cảnh báo liên quan doanh thu (đúng phân quyền).
+function _dbFinRows() {
+  if (typeof ctTaiChinh !== 'function') return [];
+  const inYear = p => (typeof qtCtInYear === 'function') ? qtCtInYear(p.name) : true;
+  return (typeof projects !== 'undefined' ? projects : [])
+    .filter(p => p && !p.deletedAt && p.id !== 'COMPANY' && inYear(p))
+    .map(p => ({ p, f: ctTaiChinh(p) }))
+    .filter(({ f }) => f.giaTriHD || f.tongThu || f.chiThucTe);
+}
+
+function _dbOverview(rows) {
+  const el = document.getElementById('db-overview-row');
+  if (!el) return;
+  const kt = typeof isKetoan === 'function' && isKetoan();
+  const sum = k => rows.reduce((s, r) => s + (r.f[k] || 0), 0);
+  const hd = sum('giaTriHD'), thu = sum('tongThu'), chi = sum('chiThucTe');
+  const conThu = rows.reduce((s, r) => s + Math.max(0, r.f.conPhaiThu || 0), 0);
+  const lai = thu - chi;
+  let no = 0, soNo = 0;
+  if (typeof _ttBuildRows === 'function') {
+    const tol = typeof _ttTolerance === 'function' ? _ttTolerance() : 0;
+    _ttBuildRows().forEach(r => { if (r.con > tol) { no += r.con; soNo++; } });
+  }
+  const cards = [
+    !kt && { label: 'Tổng Giá Trị HĐ', val: fmtS(hd), sub: rows.length + ' công trình', cls: 'accent-blue' },
+    !kt && { label: 'Tổng Đã Thu', val: fmtS(thu), sub: conThu > 0 ? 'Còn phải thu ' + fmtS(conThu) : 'Đã thu đủ', cls: 'accent-green' },
+    { label: 'Tổng Thực Chi', val: fmtS(chi), sub: 'Trực tiếp + CP chung chia tỉ trọng', cls: 'accent-gold' },
+    !kt && { label: 'Lợi Nhuận Tạm Tính', val: (lai < 0 ? '−' : '') + fmtS(Math.abs(lai)), sub: thu > 0 ? 'Tỷ suất ' + (lai / thu * 100).toFixed(1).replace('.', ',') + '% · Đã thu − Thực chi' : 'Đã thu − Thực chi', cls: lai < 0 ? 'accent-red' : 'accent-green', color: lai < 0 ? 'var(--bs-danger)' : 'var(--bs-success)' },
+    { label: 'Công Nợ Phải Trả TP/NCC', val: fmtS(no), sub: soNo ? soNo + ' dòng còn nợ (toàn vòng đời)' : 'Không còn nợ', cls: 'accent-red', go: "goPage(null,'congno')" },
+  ].filter(Boolean);
+  el.innerHTML = cards.map(k =>
+    `<div class="db-kpi-card card shadow-sm ${k.cls}"${k.go ? ` role="button" style="cursor:pointer" onclick="${k.go}" title="Mở tab Công Nợ TP/NCC"` : ''}>
+       <div class="db-kpi-label">${k.label}</div>
+       <div class="db-kpi-val"${k.color ? ` style="color:${k.color}"` : ''}>${k.val}</div>
+       <div class="db-kpi-sub">${k.sub}</div>
+     </div>`).join('');
+}
+
+function _dbAlerts(rows) {
+  const el = document.getElementById('db-alerts');
+  if (!el) return;
+  const kt = typeof isKetoan === 'function' && isKetoan();
+  const groups = [];
+  // 1. Đã hoàn thành nhưng chưa quyết toán
+  const chuaQT = (typeof projects !== 'undefined' ? projects : [])
+    .filter(p => p && !p.deletedAt && p.id !== 'COMPANY' && p.status === 'completed')
+    .sort((a, b) => String(a.completedDate || a.endDate || '').localeCompare(String(b.completedDate || b.endDate || '')));
+  groups.push({ icon: 'fact_check', title: 'Đã hoàn thành — chưa quyết toán', cls: 'warning',
+    items: chuaQT.map(p => ({ txt: x(p.name), sub: (p.completedDate || p.endDate) ? 'Hoàn thành ' + fmtISODate(p.completedDate || p.endDate) : '', go: `openCTDetail('${p.id}')` })) });
+  // 2. Chi phí vượt / sắp chạm số tiền đã thu (≥ 90%) — công trình chưa quyết toán
+  if (!kt) {
+    const ds = rows.filter(({ p, f }) => p.status !== 'closed' && f.chiThucTe > 0 && f.chiThucTe >= f.tongThu * 0.9)
+      .sort((a, b) => (b.f.chiThucTe - b.f.tongThu) - (a.f.chiThucTe - a.f.tongThu));
+    groups.push({ icon: 'trending_down', title: 'Chi phí vượt / sắp chạm số đã thu', cls: 'danger',
+      items: ds.map(({ p, f }) => {
+        const vuot = f.chiThucTe > f.tongThu;
+        return { txt: x(p.name), sub: `Chi ${fmtS(f.chiThucTe)} / thu ${fmtS(f.tongThu)}` + (vuot ? ` · <b class="text-danger">vượt ${fmtS(f.chiThucTe - f.tongThu)}</b>` : ` · ${f.tongThu ? Math.round(f.chiThucTe / f.tongThu * 100) : 0}%`), go: `openCTDetail('${p.id}')` };
+      }) });
+  }
+  // 3. Thiết bị cần bảo trì / sửa chữa
+  const tb = (typeof tbData !== 'undefined' ? tbData : []).filter(r => r && !r.deletedAt && /bảo trì|sửa chữa/i.test(r.tinhtrang || ''));
+  groups.push({ icon: 'build', title: 'Thiết bị cần bảo trì / sửa chữa', cls: 'secondary',
+    items: tb.map(r => ({ txt: x(r.ten || '—') + ` <span class="text-secondary">× ${r.soluong || 0}</span>`,
+      sub: x(r.tinhtrang || '') + ' · ' + x((typeof _tbLocName === 'function' ? _tbLocName(r) : r.ct) || '—'), go: "goPage(null,'thietbi')" })) });
+
+  const MAX = 6;
+  el.innerHTML = `<div class="row g-3">${groups.map(g => `
+    <div class="col-12 col-lg-${12 / groups.length}">
+      <div class="records-wrap card shadow-sm overflow-hidden h-100 db-alert db-alert-${g.cls}">
+        <div class="db-alert-head"><span class="material-symbols-outlined">${g.icon}</span>${g.title}
+          <span class="badge rounded-pill ms-auto ${g.items.length ? 'text-bg-' + g.cls : 'text-bg-light'}">${g.items.length}</span></div>
+        ${g.items.length ? `<div class="db-alert-list">${g.items.slice(0, MAX).map(it => `
+          <div class="db-alert-item" role="button" onclick="${it.go}">
+            <div class="db-alert-txt">${it.txt}</div>${it.sub ? `<div class="db-alert-sub">${it.sub}</div>` : ''}
+          </div>`).join('')}
+          ${g.items.length > MAX ? `<div class="db-alert-sub px-3 pb-2">… và ${g.items.length - MAX} mục nữa</div>` : ''}</div>`
+        : '<div class="db-alert-empty"><span class="material-symbols-outlined">check_circle</span> Không có việc cần xử lý</div>'}
+      </div>
+    </div>`).join('')}</div>`;
 }
 
 // ── Populate CT filter dropdown (Dashboard) ────────────────────

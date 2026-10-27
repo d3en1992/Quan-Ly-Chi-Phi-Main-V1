@@ -189,48 +189,39 @@
                 </button>
                 <span
                   class="text-secondary" style="font-size: 11px; margin-left: 8px"
-                  >CK: nhập % (vd: 5%) hoặc số tiền (vd: 50000)</span
+                  >CK: 5% hoặc số tiền</span
                 >
               </div>
             </div>
 
-            <!-- Footer: chỉ còn Tổng thành tiền (= tổng cột Thành tiền các dòng).
-                 (01/10/2026) Đã bỏ "Tổng Cộng (TC)" và "Chiết Khấu Tổng" — CK nhập theo từng dòng. -->
-            <div class="detail-invoice-footer">
-              <div class="detail-footer-row detail-footer-total-row">
-                <span class="detail-footer-label">Tổng Thành Tiền</span>
-                <span class="detail-footer-val hi" id="detail-tong">0</span>
+            <!-- (27/10/2026) Chân bảng gộp 1 khối: Nội dung (tự sinh từ tên hàng) + Tổng thành tiền + nút Lưu.
+                 Bỏ khung "TỔNG THÀNH TIỀN" lặp ở giữa; #detail-tong giữ lại (ẩn) vì saveDetailInvoice đọc dataset.raw. -->
+            <div class="save-bar p-3 border rounded bg-body shadow-sm mb-4" style="margin-top: 12px">
+              <div class="detail-nd-bar" style="margin: 0 0 10px; padding: 0; border: 0; background: none; box-shadow: none">
+                <span class="bar-label" style="white-space: nowrap">Nội Dung</span>
+                <input
+                  type="text"
+                  id="detail-nd"
+                  class="form-control form-control-sm"
+                  placeholder="Tự động từ tên hàng hóa..."
+                />
               </div>
-            </div>
-
-            <!-- Nội dung (tự sinh từ tên hàng) -->
-            <div class="detail-nd-bar">
-              <span class="bar-label" style="white-space: nowrap"
-                >Nội Dung</span
-              >
-              <input
-                type="text"
-                id="detail-nd"
-                class="form-control form-control-sm"
-                placeholder="Tự động từ tên hàng hóa..."
-              />
-            </div>
-
-            <!-- Save bar -->
-            <div class="save-bar d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border rounded bg-body shadow-sm mb-4" style="margin-top: 12px">
-              <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
-                <span
-                  >Tổng thành tiền:
-                  <span class="hi" id="detail-tong-save">0 đ</span></span
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="save-bar-info d-flex gap-3 align-items-center flex-wrap">
+                  <span
+                    >Tổng thành tiền:
+                    <span class="hi" id="detail-tong-save">0 đ</span></span
+                  >
+                  <span id="detail-tong" hidden>0</span>
+                </div>
+                <button
+                  class="btn btn-success"
+                  id="detail-save-btn"
+                  onclick="saveDetailInvoice()"
                 >
+                  <span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn
+                </button>
               </div>
-              <button
-                class="btn btn-success"
-                id="detail-save-btn"
-                onclick="saveDetailInvoice()"
-              >
-                <span class="material-symbols-outlined msi-gap">save</span>Lưu Hóa Đơn
-              </button>
             </div>
           </div>
 
@@ -258,10 +249,10 @@
                     <tr>
                       <th>Loại</th>
                       <th>Công Trình</th>
-                      <th style="text-align: right">Số Tiền</th>
-                      <th>Người TH</th>
                       <th>Nội Dung</th>
                       <th>NCC</th>
+                      <th>Người TH</th>
+                      <th class="text-end" style="padding-right: 24px">Số Tiền</th>
                       <th class="text-center">Thao Tác</th>
                     </tr>
                   </thead>

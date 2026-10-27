@@ -68,6 +68,7 @@ Tài liệu ngữ cảnh kỹ thuật cho AI Code khi làm việc với project 
    - [9.75 Tỉ Trọng Chi Phí — Cải tiến Phần C: Xu hướng & So sánh (so sánh Rổ 1, đ/m2 theo năm, biến động đơn giá vật tư / công nhật, dự báo) (07/10/2026)](#975-tỉ-trọng-chi-phí--cải-tiến-phần-c-xu-hướng--so-sánh-so-sánh-rổ-1-đm2-theo-năm-biến-động-đơn-giá-vật-tư--công-nhật-dự-báo-07102026)
    - [9.76 Tab Tỉ Trọng đổi tên TỈ TRỌNG & ĐỊNH MỨC, dời dưới Công Nợ TP/NCC, mở cho mọi role (09/10/2026)](#976-tab-tỉ-trọng-đổi-tên-tỉ-trọng--định-mức-dời-dưới-công-nợ-tpncc-mở-cho-mọi-role-09102026)
    - [9.79 Tái cấu trúc tab Tỉ Trọng & Định Mức 3.0 — 4 Nhóm chi phí, 3 tab con (27/10/2026)](#979-tái-cấu-trúc-tab-tỉ-trọng--định-mức-30--4-nhóm-chi-phí-3-tab-con-27102026)
+   - [9.80 Cải tạo giao diện toàn app — bản chốt (27/10/2026)](#980-cải-tạo-giao-diện-toàn-app--bản-chốt-27102026)
 
 **Phụ lục**
 
@@ -2380,3 +2381,29 @@ Thực hiện theo `KE_HOACH_TAI_CAU_TRUC_TAB_TI_TRONG.md` (bản chốt 3.0).
 **File đã sửa:** `pages/tytrong.html`, `js/modules/tytrong/tytrong.core.js`, `js/modules/tytrong/tytrong.ui.js`, `assets/css/style.css` (thay khối CSS tab Tỉ Trọng, bỏ class cũ `tyt-ro*`, `tyt-src*`, `tyt-gd-box`, `tyt-guide`, `tyt-ct-bar`…), `js/modules/projects/projects.ui.js`.
 
 **Kiểm tra:** chạy với snapshot 06/10/2026 — tổng 4 nhóm = tổng chi, tổng trụ cột = Nhóm 1, tổng cây = tổng chi ở mọi CT; lái giao diện bằng Chrome headless (đổi nhóm 1-click, gán hàng loạt, HĐ TP, popup M2/cấu hình/chưa xếp nhóm, lưu định mức, so sánh) không có lỗi JS.
+
+### 9.80 Cải tạo giao diện toàn app — bản chốt (27/10/2026)
+
+Thực hiện theo `DE_XUAT_CAI_TIEN_GIAO_DIEN_TOAN_APP.md`. Giữ nguyên 100%: Sidebar 14 tab, Chấm Công, Theo Dõi TB, Lợi Nhuận, Quyết Toán.
+
+**Khung chung**
+- `js/app/main.js` `goPage()`: chuyển tab → tự `closeModal()` + `closeKhachHangModal()` (gọi TRƯỚC khi init tab nên `tytOpenFor` vẫn mở được popup Bảng M2).
+- `index.html`: nhãn Topbar `Tổng CP` → **`Tổng HĐ (năm)`** + tooltip (tổng hóa đơn năm đang lọc, khác Tổng chi thực tế).
+- CSS dùng chung mới: `.help-tip` (biểu tượng (?) rê chuột xem hướng dẫn), `.th-sort` (tiêu đề cột bấm để sắp xếp).
+
+**Bước 1**
+- **Danh Mục** (`danhmuc.categories.js`, `pages/danhmuc.html`): lưới `.settings-grid` 3 cột (2 cột < 1200px, 1 cột mobile); bỏ nhãn "✓ đang dùng" + nền xanh — mục đang dùng chỉ hiện khóa mờ `.dm-lock`, mục chưa dùng hiện nút xóa (`_dmDelBtn(catId, idx, inUse, msg)`); vùng nút Reset / Xóa theo công trình thu vào `<details class="dm-danger">` (đóng mặc định).
+- **Nhập Chi Phí** (`pages/nhap.html`, `hoadon.detail-entry.js`, `hoadon.list-trash.js`): bỏ khung "Tổng Thành Tiền" lặp — Nội dung + Tổng thành tiền + nút Lưu gộp 1 khối save-bar (`#detail-tong` giữ lại dạng `hidden` vì `saveDetailInvoice` đọc `dataset.raw`); bảng "Hóa Đơn Đã Nhập Trong Ngày" đổi thứ tự cột `Loại | Công Trình | Nội Dung | NCC | Người TH | Số Tiền | Thao Tác`; placeholder CK → "5% hoặc số tiền".
+- **Công Nợ** (`congno.tattoan.js`, `pages/congno.html`): nhãn `TP`/`NCC` ngang hàng tên đối tác; nút "✓ Tất toán toàn bộ" → `btn-outline-success`; 2 đoạn giải thích dưới thanh lọc thu vào `(?)`; thẻ "Còn phải trả Thầu Phụ" thêm chú thích khi có khoản ứng TP ở công trình chưa khai báo HĐ thầu phụ (lý do lệch số với sub-tab HĐ Thầu Phụ).
+
+**Bước 2**
+- **Thống Kê CP/HĐ** (`pages/thongkecphd.html`, `hoadon.list-trash.js`): huy hiệu `#tc-sum-badge` "N HĐ · Tổng" ở đầu bảng; nút `#tc-reset-btn` "↺ Xóa lọc" (`tcResetFilters`, chỉ hiện khi có lọc); bấm tiêu đề Ngày / Số Tiền để sắp xếp (`_tcSort`, `tcSortBy`, `_tcRenderSortIcons`); nút Xóa → `btn-outline-danger` (cả bảng hóa đơn trong ngày).
+- **Ứng TP/NCC** (`pages/nhapung.html`, `tienung.history.js`): sub-tab Thống kê ứng gộp 2 bảng thành 1 (`#ung-all-section`) + 3 nút `[Tất cả | Thầu Phụ | Nhà Cung Cấp]` (`ungSetKind`, `_ungKind`) + 1 bộ lọc (`#ung-search`, `#uf-dt`, `#uf-ct`, `#uf-month` → `filterAndRenderUngAll`); nút "Xuất Phiếu Ứng (n)" hiện số dòng đang tick (`_ungUpdateExportCount`, `exportUngToImageSel`). Các tên hàm cũ (`filterAndRenderUngTp/Ncc`, `buildUngTpFilters`, `renderUngTpSection`, `goUngTpTo`…) giữ làm wrapper; `filteredUngTp/Ncc` vẫn được cập nhật. `projects.ui.js` `_goTabWithCT('ung')` lọc qua `#uf-ct`.
+- **Doanh Thu** (`pages/doanhthu.html`, `doanhthu.forms.js`, `doanhthu.reports-export.js`): nút 🖨️ trên từng dòng HĐ chính / phiếu thu (kể cả phiếu thu tự động) — `exportHdcToImage(oneId)` / `exportThuToImage(oneId)` nhận id trực tiếp, không cần tick; bảng "Tiến Độ Thu Tiền Theo Công Trình" đưa lên TRÊN "Lịch Sử Thu Tiền".
+- **Thùng Rác** (`thungrac.js`): tiêu đề chuẩn `.section-header/.dot`; ô tìm nhanh `#trash-search` (`_trashSearch`, `_trashQ`); sub-tab mới **Công Trình** (`congtrinh` → store `projects_v1`, chặn khôi phục khi trùng tên CT đang dùng, khôi phục xong `rebuildCatCTFromProjects` + `refreshEntryDropdowns`, xác nhận cloud đọc `d.projects`); nút xóa vĩnh viễn → outline.
+
+**Bước 3**
+- **Công Trình** (`projects.ui.js`, CSS `.ct-kpi`, `.ct-grid`, `.ct-card-health`): 5 thẻ KPI thành nút lọc 1-click (`_ctSetStatus`; bấm lại / bấm "Tổng" bỏ lọc; viền sáng thẻ đang chọn), bỏ dropdown trạng thái (`no_cost` thành nút "Không có chi phí"), số trên thẻ trạng thái tính theo các bộ lọc khác nên luôn khớp số thẻ khi bấm; nhãn `(7/17)` → "7 CT mới · 17 SC/Khác". Lưới `.ct-grid` 4 cột (3/2/1 theo màn hình), thẻ cao đều, dòng đáy `_ctCardHealth` "Đã thu · Lãi/Lỗ" (ẩn với Kế toán). Popup Chi tiết: thẻ 1 "Hợp Đồng & Thu Tiền" số to = Đã thu + "/ Tổng HĐ (x%)"; thẻ 2 "Tổng Chi Thực Tế" kèm công thức `Trực tiếp + CP công ty = Tổng`; thẻ 3 Lãi/Lỗ = Đã thu − cùng Tổng chi thực tế (số lợi nhuận hạch toán của tab Lợi Nhuận hiện thành dòng tham chiếu khi khác); tab Phân rã đổi nhãn "Tổng hóa đơn theo loại" + (?).
+- **Dashboard** (`pages/dashboard.html`, `js/legacy/datatools.js`): hàng **Bức tranh toàn cảnh** `#db-overview-row` (`_dbFinRows` dùng `ctTaiChinh`, `_dbOverview`): Tổng giá trị HĐ · Tổng đã thu (còn phải thu) · Tổng thực chi · Lợi nhuận tạm tính · Công nợ phải trả TP/NCC (`_ttBuildRows`) — Kế toán ẩn 3 thẻ doanh thu/lợi nhuận; khối **Cảnh báo & Việc cần chốt** `#db-alerts` (`_dbAlerts`): CT hoàn thành chưa quyết toán · chi phí vượt / ≥ 90% số đã thu (ẩn với Kế toán) · thiết bị cần bảo trì/sửa chữa; gỡ khối "Chi Tiết Từng Công Trình" (`#ct-grid`, `renderCtPage` thêm guard thiếu phần tử); hàng Top 5 / Tiền ứng dùng `row g-3` + `col-12 col-lg-6`.
+
+**Kiểm tra:** chạy app thật qua web server cục bộ + Chrome headless (chặn mọi request Google/Firebase), nạp snapshot 06/10/2026, duyệt 10 tab với vai trò Admin và Kế toán — không lỗi JS; thử lọc KPI Công Trình, popup tự đóng khi chuyển tab, sắp xếp / xóa lọc Thống kê, chuyển nhóm + đếm tick ở Ứng, tìm + sub-tab Công Trình ở Thùng rác.

@@ -432,6 +432,20 @@ select.cell-input {
 .ct-card-addr { font-size: 11.5px; color: var(--bs-secondary-color); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ct-card-total { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 700; color: var(--bs-warning); white-space: nowrap; }
 .ct-card-body { padding: 12px 16px; }
+/* (27/10/2026) Lưới thẻ công trình 4 cột thoáng (~290–310px/thẻ) · thẻ cao đều · dòng sức khỏe tài chính ở đáy */
+.ct-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1399.98px) { .ct-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 991.98px)  { .ct-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 575.98px)  { .ct-grid { grid-template-columns: 1fr; } }
+.ct-grid > .ct-card { display: flex; flex-direction: column; }
+.ct-grid > .ct-card > .ct-card-head { flex: 1; }
+.ct-card-health { display: flex; justify-content: space-between; gap: 8px; padding: 6px 16px; font-size: 11.5px; border-top: 1px dashed var(--bs-border-color); color: var(--bs-secondary-color); }
+.ct-card-health b { color: var(--bs-body-color); font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+.ct-card-health > span:last-child { font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap; }
+/* Thẻ KPI tab Công Trình = nút lọc 1-click */
+.ct-kpi { border-radius: 10px; padding: 12px 14px; cursor: pointer; border: 2px solid transparent; transition: border-color .15s, box-shadow .15s; user-select: none; }
+.ct-kpi:hover { box-shadow: var(--bs-box-shadow-sm); }
+.ct-kpi.on { border-color: var(--ct-kpi-c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ct-kpi-c) 18%, transparent); }
 .ct-loai-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--bs-border-color-translucent); font-size: 12px; }
 .ct-loai-row:last-child { border-bottom: none; }
 .ct-loai-name { color: var(--bs-secondary-color); }
@@ -439,8 +453,28 @@ select.cell-input {
 /* [ADDED] Placeholder text cho card không có dữ liệu */
 .ghost { color: #aaa; font-style: italic; }
 
+/* (27/10/2026) Biểu tượng (?) dùng chung toàn app — chữ hướng dẫn dài chỉ hiện khi rê chuột */
+.help-tip { cursor: help; color: var(--bs-secondary-color); font-weight: 400; display: inline-flex; align-items: center; }
+.help-tip .material-symbols-outlined { font-size: 16px; }
+
+/* Tiêu đề cột bấm để sắp xếp */
+.th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+.th-sort:hover { color: var(--bs-primary); }
+.th-sort > span { color: var(--bs-secondary-color); font-size: 11px; }
+
 /* Settings */
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+/* (27/10/2026) Lưới danh mục 3 × 2 cân đối cho 6 thẻ (≥1200px: 3 cột · 768–1199px: 2 cột · nhỏ hơn: 1 cột) */
+.settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 1199.98px) { .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Mục đang dùng: khóa mờ thay cho nút xóa (không còn nhãn "✓ đang dùng") */
+.dm-lock { display: inline-flex; align-items: center; justify-content: center; width: 31px; flex-shrink: 0; color: var(--bs-secondary-color); opacity: .45; cursor: not-allowed; }
+.dm-lock .material-symbols-outlined { font-size: 16px; }
+/* Vùng nút nguy hiểm thu gọn (Danh Mục → Tools) */
+.dm-danger > summary { cursor: pointer; list-style: none; font-size: 11px; font-weight: 700; color: var(--bs-danger); text-transform: uppercase; letter-spacing: .8px; user-select: none; }
+.dm-danger > summary::-webkit-details-marker { display: none; }
+.dm-danger > summary .dm-danger-caret { transition: transform .15s; font-size: 18px; vertical-align: -4px; }
+.dm-danger[open] > summary .dm-danger-caret { transform: rotate(90deg); }
+.dm-danger-body { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--bs-danger-border-subtle); border-radius: 8px; background: var(--bs-danger-bg-subtle); }
 /* settings-card → Bootstrap card shadow-sm overflow-hidden (Sprint 4) */
 .settings-card-head { padding: 12px 16px; background: var(--bs-tertiary-bg); border-bottom: 1px solid var(--bs-border-color); display: flex; align-items: center; justify-content: space-between; }
 .settings-card-title { font-size: 13px; font-weight: 700; }
@@ -2290,3 +2324,17 @@ td.action-col > div {
 .tyt-lg i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
 .tyt-lg.off { opacity: .4; text-decoration: line-through; }
 .tyt-rpt tr.tyt-xh-db > td { background: var(--bs-warning-bg-subtle); font-style: italic; }
+
+/* (27/10/2026) Dashboard: hàng Bức tranh toàn cảnh + khối Cảnh báo & việc cần chốt */
+.db-overview-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.db-alert-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--bs-border-color); }
+.db-alert-head .material-symbols-outlined { font-size: 19px; }
+.db-alert-warning .db-alert-head { color: var(--bs-warning-text-emphasis); background: var(--bs-warning-bg-subtle); }
+.db-alert-danger .db-alert-head { color: var(--bs-danger-text-emphasis); background: var(--bs-danger-bg-subtle); }
+.db-alert-secondary .db-alert-head { color: var(--bs-secondary-text-emphasis, var(--bs-body-color)); background: var(--bs-tertiary-bg); }
+.db-alert-item { padding: 7px 14px; border-bottom: 1px solid var(--bs-border-color-translucent); cursor: pointer; }
+.db-alert-item:hover { background: var(--bs-tertiary-bg); }
+.db-alert-txt { font-size: 12.5px; font-weight: 600; }
+.db-alert-sub { font-size: 11px; color: var(--bs-secondary-color); }
+.db-alert-empty { padding: 18px 14px; font-size: 12.5px; color: var(--bs-success-text-emphasis); }
+.db-alert-empty .material-symbols-outlined { font-size: 16px; vertical-align: -3px; }

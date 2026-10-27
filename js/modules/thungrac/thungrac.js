@@ -18,7 +18,15 @@ const _TRASH_TABS = [
   { id: 'hopdong-chinh', label: 'Hợp Đồng chính' },
   { id: 'hopdong-tp',    label: 'Hợp Đồng TP'    },
   { id: 'quyettoan',     label: 'Quyết Toán'     },
+  { id: 'congtrinh',     label: 'Công Trình'     },   // (27/10/2026) công trình đã xóa mềm (projects_v1)
 ];
+
+// (27/10/2026) Ô tìm nhanh bản ghi đã xóa — lọc theo toàn bộ chữ của dòng trong tab đang mở
+let _trashQ = '';
+function _trashSearch(v) {
+  _trashQ = (v || '').trim().toLowerCase();
+  _trashRenderTable(_trashCurrentType);
+}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 function renderThungRac() {
@@ -32,11 +40,18 @@ function renderThungRac() {
 
   // (03/10/2026) Đã GỠ nút "Làm sạch thùng rác" (xóa toàn bộ mọi tab) — chỉ còn nút
   // "Xóa tất cả trong tab này" ở từng tab để tránh lỡ tay xóa sạch mọi loại dữ liệu.
+  // (27/10/2026) Tiêu đề chuẩn .section-header / .section-title (chấm .dot) như các tab khác + ô tìm nhanh
   page.innerHTML = `
     <div style="padding:12px 16px 0">
-      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <span style="font-size:16px;font-weight:700"><span class="material-symbols-outlined msi-gap">delete</span>Thùng Rác</span>
-        <span class="text-secondary" style="font-size:12px">${totalCount ? totalCount + ' bản ghi' : 'Trống'}</span>
+      <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+          <span class="dot"></span><span class="material-symbols-outlined msi-gap">delete</span>Thùng Rác
+          <span class="text-secondary fw-normal" style="font-size:12px">${totalCount ? totalCount + ' bản ghi' : 'Trống'}</span>
+        </div>
+        <div class="search-box" style="min-width:240px">
+          <span class="ico"><span class="material-symbols-outlined">search</span></span>
+          <input type="text" id="trash-search" placeholder="Tìm nhanh bản ghi đã xóa..." value="${x(_trashQ)}" oninput="_trashSearch(this.value)" autocomplete="off" />
+        </div>
       </div>
 
       <!-- Sub-tab navigation -->
@@ -104,6 +119,9 @@ function _trashGetRecords(type) {
   if (type === 'quyettoan') {
     return _trashSort((typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : []).filter(_trashIn));
   }
+  if (type === 'congtrinh') {
+    return _trashSort((typeof projects !== 'undefined' ? projects : []).filter(r => _trashIn(r) && r.id !== 'COMPANY'));
+  }
   return [];
 }
 
@@ -112,8 +130,17 @@ function _trashRenderTable(type) {
   const wrap = document.getElementById('trash-content');
   if (!wrap) return;
 
-  const recs = _trashGetRecords(type);
+  const all  = _trashGetRecords(type);
+  // Lọc theo ô tìm nhanh: so với toàn bộ chữ hiển thị của dòng (bỏ thẻ HTML)
+  const recs = !_trashQ ? all : all.filter(r =>
+    _trashBuildRow(type, r).replace(/<[^>]*>/g, ' ').toLowerCase().includes(_trashQ));
 
+  if (all.length && !recs.length) {
+    wrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 16px;font-size:13px">
+      Không có bản ghi nào khớp "<b>${x(_trashQ)}</b>" trong tab này (${all.length} bản ghi)
+    </div>`;
+    return;
+  }
   if (!recs.length) {
     wrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 16px;font-size:13px">
       <div style="font-size:32px;margin-bottom:8px"><span class="material-symbols-outlined">delete</span></div>
@@ -129,7 +156,7 @@ function _trashRenderTable(type) {
   wrap.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button class="btn btn-danger btn-sm" onclick="_trashEmptyCurrentTab()">
-        <span class="material-symbols-outlined msi-gap">delete_forever</span>Xóa tất cả trong tab này (${recs.length})
+        <span class="material-symbols-outlined msi-gap">delete_forever</span>Xóa tất cả trong tab này (${all.length})
       </button>
     </div>
     <div style="overflow-x:auto">
@@ -157,6 +184,7 @@ function _trashGetHeaders(type) {
   if (type === 'hopdong-chinh') return ['Ngày','Công Trình','CĐT','HĐ Chính','HĐ Phụ','Tổng HĐ','Nội Dung','Ngày Xóa','Người Xóa'];
   if (type === 'hopdong-tp')    return ['Ngày','Công Trình','Thầu Phụ','Nội Dung','Giá Trị HĐ','Ngày Xóa','Người Xóa'];
   if (type === 'quyettoan')     return ['Ngày','Công Trình','Loại','Số Tiền','Nội Dung','Người QT','Ngày Xóa','Người Xóa'];
+  if (type === 'congtrinh')     return ['Tên Công Trình','Chủ Đầu Tư','Địa Chỉ','Trạng Thái','Ngày Xóa','Người Xóa'];
   return [];
 }
 
@@ -238,6 +266,13 @@ function _trashBuildRow(type, r) {
       <td class="text-end font-monospace fw-semibold ${qtSoTienCls(r)}" style="white-space:nowrap">${qtSoTienTxt(r, fmtS)}</td>
       <td class="text-body-secondary" style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(r.nguoi || '—')}</td>`;
+  } else if (type === 'congtrinh') {
+    const tt = { active: 'Đang thi công', planning: 'Kế hoạch', completed: 'Hoàn thành', closed: 'Đã quyết toán' }[r.status] || (r.status || '—');
+    cells = `
+      <td style="font-weight:600;white-space:nowrap">${x(r.name || '—')}</td>
+      <td class="text-secondary" style="font-size:12px;white-space:nowrap">${x(r.chuDauTu || '—')}</td>
+      <td class="text-secondary" style="font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.note || '')}">${x(r.note || '—')}</td>
+      <td class="text-secondary" style="font-size:12px;white-space:nowrap">${x(tt)}</td>`;
   }
 
   // Nhãn cảnh báo dữ liệu cũ thiếu trường (xem _trashCheck)
@@ -264,7 +299,7 @@ function _trashActionBtns(type, r) {
   return `<div class="d-flex gap-1">
     <button class="btn btn-outline-secondary btn-sm" style="font-size:11px"
       onclick="_trashRestore('${compositeId}')">↩ Khôi phục</button>
-    <button class="btn btn-danger btn-sm" style="font-size:11px"
+    <button class="btn btn-outline-danger btn-sm" style="font-size:11px" title="Xóa vĩnh viễn"
       onclick="_trashHardDelete('${compositeId}')"><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
@@ -284,6 +319,8 @@ const _TRASH_STORES = {
   'hopdong-tp': { key: 'thauphu_v1', get: () => thauPhuContracts, set: v => { thauPhuContracts = v; } },
   // (03/10/2026) Quyết toán — đồng bộ cloud qua doc meta_quyet_toan (gộp bằng mergeDatasets → bia mộ luôn thắng)
   quyettoan:    { key: 'quyettoan_v1', get: () => quyetToanRecords, set: v => { quyetToanRecords = v; } },
+  // (27/10/2026) Công trình — doc meta_cong_trinh; khôi phục xong dựng lại danh mục CT + dropdown nhập liệu
+  congtrinh:    { key: 'projects_v1', get: () => projects, set: v => { projects = v; } },
 };
 
 // Quyết toán chỉ Quản trị viên / Giám đốc được sửa-xóa (xem _qtCanEdit ở quyettoan.congtrinh.js)
@@ -362,6 +399,13 @@ function _trashCheck(type, r) {
     if (!(Number(r.giaTri) > 0)) warns.push('Không có giá trị hợp đồng');
   } else if (type === 'hopdong-chinh') {
     if (!(Number(r.giaTri) > 0)) warns.push('Không có giá trị hợp đồng');
+  } else if (type === 'congtrinh') {
+    if (!r.name) errors.push('Thiếu tên công trình');
+    // Đã có công trình ĐANG DÙNG trùng tên → khôi phục sẽ ra 2 công trình cùng tên
+    const n = typeof _normProjName === 'function' ? _normProjName(r.name) : String(r.name || '').toLowerCase();
+    const dup = (projects || []).find(o => o && !o.deletedAt && o.id !== r.id
+      && (typeof _normProjName === 'function' ? _normProjName(o.name) : String(o.name || '').toLowerCase()) === n);
+    if (dup) errors.push(`Đã có công trình đang dùng cùng tên "${dup.name}" — đổi tên công trình đó trước rồi khôi phục`);
   } else if (type === 'quyettoan') {
     // Thiếu ngày → không xếp được vào dòng thời gian quyết toán của công trình (sai delta)
     if (!_trashIsISO(r.ngay)) errors.push('Thiếu hoặc sai ngày (ngay)');
@@ -427,6 +471,11 @@ function _trashRestore(compositeId) {
     }
   }
 
+  // Công trình khôi phục → dựng lại danh mục công trình + dropdown nhập liệu
+  if (type === 'congtrinh') {
+    if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
+    if (typeof refreshEntryDropdowns === 'function') refreshEntryDropdowns();
+  }
   // Quyết toán khôi phục làm đổi doanh thu → vẽ lại các bảng đang dùng số quyết toán
   if (type === 'quyettoan' && typeof _qtRefreshOtherTabs === 'function') {
     try { _qtRefreshOtherTabs(); } catch (e) { console.warn('[Trash] Vẽ lại tab quyết toán lỗi:', e); }
@@ -559,6 +608,7 @@ async function _trashVerifyCloud(log) {
         if (it.type === 'hopdong-chinh')   rec = d.hopDong ? d.hopDong[it.id] : null;
         else if (it.type === 'hopdong-tp') rec = (d.thauPhu || []).find(r => r && String(r.id) === it.id);
         else if (it.type === 'quyettoan')  rec = (d.quyetToan || []).find(r => r && String(r.id) === it.id);
+        else if (it.type === 'congtrinh')  rec = (d.projects || []).find(r => r && String(r.id) === it.id);
         else                               rec = (d.records || []).find(r => r && String(r.id) === it.id);
       }
       // Doc không tồn tại / bản ghi không còn / đã là bia mộ → coi như đã xóa trên cloud

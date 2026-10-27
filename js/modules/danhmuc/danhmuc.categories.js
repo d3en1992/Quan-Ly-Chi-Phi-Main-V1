@@ -6,6 +6,7 @@
 // ══════════════════════════════
 function renderCtPage() {
   const grid=document.getElementById('ct-grid');
+  if(!grid) return;   // (27/10/2026) khối "Chi Tiết Từng Công Trình" đã gỡ khỏi Dashboard (trùng tab Công Trình)
   const map={};
   getInvoicesCached().forEach(inv=>{
     if(!inActiveYear(inv.ngay)) return;
@@ -422,30 +423,33 @@ function renderCTItem(item, idx) {
   const yrBadge = yr
     ? `<span class="text-primary" style="font-size:10px;padding:1px 5px;background:rgba(21,101,192,0.1);border-radius:3px;margin-right:2px;flex-shrink:0">${yr}</span>`
     : '';
-  return `<div class="settings-item" id="si-congTrinh-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
+  return `<div class="settings-item" id="si-congTrinh-${idx}">
     <span class="s-name" id="sn-congTrinh-${idx}" ondblclick="startEdit('congTrinh',${idx})">${x(item)}</span>
     ${yrBadge}
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-congTrinh-${idx}" value="${x(item)}"
       onblur="finishEdit('congTrinh',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congTrinh',${idx});if(event.key==='Escape')cancelEdit('congTrinh',${idx})">
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congTrinh',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
-    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congTrinh',${idx})"
-      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
+    ${_dmDelBtn('congTrinh', idx, inUse)}
   </div>`;
+}
+
+// (27/10/2026) Nút xóa 1 mục danh mục: mục ĐANG DÙNG → chỉ hiện biểu tượng khóa mờ (thay cho nhãn "✓ đang dùng"
+// lặp lại ở mọi dòng trước đây); mục chưa dùng → nút xóa đỏ.
+function _dmDelBtn(catId, idx, inUse, msg) {
+  if (inUse) return `<span class="dm-lock" title="${msg || 'Đang được sử dụng — không thể xóa'}"><span class="material-symbols-outlined">lock</span></span>`;
+  return `<button class="btn btn-outline-danger btn-sm" onclick="delItem('${catId}',${idx})" title="Xóa (chưa được sử dụng)"><span class="material-symbols-outlined">close</span></button>`;
 }
 
 function renderItem(catId,item,idx) {
   const inUse = isItemInUse(catId, item);
-  return `<div class="settings-item" id="si-${catId}-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
+  return `<div class="settings-item" id="si-${catId}-${idx}">
     <span class="s-name" id="sn-${catId}-${idx}" ondblclick="startEdit('${catId}',${idx})">${x(item)}</span>
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-${catId}-${idx}" value="${x(item)}"
       onblur="finishEdit('${catId}',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('${catId}',${idx});if(event.key==='Escape')cancelEdit('${catId}',${idx})">
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('${catId}',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
-    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('${catId}',${idx})"
-      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
+    ${_dmDelBtn(catId, idx, inUse)}
   </div>`;
 }
 
@@ -454,9 +458,8 @@ function renderCNItem(name, idx) {
   const role = cnRoles[name] || '';
   // Đang dùng = có trong chấm công HOẶC phiếu ứng công nhân (record chưa xóa) — xem isItemInUse
   const inUse = isItemInUse('congNhan', name);
-  return `<div class="settings-item" id="si-congNhan-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
+  return `<div class="settings-item" id="si-congNhan-${idx}">
     <span class="s-name" id="sn-congNhan-${idx}" ondblclick="startEdit('congNhan',${idx})">${x(name)}</span>
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-congNhan-${idx}" value="${x(name)}"
       onblur="finishEdit('congNhan',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('congNhan',${idx});if(event.key==='Escape')cancelEdit('congNhan',${idx})">
@@ -469,8 +472,7 @@ function renderCNItem(name, idx) {
       <option value="P" ${role==='P'?'selected':''}>P</option>
     </select>
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('congNhan',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
-    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('congNhan',${idx})"
-      title="${inUse?'Đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
+    ${_dmDelBtn('congNhan', idx, inUse)}
   </div>`;
 }
 
@@ -487,15 +489,13 @@ function updateCNRole(idx, role) {
 // ── Render item Thiết Bị (tbTen) ──────────────────────────────────
 function renderTbTenItem(item, idx) {
   const inUse = isItemInUse('tbTen', item); // bỏ qua thiết bị đã xóa, so khớp không dấu
-  return `<div class="settings-item" id="si-tbTen-${idx}" style="${inUse?'background:rgba(26,122,69,0.04)':''}">
+  return `<div class="settings-item" id="si-tbTen-${idx}">
     <span class="s-name" id="sn-tbTen-${idx}" ondblclick="startEdit('tbTen',${idx})">${x(item)}</span>
-    ${inUse?`<span title="Đang được sử dụng" class="text-success" style="font-size:10px;padding:2px 5px;background:rgba(26,122,69,0.1);border-radius:3px;margin-right:2px;flex-shrink:0"><span class="material-symbols-outlined msi-gap">check</span>đang dùng</span>`:''}
     <input class="s-edit-input" id="se-tbTen-${idx}" value="${x(item)}"
       onblur="finishEdit('tbTen',${idx})"
       onkeydown="if(event.key==='Enter')finishEdit('tbTen',${idx});if(event.key==='Escape')cancelEdit('tbTen',${idx})">
     <button class="btn btn-outline-secondary btn-sm" onclick="startEdit('tbTen',${idx})" title="Sửa tên"><span class="material-symbols-outlined">edit</span></button>
-    <button class="btn ${inUse?'btn-outline-secondary':'btn-danger'} btn-sm" onclick="delItem('tbTen',${idx})"
-      title="${inUse?'Thiết bị đang được sử dụng — không thể xóa':'Xóa'}" ${inUse?'style="opacity:0.4;cursor:not-allowed"':''}><span class="material-symbols-outlined">close</span></button>
+    ${_dmDelBtn('tbTen', idx, inUse, 'Thiết bị đang được sử dụng — không thể xóa')}
   </div>`;
 }
 

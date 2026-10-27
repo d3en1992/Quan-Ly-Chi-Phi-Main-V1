@@ -106,67 +106,43 @@
         </div>
         <!-- ══ /SUBTAB 1 ══ -->
 
-        <!-- ══ SUBTAB 2: Báo Cáo (Thầu Phụ + Nhà Cung Cấp) ══ -->
+        <!-- ══ SUBTAB 2: Thống kê ứng — (27/10/2026) GỘP Thầu Phụ + Nhà Cung Cấp thành 1 bảng
+             3 nút chuyển nhanh [Tất cả | Thầu Phụ | Nhà Cung Cấp] + 1 bộ lọc duy nhất (tienung.history.js) ══ -->
         <div class="sub-page" id="ung-sub-baocao">
-        <!-- Bảng 2a: Thầu Phụ -->
         <div style="margin-top: 24px">
           <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">handshake</span>Thầu Phụ
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+                <span class="dot"></span><span class="material-symbols-outlined msi-gap">bar_chart</span>Thống Kê Tiền Ứng
+              </div>
+              <div class="btn-group btn-group-sm" role="group" id="ung-kind-group">
+                <button type="button" class="btn btn-outline-primary active" data-kind="" onclick="ungSetKind('')">Tất cả</button>
+                <button type="button" class="btn btn-outline-primary" data-kind="thauphu" onclick="ungSetKind('thauphu')"><span class="material-symbols-outlined msi-gap">handshake</span>Thầu Phụ</button>
+                <button type="button" class="btn btn-outline-primary" data-kind="nhacungcap" onclick="ungSetKind('nhacungcap')"><span class="material-symbols-outlined msi-gap">storefront</span>Nhà Cung Cấp</button>
+              </div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngTpCSV()"><span class="material-symbols-outlined msi-gap">download</span>CSV</button>
-              <button class="btn btn-sm" onclick="exportUngTpToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Thầu Phụ rồi bấm để xuất phiếu tạm ứng PNG"><span class="material-symbols-outlined msi-gap">photo_camera</span>Xuất Phiếu Ứng TP</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngAllCSV()" title="Xuất CSV các dòng đang lọc"><span class="material-symbols-outlined msi-gap">download</span>CSV</button>
+              <button class="btn btn-sm" id="ung-export-img-btn" onclick="exportUngToImageSel()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn các dòng rồi bấm để xuất phiếu tạm ứng PNG"><span class="material-symbols-outlined msi-gap">photo_camera</span>Xuất Phiếu Ứng <span id="ung-export-count"></span></button>
             </div>
           </div>
           <div class="records-wrap card shadow-sm overflow-hidden" style="margin-bottom:24px">
             <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
               <div class="search-box">
                 <span class="ico"><span class="material-symbols-outlined">search</span></span>
-                <input type="text" id="ung-tp-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngTp()" />
+                <input type="text" id="ung-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngAll()" />
               </div>
-              <select class="form-select form-select-sm w-auto" id="uf-tp-tp" onchange="filterAndRenderUngTp()">
-                <option value="">Tất cả thầu phụ</option>
+              <select class="form-select form-select-sm w-auto" id="uf-dt" onchange="filterAndRenderUngAll()">
+                <option value="">Tất cả đối tác</option>
               </select>
-              <select class="form-select form-select-sm w-auto" id="uf-tp-ct" onchange="filterAndRenderUngTp()">
+              <select class="form-select form-select-sm w-auto" id="uf-ct" onchange="filterAndRenderUngAll()">
                 <option value="">Tất cả công trình</option>
               </select>
-              <select class="form-select form-select-sm w-auto" id="uf-tp-month" onchange="filterAndRenderUngTp()">
+              <select class="form-select form-select-sm w-auto" id="uf-month" onchange="filterAndRenderUngAll()">
                 <option value="">Tất cả tháng</option>
               </select>
             </div>
-            <div id="ung-tp-section"></div>
-            <div class="app-pagination" id="ung-tp-pagination"></div>
-          </div>
-
-          <!-- Bảng 2b: Nhà Cung Cấp -->
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">storefront</span>Nhà Cung Cấp
-            </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-outline-secondary btn-sm" onclick="exportUngNccCSV()"><span class="material-symbols-outlined msi-gap">download</span>CSV</button>
-              <button class="btn btn-sm" onclick="exportUngNccToImage()" style="background:#2563eb;color:#fff;border:none;font-weight:700" title="Tick chọn dòng Nhà Cung Cấp rồi bấm để xuất phiếu tạm ứng PNG"><span class="material-symbols-outlined msi-gap">photo_camera</span>Xuất Phiếu Ứng NCC</button>
-            </div>
-          </div>
-          <div class="records-wrap card shadow-sm overflow-hidden">
-            <div class="records-toolbar card-header bg-body-tertiary d-flex flex-wrap gap-2 align-items-center">
-              <div class="search-box">
-                <span class="ico"><span class="material-symbols-outlined">search</span></span>
-                <input type="text" id="ung-ncc-search" placeholder="Tìm kiếm..." oninput="filterAndRenderUngNcc()" />
-              </div>
-              <select class="form-select form-select-sm w-auto" id="uf-ncc-ncc" onchange="filterAndRenderUngNcc()">
-                <option value="">Tất cả nhà CC</option>
-              </select>
-              <select class="form-select form-select-sm w-auto" id="uf-ncc-ct" onchange="filterAndRenderUngNcc()">
-                <option value="">Tất cả công trình</option>
-              </select>
-              <select class="form-select form-select-sm w-auto" id="uf-ncc-month" onchange="filterAndRenderUngNcc()">
-                <option value="">Tất cả tháng</option>
-              </select>
-            </div>
-            <div id="ung-ncc-section"></div>
-            <div class="app-pagination" id="ung-ncc-pagination"></div>
+            <div id="ung-all-section"></div>
           </div>
         </div>
         </div>

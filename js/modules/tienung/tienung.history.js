@@ -2,155 +2,113 @@
 // Load order: sau tienung.entry.js
 
 // ══════════════════════════════
-//  FILTER BUILDERS
+//  THỐNG KÊ ỨNG — 1 BẢNG GỘP Thầu Phụ + Nhà Cung Cấp (27/10/2026)
 // ══════════════════════════════
+// 3 nút chuyển nhanh (_ungKind: '' tất cả | 'thauphu' | 'nhacungcap') + 1 bộ lọc duy nhất:
+//   #ung-search · #uf-dt (đối tác) · #uf-ct (công trình) · #uf-month. Bảng: #ung-all-section, trang ungPage.
+// filteredUng = kết quả đang lọc; filteredUngTp / filteredUngNcc = 2 phần con (giữ cho code cũ / xuất CSV riêng).
+let _ungKind = '';
+const UNG_ALL_PG = 20;
 
-function buildUngTpFilters() {
-  const active = ungRecords.filter(r => !r.deletedAt && r.loai === 'thauphu');
-  const tps    = [...new Set(active.map(i => recCatName(i,'ung','tp')))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
-  const ctNames = [...new Set(active.map(i => resolveProjectName(i)))].filter(Boolean);
-  const sortedCts = getAllProjects().map(p => p.name).filter(n => ctNames.includes(n));
-  const months = [...new Set(active.map(i => i.ngay.slice(0,7)))].filter(Boolean).sort().reverse();
-
-  const tpSel = document.getElementById('uf-tp-tp'); if (!tpSel) return;
-  const tv = tpSel.value;
-  tpSel.innerHTML = '<option value="">Tất cả thầu phụ</option>' +
-    tps.map(v => `<option ${v===tv?'selected':''} value="${x(v)}">${x(v)}</option>`).join('');
-
-  const ctSel = document.getElementById('uf-tp-ct');
-  if (ctSel) { const cv = ctSel.value;
-    ctSel.innerHTML = '<option value="">Tất cả công trình</option>' +
-      sortedCts.map(v => `<option ${v===cv?'selected':''} value="${x(v)}">${x(v)}</option>`).join(''); }
-
-  const mSel = document.getElementById('uf-tp-month');
-  if (mSel) { const mv = mSel.value;
-    mSel.innerHTML = '<option value="">Tất cả tháng</option>' +
-      months.map(m => `<option ${m===mv?'selected':''} value="${m}">${m}</option>`).join(''); }
+function ungSetKind(kind) {
+  _ungKind = kind || '';
+  document.querySelectorAll('#ung-kind-group .btn').forEach(b => b.classList.toggle('active', b.dataset.kind === _ungKind));
+  const dt = document.getElementById('uf-dt');
+  if (dt) dt.value = '';   // đối tác của nhóm cũ có thể không thuộc nhóm mới
+  buildUngFilters();
+  filterAndRenderUngAll();
 }
 
-function buildUngNccFilters() {
-  const active = ungRecords.filter(r => !r.deletedAt && r.loai === 'nhacungcap');
-  const nccs   = [...new Set(active.map(i => recCatName(i,'ung','tp')))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
-  const ctNames = [...new Set(active.map(i => resolveProjectName(i)))].filter(Boolean);
-  const sortedCts = getAllProjects().map(p => p.name).filter(n => ctNames.includes(n));
-  const months = [...new Set(active.map(i => i.ngay.slice(0,7)))].filter(Boolean).sort().reverse();
-
-  const nccSel = document.getElementById('uf-ncc-ncc'); if (!nccSel) return;
-  const nv = nccSel.value;
-  nccSel.innerHTML = '<option value="">Tất cả nhà CC</option>' +
-    nccs.map(v => `<option ${v===nv?'selected':''} value="${x(v)}">${x(v)}</option>`).join('');
-
-  const ctSel = document.getElementById('uf-ncc-ct');
-  if (ctSel) { const cv = ctSel.value;
-    ctSel.innerHTML = '<option value="">Tất cả công trình</option>' +
-      sortedCts.map(v => `<option ${v===cv?'selected':''} value="${x(v)}">${x(v)}</option>`).join(''); }
-
-  const mSel = document.getElementById('uf-ncc-month');
-  if (mSel) { const mv = mSel.value;
-    mSel.innerHTML = '<option value="">Tất cả tháng</option>' +
-      months.map(m => `<option ${m===mv?'selected':''} value="${m}">${m}</option>`).join(''); }
+function _ungActive() {
+  return ungRecords.filter(r => !r.deletedAt && (r.loai === 'thauphu' || r.loai === 'nhacungcap') && (!_ungKind || r.loai === _ungKind));
 }
 
-// Backward-compat wrapper (called from delUngRecord, editUngRecord, etc.)
 function buildUngFilters() {
-  buildUngTpFilters();
-  buildUngNccFilters();
+  const active = _ungActive();
+  const dts    = [...new Set(active.map(i => recCatName(i,'ung','tp')))].filter(Boolean).sort((a,b) => a.localeCompare(b,'vi'));
+  const ctNames = [...new Set(active.map(i => resolveProjectName(i)))].filter(Boolean);
+  const sortedCts = getAllProjects().map(p => p.name).filter(n => ctNames.includes(n));
+  const months = [...new Set(active.map(i => (i.ngay||'').slice(0,7)))].filter(Boolean).sort().reverse();
+  const fill = (id, ph, vals) => {
+    const sel = document.getElementById(id); if (!sel) return;
+    const cv = sel.value;
+    sel.innerHTML = `<option value="">${ph}</option>` + vals.map(v => `<option ${v===cv?'selected':''} value="${x(v)}">${x(v)}</option>`).join('');
+  };
+  fill('uf-dt', _ungKind === 'thauphu' ? 'Tất cả thầu phụ' : _ungKind === 'nhacungcap' ? 'Tất cả nhà CC' : 'Tất cả đối tác', dts);
+  fill('uf-ct', 'Tất cả công trình', sortedCts);
+  fill('uf-month', 'Tất cả tháng', months);
 }
+// Tên cũ — code khác vẫn gọi
+function buildUngTpFilters() { buildUngFilters(); }
+function buildUngNccFilters() { buildUngFilters(); }
 
-// ══════════════════════════════
-//  FILTER & RENDER
-// ══════════════════════════════
-
-function filterAndRenderUngTp() {
-  ungTpPage = 1;
-  const q      = (document.getElementById('ung-tp-search')?.value || '').toLowerCase();
-  const fTp    = document.getElementById('uf-tp-tp')?.value    || '';
-  const fCt    = document.getElementById('uf-tp-ct')?.value    || '';
-  const fMonth = document.getElementById('uf-tp-month')?.value || '';
-  filteredUngTp = ungRecords.filter(r => {
-    if (r.deletedAt || r.loai !== 'thauphu') return false;
+function filterAndRenderUngAll() {
+  ungPage = 1;
+  const q      = (document.getElementById('ung-search')?.value || '').toLowerCase();
+  const fDt    = document.getElementById('uf-dt')?.value    || '';
+  const fCt    = document.getElementById('uf-ct')?.value    || '';
+  const fMonth = document.getElementById('uf-month')?.value || '';
+  filteredUng = _ungActive().filter(r => {
     if (!inActiveYear(r.ngay)) return false;
-    if (fTp    && recCatName(r,'ung','tp') !== fTp)     return false;
+    if (fDt    && recCatName(r,'ung','tp') !== fDt)     return false;
     if (fCt    && resolveProjectName(r) !== fCt)        return false;
-    if (fMonth && !r.ngay.startsWith(fMonth))           return false;
+    if (fMonth && !(r.ngay||'').startsWith(fMonth))     return false;
     if (q) { const t = [r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r), r.nd].join(' ').toLowerCase(); if (!t.includes(q)) return false; }
     return true;
   });
-  filteredUngTp.sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
-  renderUngTpSection();
-  _syncFilteredUng();
+  filteredUng.sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
+  filteredUngTp  = filteredUng.filter(r => r.loai === 'thauphu');
+  filteredUngNcc = filteredUng.filter(r => r.loai === 'nhacungcap');
+  renderUngTable();
 }
-
-function filterAndRenderUngNcc() {
-  ungNccPage = 1;
-  const q      = (document.getElementById('ung-ncc-search')?.value || '').toLowerCase();
-  const fNcc   = document.getElementById('uf-ncc-ncc')?.value   || '';
-  const fCt    = document.getElementById('uf-ncc-ct')?.value    || '';
-  const fMonth = document.getElementById('uf-ncc-month')?.value || '';
-  filteredUngNcc = ungRecords.filter(r => {
-    if (r.deletedAt || r.loai !== 'nhacungcap') return false;
-    if (!inActiveYear(r.ngay)) return false;
-    if (fNcc   && recCatName(r,'ung','tp') !== fNcc)    return false;
-    if (fCt    && resolveProjectName(r) !== fCt)        return false;
-    if (fMonth && !r.ngay.startsWith(fMonth))           return false;
-    if (q) { const t = [r.ngay, recCatName(r,'ung','tp'), resolveProjectName(r), r.nd].join(' ').toLowerCase(); if (!t.includes(q)) return false; }
-    return true;
-  });
-  filteredUngNcc.sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
-  renderUngNccSection();
-  _syncFilteredUng();
-}
-
-// Giữ filteredUng = union của 2 bảng (cho exportUngAllCSV / exportUngToImage)
-function _syncFilteredUng() {
-  filteredUng = [...filteredUngTp, ...filteredUngNcc]
-    .sort((a,b) => (b.ngay||'').localeCompare(a.ngay||''));
-}
+// Tên cũ — code khác vẫn gọi
+function filterAndRenderUngTp() { filterAndRenderUngAll(); }
+function filterAndRenderUngNcc() { filterAndRenderUngAll(); }
 
 // Backward-compat (gọi khi reload, đổi năm, delUngRecord, v.v.)
 function filterAndRenderUng() {
-  buildUngTpFilters();
-  buildUngNccFilters();
-  filterAndRenderUngTp();
-  filterAndRenderUngNcc();
+  buildUngFilters();
+  filterAndRenderUngAll();
   // Bảng "Phiếu Ứng Gần Đây" ở subtab Nhập — hook duy nhất tại đây tự phủ mọi
   // điểm dữ liệu thay đổi (lưu, xóa, mở tab, đổi năm, điều hướng từ tab Công Trình)
   renderUngMini();
 }
 
 // ══════════════════════════════
-//  TABLE RENDERERS
+//  TABLE RENDERER
 // ══════════════════════════════
 
-function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) {
+function _ungTableHTML(pagedRecs, allRecs, paginationFn, curPage) {
   const mono = "font-family:'IBM Plex Mono',monospace";
-  const tp = Math.ceil(allRecs.length / UNG_TP_PG);
-  // Dòng thống kê (summary row) — LUÔN hiển thị ở cuối bảng, thống kê theo kết quả ĐANG LỌC
-  // (dùng allRecs = toàn bộ bản ghi sau khi lọc, không phải chỉ dòng của trang hiện tại).
-  // Định dạng đầy đủ "X bản ghi · Tổng: 260.000.000 đ".
-  const summaryHtml = `<span>${allRecs.length} bản ghi · Tổng: <strong class="text-primary" style="${mono}">${numFmt(sumBy(allRecs,'tien'))} đ</strong></span>`;
-  // Nút phân trang chỉ hiện khi có nhiều hơn 1 trang
+  const tp = Math.ceil(allRecs.length / UNG_ALL_PG);
+  const coLoai = !_ungKind;   // đang xem Tất cả → thêm nhãn TP / NCC cạnh tên đối tác
+  const nameColLabel = _ungKind === 'thauphu' ? 'Thầu Phụ' : _ungKind === 'nhacungcap' ? 'Nhà Cung Cấp' : 'Đối Tác';
+  // Dòng thống kê — theo kết quả ĐANG LỌC (allRecs), không phải chỉ trang hiện tại
+  const sTp = sumBy(allRecs.filter(r => r.loai === 'thauphu'), 'tien'), sNcc = sumBy(allRecs.filter(r => r.loai === 'nhacungcap'), 'tien');
+  const summaryHtml = `<span>${allRecs.length} bản ghi · Tổng: <strong class="text-primary" style="${mono}">${numFmt(sTp + sNcc)} đ</strong>${coLoai && sTp && sNcc ? ` <span style="font-size:11px">(TP ${numFmt(sTp)} · NCC ${numFmt(sNcc)})</span>` : ''}</span>`;
   let pagBtns = '';
   if (tp > 1) {
     const btns = [];
     for (let p = 1; p <= Math.min(tp, 10); p++) {
       btns.push(`<li class="page-item ${p===curPage?'active':''}"><button class="page-link" onclick="${paginationFn}(${p})">${p}</button></li>`);
     }
+    if (tp > 10) btns.push(`<li class="page-item disabled"><span class="page-link">...${tp}</span></li>`);
     pagBtns = `<ul class="pagination pagination-sm mb-0">${btns.join('')}</ul>`;
   }
-  // Footer gộp: bên trái là summary, bên phải là phân trang (nếu có)
   const pagHtml = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);font-size:12px" class="text-secondary">
       ${summaryHtml}
       ${pagBtns}
     </div>`;
+  const tag = r => !coLoai ? '' : (r.loai === 'thauphu'
+    ? ' <span class="badge bg-primary-subtle text-primary" style="font-size:9.5px" title="Thầu phụ">TP</span>'
+    : ' <span class="badge bg-warning-subtle text-warning-emphasis" style="font-size:9.5px" title="Nhà cung cấp">NCC</span>');
   // Sticky columns: dùng class chuyên để background bám theo hover state
-  // (tránh bị transparent khi Bootstrap .table-hover áp dụng background lên row)
   return `<div class="ung-table-wrap" style="overflow-x:auto">
     <table class="table table-sm table-hover align-middle mb-0 ung-sticky-table" style="min-width:580px">
       <thead><tr>
         <th class="ung-sticky-chk" style="width:32px;text-align:center">
-          <input type="checkbox" class="ung-section-chk-all" title="Chọn tất cả"
-            onchange="this.closest('table').querySelectorAll('.ung-row-chk').forEach(c=>c.checked=this.checked)">
+          <input type="checkbox" class="ung-section-chk-all" title="Chọn tất cả dòng trang này"
+            onchange="this.closest('table').querySelectorAll('.ung-row-chk').forEach(c=>c.checked=this.checked);_ungUpdateExportCount()">
         </th>
         <th style="white-space:nowrap">Ngày</th>
         <th class="ung-sticky-name" style="white-space:nowrap">${nameColLabel}</th>
@@ -161,10 +119,10 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
       </tr></thead>
       <tbody>${pagedRecs.map(r => `<tr data-ung-id="${r.id}" class="${_editingUngId===r.id?'editing-row':''}">
         <td class="ung-sticky-chk" style="text-align:center;padding:4px">
-          <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer">
+          <input type="checkbox" class="ung-row-chk" data-id="${r.id}" style="width:15px;height:15px;cursor:pointer" onchange="_ungUpdateExportCount()">
         </td>
         <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${fmtISODate(r.ngay)}</td>
-        <td class="ung-sticky-name" style="font-weight:600;font-size:12px;white-space:nowrap">${x(recCatName(r,'ung','tp'))}</td>
+        <td class="ung-sticky-name" style="font-weight:600;font-size:12px;white-space:nowrap">${x(recCatName(r,'ung','tp'))}${tag(r)}</td>
         <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
         <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
         <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
@@ -179,7 +137,7 @@ function _ungTableHTML(pagedRecs, allRecs, nameColLabel, paginationFn, curPage) 
 // ── Cột thao tác của 1 phiếu ứng ──
 // Phiếu TỰ SINH từ Tất toán (tab Công Nợ TP/NCC, autoSettle) → CHỈ XEM: ẩn nút Sửa/Xóa, hiện nhãn khóa.
 // Muốn hủy phải vào tab Công Nợ TP/NCC → Công Nợ → Lịch sử tất toán (hủy cả lô cho đúng sổ).
-// Dùng chung cho bảng Thầu Phụ / NCC (sub-tab Thống kê ứng) và bảng "Phiếu Ứng Gần Đây".
+// Dùng chung cho bảng Thống kê ứng và bảng "Phiếu Ứng Gần Đây".
 function _ungActionsHtml(r) {
   if (r.autoSettle) {
     return `<div style="display:flex;justify-content:flex-end">
@@ -190,46 +148,41 @@ function _ungActionsHtml(r) {
   }
   return `<div style="display:flex;gap:4px;justify-content:flex-end">
     <button class="btn btn-outline-secondary btn-sm" onclick="editUngRecord('${r.id}')"><span class="material-symbols-outlined">edit</span></button>
-    <button class="btn btn-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
+    <button class="btn btn-outline-danger btn-sm" onclick="delUngRecord('${r.id}')"><span class="material-symbols-outlined">close</span></button>
   </div>`;
 }
 
-function renderUngTpSection() {
-  const container = document.getElementById('ung-tp-section');
-  const pagEl     = document.getElementById('ung-tp-pagination');
-  if (!container) return;
-  if (!filteredUngTp.length) {
-    container.innerHTML = '<div class="text-secondary" style="text-align:center;padding:32px;font-size:13px">Không có dữ liệu thầu phụ</div>';
-    if (pagEl) pagEl.innerHTML = ''; return;
-  }
-  const paged = filteredUngTp.slice((ungTpPage-1)*UNG_TP_PG, ungTpPage*UNG_TP_PG);
-  container.innerHTML = _ungTableHTML(paged, filteredUngTp, 'Thầu Phụ', 'goUngTpTo', ungTpPage);
-  // Đã bỏ dòng text thống kê "X bản ghi · Tổng" dư thừa cho gọn giao diện
-  if (pagEl) pagEl.innerHTML = '';
-}
-
-function renderUngNccSection() {
-  const container = document.getElementById('ung-ncc-section');
-  const pagEl     = document.getElementById('ung-ncc-pagination');
-  if (!container) return;
-  if (!filteredUngNcc.length) {
-    container.innerHTML = '<div class="text-secondary" style="text-align:center;padding:32px;font-size:13px">Không có dữ liệu nhà cung cấp</div>';
-    if (pagEl) pagEl.innerHTML = ''; return;
-  }
-  const paged = filteredUngNcc.slice((ungNccPage-1)*UNG_TP_PG, ungNccPage*UNG_TP_PG);
-  container.innerHTML = _ungTableHTML(paged, filteredUngNcc, 'Nhà Cung Cấp', 'goUngNccTo', ungNccPage);
-  // Đã bỏ dòng text thống kê "X bản ghi · Tổng" dư thừa cho gọn giao diện
-  if (pagEl) pagEl.innerHTML = '';
-}
-
-// Backward-compat wrapper — gọi cả 2 section
 function renderUngTable() {
-  renderUngTpSection();
-  renderUngNccSection();
+  const container = document.getElementById('ung-all-section');
+  if (!container) return;
+  if (!filteredUng.length) {
+    container.innerHTML = '<div class="text-secondary" style="text-align:center;padding:32px;font-size:13px">Không có phiếu ứng nào khớp bộ lọc</div>';
+  } else {
+    const paged = filteredUng.slice((ungPage-1)*UNG_ALL_PG, ungPage*UNG_ALL_PG);
+    container.innerHTML = _ungTableHTML(paged, filteredUng, 'goUngTo', ungPage);
+  }
+  _ungUpdateExportCount();
 }
+// Tên cũ — code khác vẫn gọi
+function renderUngTpSection() { renderUngTable(); }
+function renderUngNccSection() { renderUngTable(); }
 
-function goUngTpTo(p) { ungTpPage = p; renderUngTpSection(); }
-function goUngNccTo(p) { ungNccPage = p; renderUngNccSection(); }
+function goUngTo(p) { ungPage = p; renderUngTable(); }
+function goUngTpTo(p) { goUngTo(p); }
+function goUngNccTo(p) { goUngTo(p); }
+
+// Số dòng đang tick → hiện ngay trên nút "Xuất Phiếu Ứng (n)"
+function _ungUpdateExportCount() {
+  const n = document.querySelectorAll('#ung-all-section .ung-row-chk:checked').length;
+  const el = document.getElementById('ung-export-count');
+  if (el) el.textContent = n ? `(${n})` : '';
+  const btn = document.getElementById('ung-export-img-btn');
+  if (btn) btn.style.opacity = n ? '1' : '.65';
+}
+// Xuất phiếu ứng PNG cho các dòng đang tick (cả TP lẫn NCC)
+function exportUngToImageSel() {
+  _exportUngImageFrom('ung-all-section', filteredUng);
+}
 
 // ─── Bảng "Phiếu Ứng Gần Đây" (subtab Nhập Tiền Ứng) ─────────────────────────
 // 10 phiếu mới nhất trộn cả Thầu Phụ + Nhà Cung Cấp, có nút Sửa/Xóa

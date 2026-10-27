@@ -191,6 +191,10 @@ function goPage(btn, id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   if (btn) btn.classList.add('active');
+  // (27/10/2026) Chuyển tab → đóng mọi popup đang mở (Chi tiết CT #ct-modal, Hồ sơ KH #kh-modal) để không đè lên trang mới.
+  // Đóng TRƯỚC khi init tab → tab nào tự mở popup lúc vào (VD tytOpenFor → Bảng M2) vẫn giữ được popup của nó.
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof closeKhachHangModal === 'function') closeKhachHangModal();
   // Dynamic topbar title
   const _PAGE_LABELS = {
     congtrinh: '🏗️ Công Trình', nhap: '💰 Nhập Chi Phí',

@@ -67,16 +67,39 @@ function filterAndRender() {
     if(q) { const t=[inv.ngay,resolveProjectName(inv),recCatName(inv,'inv','loai'),recCatName(inv,'inv','nguoi'),recCatName(inv,'inv','ncc'),inv.nd,String(inv.thanhtien||inv.tien||0)].join(' ').toLowerCase(); if(!t.includes(q)) return false; }
     return true;
   });
-  // Sắp xếp giảm dần theo ngày: ngày mới nhất lên đầu, cũ nhất xuống cuối
-  // Dùng so sánh chuỗi ISO (YYYY-MM-DD) — chính xác hơn localeCompare vì không phụ thuộc locale
+  // Sắp xếp theo cột đang chọn (_tcSort — bấm tiêu đề "Ngày" / "Số Tiền"); mặc định ngày mới nhất lên đầu.
+  // Ngày so chuỗi ISO (YYYY-MM-DD) — chính xác hơn localeCompare vì không phụ thuộc locale
+  const dir = _tcSort.dir === 'asc' ? 1 : -1;
+  const _tien = i => i.thanhtien || i.tien || 0;
   filteredInvs.sort((a, b) => {
-    const da = a.ngay || '';
-    const db = b.ngay || '';
-    if (db > da) return 1;
-    if (db < da) return -1;
-    return 0;
+    if (_tcSort.col === 'tien') return (_tien(a) - _tien(b)) * dir || String(b.ngay || '').localeCompare(String(a.ngay || ''));
+    const da = a.ngay || '', db = b.ngay || '';
+    return da === db ? 0 : (da > db ? dir : -dir);
   });
+  // Nút "↺ Xóa lọc" chỉ hiện khi có ít nhất 1 bộ lọc
+  const rs = document.getElementById('tc-reset-btn');
+  if (rs) rs.style.display = (q || fCt || fLoai || fNcc || fMonth || fWeek) ? '' : 'none';
+  _tcRenderSortIcons();
   renderTable();
+}
+
+// (27/10/2026) Sắp xếp nhanh theo cột Ngày / Số Tiền (bấm lại để đảo chiều)
+let _tcSort = { col: 'ngay', dir: 'desc' };
+function tcSortBy(col) {
+  _tcSort = _tcSort.col === col ? { col, dir: _tcSort.dir === 'desc' ? 'asc' : 'desc' } : { col, dir: 'desc' };
+  filterAndRender();
+}
+function _tcRenderSortIcons() {
+  ['ngay', 'tien'].forEach(c => {
+    const el = document.getElementById('tc-sort-' + c);
+    if (el) el.textContent = _tcSort.col === c ? (_tcSort.dir === 'desc' ? '↓' : '↑') : '⇅';
+  });
+}
+// Xóa mọi bộ lọc của bảng Thống kê CP/HĐ
+function tcResetFilters() {
+  ['search', 'f-ct', 'f-loai', 'f-ncc', 'f-month', 'f-week'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  buildFilters();
+  filterAndRender();
 }
 
 function renderTable() {
@@ -84,6 +107,9 @@ function renderTable() {
   const start=(curPage-1)*PG;
   const paged=filteredInvs.slice(start,start+PG);
   const sumTT=filteredInvs.reduce((s,i)=>s+(i.thanhtien||i.tien||0),0);
+  // (27/10/2026) Huy hiệu tổng hợp ở đầu bảng — lọc đến đâu thấy tổng ngay đến đó
+  const sb=document.getElementById('tc-sum-badge');
+  if(sb) sb.innerHTML=`${filteredInvs.length} HĐ · Tổng: <strong class="font-monospace">${fmtS(sumTT)}</strong>`;
   if(!paged.length) {
     tbody.innerHTML=`<tr class="empty-row"><td colspan="10">Không có hóa đơn nào</td></tr>`;
     document.getElementById('pagination').innerHTML=''; return;
@@ -96,7 +122,7 @@ function renderTable() {
     const actionBtn = isManual
       ? `<span class="d-flex gap-1">
           <button class="btn btn-outline-primary btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn"><i class="bi bi-trash-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn"><i class="bi bi-trash"></i></button>
         </span>`
       : isCC
         ? `<button class="btn btn-outline-info btn-sm" style="font-size:11px;white-space:nowrap" onclick="editCCInvoice('${inv.ccKey||inv.id}')" title="Chỉnh sửa tại tab Chấm Công"><i class="bi bi-arrow-return-left"></i> CC</button>`
@@ -114,7 +140,7 @@ function renderTable() {
   </tr>`;}).join('');
 
   const tp=Math.ceil(filteredInvs.length/PG);
-  let pag=`<span>${filteredInvs.length} hóa đơn · Tổng: <strong class="text-warning font-monospace">${fmtS(sumTT)}</strong></span>`;
+  let pag=`<span>Trang ${curPage}/${Math.max(tp,1)} · ${filteredInvs.length} hóa đơn</span>`;
   if(tp>1) {
     pag+='<ul class="pagination pagination-sm mb-0">';
     for(let p=1;p<=Math.min(tp,10);p++) pag+=`<li class="page-item ${p===curPage?'active':''}"><button class="page-link" onclick="goTo(${p})">${p}</button></li>`;
@@ -289,14 +315,14 @@ function renderTodayInvoices() {
     return `<tr>
       <td><span class="tag tag-gold">${x(recCatName(inv,'inv','loai')||'—')}</span></td>
       <td style="font-size:12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(resolveProjectName(inv)||'—')}</td>
-      <td class="text-end font-monospace fw-bold text-success">${inv.tien?numFmt(inv.tien):'—'}</td>
-      <td class="text-secondary" style="font-size:11px">${x(recCatName(inv,'inv','nguoi')||'—')}</td>
-      <td class="text-secondary" style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(inv.nd||'—')}</td>
+      <td class="text-secondary" style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd||'')}">${x(inv.nd||'—')}</td>
       <td class="text-secondary" style="font-size:11px;white-space:nowrap">${x(recCatName(inv,'inv','ncc')||'—')}</td>
+      <td class="text-secondary" style="font-size:11px">${x(recCatName(inv,'inv','nguoi')||'—')}</td>
+      <td class="text-end font-monospace fw-bold text-success" style="padding-right:24px;white-space:nowrap">${inv.tien?numFmt(inv.tien):'—'}</td>
       <td style="white-space:nowrap" class="text-center">
         <span class="d-inline-flex gap-1">
           <button class="btn btn-outline-primary btn-sm" onclick="editManualInvoice('${inv.id}')" title="Sửa hóa đơn"><i class="bi bi-pencil-fill"></i></button>
-          <button class="btn btn-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn"><i class="bi bi-trash-fill"></i></button>
+          <button class="btn btn-outline-danger btn-sm" onclick="delInvoice('${inv.id}')" title="Xóa hóa đơn"><i class="bi bi-trash"></i></button>
         </span>
       </td>
     </tr>`;

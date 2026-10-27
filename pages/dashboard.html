@@ -9,7 +9,23 @@
           </button>
         </div>
 
-        <!-- Hàng 1: KPI cards -->
+        <!-- (27/10/2026) Hàng 0: BỨC TRANH TOÀN CẢNH CÔNG TY (datatools.js _dbOverview) -->
+        <div id="db-overview-row" class="db-overview-row" style="margin-bottom: 16px"></div>
+
+        <!-- Hàng 0b: CẢNH BÁO & VIỆC CẦN CHỐT (_dbAlerts) — thay khối thẻ công trình trùng tab Công Trình -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span><span class="material-symbols-outlined msi-gap">notification_important</span>Cảnh Báo &amp; Việc Cần Chốt
+          </div>
+        </div>
+        <div id="db-alerts" style="margin-bottom: 22px"></div>
+
+        <!-- Hàng 1: KPI chi phí -->
+        <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
+            <span class="dot"></span><span class="material-symbols-outlined msi-gap">payments</span>Chi Phí
+          </div>
+        </div>
         <div
           id="db-kpi-row"
           style="
@@ -54,16 +70,10 @@
           </select>
         </div>
 
-        <!-- Hàng 3: Top 5 + Tiền Ứng -->
-        <div
-          style="
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 16px;
-          "
-        >
-          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
+        <!-- Hàng 3: Top 5 + Tiền Ứng — (27/10/2026) lưới responsive Bootstrap (2 cột ≥ lg, 1 cột màn hẹp) -->
+        <div class="row g-3" style="margin-bottom: 16px">
+          <div class="col-12 col-lg-6">
+          <div class="records-wrap card shadow-sm overflow-hidden h-100" style="padding: 18px 20px">
             <div
               style="
                 font-size: 13px;
@@ -76,7 +86,9 @@
             </div>
             <div id="db-top5"></div>
           </div>
-          <div class="records-wrap card shadow-sm overflow-hidden" style="padding: 18px 20px">
+          </div>
+          <div class="col-12 col-lg-6">
+          <div class="records-wrap card shadow-sm overflow-hidden h-100" style="padding: 18px 20px">
             <div
               style="
                 font-size: 13px;
@@ -88,6 +100,7 @@
               <span class="material-symbols-outlined msi-gap">payments</span>Tổng Tiền Ứng Theo Công Trình
             </div>
             <div id="db-ung-ct"></div>
+          </div>
           </div>
         </div>
 
@@ -109,25 +122,6 @@
           <div id="db-tb-ct"></div>
         </div>
 
-        <!-- Hàng 5: Chi tiết từng Công Trình (từ tab Tổng CP CT) -->
-        <div>
-          <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3" style="margin-bottom: 14px">
-            <div class="section-title fw-bold mb-0 d-flex align-items-center gap-2">
-              <span class="dot"></span><span class="material-symbols-outlined msi-gap">construction</span>Chi Tiết Từng Công Trình
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <span class="text-secondary" style="font-size: 12px">Sắp xếp:</span>
-              <select
-                class="form-select form-select-sm w-auto"
-                id="ct-sort"
-                onchange="renderCtPage()"
-                style="font-size: 12px"
-              >
-                <option value="value">Theo giá trị (cao → thấp)</option>
-                <option value="name">Theo tên (A → Z)</option>
-              </select>
-            </div>
-          </div>
-          <div id="ct-grid" class="ct-summary-grid"></div>
-        </div>
+        <!-- (27/10/2026) Đã gỡ "Hàng 5: Chi Tiết Từng Công Trình" (#ct-grid) — trùng tab Công Trình;
+             thay bằng khối "Cảnh Báo & Việc Cần Chốt" ở đầu trang. -->
       

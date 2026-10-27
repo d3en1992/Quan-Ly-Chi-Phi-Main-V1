@@ -67,13 +67,10 @@ function _goTabWithCT(tabId, ctName) {
       if (sel) { _ctSelectForce(sel, ctName); filterAndRender(); }
 
     } else if (tabId === 'ung') {
-      // Chuyển sang subtab Báo Cáo rồi set filter CT cho cả 2 bảng TP + NCC
-      // (sửa lỗi cũ: #uf-ct không còn tồn tại từ khi tách 2 bảng riêng)
+      // Chuyển sang subtab Thống kê ứng rồi lọc CT (27/10/2026: 2 bảng TP + NCC đã gộp thành 1, lọc chung #uf-ct)
       if (typeof ungShowSubBaoCao === 'function') ungShowSubBaoCao();
-      const selTp  = document.getElementById('uf-tp-ct');
-      const selNcc = document.getElementById('uf-ncc-ct');
-      if (selTp)  { _ctSelectForce(selTp, ctName);  filterAndRenderUngTp(); }
-      if (selNcc) { _ctSelectForce(selNcc, ctName); filterAndRenderUngNcc(); }
+      const sel = document.getElementById('uf-ct');
+      if (sel) { _ctSelectForce(sel, ctName); filterAndRenderUngAll(); }
 
     } else if (tabId === 'doanhthu') {
       // (03/10/2026) Mở subtab HỢP ĐỒNG CHÍNH + lọc sẵn Danh Sách HĐ theo công trình này
@@ -413,10 +410,14 @@ function renderCTOverview() {
   const _ctCount    = yearProjects.filter(p => _projTypeByName(p.name) === 'CT').length;
 
   // ── Helpers nội bộ ─────────────────────────────────────────────────
-  const kpiCount = (lbl, val, color, bg) =>
-    `<div style="background:${bg};border-radius:10px;padding:12px 14px;flex:1;min-width:90px;text-align:center">
+  // (27/10/2026) Thẻ KPI = NÚT LỌC 1-click (_ctSetStatus): bấm thẻ trạng thái → lọc danh sách, bấm lại
+  // hoặc bấm thẻ "Tổng" → bỏ lọc. Thẻ đang chọn sáng viền (.ct-kpi.on). Số trên thẻ cập nhật ở _ctRenderGrid.
+  const kpiCount = (st, lbl, val, color, bg) =>
+    `<div class="ct-kpi${_ctFStatus === st ? ' on' : ''}" role="button" tabindex="0" data-st="${st}" onclick="_ctSetStatus('${st}')"
+       onkeydown="if(event.key==='Enter')_ctSetStatus('${st}')" title="Bấm để lọc danh sách: ${lbl}"
+       style="background:${bg};--ct-kpi-c:${color};flex:1;min-width:90px;text-align:center">
        <div style="font-size:10px;color:${color};font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;opacity:.8">${lbl}</div>
-       <div style="font-size:26px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace">${val}</div>
+       <div id="ct-kpi-n-${st}" style="font-size:26px;font-weight:700;color:${color};font-family:'IBM Plex Mono',monospace">${val}</div>
      </div>`;
 
   const selS = 'padding:7px 10px;border:1.5px solid var(--bs-border-color);border-radius:7px;font-family:inherit;font-size:12px;background:var(--bs-body-bg);color:var(--bs-body-color);outline:none';
@@ -431,34 +432,28 @@ function renderCTOverview() {
       </div>
     </div>
 
-    <!-- KPI 1: Số lượng theo trạng thái -->
+    <!-- KPI 1: Số lượng theo trạng thái — bấm thẻ để lọc (thay ô "Tất cả trạng thái") -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-      <div style="background:var(--bs-tertiary-bg);border-radius:10px;padding:12px 14px;flex:1;min-width:90px;text-align:center">
+      <div class="ct-kpi${!_ctFStatus ? ' on' : ''}" role="button" tabindex="0" data-st="" onclick="_ctSetStatus('')" onkeydown="if(event.key==='Enter')_ctSetStatus('')"
+        title="Bấm để bỏ lọc trạng thái" style="background:var(--bs-tertiary-bg);--ct-kpi-c:var(--bs-body-color);flex:1;min-width:120px;text-align:center">
         <div style="font-size:10px;color:var(--bs-body-color);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;opacity:.8">Tổng</div>
         <div style="font-family:'IBM Plex Mono',monospace;white-space:nowrap">
           <span id="ct-kpi-total" style="font-size:26px;font-weight:700;color:var(--bs-body-color)">${yearProjects.length}</span>
-          <span id="ct-kpi-split" class="text-secondary" style="font-size:13px;font-weight:500;margin-left:5px">(${_ctCount}/${yearProjects.length - _ctCount})</span>
         </div>
+        <div id="ct-kpi-split" class="text-secondary" style="font-size:11px;font-weight:500">${_ctCount} CT mới · ${yearProjects.length - _ctCount} SC/Khác</div>
       </div>
-      ${kpiCount('Chuẩn bị',  counts.planning,  'var(--bs-primary)',   'rgba(var(--bs-primary-rgb),.1)')}
-      ${kpiCount('Thi công',  counts.active,    'var(--bs-success)',   'rgba(var(--bs-success-rgb),.1)')}
-      ${kpiCount('Hoàn thành',counts.completed, 'var(--bs-warning)',   'rgba(var(--bs-warning-rgb),.1)')}
-      ${kpiCount('Quyết toán',counts.closed,    'var(--bs-secondary)', 'rgba(var(--bs-secondary-rgb),.1)')}
+      ${kpiCount('planning',  'Chuẩn bị',   counts.planning,  'var(--bs-primary)',   'rgba(var(--bs-primary-rgb),.1)')}
+      ${kpiCount('active',    'Thi công',   counts.active,    'var(--bs-success)',   'rgba(var(--bs-success-rgb),.1)')}
+      ${kpiCount('completed', 'Hoàn thành', counts.completed, 'var(--bs-warning)',   'rgba(var(--bs-warning-rgb),.1)')}
+      ${kpiCount('closed',    'Quyết toán', counts.closed,    'var(--bs-secondary)', 'rgba(var(--bs-secondary-rgb),.1)')}
     </div>
 
     <!-- Filter bar -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <input id="ct-search" type="search" placeholder="🔍  Tìm công trình, khách hàng..." style="${inpS}"
         oninput="_ctApply()" value="${x(_ctSearch)}">
-      <select id="ct-f-status" style="${selS}" onchange="_ctApply()">
-        <option value="">Tất cả trạng thái</option>
-        <option value="planning">Chuẩn bị thi công</option>
-        <option value="active">Đang thi công</option>
-        <option value="completed">Hoàn thành</option>
-        <option value="closed">Đã quyết toán</option>
-        <!-- [ADDED] Filter công trình không có hóa đơn -->
-        <option value="no_cost">Không có chi phí</option>
-      </select>
+      <!-- (27/10/2026) Ô "Tất cả trạng thái" đã thay bằng bấm thẻ KPI; riêng "Không có chi phí" thành nút bật/tắt -->
+      <button type="button" id="ct-f-nocost" class="btn btn-sm ${_ctFStatus === 'no_cost' ? 'btn-secondary' : 'btn-outline-secondary'}" onclick="_ctSetStatus('no_cost')" title="Chỉ hiện công trình chưa có hóa đơn nào">Không có chi phí</button>
       <select id="ct-f-type" style="${selS}" onchange="_ctApply()">
         <option value="">Tất cả loại</option>
         <option value="CT">Công trình (CT)</option>
@@ -489,10 +484,8 @@ function renderCTOverview() {
   `;
 
   // Restore filter state to selects
-  const elStatus = document.getElementById('ct-f-status');
   const elType   = document.getElementById('ct-f-type');
   const elLaiLo  = document.getElementById('ct-f-lailo');
-  if (elStatus) elStatus.value = _ctFStatus;
   if (elType)   elType.value   = _ctFType;
   if (elLaiLo)  elLaiLo.value  = _ctFLaiLo;
 
@@ -502,9 +495,17 @@ function renderCTOverview() {
 // ── Đọc filter controls → cập nhật state → re-render grid ──────────
 function _ctApply() {
   _ctSearch  = document.getElementById('ct-search')?.value    || '';
-  _ctFStatus = document.getElementById('ct-f-status')?.value  || '';
   _ctFType   = document.getElementById('ct-f-type')?.value    || '';
   _ctFLaiLo  = document.getElementById('ct-f-lailo')?.value   || '';
+  _ctRenderGrid();
+}
+
+// ── Bấm thẻ KPI trạng thái / nút "Không có chi phí" → lọc; bấm lại thẻ đang chọn → bỏ lọc (27/10/2026) ──
+function _ctSetStatus(st) {
+  _ctFStatus = (st && _ctFStatus !== st) ? st : '';
+  document.querySelectorAll('.ct-kpi').forEach(el => el.classList.toggle('on', (el.dataset.st || '') === _ctFStatus));
+  const nb = document.getElementById('ct-f-nocost');
+  if (nb) nb.className = 'btn btn-sm ' + (_ctFStatus === 'no_cost' ? 'btn-secondary' : 'btn-outline-secondary');
   _ctRenderGrid();
 }
 
@@ -553,12 +554,26 @@ function _ctCardHtml(it) {
       </div>
       <div class="ct-card-total" style="margin-left:8px">${total}</div>
     </div>
+    ${_ctCardHealth(it)}
+  </div>`;
+}
+
+// (27/10/2026) Dòng nhỏ đáy thẻ — sức khỏe tài chính: "Đã thu 900 tr · Lãi +22,6 tr" (theo năm đang lọc,
+// Lãi = Đã thu − Tổng chi trên thẻ). Ẩn với Kế toán (không xem doanh thu / lãi lỗ) và thẻ chưa phát sinh.
+function _ctCardHealth(it) {
+  if (it.noCost || it.thu === undefined || (typeof isKetoan === 'function' && isKetoan())) return '';
+  const lai = it.laiLo || 0;
+  const cls = !it.thu ? 'text-secondary' : (lai >= 0 ? 'text-success' : 'text-danger');
+  return `<div class="ct-card-health">
+    <span>Đã thu: <b>${it.thu ? fmtS(it.thu) : '0'}</b></span>
+    <span class="${cls}">${!it.thu ? 'Chưa thu' : (lai >= 0 ? 'Lãi: +' : 'Lỗ: −') + fmtS(Math.abs(lai))}</span>
   </div>`;
 }
 
 // ── Lưới thẻ ──
 function _ctCardsGrid(items, lead) {
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+  // (27/10/2026) Lưới 4 cột thoáng (≥1400px) · 3 · 2 · 1 — xem .ct-grid ở style.css
+  return `<div class="ct-grid">
     ${lead || ''}${items.map(_ctCardHtml).join('')}
   </div>`;
 }
@@ -818,7 +833,7 @@ function _ctRenderGrid() {
     if (kpiTotalEl) kpiTotalEl.textContent = noCostList.length;
     const ctCount = noCostList.filter(p => _projTypeByName(p.name) === 'CT').length;
     const kpiSplitEl = document.getElementById('ct-kpi-split');
-    if (kpiSplitEl) kpiSplitEl.textContent = `(${ctCount}/${noCostList.length - ctCount})`;
+    if (kpiSplitEl) kpiSplitEl.textContent = `${ctCount} CT mới · ${noCostList.length - ctCount} SC/Khác`;
 
     if (!noCostList.length) {
       gridWrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 0;font-size:14px">
@@ -859,22 +874,27 @@ function _ctRenderGrid() {
     return (a.p.name || '').localeCompare(b.p.name || '', 'vi');
   });
 
-  // Apply filters
+  // Apply filters (lọc trạng thái làm SAU CÙNG — để số trên các thẻ KPI tính theo các bộ lọc khác)
   if (q)           withData = withData.filter(({ p }) => _ctMatchSearch(p, q));
-  if (_ctFStatus)  withData = withData.filter(({ p }) => p.status === _ctFStatus);
   if (_ctFType) withData = withData.filter(({ p }) => _projTypeByName(p.name) === _ctFType);
   if (_ctFLaiLo === 'lai')     withData = withData.filter(({ laiLo, c, thu }) => (c.total || thu) && laiLo > 0);
   if (_ctFLaiLo === 'lo')      withData = withData.filter(({ laiLo, c, thu }) => (c.total || thu) && laiLo < 0);
   if (_ctFLaiLo === 'khongdu') withData = withData.filter(({ c, thu }) => !c.total && !thu);
 
-  const countEl = document.getElementById('ct-grid-count');
-  if (countEl) countEl.textContent = withData.length;
-  // Cập nhật KPI "Tổng" và "(CT/SC)" theo năm đang chọn
+  // Cập nhật KPI: Tổng + "x CT mới · y SC/Khác" + số từng trạng thái — đúng bằng số thẻ hiện ra khi bấm lọc
   const kpiTotalEl = document.getElementById('ct-kpi-total');
   if (kpiTotalEl) kpiTotalEl.textContent = withData.length;
   const ctCount = withData.filter(({ p }) => _projTypeByName(p.name) === 'CT').length;
   const kpiSplitEl = document.getElementById('ct-kpi-split');
-  if (kpiSplitEl) kpiSplitEl.textContent = `(${ctCount}/${withData.length - ctCount})`;
+  if (kpiSplitEl) kpiSplitEl.textContent = `${ctCount} CT mới · ${withData.length - ctCount} SC/Khác`;
+  ['planning', 'active', 'completed', 'closed'].forEach(st => {
+    const el = document.getElementById('ct-kpi-n-' + st);
+    if (el) el.textContent = withData.filter(({ p }) => p.status === st).length;
+  });
+  if (_ctFStatus)  withData = withData.filter(({ p }) => p.status === _ctFStatus);
+
+  const countEl = document.getElementById('ct-grid-count');
+  if (countEl) countEl.textContent = withData.length;
 
   if (!withData.length) {
     gridWrap.innerHTML = `<div class="text-secondary" style="text-align:center;padding:48px 0;font-size:14px">
@@ -1154,11 +1174,15 @@ function openCTDetail(id) {
 
   // Cột 1 — DOANH THU: số CHÍNH là Doanh Thu (= tổng đã thu),
   // dòng phụ kèm "đã thu" (dòng tiền thực đã vào) + còn phải thu.
+  // (27/10/2026) Số to nhất = ĐÃ THU, ngay cạnh ghi rõ "/ Tổng HĐ: … (x%)" — tránh nhìn nhầm Đã thu là giá trị HĐ
   const _colRevenue = `
     <div style="${_bxG}">
-      ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Doanh Thu')}
-      ${_vl(doanhThu ? fmtS(doanhThu) : '—', CG)}
-      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-top:2px">Đã thu: <span style="color:var(--bs-body-color)">${fmtS(tongThu)}</span>${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
+      ${_lb('<span class="material-symbols-outlined msi-gap">payments</span>Hợp Đồng &amp; Thu Tiền')}
+      <div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px">
+        ${_vl(tongThu ? fmtS(tongThu) : '0', CG)}
+        <span class="text-secondary" style="font-size:12px;font-weight:600">/ Tổng HĐ: <span style="color:var(--bs-body-color)">${giaTriHD > 0 ? fmtS(giaTriHD) + ' (' + pctThu + '%)' : 'chưa khai báo'}</span></span>
+      </div>
+      <div class="text-secondary" style="font-size:11px;font-weight:600;margin-top:2px">Đã thu${soDotThu ? ` · ${soDotThu} đợt` : ''}</div>
       ${giaTriHD > 0 ? _ctdProgress(pctThu, { color: CG }) : ''}
       <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
         Còn phải thu: <strong style="font-family:'IBM Plex Mono',monospace;color:${conPhaiThuCT > 0 ? CR : CG}">${conPhaiThuCT > 0 ? fmtS(conPhaiThuCT) : (conPhaiThuCT < 0 ? 'Thu dư ' + fmtS(-conPhaiThuCT) : '0')}</strong>
@@ -1169,11 +1193,14 @@ function openCTDetail(id) {
   const _over = pctChi > 100;
   // Tổng chi phí thực tế hiển thị = chi trực tiếp (tongChiCongTrinh) + chi phí chia tỉ trọng
   const _tongChiHienThi = tongChiCongTrinh + _chiPhiChungFixed;
+  // (27/10/2026) Dòng công thức DÙNG CHUNG cho thẻ Chi phí & thẻ Hiệu quả → 2 thẻ cùng 1 con số Tổng chi thực tế
+  const _ctdCongThucChi = `<div class="text-secondary" style="font-size:11px;margin-top:2px" title="Trực tiếp = hóa đơn + ứng thầu phụ + ứng NCC (đúng số trên thẻ công trình) · CP công ty = chi phí chung CÔNG TY chia theo tỉ trọng">
+    Trực tiếp ${fmtS(tongChiCongTrinh)}${_chiPhiChungFixed > 0 ? ` + CP công ty ${fmtS(_chiPhiChungFixed)} = <b style="color:var(--bs-body-color)">${fmtS(_tongChiHienThi)}</b>` : ''}</div>`;
   const _colCost = `
     <div style="${_bxR}">
-      ${_lb('<span class="material-symbols-outlined msi-gap">foundation</span>Chi Phí Thực Tế Đã Chi')}
+      ${_lb('<span class="material-symbols-outlined msi-gap">foundation</span>Tổng Chi Thực Tế')}
       ${_vl(_tongChiHienThi ? fmtS(_tongChiHienThi) : '—', CR)}
-      ${_chiPhiChungFixed > 0 ? `<div class="text-secondary" style="font-size:11px;margin-top:2px">(${fmtS(_chiPhiChungFixed)} chi phí chia tỉ trọng)</div>` : ''}
+      ${_ctdCongThucChi}
       ${isActiveCT ? `
         ${_ctdProgress(pctChi, { color: CB, over: _over })}
         <div class="text-secondary" style="font-size:11.5px;margin-top:6px">
@@ -1190,10 +1217,13 @@ function openCTDetail(id) {
   //   KHÔNG phụ thuộc năm đang lọc → mở popup ở năm nào cũng ra cùng 1 số, khớp tab Lợi Nhuận.
   // Kèm: Tỷ suất lợi nhuận = Lợi nhuận / Tổng đã thu × 100 (chưa có doanh thu → "—") + huy hiệu đánh giá.
   // Fallback (tab Lợi Nhuận chưa nạp): lãi/lỗ dòng tiền theo năm đang lọc như trước.
+  // (27/10/2026 — kế hoạch cải tạo UI) Số chính của thẻ = Đã thu − TỔNG CHI THỰC TẾ (cùng con số thẻ Chi phí,
+  //   cùng phạm vi năm đang lọc) → 3 thẻ đọc liền mạch. Số lợi nhuận hạch toán của tab LỢI NHUẬN (lnHieuQuaCT)
+  //   hiện thành dòng tham chiếu bên dưới khi khác số chính.
   const _hq = (typeof lnHieuQuaCT === 'function') ? lnHieuQuaCT(p) : null;
-  const _hqNum    = _hq ? _hq.ln : (tongThu - (tongChiCongTrinh + _chiPhiChungFixed));
-  const _hqDt     = _hq ? _hq.dt : tongThu;
-  const _hqMargin = _hq ? _hq.margin : (_hqDt > 0 ? _hqNum / _hqDt * 100 : null);   // chia cho 0 → null
+  const _hqNum    = tongThu - _tongChiHienThi;
+  const _hqDt     = tongThu;
+  const _hqMargin = _hqDt > 0 ? _hqNum / _hqDt * 100 : null;   // chia cho 0 → null
   const _hqPos   = _hqNum >= 0;
   const _hqColor = _hqPos ? CG : CR;
   const _hqBg    = _hqPos ? BG : BR;
@@ -1221,13 +1251,14 @@ function openCTDetail(id) {
         <strong style="font-family:'IBM Plex Mono',monospace;color:${_hqMargin === null ? 'var(--bs-secondary-color)' : _hqColor}"
           title="Lợi nhuận / Tổng đã thu × 100">${_hqMarginTxt}</strong>
       </div>
-      ${_hq ? `<div class="text-secondary" style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px">
-        <span>Đã thu ${fmtS(_hq.dt)}</span><span>Chi ${fmtS(_hq.chi)}</span>
-      </div>` : ''}
-      <div class="text-secondary" style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bs-border-color)"
-        ${_hqEyTip ? `title="Tỷ trọng hóa đơn: ${x(_hqEyTip)}"` : ''}>
-        <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">event</span>${_hqBasis}
+      <div class="text-secondary" style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px">
+        <span>Đã thu ${fmtS(tongThu)}</span><span>− Tổng chi ${fmtS(_tongChiHienThi)}</span>
       </div>
+      ${_hq && Math.abs(_hq.ln - _hqNum) >= 1000 ? `<div class="text-secondary" style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--bs-border-color)"
+        ${_hqEyTip ? `title="Tỷ trọng hóa đơn: ${x(_hqEyTip)}"` : ''}>
+        <span class="material-symbols-outlined msi-gap" style="font-size:13px;vertical-align:-2px">event</span>Tab Lợi Nhuận: <b>${_hq.ln >= 0 ? '' : '−'}${fmtS(Math.abs(_hq.ln))}</b> · ${_hqBasis}
+        <span class="help-tip" title="Tab Lợi Nhuận tính theo hạch toán (hóa đơn + GIÁ TRỊ HĐ thầu phụ + CP chung) và theo năm hạch toán của công trình, nên có thể lệch nhẹ so với số dòng tiền ở trên."><span class="material-symbols-outlined" style="font-size:13px">help</span></span>
+      </div>` : ''}
     </div>`;
 
   html += `<div class="ctd-core" style="display:grid;grid-template-columns:repeat(${_cols},minmax(0,1fr));gap:10px;margin-bottom:14px">
@@ -1249,7 +1280,8 @@ function openCTDetail(id) {
   // Tab 1 — Phân rã chi phí
   const _tab1 = `
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
-      <span style="font-weight:700;font-size:13px">Tổng chi phí trực tiếp: <span style="color:${CR};font-family:'IBM Plex Mono',monospace">${fmtS(c.total)}</span></span>
+      <span style="font-weight:700;font-size:13px">Tổng hóa đơn theo loại: <span style="color:${CR};font-family:'IBM Plex Mono',monospace">${fmtS(c.total)}</span>
+        <span class="help-tip" title="Chỉ gồm HÓA ĐƠN (kể cả nhân công chấm công) theo năm đang lọc — chưa gồm tiền ứng thầu phụ / NCC và chi phí chung công ty. Tổng chi thực tế xem ở thẻ phía trên."><span class="material-symbols-outlined" style="font-size:14px">help</span></span></span>
       ${_xct('thongke')}
     </div>
     ${_costBreakdownHtml()}`;

@@ -55,8 +55,8 @@ function _ttCanEdit() {
 // Badge nhóm đối tác (Thầu Phụ / NCC) — chuyển từ doanhthu.congno.js cũ
 function _cnGroupBadge(group) {
   return group === 'thauphu'
-    ? '<span class="badge bg-primary-subtle text-primary" style="font-size:10px">Thầu Phụ</span>'
-    : '<span class="badge bg-warning-subtle text-warning-emphasis" style="font-size:10px">NCC</span>';
+    ? '<span class="badge bg-primary-subtle text-primary ms-1" style="font-size:10px;vertical-align:1px" title="Thầu phụ">TP</span>'
+    : '<span class="badge bg-warning-subtle text-warning-emphasis ms-1" style="font-size:10px;vertical-align:1px" title="Nhà cung cấp">NCC</span>';
 }
 
 // ── Dựng các dòng công nợ TOÀN VÒNG ĐỜI ──
@@ -191,6 +191,14 @@ function ttRender() {
   const setTxt = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
   setTxt('tt-kpi-tp', fmtM(sum('thauphu')));
   setTxt('tt-kpi-tp-sub', cnt('thauphu') ? `${cnt('thauphu')} dòng còn nợ` : 'Không còn nợ');
+  // (27/10/2026) Giải thích chênh lệch với sub-tab HĐ Thầu Phụ: tiền ứng TP ở công trình CHƯA khai báo HĐ thầu phụ
+  // (giá trị = 0 → hiện "Ứng dư", không cộng vào số còn phải trả ở đây và không có dòng bên HĐ Thầu Phụ)
+  const khongHd = (_ttShowDone ? all : _ttBuildRows({ includeDone: true })).filter(r => r.group === 'thauphu' && !r.value && r.daUng > 0);
+  const tpSub = document.getElementById('tt-kpi-tp-sub');
+  if (tpSub && khongHd.length) {
+    const tien = khongHd.reduce((s, r) => s + r.daUng, 0);
+    tpSub.insertAdjacentHTML('beforeend', ` · <span class="text-warning-emphasis" style="cursor:help" title="Có ${khongHd.length} cặp Thầu phụ × Công trình đã ứng tiền nhưng CHƯA khai báo Hợp đồng thầu phụ: ${x(khongHd.slice(0, 8).map(r => r.partner + ' — ' + (r.ctName || '?')).join('; '))}${khongHd.length > 8 ? '…' : ''}. Các khoản này không tính vào Còn phải trả nên số ở đây có thể lệch nhẹ so với sub-tab HĐ Thầu Phụ. Khai báo HĐ để số khớp.">${khongHd.length} ứng chưa có HĐ (${fmtM(tien)}) ⓘ</span>`);
+  }
   setTxt('tt-kpi-ncc', fmtM(sum('nhacungcap')));
   setTxt('tt-kpi-ncc-sub', cnt('nhacungcap') ? `${cnt('nhacungcap')} dòng còn nợ` : 'Không còn nợ');
   const batches = _ttBatches();
@@ -245,13 +253,13 @@ function ttRender() {
           ? `<td class="text-end font-monospace fw-semibold text-info" style="white-space:nowrap" title="Đã ứng nhiều hơn giá trị">Ứng dư ${fmtM(-r.con)}</td>`
           : `<td class="text-end" style="white-space:nowrap"><span class="badge bg-success" style="font-size:11px">Đã xong</span></td>`);
       return `<tr id="tt-row-${i}" style="transition:opacity .4s ease, background .4s ease${isDebt ? '' : ';opacity:.75'}">
-        <td style="white-space:nowrap"><div style="font-weight:600">${x(r.partner)}</div>${_cnGroupBadge(r.group)}</td>
+        <td style="white-space:nowrap"><span style="font-weight:600">${x(r.partner)}</span>${_cnGroupBadge(r.group)}</td>
         <td style="white-space:nowrap">${x(r.ctName || '—')}</td>
         <td class="text-end font-monospace" style="white-space:nowrap">${r.value ? fmtS(r.value) : '<span class="text-secondary">—</span>'}</td>
         <td class="text-end font-monospace text-success" style="white-space:nowrap">${r.daUng ? fmtS(r.daUng) : '0'} <span class="text-secondary" style="font-size:10px">(${pct}%)</span></td>
         ${conCell}
         <td style="text-align:center;white-space:nowrap">
-          ${canEdit && isDebt ? `<button class="btn btn-sm btn-success fw-semibold" onclick="ttSettleOne(${i})">✔️ Tất toán toàn bộ</button>` : ''}
+          ${canEdit && isDebt ? `<button class="btn btn-sm btn-outline-success fw-semibold py-0" onclick="ttSettleOne(${i})" title="Tất toán toàn bộ số còn phải trả của dòng này">✓ Tất toán toàn bộ</button>` : ''}
         </td>
       </tr>`;
     }).join('') + `<tr id="tt-total-row" style="border-top:2px solid var(--bs-border-color);font-weight:700;background:var(--bs-tertiary-bg)">
