@@ -77,10 +77,6 @@ const MB_STATUS = {
 };
 
 const MB_UNG_LABEL   = { thauphu: 'Thầu phụ', nhacungcap: 'Nhà cung cấp', congnhan: 'Công nhân' };
-// Các danh mục sửa được trên mobile. Khóa PHẢI trùng `catId` của bản desktop
-// (xem CATS trong core.cloud-cats-ui.js) vì mobile gọi thẳng addItem()/delItem().
-// `congTrinh` cố ý không có ở đây — công trình chỉ tạo/sửa ở tab Công Trình.
-const MB_DM_LABELS   = { loaiChiPhi: 'Loại chi phí', nhaCungCap: 'Nhà cung cấp', nguoiTH: 'Người chi', thauPhu: 'Thầu phụ', congNhan: 'Công nhân', tbTen: 'Tên thiết bị' };
 
 // ══════════════════════════════
 //  BỘ ĐỊNH TUYẾN MÀN HÌNH
@@ -94,12 +90,9 @@ function mbScreen(tab) {
     case 'chamcong':  return mbScrChamCong();
     case 'tienung':   return mbScrTienUng();
     case 'doanhthu':  return mbScrDoanhThu();
-    case 'quyettoan': return mbScrQuyetToan();
     case 'congno':    return mbScrCongNo();
     case 'thietbi':   return mbScrThietBi();
-    case 'danhmuc':   return mbScrDanhMuc();
     case 'thongke':   return mbScrThongKe();
-    case 'thungrac':  return mbScrThungRac();
     case 'more':      return mbScrMore();
     default:          return `<div class="mb-pad"><div class="mb-empty">Màn hình chưa có</div></div>`;
   }
@@ -255,34 +248,51 @@ function mbScrProjectDetail() {
   if (seg === 'ung')  return mbPdTienUng(p);
 
   // ── Tổng quan ──
+  // Kế toán: ẩn doanh thu / lãi lỗ + không đổi trạng thái (khớp phân quyền bản desktop)
+  const isKt = mbRole() === 'ketoan';
   const lai  = st.thu - st.chi;
   const days = (typeof getProjectDays === 'function') ? getProjectDays(p) : 0;
   const k    = (typeof getProjectK === 'function') ? getProjectK(p) : 1;
-  const [stLabel] = MB_STATUS[p.status] || ['—', 'gray'];
   const pct  = mbPct(st.chi, st.hd);
 
+  // [nhãn, giá trị, màu, nhạy cảm (ẩn với Kế toán)]
   const rows = [
-    ['Trạng thái',        stLabel,                 ''],
-    ['Giá trị hợp đồng',  mbFull(st.hd),           ''],
-    ['Quyết toán (±)',    st.qt ? (st.qt > 0 ? '+' : '-') + mbFull(Math.abs(st.qt)) : '0 đ', st.qt < 0 ? 'var(--mb-red)' : (st.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)')],
-    ['Giá trị HĐ sau QT',  mbFull(st.dt),           'var(--mb-primary)'],
-    ['Tổng chi phí',      mbFull(st.chi),          ''],
-    ['— trong đó hóa đơn', mbFull(st.hoaDon),      'var(--mb-muted)'],
-    ['— ứng thầu phụ',    mbFull(st.ungTp),        'var(--mb-muted)'],
-    ['Đã thu',            mbFull(st.thu),          'var(--mb-green)'],
-    ['Còn phải thu',      mbFull(st.conThu),       st.conThu < 0 ? 'var(--mb-red)' : 'var(--mb-amber)'],
-    ['Lãi/lỗ tạm tính',   mbFull(lai),             lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)'],
-    ['Số ngày thi công',  days + ' ngày · k=' + k, ''],
-  ];
+    ['Giá trị hợp đồng',  mbFull(st.hd),           '', true],
+    ['Quyết toán (±)',    st.qt ? (st.qt > 0 ? '+' : '-') + mbFull(Math.abs(st.qt)) : '0 đ', st.qt < 0 ? 'var(--mb-red)' : (st.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'), true],
+    ['Giá trị HĐ sau QT',  mbFull(st.dt),           'var(--mb-primary)', true],
+    ['Tổng chi phí',      mbFull(st.chi),          '', false],
+    ['— trong đó hóa đơn', mbFull(st.hoaDon),      'var(--mb-muted)', false],
+    ['— ứng thầu phụ',    mbFull(st.ungTp),        'var(--mb-muted)', false],
+    ['Đã thu',            mbFull(st.thu),          'var(--mb-green)', true],
+    ['Còn phải thu',      mbFull(st.conThu),       st.conThu < 0 ? 'var(--mb-red)' : 'var(--mb-amber)', true],
+    ['Lãi/lỗ tạm tính',   mbFull(lai),             lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)', true],
+    ['Số ngày thi công',  days + ' ngày · k=' + k, '', false],
+  ].filter(r => !(isKt && r[3]));
 
-  const shortcuts = [
-    ['Nhập chi phí',   'Thêm hóa đơn cho CT này', 'shortcut', 'nhap'],
-    ['Chấm công tuần', 'Sổ công nhân',            'shortcut', 'chamcong'],
-    ['Tạm ứng',        'Thầu phụ / NCC / CN',     'shortcut', 'tienung'],
-    ['Thu tiền',       'Ghi nhận thu HĐ',         'shortcut', 'thu'],
-  ];
+  // 4 nút thao tác nhanh — chuyển sang form tương ứng, chọn sẵn công trình này
+  const quick = [
+    ['nhap',     'add_circle',     'Nhập CP'],
+    ['chamcong', 'calendar_month', 'Chấm công'],
+    ['tienung',  'payments',       'Ứng tiền'],
+    ['thu',      'savings',        'Thu tiền'],
+  ].filter(q => q[0] !== 'thu' || mbCanSee('doanhthu'));
+
+  const [stLabel, stCls] = MB_STATUS[p.status] || ['—', 'gray'];
 
   return `<div class="mb-pad">
+    <div class="mb-qa" style="grid-template-columns:repeat(${quick.length},1fr)">
+      ${quick.map(([arg, icon, label]) => `<div data-act="shortcut" data-arg="${arg}">${mbIcon(icon, 22)}${label}</div>`).join('')}
+    </div>
+
+    ${isKt
+      ? `<div class="mb-row-between" style="align-items:center"><span style="font-size:12px;color:var(--mb-muted)">Trạng thái</span><span class="mb-tag ${stCls}">${stLabel}</span></div>`
+      : `<div>
+          <div class="mb-label">Trạng thái công trình</div>
+          <div class="mb-chips">
+            ${['active', 'completed', 'planning', 'closed'].map(s => `<div class="mb-chip${p.status === s ? ' on' : ''}" data-act="changeProjStatus" data-arg="${s}">${MB_STATUS[s][0]}</div>`).join('')}
+          </div>
+        </div>`}
+
     <div class="mb-list">
       ${rows.map(([l, v, c]) => `<div class="mb-list-row" style="justify-content:space-between">
         <span style="font-size:12.5px;color:var(--mb-muted)">${mbX(l)}</span>
@@ -290,37 +300,60 @@ function mbScrProjectDetail() {
       </div>`).join('')}
     </div>
 
-    <div class="mb-kpi blue" style="border-radius:14px;padding:14px">
+    ${isKt ? '' : `<div class="mb-kpi blue" style="border-radius:14px;padding:14px">
       <div class="mb-row-between" style="margin-bottom:9px">
         <span style="font-size:12.5px;font-weight:600;color:var(--mb-primary-d)">Tỉ lệ chi phí / hợp đồng</span>
         <span style="font-size:13px;font-weight:800;color:var(--mb-primary-d)">${pct}%</span>
       </div>
       <div class="mb-bar" style="height:8px;background:#DBEAFE"><i style="width:${mbBarW(st.chi, st.hd)};background:var(--mb-primary)"></i></div>
-    </div>
-
-    <div class="mb-grid2">
-      ${shortcuts.map(([l, h, act, arg]) => `<div class="mb-card mb-card-sm tap" data-act="${act}" data-arg="${arg}">
-        <div style="font-size:12.5px;font-weight:700;margin-bottom:3px">${mbX(l)}</div>
-        <div style="font-size:11px;color:var(--mb-muted)">${mbX(h)}</div>
-      </div>`).join('')}
-    </div>
+    </div>`}
   </div>`;
 }
 
+/** Chi phí của công trình: thẻ tổng ở ĐẦU + ô tìm + chip lọc theo loại chi phí */
 function mbPdChiPhi(p, st) {
-  const list = [...st.invs].sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
+  const NO_LOAI = '(Không phân loại)';
+  const byLoai = {};
+  st.invs.forEach(i => { const k = i.loai || NO_LOAI; byLoai[k] = (byLoai[k] || 0) + mbInvAmount(i); });
+  const loaiRows = Object.entries(byLoai).sort((a, b) => b[1] - a[1]);
+  const loai = (MB.pdLoai && byLoai[MB.pdLoai] !== undefined) ? MB.pdLoai : '';
+  const q = (MB.pdSearch || '').toLowerCase();
+
+  const list = st.invs
+    .filter(i => !loai || (i.loai || NO_LOAI) === loai)
+    .filter(i => !q || ((i.nd || '') + ' ' + (i.ncc || '')).toLowerCase().includes(q))
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
+  const filtered = !!(loai || q);
+  const shown = list.reduce((s, i) => s + mbInvAmount(i), 0);
+
   return `<div class="mb-pad">
+    <div class="mb-card mb-card-sm" style="background:#F9FAFB">
+      <div class="mb-row-between" style="align-items:baseline">
+        <span style="font-size:12.5px;font-weight:700;color:#374151">Tổng chi phí hóa đơn</span>
+        <span style="font-size:15px;font-weight:800">${mbFull(st.hoaDon)}</span>
+      </div>
+      ${filtered ? `<div class="mb-row-between" style="margin-top:4px;font-size:11.5px;color:var(--mb-muted)">
+        <span>Đang lọc: ${list.length} hóa đơn</span><span style="font-weight:700;color:var(--mb-primary)">${mbFull(shown)}</span>
+      </div>` : ''}
+    </div>
+
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-pdsearch" data-in="pdSearch" data-live="1" value="${mbX(MB.pdSearch)}" placeholder="Tìm nội dung, nhà cung cấp..."/>
+    </div>
+
+    <div class="mb-chips">
+      <div class="mb-chip${loai ? '' : ' on'}" data-act="setFilter" data-arg="pdLoai|">Tất cả (${mbFmt(st.hoaDon)})</div>
+      ${loaiRows.map(([l, v]) => `<div class="mb-chip${loai === l ? ' on' : ''}" data-act="setFilter" data-arg="pdLoai|${mbX(l)}">${mbX(l)} (${mbFmt(v)})</div>`).join('')}
+    </div>
+
     ${list.length ? list.map(i => `<div class="mb-card mb-card-sm">
       <div class="mb-row-between" style="margin-bottom:4px">
         <span style="font-size:13px;font-weight:700">${mbX(i.nd || '(không có nội dung)')}</span>
         <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(mbInvAmount(i))}</span>
       </div>
       <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(i.loai || '—')} · ${mbX(i.ncc || '—')} · ${mbDate(i.ngay)}</div>
-    </div>`).join('') : '<div class="mb-empty">Chưa có hóa đơn trong năm này</div>'}
-    <div class="mb-card mb-card-sm" style="background:#F9FAFB;display:flex;justify-content:space-between">
-      <span style="font-size:12.5px;font-weight:700;color:#374151">Tổng chi phí hóa đơn</span>
-      <span style="font-size:13.5px;font-weight:800">${mbFull(st.hoaDon)}</span>
-    </div>
+    </div>`).join('') : `<div class="mb-empty">${filtered ? 'Không có hóa đơn phù hợp' : 'Chưa có hóa đơn trong năm này'}</div>`}
   </div>`;
 }
 
@@ -395,177 +428,166 @@ function mbPdTienUng(p) {
 //  4 · NHẬP HÓA ĐƠN
 // ══════════════════════════════════════════════════════════════
 function mbScrNhap() {
-  if (MB.seg.nhap === 'chitiet') return mbNhapChiTiet();
-  if (MB.seg.nhap === 'tatca')   return mbNhapTatCa();
+  if (MB.seg.nhap === 'tatca') return mbNhapTatCa();
   return mbNhapNhanh();
 }
 
+/** Tập id hóa đơn GỐC còn hiệu lực (không gồm HĐ sinh từ chấm công) — sửa/xóa được trên điện thoại */
+function mbInvEditableIds() {
+  return new Set((typeof invoices !== 'undefined' ? invoices : [])
+    .filter(i => !i.deletedAt && !i.ccKey && i.source !== 'cc')
+    .map(i => String(i.id)));
+}
+
+/** Thẻ hóa đơn dùng chung cho "Đã nhập trong ngày" và "Lịch sử HĐ" */
+function mbInvCard(i, editable) {
+  const hasItems = Array.isArray(i.items) && i.items.length > 0;
+  const src = (i.source === 'cc' || i.ccKey) ? 'Từ chấm công' : (i.source === 'detail' || hasItems) ? 'HĐ chi tiết' : 'Nhập nhanh';
+  return `<div class="mb-card mb-card-sm">
+    <div class="mb-row-between" style="margin-bottom:4px">
+      <span style="font-size:13px;font-weight:700">${mbX(i.nd || '(không có nội dung)')}</span>
+      <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(mbInvAmount(i))}</span>
+    </div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(i.congtrinh || '—')}${i.ncc ? ' · ' + mbX(i.ncc) : ''} · ${mbDate(i.ngay)}</div>
+    <div class="mb-row-between" style="align-items:center;margin-top:7px">
+      <div style="display:flex;gap:6px;min-width:0;flex-wrap:wrap">
+        <span class="mb-tag blue" style="background:var(--mb-primary-l);color:var(--mb-primary)">${mbX(i.loai || '—')}</span>
+        <span class="mb-tag gray">${src}</span>
+      </div>
+      ${editable ? `<div class="mb-btn-row" style="flex-shrink:0">
+        ${hasItems ? '' : `<button class="mb-btn-outline blue" data-act="editQuickInv" data-arg="${mbX(i.id)}">Sửa</button>`}
+        <button class="mb-btn-outline red" data-act="delQuickInv" data-arg="${mbX(i.id)}">Xóa</button>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+/**
+ * Nhập hóa đơn — LƯU 1 CHẠM (27/10/2026).
+ * Mặc định nhập thẳng tổng tiền; bật "Tính theo SL × Đơn giá" khi cần.
+ * Lưu xong giữ ngày / CT / loại / NCC / người chi để nhập tờ kế tiếp thật nhanh.
+ */
 function mbNhapNhanh() {
   const f  = MB.form;
-  const tt = (parseFloat(String(f.sl).replace(',', '.')) || 0) * (typeof parseMoney === 'function' ? parseMoney(f.tien) : 0);
-  const draftTotal = MB.drafts.reduce((s, d) => s + d.sl * d.tien, 0);
+  const tt = f.calcMode ? Math.round(mbNum(f.sl) * mbMoney(f.dg)) : mbMoney(f.tien);
+  const editing = !!f.editId;
+
+  // Hóa đơn gốc đã nhập trong ngày đang chọn (mới nhất trước)
+  const day = (typeof invoices !== 'undefined' ? invoices : [])
+    .filter(i => !i.deletedAt && !i.ccKey && i.source !== 'cc' && i.ngay === f.ngay)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const dayTotal = day.reduce((s, i) => s + mbInvAmount(i), 0);
+
+  const addBtn = cat => `<button class="mb-mini-add" data-act="quickAddCat" data-arg="${cat}" title="Thêm mới">+</button>`;
+
+  const moneyBlock = f.calcMode
+    ? `<div>
+        <div class="mb-label-row">
+          <div class="mb-label">Số lượng × Đơn giá (đ)</div>
+          <span class="mb-link" style="font-size:11.5px" data-act="toggleCalcMode">Nhập thẳng tổng tiền</span>
+        </div>
+        <div class="mb-row">
+          <div class="mb-field"><input id="mb-f-sl" class="mb-input" inputmode="decimal" data-in="form.sl" data-live="1" value="${mbX(f.sl)}" placeholder="Số lượng"/></div>
+          <div class="mb-field" style="flex:1.5"><input id="mb-f-dg" class="mb-input" inputmode="numeric" data-money="1" data-in="form.dg" data-live="1" value="${mbX(f.dg)}" placeholder="Đơn giá"/></div>
+        </div>
+        ${mbQuickMoney('form.dg', f.dg)}
+        <div style="background:#F9FAFB;border-radius:10px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12.5px;color:var(--mb-muted)">Thành tiền</span>
+          <span style="font-size:16px;font-weight:800">${mbFull(tt)}</span>
+        </div>
+      </div>`
+    : `<div>
+        <div class="mb-label-row">
+          <div class="mb-label">Số tiền thanh toán (đ)</div>
+          <span class="mb-link" style="font-size:11.5px" data-act="toggleCalcMode">🔢 Tính theo SL × Đơn giá</span>
+        </div>
+        <input id="mb-f-tien" class="mb-input money-lg" inputmode="numeric" data-money="1" data-in="form.tien" data-live="1" value="${mbX(f.tien)}" placeholder="0"/>
+        ${mbQuickMoney('form.tien', f.tien)}
+      </div>`;
 
   return `<div class="mb-pad">
     <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
-      <div class="mb-sec-title">Dòng hóa đơn mới</div>
-
-      <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">Ngày</div>
-          <input id="mb-f-ngay" class="mb-input" type="date" data-in="form.ngay" value="${mbX(f.ngay)}"/></div>
-        <div class="mb-field"><div class="mb-label">Loại chi phí</div>
-          <select id="mb-f-loai" class="mb-select" data-in="form.loai">${mbOptions(cats.loaiChiPhi, f.loai)}</select></div>
+      <div class="mb-row-between" style="align-items:center">
+        <div class="mb-sec-title">${editing ? 'Sửa hóa đơn' : 'Hóa đơn mới'}</div>
+        ${editing ? '<span class="mb-tag amber">Đang sửa</span>' : ''}
       </div>
 
       <div><div class="mb-label">Công trình</div>
         <select id="mb-f-ct" class="mb-select" data-in="form.ct">${mbCtOptions(f.ct, true)}</select></div>
 
       <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">Nhà cung cấp</div>
-          <select id="mb-f-ncc" class="mb-select" data-in="form.ncc">${mbOptionsKeep(cats.nhaCungCap, f.ncc, '-- Chọn NCC --')}</select></div>
-        <div class="mb-field"><div class="mb-label">Người chi</div>
-          <select id="mb-f-nguoi" class="mb-select" data-in="form.nguoi">${mbOptionsKeep(cats.nguoiTH, f.nguoi, '-- Chọn người chi --')}</select></div>
+        <div class="mb-field"><div class="mb-label">Ngày</div>
+          <input id="mb-f-ngay" class="mb-input" type="date" data-in="form.ngay" value="${mbX(f.ngay)}"/></div>
+        <div class="mb-field">
+          <div class="mb-label-row"><div class="mb-label">Loại chi phí</div>${addBtn('loaiChiPhi')}</div>
+          <select id="mb-f-loai" class="mb-select" data-in="form.loai">${mbOptionsKeep(cats.loaiChiPhi, f.loai, '-- Chọn --')}</select></div>
       </div>
 
-      <div><div class="mb-label">Nội dung</div>
-        <input id="mb-f-nd" class="mb-input" data-in="form.nd" value="${mbX(f.nd)}" placeholder="VD: Thép hộp 40x80"/></div>
+      <div><div class="mb-label">Nội dung chi phí</div>
+        <input id="mb-f-nd" class="mb-input" data-in="form.nd" value="${mbX(f.nd)}" placeholder="VD: Mua xi măng, đổ xăng, sắt hộp..."/></div>
+
+      ${moneyBlock}
 
       <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">Số lượng</div>
-          <input id="mb-f-sl" class="mb-input" inputmode="decimal" data-in="form.sl" data-live="1" value="${mbX(f.sl)}" placeholder="0"/></div>
-        <div class="mb-field" style="flex:1.4"><div class="mb-label">Đơn giá (đ)</div>
-          <input id="mb-f-tien" class="mb-input" inputmode="numeric" data-in="form.tien" data-live="1" value="${mbX(f.tien)}" placeholder="0"/></div>
+        <div class="mb-field">
+          <div class="mb-label-row"><div class="mb-label">Nhà cung cấp</div>${addBtn('nhaCungCap')}</div>
+          <select id="mb-f-ncc" class="mb-select" data-in="form.ncc">${mbOptionsKeep(cats.nhaCungCap, f.ncc, '-- Chọn NCC --')}</select></div>
+        <div class="mb-field">
+          <div class="mb-label-row"><div class="mb-label">Người chi</div>${addBtn('nguoiTH')}</div>
+          <select id="mb-f-nguoi" class="mb-select" data-in="form.nguoi">${mbOptionsKeep(cats.nguoiTH, f.nguoi, '-- Chọn --')}</select></div>
       </div>
 
-      <div style="background:#F9FAFB;border-radius:10px;padding:11px 12px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:12.5px;color:var(--mb-muted)">Thành tiền</span>
-        <span style="font-size:15px;font-weight:800">${mbFull(tt)}</span>
-      </div>
-
-      <div style="display:flex;gap:9px">
-        <button class="mb-btn gray" style="flex:1" data-act="clearForm">Xóa</button>
-        <button class="mb-btn" style="flex:1.6" data-act="addDraft">+ Thêm vào danh sách</button>
-      </div>
+      ${editing
+        ? `<div style="display:flex;gap:9px">
+            <button class="mb-btn gray" style="flex:1" data-act="cancelEditInv">Hủy sửa</button>
+            <button class="mb-btn lg" style="flex:2" data-act="saveQuickInv">💾 Cập nhật hóa đơn</button>
+          </div>`
+        : `<button class="mb-btn lg green" data-act="saveQuickInv">💾 Lưu hóa đơn ngay</button>`}
     </div>
 
     <div>
       <div class="mb-sec-head">
-        <div class="mb-sec-title">Chờ lưu (${MB.drafts.length})</div>
-        <div style="font-size:12px;font-weight:700">${mbFull(draftTotal)}</div>
+        <div class="mb-sec-title">Đã nhập ngày ${mbDate(f.ngay)} (${day.length})</div>
+        <div style="font-size:12.5px;font-weight:800">${mbFull(dayTotal)}</div>
       </div>
       <div class="mb-col">
-        ${MB.drafts.length ? MB.drafts.map((d, idx) => `
-          <div class="mb-card mb-card-sm" style="display:flex;gap:10px;align-items:center;padding:11px 12px">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(d.nd)}</div>
-              <div style="font-size:10.5px;color:var(--mb-muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(d.ct || '—')} · ${d.sl} × ${mbFmt(d.tien)}</div>
-            </div>
-            <div style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(d.sl * d.tien)}</div>
-            <button class="mb-del" data-act="delDraft" data-arg="${idx}">×</button>
-          </div>`).join('')
-        : '<div style="text-align:center;color:var(--mb-muted-2);font-size:12.5px;padding:22px 0;background:#fff;border:1px dashed var(--mb-line);border-radius:12px">Chưa có dòng nào chờ lưu</div>'}
+        ${day.length ? day.slice(0, 30).map(i => mbInvCard(i, true)).join('')
+          : '<div style="text-align:center;color:var(--mb-muted-2);font-size:12.5px;padding:22px 0;background:#fff;border:1px dashed var(--mb-line);border-radius:12px">Chưa có hóa đơn nào trong ngày này</div>'}
       </div>
-    </div>
-
-    <button class="mb-btn lg ${MB.drafts.length ? 'green' : 'muted'}" data-act="saveDrafts">Lưu tất cả (${MB.drafts.length})</button>
-  </div>`;
-}
-
-function mbNhapChiTiet() {
-  const f     = MB.detailForm;
-  const it    = MB.itemForm;
-  const total = MB.detailItems.reduce((s, r) => s + r.sl * r.dg, 0);
-
-  return `<div class="mb-pad">
-    <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
-      <div class="mb-sec-title">Hóa đơn chi tiết nhiều dòng</div>
-      <div style="font-size:11.5px;color:var(--mb-muted);line-height:1.5">Nhập 1 hóa đơn gồm nhiều vật tư. Nội dung tổng hợp tự sinh từ tên các vật tư (giống bản web).</div>
-
-      <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">Ngày</div>
-          <input id="mb-d-ngay" class="mb-input" type="date" data-in="detailForm.ngay" value="${mbX(f.ngay)}"/></div>
-        <div class="mb-field"><div class="mb-label">Loại chi phí</div>
-          <select id="mb-d-loai" class="mb-select" data-in="detailForm.loai">${mbOptions(cats.loaiChiPhi, f.loai)}</select></div>
-      </div>
-      <div><div class="mb-label">Công trình</div>
-        <select id="mb-d-ct" class="mb-select" data-in="detailForm.ct">${mbCtOptions(f.ct, true)}</select></div>
-      <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">Nhà cung cấp</div>
-          <select id="mb-d-ncc" class="mb-select" data-in="detailForm.ncc">${mbOptionsKeep(cats.nhaCungCap, f.ncc, '-- Chọn NCC --')}</select></div>
-        <div class="mb-field"><div class="mb-label">Người chi</div>
-          <select id="mb-d-nguoi" class="mb-select" data-in="detailForm.nguoi">${mbOptionsKeep(cats.nguoiTH, f.nguoi, '-- Chọn người chi --')}</select></div>
-      </div>
-    </div>
-
-    <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
-      <div class="mb-sec-title">Dòng vật tư</div>
-      <div class="mb-col">
-        ${MB.detailItems.map((r, idx) => `
-          <div style="border:1px solid var(--mb-line);border-radius:11px;padding:11px 12px;display:flex;gap:10px;align-items:center">
-            <div style="width:22px;height:22px;border-radius:11px;background:var(--mb-primary-l);color:var(--mb-primary);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${idx + 1}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(r.ten)}</div>
-              <div style="font-size:10.5px;color:var(--mb-muted-2)">${r.sl} ${mbX(r.dvt || '')} × ${mbFmt(r.dg)}</div>
-            </div>
-            <div style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(r.sl * r.dg)}</div>
-            <button class="mb-del" data-act="delItem" data-arg="${idx}">×</button>
-          </div>`).join('')}
-        ${MB.detailItems.length ? '' : '<div style="text-align:center;color:var(--mb-muted-2);font-size:12.5px;padding:18px 0;border:1px dashed var(--mb-line);border-radius:11px">Chưa có dòng vật tư</div>'}
-      </div>
-
-      <div class="mb-row">
-        <div class="mb-field" style="flex:2"><div class="mb-label">Tên vật tư</div>
-          <input id="mb-i-ten" class="mb-input" data-in="itemForm.ten" value="${mbX(it.ten)}" placeholder="VD: Thép hộp 40x80"/></div>
-        <div class="mb-field" style="flex:1"><div class="mb-label">ĐVT</div>
-          <input id="mb-i-dvt" class="mb-input" data-in="itemForm.dvt" value="${mbX(it.dvt)}" placeholder="kg"/></div>
-      </div>
-      <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">Số lượng</div>
-          <input id="mb-i-sl" class="mb-input" inputmode="decimal" data-in="itemForm.sl" value="${mbX(it.sl)}" placeholder="0"/></div>
-        <div class="mb-field" style="flex:1.4"><div class="mb-label">Đơn giá (đ)</div>
-          <input id="mb-i-dg" class="mb-input" inputmode="numeric" data-in="itemForm.dg" value="${mbX(it.dg)}" placeholder="0"/></div>
-      </div>
-      <button class="mb-btn dashed" data-act="addItem">+ Thêm dòng vật tư</button>
-
-      <div style="background:#F9FAFB;border-radius:10px;padding:11px 12px;display:flex;justify-content:space-between">
-        <span style="font-size:12.5px;color:var(--mb-muted)">Tổng hóa đơn</span>
-        <span style="font-size:15px;font-weight:800">${mbFull(total)}</span>
-      </div>
-      <button class="mb-btn" data-act="saveDetailInvoice">Lưu hóa đơn chi tiết</button>
     </div>
   </div>`;
 }
 
+/** Lịch sử hóa đơn: tìm + lọc CT / loại + "Xem thêm" từng 50 dòng + Sửa / Xóa trên thẻ */
 function mbNhapTatCa() {
-  const q = (MB.invSearch || '').toLowerCase();
-  const list = mbInvoices()
-    .filter(i => ((i.nd || '') + ' ' + (i.ncc || '') + ' ' + (i.congtrinh || '')).toLowerCase().includes(q))
-    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''))
-    .slice(0, 200);
+  const q   = (MB.invSearch || '').toLowerCase();
+  const all = mbInvoices();
+  const list = all
+    .filter(i => !MB.invCt   || (i.congtrinh || '') === MB.invCt)
+    .filter(i => !MB.invLoai || (i.loai || '') === MB.invLoai)
+    .filter(i => !q || ((i.nd || '') + ' ' + (i.ncc || '') + ' ' + (i.congtrinh || '')).toLowerCase().includes(q))
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || ((b.createdAt || 0) - (a.createdAt || 0)));
   const total = list.reduce((s, i) => s + mbInvAmount(i), 0);
-  const srcLabel = s => s === 'detail' ? 'HĐ chi tiết' : s === 'cc' ? 'Từ chấm công' : 'Nhập nhanh';
+  const shown = list.slice(0, MB.invLimit || 50);
+  const editable = mbInvEditableIds();
 
   return `<div class="mb-pad">
     <div class="mb-search">
       ${mbSearchIcon()}
       <input id="mb-in-invsearch" data-in="invSearch" data-live="1" value="${mbX(MB.invSearch)}" placeholder="Tìm nội dung, NCC, công trình..."/>
     </div>
+    <div class="mb-row" style="gap:8px">
+      <div class="mb-field"><select id="mb-inv-ct" class="mb-select" data-in="invCt">${mbFilterOptions(all.map(i => i.congtrinh), MB.invCt, 'Tất cả công trình')}</select></div>
+      <div class="mb-field"><select id="mb-inv-loai" class="mb-select" data-in="invLoai">${mbFilterOptions(all.map(i => i.loai), MB.invLoai, 'Tất cả loại CP')}</select></div>
+    </div>
     <div class="mb-row-between" style="align-items:baseline">
-      <div style="font-size:12.5px;color:var(--mb-muted)">${list.length} hóa đơn${list.length >= 200 ? ' (200 mới nhất)' : ''}</div>
+      <div style="font-size:12.5px;color:var(--mb-muted)">${list.length} hóa đơn${list.length > shown.length ? ' · đang hiện ' + shown.length : ''}</div>
       <div style="font-size:13px;font-weight:800">${mbFull(total)}</div>
     </div>
     <div class="mb-col">
-      ${list.length ? list.map(i => `<div class="mb-card mb-card-sm">
-        <div class="mb-row-between" style="margin-bottom:4px">
-          <span style="font-size:13px;font-weight:700">${mbX(i.nd || '(không có nội dung)')}</span>
-          <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(mbInvAmount(i))}</span>
-        </div>
-        <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:6px">${mbX(i.congtrinh || '—')} · ${mbDate(i.ngay)}</div>
-        <div style="display:flex;gap:6px">
-          <span class="mb-tag blue" style="background:var(--mb-primary-l);color:var(--mb-primary)">${mbX(i.loai || '—')}</span>
-          <span class="mb-tag gray">${srcLabel(i.source)}</span>
-        </div>
-      </div>`).join('') : '<div class="mb-empty">Không có hóa đơn phù hợp</div>'}
+      ${shown.length ? shown.map(i => mbInvCard(i, editable.has(String(i.id)))).join('') : '<div class="mb-empty">Không có hóa đơn phù hợp</div>'}
     </div>
+    ${list.length > shown.length ? `<button class="mb-btn gray" data-act="moreInvs">Xem thêm (+50 hóa đơn) · còn ${list.length - shown.length}</button>` : ''}
   </div>`;
 }
 
@@ -604,6 +626,7 @@ function mbCcEnsureDraft() {
       }))
     : [];
   MB.ccLoadedKey = key;
+  MB.ccOpenSalary = {};
 }
 
 function mbScrChamCong() {
@@ -612,19 +635,48 @@ function mbScrChamCong() {
   return mbCcSo();
 }
 
+/** Tuần chấm công gần nhất TRƯỚC tuần đang mở của cùng công trình (để chép danh sách công nhân) */
+function mbCcPrevWeek() {
+  const ct = MB.ccCt;
+  if (!ct) return null;
+  const from = mbCcSunday();
+  return (typeof ccData !== 'undefined' ? ccData : [])
+    .filter(w => !w.deletedAt && w.ct === ct && (w.fromDate || '') < from && (w.workers || []).length)
+    .sort((a, b) => (b.fromDate || '').localeCompare(a.fromDate || ''))[0] || null;
+}
+
+/** Lương/công của công nhân ở tuần chấm công gần nhất (mọi công trình) — 0 nếu chưa có */
+function mbCcLastLuong(name) {
+  const n = (name || '').trim().toLowerCase();
+  if (!n) return 0;
+  let luong = 0, at = '';
+  (typeof ccData !== 'undefined' ? ccData : []).forEach(w => {
+    if (w.deletedAt || (w.fromDate || '') <= at) return;
+    const k = (w.workers || []).find(x => (x.name || '').trim().toLowerCase() === n && (x.luong || 0) > 0);
+    if (k) { luong = k.luong; at = w.fromDate || ''; }
+  });
+  return luong;
+}
+
+/**
+ * Sổ chấm công tuần (27/10/2026): thẻ công nhân thu gọn — dòng Lương/Phụ cấp chỉ
+ * hiện khi bấm "⚙ Lương" hoặc công nhân chưa có lương; thanh Lưu dính đáy màn hình.
+ */
 function mbCcSo() {
   mbCcEnsureDraft();
   const from = mbCcSunday(), to = mbCcSaturday();
   const dayLabels = (typeof CC_DAY_LABELS !== 'undefined') ? CC_DAY_LABELS : ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
   const workers = MB.ccWorkers || [];
+  const prev    = mbCcPrevWeek();
 
   const congsOf = w => (w.d || []).reduce((s, v) => s + (v || 0), 0);
-  const grossOf = w => congsOf(w) * (w.luong || 0) + (w.phucap || 0);
+  const grossOf = w => congsOf(w) * mbMoney(w.luong) + mbMoney(w.phucap);
   const adjOf   = w => (typeof ccThucLanhLedgerAdj === 'function') ? ccThucLanhLedgerAdj(w.name, from, to) : 0;
 
   const totCongs = workers.reduce((s, w) => s + congsOf(w), 0);
   const totGross = workers.reduce((s, w) => s + grossOf(w), 0);
   const totAdj   = workers.reduce((s, w) => s + adjOf(w), 0);
+  const round1   = v => Math.round(v * 10) / 10;
 
   return `<div class="mb-pad">
     <div class="mb-card" style="padding:13px">
@@ -643,30 +695,35 @@ function mbCcSo() {
       <select id="mb-cc-ct" class="mb-select" data-in="ccCt">${mbCtOptions(MB.ccCt, false)}</select>
     </div>
 
-    <div class="mb-col" style="gap:10px">
+    <div class="mb-col" style="gap:8px">
       ${workers.map((w, wi) => {
         const congs = congsOf(w);
         const net   = grossOf(w) + adjOf(w);
         const role  = (typeof cnRoles !== 'undefined' && cnRoles[w.name]) || 'Công nhân';
-        return `<div class="mb-card" style="padding:13px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px">
+        const luong = mbMoney(w.luong), pc = mbMoney(w.phucap);
+        // Chưa có lương → mở sẵn dòng lương và GIỮ mở trong lúc gõ (không tự đóng khi vừa gõ chữ số đầu)
+        if (!luong) MB.ccOpenSalary[wi] = true;
+        const open = !!MB.ccOpenSalary[wi];
+        return `<div class="mb-card" style="padding:10px 11px">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
             <div style="flex:1;min-width:0">
-              <input id="mb-cc-name-${wi}" class="mb-input" list="mb-dl-cn" style="padding:6px 8px;font-size:13.5px;font-weight:700;border-color:transparent;background:#F9FAFB"
-                     data-in="ccWorkers.${wi}.name" value="${mbX(w.name)}" placeholder="Tên công nhân"/>
-              <div style="font-size:10.5px;color:var(--mb-muted-2);margin-top:3px">${mbX(role)} · ${mbFmt(w.luong)}/công</div>
+              <input id="mb-cc-name-${wi}" class="mb-input" list="mb-dl-cn" style="padding:5px 8px;font-size:13.5px;font-weight:700;border-color:transparent;background:#F9FAFB"
+                     data-in="ccWorkers.${wi}.name" data-onchange="ccNamePicked" data-arg="${wi}" value="${mbX(w.name)}" placeholder="Tên công nhân"/>
+              <div style="font-size:10.5px;color:var(--mb-muted-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${mbX(role)} · ${mbFmt(luong)}/công${pc ? ' + PC ' + mbFmt(pc) : ''}</div>
             </div>
-            <div style="text-align:right;flex-shrink:0">
-              <div style="font-size:14px;font-weight:800">${mbFmt(net)}</div>
-              <div style="font-size:10.5px;color:var(--mb-muted-2)">${Math.round(congs * 10) / 10} công</div>
+            <button class="mb-btn-outline${open ? ' blue' : ''}" style="padding:5px 7px" data-act="ccToggleSalary" data-arg="${wi}">⚙️ Lương</button>
+            <div style="text-align:right;flex-shrink:0;min-width:50px">
+              <div style="font-size:13.5px;font-weight:800">${mbFmt(net)}</div>
+              <div style="font-size:10.5px;color:var(--mb-muted-2)">${round1(congs)} công</div>
             </div>
+            <button class="mb-del" data-act="ccDelWorker" data-arg="${wi}">×</button>
           </div>
-          <div class="mb-row" style="margin-bottom:10px">
+          ${open ? `<div class="mb-row" style="margin-bottom:8px">
             <div class="mb-field"><div class="mb-label">Lương/công</div>
-              <input id="mb-cc-luong-${wi}" class="mb-input" inputmode="numeric" data-in="ccWorkers.${wi}.luong" data-live="1" value="${w.luong || ''}" placeholder="0"/></div>
+              <input id="mb-cc-luong-${wi}" class="mb-input" inputmode="numeric" data-money="1" data-in="ccWorkers.${wi}.luong" data-live="1" value="${mbX(mbMoneyStr(w.luong))}" placeholder="0"/></div>
             <div class="mb-field"><div class="mb-label">Phụ cấp</div>
-              <input id="mb-cc-pc-${wi}" class="mb-input" inputmode="numeric" data-in="ccWorkers.${wi}.phucap" data-live="1" value="${w.phucap || ''}" placeholder="0"/></div>
-            <button class="mb-del" style="align-self:flex-end;margin-bottom:6px" data-act="ccDelWorker" data-arg="${wi}">×</button>
-          </div>
+              <input id="mb-cc-pc-${wi}" class="mb-input" inputmode="numeric" data-money="1" data-in="ccWorkers.${wi}.phucap" data-live="1" value="${mbX(mbMoneyStr(w.phucap))}" placeholder="0"/></div>
+          </div>` : ''}
           <div class="mb-days">
             ${(w.d || []).map((v, di) => `<div class="mb-day${v > 0 ? ' on' : ''}" data-act="ccCycle" data-arg="${wi}|${di}">
               <div class="mb-day-lb">${dayLabels[di]}</div>
@@ -678,21 +735,26 @@ function mbCcSo() {
       <datalist id="mb-dl-cn">${((typeof ccAllNames === 'function') ? ccAllNames() : []).map(n => `<option value="${mbX(n)}">`).join('')}</datalist>
     </div>
 
-    <button class="mb-btn dashed" data-act="ccAddWorker">+ Thêm công nhân</button>
+    ${!workers.length && prev
+      ? `<button class="mb-btn soft-blue" data-act="ccCopyPrevWeek">📋 Chép công nhân từ tuần trước (${(prev.workers || []).length} người)</button>
+         <button class="mb-btn dashed" data-act="ccAddWorker">+ Thêm công nhân</button>`
+      : `<div style="display:flex;gap:8px">
+          <button class="mb-btn dashed" style="flex:1" data-act="ccAddWorker">+ Thêm công nhân</button>
+          ${prev ? `<button class="mb-btn dashed" style="flex:1" data-act="ccCopyPrevWeek">📋 Chép tuần trước</button>` : ''}
+        </div>`}
 
-    <div class="mb-card" style="padding:13px;display:flex;flex-direction:column;gap:8px">
-      ${[
-        ['Tổng công',        (Math.round(totCongs * 10) / 10) + ' công', ''],
-        ['Tổng lương',       mbFull(totGross),                           ''],
-        ['Điều chỉnh ứng CN', (totAdj >= 0 ? '+ ' : '− ') + mbFull(Math.abs(totAdj)), 'var(--mb-amber)'],
-        ['Thực lãnh',        mbFull(totGross + totAdj),                  'var(--mb-green)'],
-      ].map(([l, v, c]) => `<div class="mb-row-between">
-        <span style="font-size:12.5px;color:var(--mb-muted)">${l}</span>
-        <span style="font-size:13px;font-weight:700;color:${c || 'var(--mb-text)'}">${mbX(v)}</span>
-      </div>`).join('')}
+    ${totAdj ? `<div class="mb-card mb-card-sm" style="display:flex;flex-direction:column;gap:6px">
+      <div class="mb-row-between"><span style="font-size:12px;color:var(--mb-muted)">Tổng lương</span><span style="font-size:12.5px;font-weight:700">${mbFull(totGross)}</span></div>
+      <div class="mb-row-between"><span style="font-size:12px;color:var(--mb-muted)">Điều chỉnh ứng CN</span><span style="font-size:12.5px;font-weight:700;color:var(--mb-amber)">${(totAdj >= 0 ? '+ ' : '− ') + mbFull(Math.abs(totAdj))}</span></div>
+    </div>` : ''}
+
+    <div class="mb-sticky-bar">
+      <div style="min-width:0">
+        <div style="font-size:11px;color:var(--mb-muted)">Tổng: ${round1(totCongs)} công</div>
+        <div style="font-size:13.5px;font-weight:800;color:var(--mb-green);white-space:nowrap">Thực lãnh: ${mbFull(totGross + totAdj)}</div>
+      </div>
+      <button class="mb-btn" data-act="ccSaveWeek">💾 Lưu chấm công</button>
     </div>
-
-    <button class="mb-btn lg" data-act="ccSaveWeek">Lưu tuần chấm công</button>
   </div>`;
 }
 
@@ -750,7 +812,7 @@ function mbCcBaoCao() {
 function mbCcUng() {
   const today = mbToday();
   const names = (typeof ccAllNames === 'function') ? ccAllNames() : [];
-  const rows = names.map(n => {
+  const all = names.map(n => {
     const ung = (typeof ungRecords !== 'undefined' ? ungRecords : [])
       .filter(r => !r.deletedAt && r.loai === 'congnhan' && (r.tp || '') === n);
     const daUng = ung.filter(r => r.cnKind !== 'tra').reduce((s, r) => s + (r.tien || 0), 0);
@@ -759,14 +821,19 @@ function mbCcUng() {
     return { name: n, daUng, daTra, remain };
   }).filter(r => r.daUng || r.daTra || r.remain);
 
-  const total = rows.reduce((s, r) => s + r.remain, 0);
+  // Mặc định chỉ hiện công nhân CÒN NỢ; bấm chip để hiện cả người đã hết nợ
+  const showAll = MB.ccUngShowAll === '1';
+  const owing   = all.filter(r => Math.round(r.remain) !== 0);
+  const rows    = (showAll ? all : owing).sort((a, b) => b.remain - a.remain);
+
+  const total = all.reduce((s, r) => s + r.remain, 0);
   const f = MB.ccUngForm;
 
   return `<div class="mb-pad">
     <div class="mb-kpi amber" style="border-radius:13px">
       <div class="mb-kpi-label">Công nợ công nhân còn lại</div>
       <div class="mb-kpi-value" style="font-size:17px">${mbFmt(total)}</div>
-      <div class="mb-kpi-hint">${rows.length} công nhân có phát sinh</div>
+      <div class="mb-kpi-hint">${owing.length} công nhân còn nợ</div>
     </div>
 
     <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
@@ -778,8 +845,8 @@ function mbCcUng() {
       </div>
 
       <div><div class="mb-label">Công nhân</div>
-        <input id="mb-cu-tp" class="mb-input" list="mb-dl-cnung" data-in="ccUngForm.tp" value="${mbX(f.tp)}" placeholder="Nhập hoặc chọn tên"/>
-        <datalist id="mb-dl-cnung">${((typeof ccAllNames === 'function') ? ccAllNames() : []).map(n => `<option value="${mbX(n)}">`).join('')}</datalist></div>
+        <input id="mb-cu-tp" class="mb-input" list="mb-dl-cnung" data-in="ccUngForm.tp" value="${mbX(f.tp)}" placeholder="Nhập, chọn tên hoặc bấm thẻ bên dưới"/>
+        <datalist id="mb-dl-cnung">${names.map(n => `<option value="${mbX(n)}">`).join('')}</datalist></div>
 
       <div><div class="mb-label">Công trình</div>
         <select id="mb-cu-ct" class="mb-select" data-in="ccUngForm.ct">${mbCtOptions(f.ct, false)}</select></div>
@@ -788,8 +855,9 @@ function mbCcUng() {
         <div class="mb-field"><div class="mb-label">Ngày</div>
           <input id="mb-cu-ngay" class="mb-input" type="date" data-in="ccUngForm.ngay" value="${mbX(f.ngay)}"/></div>
         <div class="mb-field" style="flex:1.3"><div class="mb-label">Số tiền (đ)</div>
-          <input id="mb-cu-tien" class="mb-input" inputmode="numeric" data-in="ccUngForm.tien" value="${mbX(f.tien)}" placeholder="0"/></div>
+          <input id="mb-cu-tien" class="mb-input" inputmode="numeric" data-money="1" data-in="ccUngForm.tien" data-live="1" value="${mbX(f.tien)}" placeholder="0"/></div>
       </div>
+      ${mbQuickMoney('ccUngForm.tien', f.tien)}
 
       <div><div class="mb-label">Nội dung</div>
         <input id="mb-cu-nd" class="mb-input" data-in="ccUngForm.nd" value="${mbX(f.nd)}" placeholder="${f.kind === 'tra' ? 'VD: Trả nợ đợt 1' : 'VD: Ứng sinh hoạt'}"/></div>
@@ -799,8 +867,12 @@ function mbCcUng() {
       </button>
     </div>
 
+    <div class="mb-row-between" style="align-items:center">
+      <div class="mb-sec-title">${showAll ? 'Tất cả công nhân có phát sinh' : 'Công nhân còn nợ'}</div>
+      <div class="mb-chip${showAll ? ' on' : ''}" data-act="setFilter" data-arg="ccUngShowAll|${showAll ? '0' : '1'}">Hiện cả đã hết nợ</div>
+    </div>
     <div class="mb-col">
-      ${rows.length ? rows.map(r => `<div class="mb-card mb-card-sm">
+      ${rows.length ? rows.map(r => `<div class="mb-card mb-card-sm tap" data-act="ccPickWorker" data-arg="${mbX(r.name)}"${f.tp === r.name ? ' style="border-color:var(--mb-primary)"' : ''}>
         <div class="mb-row-between" style="margin-bottom:6px">
           <span style="font-size:13px;font-weight:700">${mbX(r.name)}</span>
           <span style="font-size:13px;font-weight:800;color:${r.remain > 0 ? 'var(--mb-amber)' : 'var(--mb-green)'};flex-shrink:0">${mbFmtSigned(r.remain)}</span>
@@ -808,7 +880,7 @@ function mbCcUng() {
         <div class="mb-row-between" style="font-size:11px;color:var(--mb-muted-2)">
           <span>Đã ứng ${mbFmt(r.daUng)}</span><span>Đã trả ${mbFmt(r.daTra)}</span>
         </div>
-      </div>`).join('') : '<div class="mb-empty">Chưa có công nợ công nhân</div>'}
+      </div>`).join('') : `<div class="mb-empty">${showAll ? 'Chưa có công nợ công nhân' : '🎉 Không còn công nhân nào nợ'}</div>`}
     </div>
   </div>`;
 }
@@ -854,8 +926,9 @@ function mbUngNhap() {
         <div class="mb-field"><div class="mb-label">Ngày</div>
           <input id="mb-u-ngay" class="mb-input" type="date" data-in="ungForm.ngay" value="${mbX(f.ngay)}"/></div>
         <div class="mb-field" style="flex:1.3"><div class="mb-label">Số tiền (đ)</div>
-          <input id="mb-u-tien" class="mb-input" inputmode="numeric" data-in="ungForm.tien" value="${mbX(f.tien)}" placeholder="0"/></div>
+          <input id="mb-u-tien" class="mb-input" inputmode="numeric" data-money="1" data-in="ungForm.tien" data-live="1" value="${mbX(f.tien)}" placeholder="0"/></div>
       </div>
+      ${mbQuickMoney('ungForm.tien', f.tien)}
 
       <div><div class="mb-label">Nội dung</div>
         <input id="mb-u-nd" class="mb-input" data-in="ungForm.nd" value="${mbX(f.nd)}" placeholder="VD: Ứng đợt 1"/></div>
@@ -925,76 +998,54 @@ function mbUngThongKe() {
 function mbScrDoanhThu() {
   if (MB.seg.doanhthu === 'thongke')  return mbDtThongKe();
   if (MB.seg.doanhthu === 'loinhuan') return mbDtLoiNhuan();
-  return mbDtKhaiBao();
+  return mbDtThu();
 }
 
-// (02/10/2026) Doanh thu chỉ còn 2 thao tác nhập: HĐ chính + Thu tiền.
-// HĐ thầu phụ (chi phí) chuyển sang màn Công nợ → tab con "HĐ thầu phụ" (dùng lại form này).
-const MB_DT_KINDS = [['hdc', 'HĐ chính'], ['thu', 'Thu tiền']];
-const MB_DT_TITLE = { hdc: 'Hợp đồng chính', hdtp: 'Hợp đồng thầu phụ', thu: 'Thu tiền' };
-
-// forceKind: 'hdtp' khi gọi từ màn Công nợ (ẩn chip chọn loại)
-function mbDtKhaiBao(forceKind) {
+// (27/10/2026) Điện thoại chỉ còn ghi nhận THU TIỀN của chủ đầu tư.
+// Khai báo HĐ chính / HĐ thầu phụ làm trên máy tính.
+function mbDtThu() {
   const f = MB.dtForm;
-  let kind = forceKind || MB.dtKind;
-  if (!forceKind && kind === 'hdtp') kind = MB.dtKind = 'hdc';   // state cũ còn 'hdtp' → về HĐ chính
-
-  // Danh sách khai báo gần đây theo loại
-  let rows = [];
-  if (kind === 'hdc') {
-    rows = Object.entries(typeof hopDongData !== 'undefined' ? hopDongData : {})
-      .filter(([, v]) => v && !v.deletedAt)
-      .map(([k, v]) => {
-        const p = mbProject(v.projectId || k);
-        return { ct: p ? p.name : k, tien: (v.giaTri || 0) + (v.giaTriphu || 0) + (v.phatSinh || 0), ngay: v.ngay, label: 'Hợp đồng chính', color: '' };
-      });
-  } else if (kind === 'hdtp') {
-    rows = (typeof thauPhuContracts !== 'undefined' ? thauPhuContracts : [])
-      .filter(r => !r.deletedAt && inActiveYear(r.ngay))
-      .map(r => ({ ct: r.congtrinh || '—', tien: (r.giaTri || 0) + (r.phatSinh || 0), ngay: r.ngay, label: 'Thầu phụ · ' + (r.thauphu || '—'), color: 'var(--mb-amber)' }));
-  } else {
-    rows = (typeof thuRecords !== 'undefined' ? thuRecords : [])
-      .filter(r => !r.deletedAt && inActiveYear(r.ngay))
-      .map(r => ({ ct: r.congtrinh || '—', tien: r.tien || 0, ngay: r.ngay, label: 'Thu tiền · ' + (r.nd || ''), color: 'var(--mb-green)' }));
-  }
-  rows = rows.sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '')).slice(0, 20);
+  const year = (typeof thuRecords !== 'undefined' ? thuRecords : [])
+    .filter(r => !r.deletedAt && inActiveYear(r.ngay))
+    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || ((b.createdAt || 0) - (a.createdAt || 0)));
+  const total = year.reduce((s, r) => s + (r.tien || 0), 0);
 
   return `<div class="mb-pad">
-    ${forceKind ? '' : `<div class="mb-chips even">
-      ${MB_DT_KINDS.map(([k, l]) => `<div class="mb-chip${kind === k ? ' on' : ''}" data-act="setFilter" data-arg="dtKind|${k}">${l}</div>`).join('')}
-    </div>`}
-
     <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
-      <div class="mb-sec-title">${MB_DT_TITLE[kind]}</div>
+      <div class="mb-sec-title">Ghi nhận thu tiền</div>
 
       <div><div class="mb-label">Công trình</div>
         <select id="mb-dt-ct" class="mb-select" data-in="dtForm.ct">${mbCtOptions(f.ct, false)}</select></div>
 
-      ${kind === 'hdtp' ? `<div><div class="mb-label">Thầu phụ</div>
-        <input id="mb-dt-tp" class="mb-input" list="mb-dl-dttp" data-in="dtForm.tp" value="${mbX(f.tp)}" placeholder="Tên thầu phụ"/>
-        <datalist id="mb-dl-dttp">${(cats.thauPhu || []).map(v => `<option value="${mbX(v)}">`).join('')}</datalist></div>` : ''}
+      <div><div class="mb-label">Số tiền thu (đ)</div>
+        <input id="mb-dt-tien" class="mb-input money-lg" inputmode="numeric" data-money="1" data-in="dtForm.tien" data-live="1" value="${mbX(f.tien)}" placeholder="0"/>
+        ${mbQuickMoney('dtForm.tien', f.tien)}</div>
 
       <div class="mb-row">
-        <div class="mb-field"><div class="mb-label">${kind === 'thu' ? 'Số tiền thu (đ)' : 'Giá trị (đ)'}</div>
-          <input id="mb-dt-tien" class="mb-input" inputmode="numeric" data-in="dtForm.tien" value="${mbX(f.tien)}" placeholder="0"/></div>
-        <div class="mb-field"><div class="mb-label">Ngày</div>
+        <div class="mb-field"><div class="mb-label">Ngày thu</div>
           <input id="mb-dt-ngay" class="mb-input" type="date" data-in="dtForm.ngay" value="${mbX(f.ngay)}"/></div>
+        <div class="mb-field" style="flex:1.3"><div class="mb-label">Nội dung / Đợt thu</div>
+          <input id="mb-dt-nd" class="mb-input" data-in="dtForm.nd" value="${mbX(f.nd)}" placeholder="VD: Thu đợt 2"/></div>
       </div>
 
-      <div><div class="mb-label">${kind === 'thu' ? 'Người thu / nội dung' : 'Nội dung'}</div>
-        <input id="mb-dt-nd" class="mb-input" data-in="dtForm.nd" value="${mbX(f.nd)}" placeholder="Ghi chú"/></div>
-
-      <button class="mb-btn" data-act="saveDt" data-arg="${kind}">Lưu ${MB_DT_TITLE[kind].toLowerCase()}</button>
+      <button class="mb-btn green" data-act="saveDt">💾 Lưu phiếu thu</button>
     </div>
 
+    <div class="mb-sec-head">
+      <div class="mb-sec-title">Phiếu thu gần đây</div>
+      <div style="font-size:12.5px;font-weight:800;color:var(--mb-green)">${mbFull(total)}</div>
+    </div>
     <div class="mb-col">
-      ${rows.length ? rows.map(r => `<div class="mb-card mb-card-sm">
-        <div class="mb-row-between" style="margin-bottom:4px">
-          <span style="font-size:13px;font-weight:700">${mbX(r.ct)}</span>
-          <span style="font-size:13px;font-weight:800;color:${r.color || 'var(--mb-text)'};flex-shrink:0">${mbFmt(r.tien)}</span>
+      ${year.length ? year.slice(0, 30).map(r => `<div class="mb-card mb-card-sm" style="display:flex;gap:10px;align-items:center">
+        <div style="flex:1;min-width:0">
+          <div class="mb-row-between" style="margin-bottom:4px">
+            <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(r.congtrinh || '—')}</span>
+            <span style="font-size:13px;font-weight:800;color:var(--mb-green);flex-shrink:0">${mbFmt(r.tien)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(r.nd || 'Thu tiền')} · ${mbDate(r.ngay)}</div>
         </div>
-        <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(r.label)} · ${mbDate(r.ngay)}</div>
-      </div>`).join('') : '<div class="mb-empty">Chưa có khai báo nào</div>'}
+        <button class="mb-del" data-act="delThu" data-arg="${mbX(r.id)}" title="Xóa phiếu thu">×</button>
+      </div>`).join('') : '<div class="mb-empty">Chưa có phiếu thu trong năm này</div>'}
     </div>
   </div>`;
 }
@@ -1054,7 +1105,7 @@ function mbDtLoiNhuan() {
     ['A · Chi phí hóa đơn',         totInv, 'var(--mb-red)'],
     ['B · Chi phí thầu phụ',        totTp,  'var(--mb-amber)'],
     ['C · Phân bổ chi phí chung',   chung,  'var(--mb-purple)'],
-    ['Lợi nhuận gộp',               loi,    'var(--mb-green)'],
+    ['Lợi nhuận gộp',               loi,    loi >= 0 ? 'var(--mb-green)' : 'var(--mb-red)'],
   ];
 
   return `<div class="mb-pad">
@@ -1079,7 +1130,9 @@ function mbDtLoiNhuan() {
         return `<div class="mb-card mb-card-sm tap" data-act="openProject" data-arg="${mbX(p.id)}">
           <div class="mb-row-between" style="margin-bottom:5px">
             <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(p.name)}</span>
-            <span class="mb-tag ${lai >= 0 ? 'green' : 'red'}">${lai >= 0 ? 'Lãi' : 'Lỗ'} ${pct}%</span>
+            ${st.thu === 0 && st.chi > 0
+              ? '<span class="mb-tag amber">Chưa thu</span>'   // chưa thu đồng nào → không chia cho 0 ra "Lỗ 0%"
+              : `<span class="mb-tag ${lai >= 0 ? 'green' : 'red'}">${lai >= 0 ? 'Lãi' : 'Lỗ'} ${pct}%</span>`}
           </div>
           <div class="mb-row-between" style="font-size:11.5px;color:var(--mb-muted)">
             <span>DT ${mbFmt(st.thu)} · Chi ${mbFmt(st.chi)}</span>
@@ -1096,8 +1149,7 @@ function mbDtLoiNhuan() {
 //      Dùng lại lõi desktop congno.tattoan.js: ttBuildRows() · ttBatches()
 // ══════════════════════════════════════════════════════════════
 function mbScrCongNo() {
-  // Tab con "HĐ thầu phụ" — form khai báo HĐ thầu phụ (chuyển từ Doanh thu sang)
-  if (MB.seg.congno === 'hdtp') return mbDtKhaiBao('hdtp');
+  // (27/10/2026) Không còn tab con "HĐ thầu phụ" trên điện thoại — vào thẳng công nợ & tất toán
   return mbCnCongNo();
 }
 
@@ -1111,7 +1163,12 @@ function mbScrThietBi() {
   // Tên nơi lấy qua _tbLocName (thietbi.js) để hiện đúng tên kho kể cả khi `ct` bị ghi đè.
   const tbCt  = t => (typeof _tbLocName === 'function' ? _tbLocName(t) : '') || t.ct || t.congtrinh || '';
   const isKho = t => t.projectId === 'COMPANY' || !tbCt(t) || tbCt(t).toLowerCase().includes('kho');
-  const rows = all.filter(t => MB.tbView === 'kho' ? isKho(t) : !isKho(t));
+  const base  = all.filter(t => MB.tbView === 'kho' ? isKho(t) : !isKho(t));
+  const q     = (MB.tbSearch || '').toLowerCase();
+  const rows  = base
+    .filter(t => !MB.tbCt || tbCt(t) === MB.tbCt)
+    .filter(t => !q || ((t.ten || '') + ' ' + tbCt(t) + ' ' + (t.nguoi || '')).toLowerCase().includes(q));
+  const totSl = rows.reduce((s, t) => s + (Number(t.soluong) || 0), 0);
 
   const stCls = s => {
     const v = (s || '').toLowerCase();
@@ -1126,6 +1183,12 @@ function mbScrThietBi() {
       ${[['ct', 'Tại công trình'], ['kho', 'Kho']].map(([k, l]) =>
         `<div class="mb-chip${MB.tbView === k ? ' on' : ''}" data-act="setFilter" data-arg="tbView|${k}">${l}</div>`).join('')}
     </div>
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-tbsearch" data-in="tbSearch" data-live="1" value="${mbX(MB.tbSearch)}" placeholder="Tìm tên thiết bị, người phụ trách..."/>
+    </div>
+    <select id="mb-tb-ct" class="mb-select" data-in="tbCt">${mbFilterOptions(base.map(tbCt), MB.tbCt, MB.tbView === 'kho' ? 'Tất cả kho' : 'Tất cả công trình')}</select>
+    <div style="font-size:12px;color:var(--mb-muted)">${rows.length} dòng thiết bị · tổng SL ${totSl}</div>
     <div class="mb-col">
       ${rows.length ? rows.map(t => `<div class="mb-card mb-card-sm">
         <div class="mb-row-between" style="margin-bottom:4px">
@@ -1136,221 +1199,64 @@ function mbScrThietBi() {
           <span style="font-size:11px;color:var(--mb-muted-2)">${mbX(tbCt(t) || 'Kho')} · ${mbX(t.nguoi || '—')}</span>
           <span class="mb-tag ${stCls(t.tinhtrang)}">${mbX(t.tinhtrang || '—')}</span>
         </div>
-      </div>`).join('') : '<div class="mb-empty">Không có thiết bị</div>'}
+      </div>`).join('') : '<div class="mb-empty">Không có thiết bị phù hợp</div>'}
     </div>
   </div>`;
 }
 
 // ══════════════════════════════════════════════════════════════
-//  10 · DANH MỤC
-// ══════════════════════════════════════════════════════════════
-function mbScrDanhMuc() {
-  const list = (cats[MB.dmType] || []);
-  return `<div class="mb-pad">
-    <div class="mb-chips">
-      ${Object.keys(MB_DM_LABELS).map(k =>
-        `<div class="mb-chip${MB.dmType === k ? ' on' : ''}" data-act="setFilter" data-arg="dmType|${k}">${MB_DM_LABELS[k]}</div>`).join('')}
-    </div>
-
-    <div style="display:flex;gap:8px">
-      <input id="mb-dm-new" class="mb-input" data-in="dmNew" value="${mbX(MB.dmNew)}" placeholder="Thêm mục mới..."/>
-      <button class="mb-btn" style="width:auto;padding:10px 15px;font-size:13px" data-act="addDm">Thêm</button>
-    </div>
-
-    <div class="mb-list">
-      ${list.length ? list.map((name, idx) => `<div class="mb-list-row">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600">${mbX(name)}</div>
-          <div style="font-size:10.5px;color:var(--mb-muted-2)">${MB_DM_LABELS[MB.dmType]}</div>
-        </div>
-        <button class="mb-del" data-act="delDm" data-arg="${idx}">×</button>
-      </div>`).join('') : '<div class="mb-empty">Danh mục trống</div>'}
-    </div>
-  </div>`;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  11 · THỐNG KÊ CPHĐ
+//  10 · CƠ CẤU CHI PHÍ (27/10/2026) — chi phí theo loại của Toàn công ty
+//       hoặc của từng công trình (MB.tkCt). Khối "Chi phí chung phân bổ"
+//       đã bỏ khỏi điện thoại (xem trên máy tính → Thống Kê CPHĐ).
 // ══════════════════════════════════════════════════════════════
 function mbScrThongKe() {
-  const invs = mbInvoices();
+  const all  = mbInvoices();
+  const ct   = MB.tkCt;
+  const invs = ct ? all.filter(i => (i.congtrinh || '') === ct) : all;
+  const total = invs.reduce((s, i) => s + mbInvAmount(i), 0);
 
-  // Chi phí theo loại
   const byLoai = {};
   invs.forEach(i => { const k = i.loai || '(Không phân loại)'; byLoai[k] = (byLoai[k] || 0) + mbInvAmount(i); });
   const loaiRows = Object.entries(byLoai).sort((a, b) => b[1] - a[1]);
   const maxLoai  = loaiRows.length ? loaiRows[0][1] : 1;
   const COLORS   = ['var(--mb-primary)', 'var(--mb-green)', 'var(--mb-amber)', 'var(--mb-purple)', 'var(--mb-red)'];
 
-  // Phân bổ chi phí chung — dùng đúng allocateCompanyCost() của desktop
-  const alloc = (typeof allocateCompanyCost === 'function') ? allocateCompanyCost() : [];
-  const chung = (typeof getCompanyCost === 'function') ? getCompanyCost() : 0;
-
   return `<div class="mb-pad">
+    <select id="mb-tk-ct" class="mb-select" data-in="tkCt">${mbFilterOptions(all.map(i => i.congtrinh), ct, 'Toàn công ty')}</select>
+
+    <div class="mb-kpi blue">
+      <div class="mb-kpi-label">Tổng chi phí · ${mbX(ct || 'Toàn công ty')}</div>
+      <div class="mb-kpi-value">${mbFull(total)}</div>
+      <div class="mb-kpi-hint">${invs.length} hóa đơn · ${mbYearLabel()}</div>
+    </div>
+
     <div class="mb-card">
       <div class="mb-sec-title" style="margin-bottom:11px">Chi phí theo loại</div>
       <div class="mb-col" style="gap:10px">
         ${loaiRows.length ? loaiRows.map(([label, v], idx) => `<div>
           <div class="mb-row-between" style="margin-bottom:4px">
             <span style="font-size:12px;color:var(--mb-text-2);font-weight:600">${mbX(label)}</span>
-            <span style="font-size:12.5px;font-weight:800">${mbFmt(v)}</span>
+            <span style="font-size:12.5px;font-weight:800">${mbFmt(v)} <span style="font-weight:600;color:var(--mb-muted-2)">· ${mbPct(v, total)}%</span></span>
           </div>
           <div class="mb-bar"><i style="width:${mbBarW(v, maxLoai)};background:${COLORS[idx % COLORS.length]}"></i></div>
         </div>`).join('') : '<div class="mb-empty">Chưa có chi phí</div>'}
       </div>
     </div>
-
-    <div class="mb-card">
-      <div class="mb-sec-head" style="margin-bottom:11px">
-        <div class="mb-sec-title">Chi phí chung phân bổ</div>
-        <div style="font-size:12px;font-weight:700">${mbFmt(chung)}</div>
-      </div>
-      <div class="mb-col" style="gap:9px">
-        ${alloc.length ? alloc.filter(a => a.allocated > 0).map(a => `
-          <div class="mb-row-between" style="align-items:center">
-            <div style="min-width:0">
-              <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(a.p.name)}</div>
-              <div style="font-size:10.5px;color:var(--mb-muted-2)">${(typeof getProjectDays === 'function') ? getProjectDays(a.p) : 0} ngày × k=${(typeof getProjectK === 'function') ? getProjectK(a.p) : 1}</div>
-            </div>
-            <div style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(a.allocated)}</div>
-          </div>`).join('') : '<div class="mb-empty">Chưa có chi phí chung để phân bổ</div>'}
-      </div>
-    </div>
-  </div>`;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  12 · THÙNG RÁC — dùng lại _trashGetRecords / _trashRestore / _trashHardDelete
-// ══════════════════════════════════════════════════════════════
-const MB_TRASH_TABS = [
-  ['hoadon', 'Hóa đơn'], ['tienung', 'Tiền ứng'], ['chamcong', 'Chấm công'],
-  ['thietbi', 'Thiết bị'], ['thutien', 'Thu tiền'],
-];
-
-function mbScrThungRac() {
-  const recs = (typeof _trashGetRecords === 'function') ? _trashGetRecords(MB.trashType) : [];
-
-  const title = r => {
-    if (MB.trashType === 'hoadon')   return r.nd || '(Hóa đơn không tên)';
-    if (MB.trashType === 'tienung')  return 'Ứng ' + (r.tp || '—');
-    if (MB.trashType === 'chamcong') return 'Tuần ' + ((typeof weekLabel === 'function') ? weekLabel(r.fromDate) : r.fromDate);
-    if (MB.trashType === 'thietbi')  return r.ten || '(Thiết bị)';
-    if (MB.trashType === 'thutien')  return 'Thu ' + (r.nd || '');
-    return '(Bản ghi)';
-  };
-  const amount = r => {
-    if (MB.trashType === 'hoadon')   return mbInvAmount(r);
-    if (MB.trashType === 'chamcong') return (r.workers || []).reduce((s, k) =>
-      s + (k.d || []).reduce((a, v) => a + (v || 0), 0) * (k.luong || 0) + (k.phucap || 0), 0);
-    if (MB.trashType === 'thietbi')  return 0;
-    return r.tien || 0;
-  };
-
-  return `<div class="mb-pad">
-    <div class="mb-chips">
-      ${MB_TRASH_TABS.map(([k, l]) => {
-        const n = (typeof _trashGetRecords === 'function') ? _trashGetRecords(k).length : 0;
-        return `<div class="mb-chip${MB.trashType === k ? ' on' : ''}" data-act="setFilter" data-arg="trashType|${k}">${l}${n ? ' · ' + n : ''}</div>`;
-      }).join('')}
-    </div>
-
-    <div class="mb-col" style="gap:9px">
-      ${recs.length ? recs.map(r => `<div class="mb-card mb-card-sm">
-        <div class="mb-row-between" style="margin-bottom:4px">
-          <span style="font-size:13px;font-weight:700">${mbX(title(r))}</span>
-          ${amount(r) ? `<span style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(amount(r))}</span>` : ''}
-        </div>
-        <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:10px">Xóa ${mbDate(new Date(r.deletedAt || Date.now()).toISOString().slice(0, 10))} · ${mbX(r.congtrinh || r.ct || '—')}</div>
-        <div style="display:flex;gap:8px">
-          <button class="mb-btn sm soft-blue" style="flex:1" data-act="trashRestore" data-arg="${MB.trashType}||${mbX(r.id)}">Phục hồi</button>
-          <button class="mb-btn sm soft-red"  style="flex:1" data-act="trashPurge"   data-arg="${MB.trashType}||${mbX(r.id)}">Xóa vĩnh viễn</button>
-        </div>
-      </div>`).join('') : '<div class="mb-empty">Thùng rác trống</div>'}
-    </div>
-  </div>`;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  12b · QUYẾT TOÁN (02/10/2026) — dùng lại lõi desktop:
-//        calcTongDoanhThu() · qtLoaiOf()
-//        Quyết toán CT chỉ XEM (nhập/sửa trên máy tính).
-//        (03/10/2026) Tất toán TP/NCC đã chuyển sang màn Công nợ (mbCnCongNo).
-// ══════════════════════════════════════════════════════════════
-// THEO NĂM ĐANG LỌC như các màn khác — KHÔNG tự tải toàn bộ các năm (02/10/2026).
-function mbScrQuyetToan() {
-  return mbQtCongTrinh();
-}
-
-// ── Tab con 1: QUYẾT TOÁN CÔNG TRÌNH (chỉ xem) ──
-function mbQtCongTrinh() {
-  const q = (MB.search || '').toLowerCase();
-  const rows = mbProjects()
-    .filter(p => (p.name || '').toLowerCase().includes(q))
-    .filter(p => typeof qtCtInYear !== 'function' || qtCtInYear(p.name))   // chỉ CT thuộc năm đang lọc
-    .map(p => ({ p, d: calcTongDoanhThu(p) }))                            // số liệu theo năm đang lọc
-    .filter(r => r.d.hdGoc || r.d.qt || r.d.daThu)
-    .sort((a, b) => b.d.conPhaiThu - a.d.conPhaiThu);
-
-  // 15 quyết toán mới nhất trong năm đang lọc
-  const recent = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
-    .filter(r => !r.deletedAt && (typeof _dtInYear !== 'function' || _dtInYear(r.ngay)))
-    .sort((a, b) => (b.ngay || '').localeCompare(a.ngay || '') || ((b.createdAt || 0) - (a.createdAt || 0)))
-    .slice(0, 15);
-  const _loaiTag = { tang: ['Tăng', 'green'], giam: ['Giảm', 'red'], thaythe: ['Thay thế', 'blue'] };
-
-  return `<div class="mb-pad">
-    <div class="mb-search">
-      ${mbSearchIcon()}
-      <input id="mb-in-search" data-in="search" data-live="1" value="${mbX(MB.search)}" placeholder="Tìm công trình..."/>
-    </div>
-    <div style="font-size:11px;color:var(--mb-muted-2)">Số liệu theo năm đang chọn. Nhập / sửa quyết toán trên máy tính (tab Quyết Toán).</div>
-
-    <div class="mb-col" style="gap:9px">
-      ${rows.length ? rows.map(({ p, d }) => {
-        const [stLabel, stCls] = MB_STATUS[p.status] || ['—', 'gray'];
-        return `<div class="mb-card" style="padding:13px">
-          <div class="mb-row-between" style="margin-bottom:8px">
-            <span style="font-size:13.5px;font-weight:700">${mbX(p.name)}</span>
-            <span class="mb-tag ${stCls}">${stLabel}</span>
-          </div>
-          <div class="mb-grid3" style="margin-bottom:9px">
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">HĐ gốc</div><div style="font-size:12px;font-weight:700">${mbFmt(d.hdGoc)}</div></div>
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">Quyết toán</div><div style="font-size:12px;font-weight:700;color:${d.qt < 0 ? 'var(--mb-red)' : d.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'}">${d.qt ? mbFmtSigned(d.qt) : '0'}</div></div>
-            <div><div style="font-size:10px;color:var(--mb-muted-2)">Giá trị HĐ</div><div style="font-size:12px;font-weight:800;color:var(--mb-primary)">${mbFmt(d.tongDT)}</div></div>
-          </div>
-          <div class="mb-bar"><i style="width:${mbBarW(d.daThu, d.tongDT)};background:var(--mb-green)"></i></div>
-          <div class="mb-row-between" style="margin-top:5px;font-size:10.5px;color:var(--mb-muted-2)">
-            <span>Đã thu ${mbFmt(d.daThu)} (${mbPct(d.daThu, d.tongDT)}%)</span>
-            <span style="font-weight:700;color:${d.conPhaiThu < 0 ? 'var(--mb-red)' : 'var(--mb-text-2)'}">Còn ${mbFmtSigned(d.conPhaiThu)}</span>
-          </div>
-        </div>`;
-      }).join('') : '<div class="mb-empty">Chưa có hợp đồng / quyết toán</div>'}
-    </div>
-
-    <div class="mb-sec-title">Quyết toán gần đây</div>
-    <div class="mb-col">
-      ${recent.length ? recent.map(r => {
-        const [lb, cls] = _loaiTag[qtLoaiOf(r)] || ['—', 'gray'];
-        return `<div class="mb-card mb-card-sm">
-          <div class="mb-row-between" style="margin-bottom:4px">
-            <span style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(_resolveCtName(r) || r.congtrinh || '—')}</span>
-            <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbX(qtSoTienTxt(r, mbFmt))}</span>
-          </div>
-          <div style="font-size:11px;color:var(--mb-muted-2)"><span class="mb-tag ${cls}">${lb}</span>${r.chot ? ' 🔒' : ''} · ${mbDate(r.ngay)} · ${mbX(r.nd || '')}</div>
-        </div>`;
-      }).join('') : '<div class="mb-empty">Chưa có quyết toán nào</div>'}
-    </div>
   </div>`;
 }
 
 // ── CÔNG NỢ = Tất toán TP/NCC (03/10/2026: chuyển từ tab Quyết toán; mọi vai trò được tất toán) ──
+// (27/10/2026) Thêm ô tìm + lọc công trình; nút nhỏ ở chân thẻ thay nút to (chống bấm nhầm khi cuộn).
 function mbCnCongNo() {
   const canEdit = true;    // Admin + Giám đốc + Kế toán đều được tất toán (giống desktop _ttCanEdit)
   const tol  = (typeof CN_DONE_TOLERANCE !== 'undefined') ? CN_DONE_TOLERANCE : 100000;
   const showDone = MB.cnShowDone === '1';
   const all  = (typeof ttBuildRows === 'function') ? ttBuildRows({ includeDone: showDone }) : [];
   const debt = all.filter(r => r.con > tol);     // thẻ tổng quan chỉ tính dòng còn nợ
+  const q    = (MB.cnSearch || '').toLowerCase();
   const rows = all.filter(r => MB.cnGroup === 'all' || r.group === MB.cnGroup)
+                  .filter(r => !MB.cnCt || (r.ctName || '') === MB.cnCt)
+                  .filter(r => !q || ((r.partner || '') + ' ' + (r.ctName || '')).toLowerCase().includes(q))
                   .sort((a, b) => b.con - a.con);
   const sum = (g) => debt.filter(r => r.group === g).reduce((s, r) => s + r.con, 0);
   const batches = (typeof ttBatches === 'function') ? ttBatches().slice(0, 5) : [];
@@ -1365,7 +1271,11 @@ function mbCnCongNo() {
       <div class="mb-kpi red" style="border-radius:13px"><div class="mb-kpi-label">Nợ thầu phụ</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('thauphu'))}</div></div>
       <div class="mb-kpi" style="border-radius:13px"><div class="mb-kpi-label">Nợ nhà cung cấp</div><div class="mb-kpi-value" style="font-size:15px">${mbFmt(sum('nhacungcap'))}</div></div>
     </div>
-    <div style="font-size:11px;color:var(--mb-muted-2)">Chỉ đối tác đã có phiếu ứng hoặc HĐ thầu phụ. Tất toán → tự tạo phiếu ứng đúng số còn nợ (ngày hôm nay).</div>
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-cnsearch" data-in="cnSearch" data-live="1" value="${mbX(MB.cnSearch)}" placeholder="Tìm tên thầu phụ, nhà cung cấp..."/>
+    </div>
+    <select id="mb-cn-ct" class="mb-select" data-in="cnCt">${mbFilterOptions(all.map(r => r.ctName), MB.cnCt, 'Tất cả công trình')}</select>
     <div class="mb-chips">
       ${chips.map(([k, l]) => `<div class="mb-chip${MB.cnGroup === k ? ' on' : ''}" data-act="setFilter" data-arg="cnGroup|${k}">${l}</div>`).join('')}
       <div class="mb-chip${showDone ? ' on' : ''}" data-act="setFilter" data-arg="cnShowDone|${showDone ? '0' : '1'}">Hiện cả đã xong</div>
@@ -1378,16 +1288,19 @@ function mbCnCongNo() {
         const right = isDebt
           ? `<span style="font-size:13.5px;font-weight:800;color:var(--mb-red);flex-shrink:0">${mbFmt(r.con)}</span>`
           : (r.con < -tol ? `<span class="mb-tag blue">Ứng dư ${mbFmt(-r.con)}</span>` : '<span class="mb-tag green">Đã xong</span>');
-        return `<div class="mb-card" style="padding:13px${isDebt ? '' : ';opacity:.8'}">
+        return `<div class="mb-card" style="padding:12px 13px${isDebt ? '' : ';opacity:.8'}">
           <div class="mb-row-between" style="margin-bottom:4px">
             <span style="font-size:13.5px;font-weight:700">${mbX(r.partner)}</span>
             ${right}
           </div>
           <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:9px">${mbX(MB_UNG_LABEL[r.group] || r.group)} · ${mbX(r.ctName || '—')} · Giá trị ${mbFmt(r.value)} · Đã ứng ${mbFmt(r.daUng)}</div>
-          ${canEdit && isDebt ? `<button class="mb-btn" style="padding:9px" data-act="ttSettleMb" data-arg="${mbX(r.key)}">Tất toán toàn bộ</button>` : ''}
+          <div class="mb-btn-row">
+            <button class="mb-btn-outline" data-act="cnQuickUng" data-arg="${mbX(r.key)}">+ Ghi phiếu ứng</button>
+            ${canEdit && isDebt ? `<button class="mb-btn-outline green" data-act="ttSettleMb" data-arg="${mbX(r.key)}">✓ Tất toán hết nợ</button>` : ''}
+          </div>
         </div>`;
       }).join('')
-        : (showDone ? '<div class="mb-empty">Không có đối tác phù hợp</div>' : '<div class="mb-empty">🎉 Không còn đối tác nào nợ</div>')}
+        : (showDone || q || MB.cnCt ? '<div class="mb-empty">Không có đối tác phù hợp</div>' : '<div class="mb-empty">🎉 Không còn đối tác nào nợ</div>')}
     </div>
 
     ${batches.length ? `<div class="mb-sec-title">Tất toán gần đây</div>
@@ -1412,29 +1325,25 @@ function mbScrMore() {
   const role = mbRole();
   const roleLabel = role === 'admin' ? 'Quản trị viên' : role === 'giamdoc' ? 'Giám đốc' : role === 'ketoan' ? 'Kế toán' : '—';
   const pending = mbPending();
-  const trashN = (typeof _trashCountAll === 'function') ? _trashCountAll() : 0;
 
-  // Tiền Ứng đã lên bottom nav nên không liệt kê ở đây nữa.
-  // Tổng Quan rời bottom nav xuống đây.
+  // (27/10/2026) Rút gọn: bỏ Quyết toán / Danh mục / Thùng rác (làm trên máy tính).
+  // [màn hình, nhãn, gợi ý, icon Material Symbols, nền, màu icon]
   const rows = [
-    ['dashboard', 'Tổng Quan',     'Dashboard chi phí ' + mbYearLabel(), 'T', '#EFF6FF', '#2563EB'],
-    ['doanhthu', 'Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận', 'D', '#F0FDF4', '#16A34A'],
-    ['quyettoan','Quyết Toán',     'Quyết toán công trình',          'Q', '#FFFBEB', '#D97706'],
-    ['congno',   'Công Nợ TP/NCC',      'Còn phải trả · Tất toán',        'N', '#FEF2F2', '#DC2626'],
-    ['thietbi',  'Thiết Bị',       'Kho tổng & tại công trình',      'B', '#EFF6FF', '#2563EB'],
-    ['thongke',  'Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí',       'K', '#F5F3FF', '#7C3AED'],
-    ['danhmuc',  'Danh Mục',       'Loại CP · NCC · Người · Thầu phụ', 'M', '#F3F4F6', '#4B5563'],
-    ['thungrac', 'Thùng Rác',      trashN + ' bản ghi có thể phục hồi', 'R', '#F3F4F6', '#6B7280'],
+    ['dashboard', 'Tổng Quan',            'Dashboard chi phí ' + mbYearLabel(), 'analytics',              '#EFF6FF', '#2563EB'],
+    ['doanhthu',  'Thu Tiền & Lợi Nhuận', 'Thu tiền · Tiến độ thu · Lợi nhuận', 'account_balance_wallet', '#F0FDF4', '#16A34A'],
+    ['congno',    'Công Nợ TP/NCC',       'Còn phải trả · Tất toán',            'request_quote',          '#FEF2F2', '#DC2626'],
+    ['thietbi',   'Thiết Bị & Kho',       'Kho tổng & tại công trình',          'handyman',               '#FFFBEB', '#D97706'],
+    ['thongke',   'Cơ Cấu Chi Phí',       'Chi phí theo loại · từng công trình', 'pie_chart',             '#F5F3FF', '#7C3AED'],
   ].filter(r => mbCanSee(r[0]));
 
   const sys = [
-    ['sync',       'Đồng bộ Firebase', pending > 0 ? pending + ' thay đổi chờ đẩy lên' : 'Đã đồng bộ', 'S', '#EFF6FF', '#2563EB'],
-    ['useDesktop', 'Mở bản máy tính',  'Dùng giao diện đầy đủ trên máy này',                          'W', '#F3F4F6', '#4B5563'],
+    ['sync',       'Đồng bộ Firebase', pending > 0 ? pending + ' thay đổi chờ đẩy lên' : 'Đã đồng bộ', 'sync',            '#EFF6FF', '#2563EB'],
+    ['useDesktop', 'Mở bản máy tính',  'Dùng giao diện đầy đủ trên máy này',                          'desktop_windows', '#F3F4F6', '#4B5563'],
   ];
 
-  const rowHtml = ([act, label, hint, letter, bg, fg], isNav) =>
+  const rowHtml = ([act, label, hint, icon, bg, fg], isNav) =>
     `<div class="mb-list-row" style="cursor:pointer" data-act="${isNav ? 'go' : act}" ${isNav ? `data-arg="${act}"` : ''}>
-       <div style="width:32px;height:32px;border-radius:9px;background:${bg};color:${fg};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${letter}</div>
+       <div style="width:34px;height:34px;border-radius:10px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;flex-shrink:0">${mbIcon(icon, 20)}</div>
        <div style="flex:1;min-width:0">
          <div style="font-size:13.5px;font-weight:600">${mbX(label)}</div>
          <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(hint)}</div>

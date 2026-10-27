@@ -45,12 +45,10 @@ const MB = {
   // Tab con của từng màn hình
   seg: {
     detail:   'tong',     // tong | chi | cc | ung
-    nhap:     'nhanh',    // nhanh | chitiet | tatca
+    nhap:     'nhanh',    // nhanh | tatca  (27/10/2026: bỏ HĐ chi tiết nhiều dòng trên điện thoại)
     chamcong: 'so',       // so | baocao | ung
     tienung:  'nhap',     // nhap | thongke
-    doanhthu: 'khaibao',  // khaibao | thongke | loinhuan
-    congno:   'congno',   // congno | hdtp  (HĐ thầu phụ chuyển từ Doanh thu sang — 02/10/2026)
-    quyettoan:'congtrinh',// chỉ còn congtrinh (03/10/2026 — tất toán chuyển sang Công nợ)
+    doanhthu: 'thu',      // thu | thongke | loinhuan  (27/10/2026: bỏ khai báo HĐ chính trên điện thoại)
   },
 
   // Bộ lọc / tìm kiếm
@@ -59,13 +57,17 @@ const MB = {
   statusFilter: 'all',    // trạng thái công trình
   cnGroup:      'all',    // nhóm đối tác công nợ
   cnShowDone:   '0',      // công nợ: '1' = hiện cả đối tác đã xong (03/10/2026)
+  cnSearch:     '',       // công nợ: tìm tên đối tác
+  cnCt:         '',       // công nợ: lọc theo tên công trình ('' = tất cả)
   tbView:       'ct',     // thiết bị: ct | kho
-  // Danh mục đang xem — PHẢI là một khóa có thật trong `cats`
-  // (loaiChiPhi | nhaCungCap | nguoiTH | thauPhu | congNhan | tbTen),
-  // vì mbScrDanhMuc() đọc thẳng cats[MB.dmType].
-  dmType:       'loaiChiPhi',
-  trashType:    'hoadon', // loại bản ghi trong thùng rác
-  dtKind:       'hdc',    // khai báo doanh thu: hdc | thu  (hdtp nay nằm ở Công nợ → HĐ thầu phụ)
+  tbSearch:     '',       // thiết bị: tìm tên
+  tbCt:         '',       // thiết bị: lọc theo nơi đặt
+  invCt:        '',       // lịch sử HĐ: lọc công trình
+  invLoai:      '',       // lịch sử HĐ: lọc loại chi phí
+  invLimit:     50,       // lịch sử HĐ: số dòng đang hiện (nút "Xem thêm" +50)
+  pdSearch:     '',       // chi tiết CT → Chi phí: tìm nội dung
+  pdLoai:       '',       // chi tiết CT → Chi phí: chip loại chi phí
+  tkCt:         '',       // cơ cấu chi phí: '' = toàn công ty, hoặc tên công trình
   ttLast:       null,     // { id, msg } lần tất toán vừa làm trên điện thoại (cho nút Hoàn tác)
   // Loại phiếu ứng — CHỈ thầu phụ / nhà cung cấp.
   // Ứng công nhân cố ý không nằm ở đây: nó là sổ nợ riêng (ung_v1 với
@@ -73,26 +75,25 @@ const MB = {
   // bản desktop (trang Tiền Ứng và Công Nợ đều lọc bỏ phiếu công nhân).
   ungKind:      'thauphu',
 
-  dmNew: '',              // ô nhập thêm danh mục
-
   // Chấm công
   ccOffset:  0,           // lệch tuần so với tuần hiện tại
   ccCt:      '',          // tên công trình đang chấm
   ccWorkers: null,        // bản nháp danh sách công nhân trong tuần (null = chưa nạp)
   ccLoadedKey: '',        // khóa "tuần|công trình" của bản nháp đang giữ
+  ccOpenSalary: {},       // { chỉ số công nhân: true } — đang mở dòng sửa Lương & Phụ cấp
+  ccUngShowAll: '0',      // Ứng CN: '1' = hiện cả công nhân đã hết nợ
   // Form ứng/trả cho công nhân (subtab "Ứng CN")
   ccUngForm: { tp: '', ct: '', ngay: '', tien: '', nd: '', kind: 'ung' },
 
-  // Nhập hóa đơn nhanh — các dòng chờ lưu
-  drafts: [],
-  form:    { ngay: '', loai: '', ct: '', ncc: '', nguoi: '', nd: '', sl: '', tien: '' },
+  // Nhập hóa đơn — LƯU 1 CHẠM (27/10/2026: bỏ danh sách "Chờ lưu")
+  form: {
+    ngay: '', loai: '', ct: '', ncc: '', nguoi: '',
+    nd: '', tien: '', sl: '', dg: '',
+    calcMode: false,      // false = nhập thẳng Tổng tiền; true = tính theo SL × Đơn giá
+    editId: null,         // id hóa đơn đang sửa nhanh
+  },
   ungForm: { tp: '', ct: '', ngay: '', tien: '', nd: '' },
-  dtForm:  { ct: '', tien: '', ngay: '', nguoi: '', nd: '', tp: '' },
-
-  // Hóa đơn chi tiết nhiều dòng vật tư
-  detailItems: [],
-  detailForm:  { ngay: '', ct: '', loai: '', ncc: '', nguoi: '' },
-  itemForm:    { ten: '', dvt: '', sl: '', dg: '' },
+  dtForm:  { ct: '', tien: '', ngay: '', nd: '' },   // chỉ còn Thu tiền
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -214,6 +215,63 @@ function mbGetPath(path) {
   return path.split('.').reduce((o, k) => (o == null ? o : o[k]), MB);
 }
 
+/** Chuỗi chữ số → phân cách hàng nghìn bằng dấu chấm ("1500000" → "1.500.000") */
+function mbGroup(digits) {
+  return String(digits || '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/** Giá trị hiển thị trong ô tiền: số → "1.500.000", chuỗi giữ nguyên, 0/rỗng → '' */
+function mbMoneyStr(v) {
+  if (v == null || v === '' || v === 0) return '';
+  return typeof v === 'number' ? mbGroup(Math.round(v)) : String(v);
+}
+
+/**
+ * Định dạng lại ô <input data-money="1"> ngay khi gõ, giữ con trỏ đúng chỗ
+ * (đếm số chữ số nằm bên phải con trỏ trước và sau khi chèn dấu chấm).
+ */
+function mbFormatMoneyInput(el) {
+  const raw    = el.value;
+  const caret  = (el.selectionStart == null) ? raw.length : el.selectionStart;
+  const right  = raw.slice(caret).replace(/\D/g, '').length;
+  const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  const out    = mbGroup(digits);
+  el.value = out;
+  let pos = out.length, seen = 0;
+  while (pos > 0 && seen < right) { pos--; if (/\d/.test(out[pos])) seen++; }
+  try { el.setSelectionRange(pos, pos); } catch (e) { /* input type không hỗ trợ */ }
+}
+
+/**
+ * Dải chip gợi ý số tiền 1 chạm dưới ô tiền. Gõ số nhỏ (vd 500) → hiện
+ * 500.000 · 5.000.000 · 50.000.000 · 500.000.000 và nút "+000".
+ * @param {string} targetPath  đường dẫn state của ô tiền (vd 'form.tien')
+ * @param {*}      currentVal  giá trị hiện tại của ô
+ */
+function mbQuickMoney(targetPath, currentVal) {
+  const digits = String(currentVal == null ? '' : currentVal).replace(/\D/g, '');
+  const n = parseInt(digits, 10) || 0;
+  if (!n || digits.length > 4) return '';
+  const opts = [1e3, 1e4, 1e5, 1e6].map(m => n * m).filter(v => v >= 1000 && v <= 1e11);
+  return `<div class="mb-money-chips">
+    ${opts.map(v => `<span data-act="setMoney" data-arg="${targetPath}|${v}">${mbGroup(v)}</span>`).join('')}
+    <span data-act="setMoney" data-arg="${targetPath}|${n * 1000}" style="background:var(--mb-line-soft);color:#374151">+000</span>
+  </div>`;
+}
+
+/** Icon Material Symbols (font đã nạp sẵn trong index.html) */
+function mbIcon(name, size) {
+  return `<span class="material-symbols-outlined" style="font-size:${size || 20}px">${name}</span>`;
+}
+
+/** <option> lọc "Tất cả" + danh sách tên (dùng cho các dropdown bộ lọc) */
+function mbFilterOptions(list, selected, allLabel) {
+  const arr = [...new Set((list || []).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
+  if (selected && !arr.includes(selected)) arr.unshift(selected);
+  return `<option value="">${mbX(allLabel || 'Tất cả')}</option>` + arr.map(v =>
+    `<option value="${mbX(v)}"${v === selected ? ' selected' : ''}>${mbX(v)}</option>`).join('');
+}
+
 // ══════════════════════════════════════════════════════════════
 //  ĐIỀU HƯỚNG
 // ══════════════════════════════════════════════════════════════
@@ -231,13 +289,10 @@ function mbTitles() {
     nhap:      ['Nhập Hóa Đơn',   'Chi phí công trình'],
     chamcong:  ['Chấm Công',      'Sổ công & lương tuần'],
     tienung:   ['Tiền Ứng',       'Thầu phụ · NCC · Công nhân'],
-    doanhthu:  ['Doanh Thu',      'Hợp đồng · Thu tiền · Lợi nhuận'],
-    quyettoan: ['Quyết Toán',     'Quyết toán công trình'],
-    congno:    ['Công Nợ TP/NCC',      'Công nợ & tất toán · HĐ thầu phụ'],
-    thietbi:   ['Thiết Bị',       'Kho tổng & tại công trình'],
-    danhmuc:   ['Danh Mục',       'Loại CP · NCC · Người · Thầu phụ'],
-    thongke:   ['Thống Kê CPHĐ',  'Cơ cấu & phân bổ chi phí'],
-    thungrac:  ['Thùng Rác',      'Phục hồi bản ghi đã xóa'],
+    doanhthu:  ['Thu Tiền & Lợi Nhuận', 'Thu tiền · Tiến độ thu · Lợi nhuận'],
+    congno:    ['Công Nợ TP/NCC', 'Còn phải trả · Tất toán'],
+    thietbi:   ['Thiết Bị & Kho', 'Kho tổng & tại công trình'],
+    thongke:   ['Cơ Cấu Chi Phí', 'Chi phí theo loại'],
     more:      ['Thêm',           'Tất cả chức năng'],
   };
 }
@@ -245,26 +300,26 @@ function mbTitles() {
 // Các màn hình nằm trong tab "Thêm" (có nút Back về 'more').
 // Tiền ứng đã lên bottom nav nên KHÔNG còn ở đây; đổi lại Tổng quan rời nav
 // xuống đây để vẫn xem được.
-const MB_MORE_TABS = ['dashboard', 'doanhthu', 'quyettoan', 'congno', 'thietbi', 'danhmuc', 'thongke', 'thungrac'];
+// (27/10/2026) Bỏ Quyết toán / Danh mục / Thùng rác khỏi điện thoại — làm trên máy tính.
+const MB_MORE_TABS = ['dashboard', 'doanhthu', 'congno', 'thietbi', 'thongke'];
 
-// Bottom nav: [id, nhãn, ký tự icon] — 5 mục, "Nhập" đặt giữa cho dễ bấm
+// Bottom nav: [id, nhãn, icon Material Symbols] — 5 mục, "Nhập CP" đặt giữa cho dễ bấm
 const MB_NAV = [
-  ['congtrinh', 'Công trình', 'C'],
-  ['chamcong',  'Chấm công', 'K'],
-  ['nhap',      'Nhập',      '+'],
-  ['tienung',   'Tiền ứng',  'U'],
-  ['more',      'Thêm',      '≡'],
+  ['congtrinh', 'Công trình', 'home_work'],
+  ['chamcong',  'Chấm công', 'calendar_month'],
+  ['nhap',      'Nhập CP',   'add_circle'],
+  ['tienung',   'Tiền ứng',  'payments'],
+  ['more',      'Thêm',      'menu'],
 ];
 
 // Tab con của từng màn hình: [khóa state, [[id, nhãn], ...]]
+// (27/10/2026) Công nợ không còn tab con — vào thẳng danh sách công nợ & tất toán.
 const MB_SEGS = {
   detail:   ['detail',   [['tong', 'Tổng quan'], ['chi', 'Chi phí'], ['cc', 'Chấm công'], ['ung', 'Tiền ứng']]],
-  nhap:     ['nhap',     [['nhanh', 'Nhập nhanh'], ['chitiet', 'Chi tiết'], ['tatca', 'Tất cả HĐ']]],
+  nhap:     ['nhap',     [['nhanh', 'Nhập hóa đơn'], ['tatca', 'Lịch sử HĐ']]],
   chamcong: ['chamcong', [['so', 'Sổ chấm công'], ['baocao', 'Tổng lương'], ['ung', 'Ứng CN']]],
   tienung:  ['tienung',  [['nhap', 'Nhập ứng'], ['thongke', 'Thống kê ứng']]],
-  doanhthu: ['doanhthu', [['khaibao', 'Khai báo'], ['thongke', 'Thống kê'], ['loinhuan', 'Lợi nhuận']]],
-  congno:   ['congno',   [['congno', 'Công nợ'], ['hdtp', 'HĐ thầu phụ']]],
-  // (03/10/2026) quyettoan không còn tab con — Tất toán TP/NCC đã gộp vào Công nợ
+  doanhthu: ['doanhthu', [['thu', 'Thu tiền'], ['thongke', 'Tiến độ thu'], ['loinhuan', 'Lợi nhuận']]],
 };
 
 /** Chuyển màn hình */
@@ -283,7 +338,7 @@ function mbGo(tab, extra) {
 
 /** Mở màn chi tiết một công trình */
 function mbOpenProject(pid) {
-  mbGo('detail', { projectId: pid, seg: Object.assign({}, MB.seg, { detail: 'tong' }) });
+  mbGo('detail', { projectId: pid, pdSearch: '', pdLoai: '', seg: Object.assign({}, MB.seg, { detail: 'tong' }) });
 }
 
 /** Đổi tab con */
@@ -427,9 +482,9 @@ function mbRenderNav() {
   if (!el) return;
   const active = MB.tab === 'detail' ? 'congtrinh'
     : (MB_MORE_TABS.includes(MB.tab) ? 'more' : MB.tab);
-  el.innerHTML = MB_NAV.filter(([id]) => mbCanSee(id)).map(([id, label, letter]) =>
+  el.innerHTML = MB_NAV.filter(([id]) => mbCanSee(id)).map(([id, label, icon]) =>
     `<div class="mb-nav-item${active === id ? ' on' : ''}" data-act="go" data-arg="${id}">
-       <div class="mb-nav-icon">${letter}</div>
+       <div class="mb-nav-icon"><span class="material-symbols-outlined" style="font-size:20px">${icon}</span></div>
        <div class="mb-nav-label">${mbX(label)}</div>
      </div>`
   ).join('');
@@ -463,18 +518,23 @@ function mbBindEvents() {
   });
 
   // Ô nhập text/number → cập nhật state, KHÔNG render lại (tránh giật khi gõ)
+  // Ô tiền (data-money="1") → tự phân cách hàng nghìn "1.500.000" ngay khi gõ
   shell.addEventListener('input', ev => {
     const el = ev.target.closest('[data-in]');
     if (!el) return;
+    if (el.dataset.money === '1') mbFormatMoneyInput(el);
     mbSetPath(el.dataset.in, el.value);
     if (el.dataset.live === '1') mbRender();   // ô cần tính lại ngay (vd: thành tiền)
   });
 
   // Select / date → cập nhật rồi render lại
+  // data-onchange="tên hành động" → gọi thêm MB_ACTS[tên](data-arg) sau khi ghi state
   shell.addEventListener('change', ev => {
     const el = ev.target.closest('[data-in]');
     if (!el) return;
     mbSetPath(el.dataset.in, el.value);
+    const hook = el.dataset.onchange && MB_ACTS[el.dataset.onchange];
+    if (hook) { hook(el.dataset.arg, el); return; }
     if (el.tagName === 'SELECT' || el.type === 'date') mbRender();
   });
 }
@@ -566,7 +626,6 @@ async function initMobile() {
   if (!MB.form.ngay)       MB.form.ngay       = today;
   if (!MB.ungForm.ngay)    MB.ungForm.ngay    = today;
   if (!MB.dtForm.ngay)     MB.dtForm.ngay     = today;
-  if (!MB.detailForm.ngay) MB.detailForm.ngay = today;
   if (!MB.ccUngForm.ngay)  MB.ccUngForm.ngay  = today;
 
   // Kế toán không vào được Tổng quan → mở thẳng Công trình
@@ -586,8 +645,7 @@ async function initMobile() {
 const MB_TO_DESKTOP = {
   dashboard: 'dashboard', congtrinh: 'congtrinh', detail: 'congtrinh',
   nhap: 'nhap', chamcong: 'chamcong', tienung: 'nhapung',
-  doanhthu: 'doanhthu', quyettoan: 'quyettoan', congno: 'congno', thietbi: 'thietbi',
-  danhmuc: 'danhmuc', thongke: 'thongkecphd', thungrac: 'thungrac',
+  doanhthu: 'doanhthu', congno: 'congno', thietbi: 'thietbi', thongke: 'thongkecphd',
   more: 'congtrinh',
 };
 

@@ -59,7 +59,9 @@ body.mb-on #mb-shell {
 body.mb-on .topbar,
 body.mb-on .container-fluid,
 body.mb-on .app-nav,
+body.mb-on .content,
 body.mb-on .page,
+body.mb-on .overlay,
 body.mb-on footer { display: none !important; }
 
 body.mb-on { overflow: hidden; }
@@ -217,6 +219,15 @@ body.mb-on .app-toast {
 .mb-chips.even { overflow: visible; }
 .mb-chips.even .mb-chip { flex: 1; text-align: center; padding: 9px 4px; border-radius: 9px; font-weight: 700; }
 
+/* Ẩn thanh cuộn ngang thô của các dải chip / năm / tab con (vẫn vuốt được) */
+.mb-chips, .mb-years, .mb-subtabs {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mb-chips::-webkit-scrollbar,
+.mb-years::-webkit-scrollbar,
+.mb-subtabs::-webkit-scrollbar { display: none; }
+
 /* Nhãn trạng thái */
 .mb-tag {
   font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 100px;
@@ -268,6 +279,27 @@ body.mb-on .app-toast {
 .mb-btn.sm    { padding: 9px; border-radius: 9px; font-size: 12px; }
 .mb-btn.soft-blue { background: var(--mb-primary-l); color: var(--mb-primary); }
 .mb-btn.soft-red  { background: var(--mb-red-l);     color: var(--mb-red); }
+/* Nút viền — hành động phụ, gọn, chống bấm nhầm khi cuộn */
+.mb-btn-outline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 7px 11px; border-radius: 9px; font-size: 12px; font-weight: 700;
+  cursor: pointer; background: #fff; font-family: inherit; white-space: nowrap;
+  border: 1px solid var(--mb-line); color: #374151;
+}
+.mb-btn-outline.blue  { border-color: #BFDBFE; color: var(--mb-primary); }
+.mb-btn-outline.green { border-color: var(--mb-green-b); color: var(--mb-green); }
+.mb-btn-outline.red   { border-color: var(--mb-red-b); color: var(--mb-red); }
+.mb-btn-outline .material-symbols-outlined { font-size: 16px; }
+.mb-btn .material-symbols-outlined { font-size: 18px; vertical-align: -4px; margin-right: 3px; }
+/* Nút "+" nhỏ cạnh nhãn ô nhập (thêm nhanh danh mục) */
+.mb-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; gap: 6px; }
+.mb-label-row .mb-label { margin-bottom: 0; }
+.mb-mini-add {
+  width: 20px; height: 20px; border-radius: 6px; border: 0; padding: 0;
+  background: var(--mb-primary-l); color: var(--mb-primary);
+  font-size: 15px; font-weight: 800; line-height: 20px; cursor: pointer;
+}
+.mb-btn-row { display: flex; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
 .mb-del {
   width: 26px; height: 26px; border-radius: 13px;
   background: var(--mb-red-l); color: var(--mb-red);
@@ -275,6 +307,33 @@ body.mb-on .app-toast {
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0; border: 0;
 }
+
+/* Ô số tiền lớn + dải chip gợi ý nhanh */
+.mb-input.money-lg { font-size: 16px; font-weight: 800; padding: 11px 12px; }
+.mb-money-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.mb-money-chips span {
+  padding: 5px 10px; border-radius: 100px; font-size: 12px; font-weight: 700;
+  cursor: pointer; background: var(--mb-primary-l); color: var(--mb-primary);
+}
+
+/* 4 nút thao tác nhanh ngang (chi tiết công trình) */
+.mb-qa { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.mb-qa > div {
+  background: var(--mb-card); border: 1px solid var(--mb-line); border-radius: 12px;
+  padding: 9px 2px 8px; text-align: center; cursor: pointer;
+  font-size: 11px; font-weight: 700; color: #374151;
+}
+.mb-qa .material-symbols-outlined { display: block; font-size: 22px; color: var(--mb-primary); margin-bottom: 2px; }
+
+/* Thanh lưu dính đáy vùng cuộn (ngay trên bottom nav) */
+.mb-sticky-bar {
+  position: sticky; bottom: 0; z-index: 5;
+  margin: 0 -16px -24px; padding: 10px 16px;
+  background: var(--mb-card); border-top: 1px solid var(--mb-line);
+  box-shadow: 0 -4px 12px rgba(17, 24, 39, .06);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.mb-sticky-bar .mb-btn { width: auto; padding: 11px 16px; flex-shrink: 0; }
 
 /* Danh sách kiểu bảng */
 .mb-list { background: var(--mb-card); border: 1px solid var(--mb-line); border-radius: 14px; overflow: hidden; }
@@ -321,7 +380,7 @@ body.mb-on .app-toast {
   cursor: pointer; padding: 3px 0;
 }
 .mb-nav-icon {
-  width: 26px; height: 26px; border-radius: 9px;
+  width: 34px; height: 26px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 800;
   background: transparent; color: var(--mb-muted-2);

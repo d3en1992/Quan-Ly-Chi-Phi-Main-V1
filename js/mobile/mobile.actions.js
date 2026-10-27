@@ -5,7 +5,7 @@
 // QUY TẮC AN TOÀN:
 //   - Ghi dữ liệu đi ĐÚNG đường của bản desktop: mkRecord()/mkUpdate() + save().
 //     save() tự lo _mem → IndexedDB → hẹn giờ đẩy lên Firebase (sync.js).
-//   - Chỗ nào bản desktop đã có hàm chuẩn thì GỌI LẠI hàm đó (danh mục, thùng rác)
+//   - Chỗ nào bản desktop đã có hàm chuẩn thì GỌI LẠI hàm đó (danh mục, trạng thái CT, tất toán)
 //     thay vì chép logic — tránh lệch nghiệp vụ về sau.
 //   - Sau khi ghi: gọi mbAfterWrite() để nạp lại global từ _mem rồi vẽ lại
 //     màn hình mobile. Không cần đụng tầng render desktop (đang bị ẩn).
@@ -46,16 +46,47 @@ function mbAfterWrite() {
   mbRender();
 }
 
+/**
+ * Thêm 1 mục vào danh mục `cats[catId]` bằng đúng addItem() của bản desktop
+ * (giữ luật chống trùng / chuẩn hóa / lưu cloud). addItem() đọc giá trị từ ô
+ * nhập desktop id="sa-<catId>" — ô này chỉ có sau renderSettings(), nên nếu
+ * chưa có thì tạo tạm một ô ẩn rồi gỡ đi.
+ */
+function mbAddCat(catId, val) {
+  if (typeof addItem !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+  let inp = document.getElementById('sa-' + catId);
+  let temp = false;
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.id = 'sa-' + catId;
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+    temp = true;
+  }
+  inp.value = val;
+  addItem(catId);
+  if (temp && inp.parentNode) inp.parentNode.removeChild(inp);
+}
+
 // ══════════════════════════════════════════════════════════════
 //  ĐĂNG KÝ HÀNH ĐỘNG — bổ sung vào bảng MB_ACTS của mobile.core.js
 // ══════════════════════════════════════════════════════════════
 Object.assign(MB_ACTS, {
 
-  // ── Bộ lọc / chip chung: data-arg="khóaState|giá trị" ──
+  // ── Bộ lọc / chip chung: data-arg="khóaState|giá trị" (giá trị được phép chứa "|") ──
   setFilter: (arg) => {
-    const [key, val] = arg.split('|');
+    const cut = arg.indexOf('|');
+    const key = cut < 0 ? arg : arg.slice(0, cut);
+    const val = cut < 0 ? '' : arg.slice(cut + 1);
     MB[key] = val;
-    if (key === 'dtKind') MB.dtForm.tien = '';   // đổi loại khai báo → xóa số tiền cũ
+    if (key === 'tbView') MB.tbCt = '';          // đổi Công trình ↔ Kho → bỏ lọc nơi đặt cũ
+    mbRender();
+  },
+
+  // Chip gợi ý số tiền: data-arg="đường.dẫn|số" → ghi số đã phân cách nghìn vào ô tiền
+  setMoney: (arg) => {
+    const cut = arg.lastIndexOf('|');
+    mbSetPath(arg.slice(0, cut), mbGroup(parseInt(arg.slice(cut + 1), 10) || 0));
     mbRender();
   },
 
@@ -66,101 +97,151 @@ Object.assign(MB_ACTS, {
     mbToast('Tuần ' + ((typeof weekLabel === 'function') ? weekLabel(sun) : sun), 'info');
   },
 
-  // Nút tắt trong màn chi tiết công trình
+  // Nút tắt trong màn chi tiết công trình — mở form và chọn sẵn công trình này
   shortcut: (arg) => {
     const p = mbProject(MB.projectId);
     const ct = p ? p.name : '';
     if (arg === 'nhap')     { MB.form.ct = ct;    mbGo('nhap',     { seg: Object.assign({}, MB.seg, { nhap: 'nhanh' }) }); }
     if (arg === 'chamcong') { MB.ccCt = ct; MB.ccWorkers = null; mbGo('chamcong', { seg: Object.assign({}, MB.seg, { chamcong: 'so' }) }); }
     if (arg === 'tienung')  { MB.ungForm.ct = ct; mbGo('tienung',  { seg: Object.assign({}, MB.seg, { tienung: 'nhap' }) }); }
-    if (arg === 'thu')      { MB.dtForm.ct = ct; MB.dtKind = 'thu'; mbGo('doanhthu', { seg: Object.assign({}, MB.seg, { doanhthu: 'khaibao' }) }); }
+    if (arg === 'thu')      { MB.dtForm.ct = ct; mbGo('doanhthu', { seg: Object.assign({}, MB.seg, { doanhthu: 'thu' }) }); }
+  },
+
+  // Đổi nhanh trạng thái công trình (Admin / Giám đốc) — đi qua updateProject() của desktop
+  changeProjStatus: (arg) => {
+    const p = mbProject(MB.projectId);
+    if (!p || p.status === arg || !MB_STATUS[arg]) return;
+    if (mbRole() === 'ketoan') { mbToast('Vai trò Kế toán không đổi được trạng thái công trình', 'error'); return; }
+    if (typeof updateProject !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+    const today = mbToday();
+    const ch  = { status: arg };
+    let msg = `Đổi trạng thái "${p.name}" → ${MB_STATUS[arg][0]}?`;
+    // Giữ đúng luật của form sửa CT bản desktop: Hoàn thành cần endDate, Quyết toán cần closedDate
+    if (arg === 'completed') {
+      ch.endDate = p.endDate || today;
+      ch.completedDate = p.completedDate || ch.endDate;
+      msg += `\nNgày hoàn thành: ${mbDate(ch.endDate)}`;
+    }
+    if (arg === 'closed') {
+      ch.closedDate = today;
+      msg += `\nNgày quyết toán: ${mbDate(today)}\n\n⚠ Sau khi quyết toán sẽ không nhập thêm dữ liệu vào công trình này.`;
+    }
+    if (!confirm(msg)) return;
+    try { updateProject(p.id, ch); }
+    catch (e) { mbToast((e && e.message) || 'Không đổi được trạng thái', 'error'); return; }
+    mbToast('✅ ' + p.name + ' → ' + MB_STATUS[arg][0], 'success');
+    mbAfterWrite();
   },
 
   // ══════════════════════════════
-  //  NHẬP HÓA ĐƠN NHANH
+  //  NHẬP HÓA ĐƠN — LƯU 1 CHẠM (27/10/2026)
   // ══════════════════════════════
-  clearForm: () => {
-    Object.assign(MB.form, { ncc: '', nguoi: '', nd: '', sl: '', tien: '' });
-    mbRender();
-  },
 
-  addDraft: () => {
+  // Đổi giữa "nhập thẳng tổng tiền" ↔ "SL × Đơn giá", mang số đang có sang chế độ mới
+  toggleCalcMode: () => {
     const f = MB.form;
-    if (!f.ct)                        { mbToast('Chọn công trình', 'error'); return; }
-    if (!f.nd.trim())                 { mbToast('Nhập nội dung', 'error'); return; }
-    if (!mbNum(f.sl) || !mbMoney(f.tien)) { mbToast('Nhập số lượng và đơn giá', 'error'); return; }
-    if (mbBlockClosed(f.ct)) return;
-
-    MB.drafts.push({
-      ngay: f.ngay, ct: f.ct, loai: f.loai, ncc: f.ncc.trim(), nguoi: f.nguoi.trim(),
-      nd: f.nd.trim(), sl: mbNum(f.sl), tien: mbMoney(f.tien),
-    });
-    // Giữ lại ngày / CT / loại / NCC / người để nhập dòng tiếp cho nhanh
-    Object.assign(MB.form, { nd: '', sl: '', tien: '' });
+    if (f.calcMode) {
+      const tt = Math.round(mbNum(f.sl) * mbMoney(f.dg));
+      if (tt) f.tien = mbGroup(tt);
+    } else if (mbMoney(f.tien) && !mbMoney(f.dg)) {
+      f.sl = '1';
+      f.dg = f.tien;
+    }
+    f.calcMode = !f.calcMode;
     mbRender();
   },
 
-  delDraft: (arg) => { MB.drafts.splice(parseInt(arg, 10), 1); mbRender(); },
+  // Nút "+" cạnh Loại CP / NCC / Người chi → thêm mục danh mục mới rồi chọn luôn
+  quickAddCat: (catId) => {
+    const MAP = { loaiChiPhi: ['loại chi phí', 'loai'], nhaCungCap: ['nhà cung cấp', 'ncc'], nguoiTH: ['người chi', 'nguoi'] };
+    if (!MAP[catId]) return;
+    const val = (prompt('Thêm ' + MAP[catId][0] + ' mới:') || '').trim();
+    if (!val) return;
+    const find = () => (cats[catId] || []).find(v => String(v).toLowerCase() === val.toLowerCase());
+    if (!find()) mbAddCat(catId, val);
+    MB.form[MAP[catId][1]] = find() || val;
+    mbAfterWrite();
+  },
 
-  saveDrafts: () => {
-    if (!MB.drafts.length) { mbToast('Chưa có dòng nào để lưu', 'error'); return; }
-    let n = 0;
-    MB.drafts.forEach(d => {
-      const thanhtien = Math.round(d.sl * d.tien);
-      const fields = (typeof _ensureInvRef === 'function')
-        ? _ensureInvRef({
-            ngay: d.ngay, congtrinh: d.ct, loai: d.loai, nguoi: d.nguoi, ncc: d.ncc,
-            nd: d.nd, sl: d.sl, tien: thanhtien, thanhtien, projectId: null, source: 'quick',
-          })
-        : { ngay: d.ngay, congtrinh: d.ct, loai: d.loai, nguoi: d.nguoi, ncc: d.ncc,
-            nd: d.nd, sl: d.sl, tien: thanhtien, thanhtien, projectId: null, source: 'quick' };
+  saveQuickInv: () => {
+    const f = MB.form;
+    const tien = f.calcMode ? Math.round(mbNum(f.sl) * mbMoney(f.dg)) : mbMoney(f.tien);
+    if (!f.ct)          { mbToast('Chọn công trình', 'error'); return; }
+    if (!f.nd.trim())   { mbToast('Nhập nội dung chi phí', 'error'); return; }
+    if (!tien)          { mbToast(f.calcMode ? 'Nhập số lượng và đơn giá' : 'Nhập số tiền', 'error'); return; }
+    if (mbBlockClosed(f.ct)) return;
+
+    const raw = {
+      ngay: f.ngay, congtrinh: f.ct, loai: f.loai, nguoi: (f.nguoi || '').trim(), ncc: (f.ncc || '').trim(),
+      nd: f.nd.trim(), sl: f.calcMode ? mbNum(f.sl) : 1, tien, thanhtien: tien, projectId: null, source: 'quick',
+    };
+    const fields = (typeof _ensureInvRef === 'function') ? _ensureInvRef(raw) : raw;
+
+    if (f.editId) {
+      const idx = invoices.findIndex(i => String(i.id) === String(f.editId));
+      if (idx < 0) { mbToast('Không tìm thấy hóa đơn đang sửa', 'error'); f.editId = null; mbRender(); return; }
+      invoices[idx] = mkUpdate(invoices[idx], fields);
+      mbToast('✅ Đã cập nhật hóa đơn: ' + mbFull(tien), 'success');
+    } else {
       invoices.unshift(mkRecord(fields));
-      n++;
+      mbToast('✅ Đã lưu hóa đơn: ' + mbFull(tien), 'success');
+    }
+    save('inv_v3', invoices);
+    // Giữ ngày / CT / loại / NCC / người chi để nhập tiếp tờ kế tiếp.
+    // Vừa sửa xong 1 HĐ → trả về chế độ nhập thẳng tổng tiền (mặc định).
+    if (f.editId) f.calcMode = false;
+    Object.assign(f, { nd: '', tien: '', sl: '', dg: '', editId: null });
+    mbAfterWrite();
+  },
+
+  // Nạp một hóa đơn nhập nhanh lên form để sửa
+  editQuickInv: (id) => {
+    const inv = invoices.find(i => String(i.id) === String(id) && !i.deletedAt);
+    if (!inv) { mbToast('Không tìm thấy hóa đơn', 'error'); return; }
+    if (inv.ccKey || inv.source === 'cc') { mbToast('Hóa đơn từ chấm công — sửa tại tab Chấm công', 'error'); return; }
+    if (Array.isArray(inv.items) && inv.items.length) { mbToast('Hóa đơn chi tiết nhiều dòng — sửa trên máy tính', 'error'); return; }
+    const tien = inv.thanhtien || inv.tien || 0;
+    const sl   = Number(inv.sl) || 0;
+    const calc = sl > 0 && sl !== 1;
+    Object.assign(MB.form, {
+      ngay: inv.ngay || mbToday(), ct: inv.congtrinh || '', loai: inv.loai || '',
+      ncc: inv.ncc || '', nguoi: inv.nguoi || '', nd: inv.nd || '',
+      calcMode: calc,
+      tien: calc ? '' : mbGroup(tien),
+      sl:   calc ? String(sl) : '',
+      dg:   calc ? mbGroup(Math.round(tien / sl)) : '',
+      editId: inv.id,
     });
-    save('inv_v3', invoices);
-    MB.drafts = [];
-    mbToast('✅ Đã lưu ' + n + ' hóa đơn', 'success');
-    mbAfterWrite();
-    MB.seg.nhap = 'tatca';
+    mbGo('nhap', { seg: Object.assign({}, MB.seg, { nhap: 'nhanh' }) });
+  },
+
+  cancelEditInv: () => {
+    Object.assign(MB.form, { nd: '', tien: '', sl: '', dg: '', editId: null, calcMode: false });
     mbRender();
   },
 
-  // ══════════════════════════════
-  //  HÓA ĐƠN CHI TIẾT NHIỀU DÒNG
-  // ══════════════════════════════
-  addItem: () => {
-    const it = MB.itemForm;
-    if (!it.ten.trim())                 { mbToast('Nhập tên vật tư', 'error'); return; }
-    if (!mbNum(it.sl) || !mbMoney(it.dg)) { mbToast('Nhập số lượng và đơn giá', 'error'); return; }
-    MB.detailItems.push({ ten: it.ten.trim(), dvt: it.dvt.trim(), sl: mbNum(it.sl), dg: mbMoney(it.dg) });
-    Object.assign(MB.itemForm, { ten: '', dvt: '', sl: '', dg: '' });
-    mbRender();
-  },
-
-  delItem: (arg) => { MB.detailItems.splice(parseInt(arg, 10), 1); mbRender(); },
-
-  saveDetailInvoice: () => {
-    const f = MB.detailForm;
-    if (!f.ct)                  { mbToast('Chọn công trình', 'error'); return; }
-    if (!MB.detailItems.length) { mbToast('Chưa có dòng vật tư nào', 'error'); return; }
-    if (mbBlockClosed(f.ct)) return;
-
-    const items = MB.detailItems.map(r => ({ ten: r.ten, dvt: r.dvt, sl: r.sl, dongia: r.dg, thanhtien: Math.round(r.sl * r.dg) }));
-    const total = items.reduce((s, r) => s + r.thanhtien, 0);
-    const nd    = (typeof buildNDFromItems === 'function') ? buildNDFromItems(items) : items.map(i => i.ten).join(', ');
-
-    const fields = (typeof _ensureInvRef === 'function')
-      ? _ensureInvRef({ ngay: f.ngay, congtrinh: f.ct, loai: f.loai, nguoi: f.nguoi.trim(), ncc: f.ncc.trim(),
-                        nd, items, tien: total, thanhtien: total, projectId: null, source: 'detail' })
-      : { ngay: f.ngay, congtrinh: f.ct, loai: f.loai, nguoi: f.nguoi.trim(), ncc: f.ncc.trim(),
-          nd, items, tien: total, thanhtien: total, projectId: null, source: 'detail' };
-
-    invoices.unshift(mkRecord(fields));
+  // Xóa mềm hóa đơn (vào Thùng rác của bản máy tính) — giống delInvoice() desktop
+  delQuickInv: (id) => {
+    const idx = invoices.findIndex(i => String(i.id) === String(id));
+    if (idx < 0) { mbToast('Không tìm thấy hóa đơn', 'error'); return; }
+    const inv = invoices[idx];
+    if (inv.ccKey || inv.source === 'cc') { mbToast('Hóa đơn từ chấm công — sửa tại tab Chấm công', 'error'); return; }
+    if (!confirm(`Xóa hóa đơn "${inv.nd || ''}" — ${mbFull(inv.thanhtien || inv.tien || 0)}?\n(Có thể khôi phục trong Thùng Rác trên máy tính)`)) return;
+    const now = Date.now();
+    const u   = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+    invoices[idx] = {
+      ...inv, deletedAt: now, updatedAt: now,
+      deviceId: (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : inv.deviceId,
+      deletedBy: (u && u.username) || 'Không rõ',
+    };
     save('inv_v3', invoices);
-    MB.detailItems = [];
-    mbToast('✅ Đã lưu hóa đơn chi tiết ' + mbFull(total), 'success');
+    if (String(MB.form.editId) === String(id)) Object.assign(MB.form, { nd: '', tien: '', sl: '', dg: '', editId: null });
+    mbToast('Đã xóa hóa đơn', 'success');
     mbAfterWrite();
   },
+
+  // Lịch sử HĐ: hiện thêm 50 dòng
+  moreInvs: () => { MB.invLimit = (MB.invLimit || 50) + 50; mbRender(); },
 
   // ══════════════════════════════
   //  CHẤM CÔNG
@@ -184,10 +265,50 @@ Object.assign(MB_ACTS, {
   ccAddWorker: () => {
     mbCcEnsureDraft();
     MB.ccWorkers.push({ name: '', d: [0, 0, 0, 0, 0, 0, 0], luong: 0, phucap: 0, hdmuale: 0, nd: '' });
+    MB.ccOpenSalary[MB.ccWorkers.length - 1] = true;
     mbRender();
   },
 
-  ccDelWorker: (arg) => { MB.ccWorkers.splice(parseInt(arg, 10), 1); mbRender(); },
+  // Xóa 1 dòng → chỉ số các dòng sau dịch lên, nên bỏ hết trạng thái mở dòng lương
+  ccDelWorker: (arg) => { MB.ccWorkers.splice(parseInt(arg, 10), 1); MB.ccOpenSalary = {}; mbRender(); },
+
+  // Nút "⚙ Lương": đóng/mở dòng sửa Lương/công & Phụ cấp của 1 công nhân
+  ccToggleSalary: (arg) => {
+    const wi = parseInt(arg, 10);
+    MB.ccOpenSalary[wi] = !MB.ccOpenSalary[wi];
+    mbRender();
+  },
+
+  // Chọn/gõ xong tên công nhân (sự kiện change) → tự điền lương từ tuần chấm công gần nhất.
+  // Chỉ render lại khi thực sự điền, để không nuốt cú bấm nút kế tiếp khi ô mất focus.
+  ccNamePicked: (arg) => {
+    const w = MB.ccWorkers && MB.ccWorkers[parseInt(arg, 10)];
+    if (!w || mbMoney(w.luong)) return;
+    const luong = mbCcLastLuong(w.name);
+    if (!luong) return;
+    w.luong = luong;
+    mbRender();
+  },
+
+  // Chép danh sách công nhân (tên + lương, công = 0) từ tuần gần nhất trước đó của cùng công trình
+  ccCopyPrevWeek: () => {
+    mbCcEnsureDraft();
+    const prev = mbCcPrevWeek();
+    if (!prev) { mbToast('Không tìm thấy tuần trước của công trình này', 'info'); return; }
+    MB.ccWorkers = MB.ccWorkers.filter(w => (w.name || '').trim());
+    const have = new Set(MB.ccWorkers.map(w => w.name.trim().toLowerCase()));
+    let n = 0;
+    (prev.workers || []).forEach(k => {
+      const name = (k.name || '').trim();
+      if (!name || have.has(name.toLowerCase())) return;
+      have.add(name.toLowerCase());
+      MB.ccWorkers.push({ name, d: [0, 0, 0, 0, 0, 0, 0], luong: k.luong || 0, phucap: 0, hdmuale: 0, nd: '' });
+      n++;
+    });
+    MB.ccOpenSalary = {};
+    mbToast(n ? '✅ Đã chép ' + n + ' công nhân từ tuần trước' : 'Đã có đủ công nhân của tuần trước', n ? 'success' : 'info');
+    mbRender();
+  },
 
   /**
    * Mở một tuần đã lưu để sửa. Gọi được từ 2 nơi:
@@ -255,6 +376,14 @@ Object.assign(MB_ACTS, {
   // Trang Tiền Ứng và Công Nợ đều lọc bỏ loại này (giống bản desktop).
   ccUngKind: (arg) => { MB.ccUngForm.kind = arg; mbRender(); },
 
+  // Bấm thẻ công nhân đang nợ → điền tên vào form ghi phiếu ứng/trả phía trên
+  ccPickWorker: (name) => {
+    MB.ccUngForm.tp = name || '';
+    mbRender();
+    const body = document.getElementById('mb-body');
+    if (body) body.scrollTop = 0;
+  },
+
   saveUngCN: () => {
     const f = MB.ccUngForm;
     if (!f.tp.trim())     { mbToast('Nhập tên công nhân', 'error'); return; }
@@ -315,61 +444,39 @@ Object.assign(MB_ACTS, {
   },
 
   // ══════════════════════════════
-  //  DOANH THU (HĐ chính · HĐ thầu phụ · Thu tiền)
+  //  THU TIỀN (27/10/2026: điện thoại chỉ còn ghi nhận thu — HĐ chính / HĐ thầu phụ làm trên máy tính)
   // ══════════════════════════════
-  // arg = loại từ nút Lưu ('hdc' | 'thu' | 'hdtp') — HĐ thầu phụ lưu từ màn Công nợ
-  saveDt: (arg) => {
+  saveDt: () => {
     const f    = MB.dtForm;
-    const kind = arg || MB.dtKind;
     const tien = mbMoney(f.tien);
-    if (!f.ct)  { mbToast('Chọn công trình', 'error'); return; }
-    if (!tien)  { mbToast('Nhập số tiền', 'error'); return; }
+    if (!f.ct)   { mbToast('Chọn công trình', 'error'); return; }
+    if (!tien)   { mbToast('Nhập số tiền', 'error'); return; }
     if (!f.ngay) { mbToast('Chọn ngày', 'error'); return; }
 
     const proj = mbFindProjByName(f.ct);
     if (!proj) { mbToast('Chỉ được tạo công trình tại tab Công Trình', 'error'); return; }
-    const now = Date.now();
 
-    if (kind === 'hdc') {
-      // Hợp đồng chính — lưu vào map hopdong_v1, ưu tiên key = projectId
-      const key = proj.id;
-      const old = hopDongData[key] || {};
-      hopDongData[key] = {
-        ...old,
-        giaTri: tien,
-        giaTriphu: old.giaTriphu || 0,
-        phatSinh:  old.phatSinh  || 0,
-        nd:        f.nd.trim(),
-        nguoi:     old.nguoi || '',
-        khachHang: proj.chuDauTu || old.khachHang || '',
-        projectId: proj.id,
-        ngay:      f.ngay,
-        createdAt: old.createdAt || now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      save('hopdong_v1', hopDongData);
-      mbToast('✅ Đã lưu hợp đồng: ' + proj.name, 'success');
-
-    } else if (kind === 'hdtp') {
-      if (!f.tp.trim()) { mbToast('Nhập tên thầu phụ', 'error'); return; }
-      thauPhuContracts.unshift(mkRecord({
-        ngay: f.ngay, congtrinh: proj.name, projectId: proj.id,
-        thauphu: f.tp.trim(), giaTri: tien, phatSinh: 0, nd: f.nd.trim(), items: [],
-      }));
-      save('thauphu_v1', thauPhuContracts);
-      mbToast('✅ Đã lưu HĐ thầu phụ: ' + f.tp.trim(), 'success');
-
-    } else {
-      thuRecords.unshift(mkRecord({
-        ngay: f.ngay, congtrinh: proj.name, projectId: proj.id,
-        tien, nguoi: '', nd: f.nd.trim(), loaiThu: '',
-      }));
-      save('thu_v1', thuRecords);
-      mbToast('✅ Đã ghi nhận thu ' + mbFull(tien) + ' — ' + proj.name, 'success');
-    }
+    thuRecords.unshift(mkRecord({
+      ngay: f.ngay, congtrinh: proj.name, projectId: proj.id,
+      tien, nguoi: '', nd: f.nd.trim(), loaiThu: '',
+    }));
+    save('thu_v1', thuRecords);
+    mbToast('✅ Đã ghi nhận thu ' + mbFull(tien) + ' — ' + proj.name, 'success');
 
     Object.assign(MB.dtForm, { tien: '', nd: '' });
+    mbAfterWrite();
+  },
+
+  // Xóa mềm phiếu thu nhập nhầm (khôi phục được trong Thùng Rác trên máy tính)
+  delThu: (id) => {
+    const idx = thuRecords.findIndex(r => String(r.id) === String(id));
+    if (idx < 0) return;
+    const r = thuRecords[idx];
+    if (!confirm(`Xóa phiếu thu ${mbFull(r.tien || 0)} — ${r.congtrinh || ''} (${mbDate(r.ngay)})?`)) return;
+    const now = Date.now();
+    thuRecords[idx] = { ...r, deletedAt: now, updatedAt: now, deviceId: (typeof DEVICE_ID !== 'undefined') ? DEVICE_ID : r.deviceId };
+    save('thu_v1', thuRecords);
+    mbToast('Đã xóa phiếu thu', 'success');
     mbAfterWrite();
   },
 
@@ -413,55 +520,12 @@ Object.assign(MB_ACTS, {
     mbAfterWrite();
   },
 
-  // ══════════════════════════════
-  //  DANH MỤC — gọi thẳng addItem()/delItem() của bản desktop
-  //  để giữ nguyên luật chống trùng, kiểm tra "đang sử dụng", dọn ung_v1...
-  // ══════════════════════════════
-  addDm: () => {
-    const catId = MB.dmType;
-    const val   = (MB.dmNew || '').trim();
-    if (!val) { mbToast('Nhập tên mục', 'error'); return; }
-    if (typeof addItem !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
-
-    // addItem() đọc giá trị từ ô nhập của bản desktop (id="sa-<catId>").
-    // Ô này chỉ tồn tại sau renderSettings() → nếu chưa có thì tạo tạm một ô ẩn.
-    let inp = document.getElementById('sa-' + catId);
-    let temp = false;
-    if (!inp) {
-      inp = document.createElement('input');
-      inp.id = 'sa-' + catId;
-      inp.style.display = 'none';
-      document.body.appendChild(inp);
-      temp = true;
-    }
-    inp.value = val;
-    addItem(catId);
-    if (temp && inp.parentNode) inp.parentNode.removeChild(inp);
-
-    MB.dmNew = '';
-    mbAfterWrite();
-  },
-
-  delDm: (arg) => {
-    const catId = MB.dmType;
-    const idx   = parseInt(arg, 10);
-    if (typeof delItem !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
-    delItem(catId, idx);               // đã tự hỏi xác nhận + kiểm tra đang dùng
-    mbAfterWrite();
-  },
-
-  // ══════════════════════════════
-  //  THÙNG RÁC — gọi thẳng hàm của bản desktop
-  // ══════════════════════════════
-  trashRestore: (arg) => {
-    if (typeof _trashRestore !== 'function') return;
-    _trashRestore(arg);
-    mbAfterWrite();
-  },
-
-  trashPurge: (arg) => {
-    if (typeof _trashHardDelete !== 'function') return;
-    _trashHardDelete(arg);             // đã tự hỏi xác nhận
-    mbAfterWrite();
+  // Công nợ → "+ Ghi phiếu ứng": sang màn Tiền ứng, điền sẵn loại + tên đối tác + công trình
+  cnQuickUng: (key) => {
+    const r = (typeof ttBuildRows === 'function') ? ttBuildRows({ includeDone: true }).find(x => x.key === key) : null;
+    if (!r) { mbToast('Không tìm thấy đối tác', 'error'); return; }
+    MB.ungKind = r.group === 'nhacungcap' ? 'nhacungcap' : 'thauphu';
+    Object.assign(MB.ungForm, { tp: r.partner || '', ct: r.ctName || '', tien: '', nd: '' });
+    mbGo('tienung', { seg: Object.assign({}, MB.seg, { tienung: 'nhap' }) });
   },
 });
