@@ -953,25 +953,44 @@ function mbCcPayroll() {
     const adj   = (typeof ccThucLanhLedgerAdj === 'function') ? ccThucLanhLedgerAdj(m.name, from, to) : 0;
     const gross = m.luong + m.pc + m.hdml;
     const debt  = (typeof ccWorkerDebtUpTo === 'function') ? ccWorkerDebtUpTo(m.name, to) : 0;
-    return { ...m, adj, gross, net: gross + adj, debt };
+    return { ...m, ...mbCcLedgerSplit(m.name, from, to), adj, gross, net: gross + adj, debt };
   }).sort((a, b) => b.net - a.net);
   return { from, to, rows };
 }
 
-/** Đoạn văn bản phiếu lương 1 công nhân — dán thẳng vào Zalo */
+/**
+ * Tách khoản điều chỉnh Thực lãnh của tuần thành 2 phần để ghi rõ trên phiếu lương:
+ *   ung — tổng phiếu ỨNG TIỀN (cộng vào thực lãnh) · tra — tổng phiếu TRẢ NỢ (trừ khỏi thực lãnh)
+ * Cùng điều kiện với ccThucLanhLedgerAdj() desktop (tick "tính vào Thực Lãnh", ngày trong tuần)
+ * → ung − tra luôn bằng adj.
+ */
+function mbCcLedgerSplit(name, from, to) {
+  const recs = (typeof _ccUngRecs === 'function') ? _ccUngRecs(name)
+    : (typeof ungRecords !== 'undefined' ? ungRecords : []).filter(r => !r.deletedAt && r.loai === 'congnhan' && (r.tp || '') === name);
+  let ung = 0, tra = 0;
+  recs.forEach(r => {
+    if (!r.tinhVaoThucLanh || !r.ngay || r.ngay < from || r.ngay > to) return;
+    if (r.cnKind === 'tra') tra += Number(r.tien) || 0;
+    else ung += Number(r.tien) || 0;
+  });
+  return { ung, tra };
+}
+
+/** Đoạn văn bản phiếu lương 1 người lao động — dán thẳng vào Zalo */
 function mbCcPayslipText(r, from, to) {
   const wl  = (typeof weekLabel === 'function') ? weekLabel(from) : (mbDate(from) + ' – ' + mbDate(to));
   const r1  = v => Math.round(v * 10) / 10;
   const L   = [
     'PHIẾU LƯƠNG TUẦN ' + wl,
-    'Công nhân: ' + r.name,
+    'Người lao động: ' + r.name,
     '────────────',
     ...r.cts.map(c => '• ' + c.ct + ': ' + r1(c.congs) + ' công × ' + mbFull(c.luong)),
     'Lương chính: ' + mbFull(r.luong),
   ];
   if (r.pc)   L.push('Phụ cấp: ' + mbFull(r.pc));
   if (r.hdml) L.push('Mua vật tư lẻ: ' + mbFull(r.hdml));
-  if (r.adj)  L.push('Cấn trừ ứng công nhân: ' + (r.adj > 0 ? '+' : '−') + mbFull(Math.abs(r.adj)));
+  if (r.tra)  L.push('Trừ trả nợ: −' + mbFull(r.tra));
+  if (r.ung)  L.push('Cộng tiền ứng: ' + mbFull(r.ung));
   L.push('────────────', 'THỰC LÃNH: ' + mbFull(r.net));
   if (Math.round(r.debt)) L.push('Nợ còn lại: ' + mbFull(r.debt));
   L.push('— CTY NGUYỄN HỮU');
@@ -1076,7 +1095,8 @@ function mbCcBangLuong(toggle) {
         <div style="font-size:11px;color:var(--mb-muted-2)">${r.cts.map(c => mbX(c.ct) + ' (' + r1(c.congs) + ' công)').join(' · ')}</div>
         ${line('Số công · Lương chính', r1(r.congs) + ' công · ' + mbFull(r.luong))}
         ${r.pc || r.hdml ? line('Phụ cấp / Mua vật tư lẻ', mbFull(r.pc) + ' / ' + mbFull(r.hdml)) : ''}
-        ${r.adj ? line('Cấn trừ ứng công nhân', (r.adj > 0 ? '+ ' : '− ') + mbFull(Math.abs(r.adj)), 'var(--mb-amber)') : ''}
+        ${r.tra ? line('Trừ trả nợ', '− ' + mbFull(r.tra), 'var(--mb-red)') : ''}
+        ${r.ung ? line('Cộng tiền ứng', '+ ' + mbFull(r.ung), 'var(--mb-amber)') : ''}
         ${line('Nợ còn lại', mbFull(r.debt), Math.round(r.debt) > 0 ? 'var(--mb-red)' : 'var(--mb-green)')}
         <div class="mb-btn-row" style="margin-top:3px">
           <button class="mb-btn-outline blue" data-act="ccCopyPayslip" data-arg="${mbX(r.name)}">📋 Sao chép phiếu lương (gửi Zalo)</button>

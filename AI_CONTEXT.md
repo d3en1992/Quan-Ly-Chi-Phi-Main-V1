@@ -2463,3 +2463,9 @@ Thực hiện theo `KE_HOACH_BO_SUNG_TINH_NANG_DIEN_THOAI_V2.md`. Chỉ sửa `j
 **State `MB` mới:** `ungSearch`, `ungCtFilter`, `ungOpen`, `cnOpen`, `hdtpOpen`, `hdtpForm`, `ccBcView`, `ccUngOpen`, `tbWarn`, `tbFormOpen`, `tbForm`, `tbMoveId`, `tbMove`, `projFormOpen`, `projForm`, `ungForm.editId`.
 
 **Kiểm tra:** `node --check` 3 file; script giả lập dữ liệu render mọi màn hình (không `undefined`/`NaN`), kiểm tra nhãn mới và chạy: tạo / sửa công trình, sửa / xóa phiếu ứng (chặn phiếu tất toán), thêm đối tác, bung thống kê ứng, chi tiết công nợ, lưu HĐ thầu phụ, bảng lương + sao chép phiếu lương, xóa phiếu ứng công nhân, thêm thiết bị (gộp dòng), điều chuyển một phần, đổi tình trạng, chặn xóa thiết bị ở công trình. Chưa chạy trên trình duyệt / điện thoại thật.
+
+### 9.83 Phiếu lương gửi Zalo (điện thoại): "Người lao động" + tách Trừ trả nợ / Cộng tiền ứng (28/10/2026)
+
+- `js/mobile/mobile.screens.js` `mbCcPayslipText()`: dòng `Công nhân:` → **`Người lao động:`** (câu chữ tôn trọng hơn); dòng `Cấn trừ ứng công nhân: ±…` tách thành **`Trừ trả nợ: −…`** và **`Cộng tiền ứng: …`** (mỗi dòng chỉ hiện khi khác 0).
+- Hàm mới `mbCcLedgerSplit(name, from, to)` → `{ ung, tra }`: cùng điều kiện với `ccThucLanhLedgerAdj()` desktop (phiếu `loai='congnhan'` có tick `tinhVaoThucLanh`, ngày trong tuần), nên `ung − tra` luôn bằng khoản điều chỉnh đang cộng vào Thực lãnh. `mbCcPayroll()` trả thêm `ung`, `tra` cho từng người.
+- Thẻ "Lương từng công nhân" (`mbCcBangLuong`) đổi theo cho khớp phiếu: 2 dòng Trừ trả nợ (đỏ) / Cộng tiền ứng (cam) thay dòng Cấn trừ.
