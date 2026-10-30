@@ -324,9 +324,6 @@ function onCCCtSelChange(){
   loadCCWeekForm();
 }
 
-// _fmtDate — alias của fmtISODate() (tienich.js) với dấu '/' để dùng trong phiếu lương.
-const _fmtDate = (iso) => fmtISODate(iso, '', '/');
-
 // ── Sub-tab navigation trong page-chamcong (bắt chước dtGoSub của tab Doanh Thu) ──
 function ccGoSub(btn, id) {
   document.querySelectorAll('#page-chamcong .sub-page').forEach(p => p.classList.remove('active'));

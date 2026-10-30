@@ -887,58 +887,7 @@ function pasteKLCT(btn) {
   }
 }
 
-// oneId: (27/10/2026) nút 🖨️ trên từng dòng truyền thẳng khóa HĐ — không cần tick ô chọn
-function exportHdcToImage(oneId) {
-  let keyId = oneId;
-  if (!keyId) {
-    const checked = [...document.querySelectorAll('.hdc-row-chk:checked')];
-    if (!checked.length) { toast('⚠️ Vui lòng tick chọn ít nhất 1 hợp đồng (hoặc bấm 🖨️ trên dòng)!', 'error'); return; }
-    if (checked.length > 1) { toast('⚠️ Chỉ chọn 1 hợp đồng để xuất phiếu!', 'error'); return; }
-    keyId = checked[0].dataset.id;
-  }
-  const hd = hopDongData[keyId];
-  if (!hd) return;
-
-  const ctName = projects.find(p => p.id === keyId)?.name || keyId;
-  const total = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
-
-  document.getElementById('phdc-ct-name').textContent = ctName;
-  document.getElementById('phdc-ct-label').textContent = ctName;
-  document.getElementById('phdc-date').textContent = hd.ngay || today();
-  document.getElementById('phdc-nguoi').textContent = recCatName(hd, 'hopdong', 'nguoi') || '—';
-  document.getElementById('phdc-giatri').textContent = numFmt(hd.giaTri || 0) + ' đ';
-  document.getElementById('phdc-phatsinh').textContent = numFmt((hd.giaTriphu || 0) + (hd.phatSinh || 0)) + ' đ';
-  document.getElementById('phdc-tong').textContent = numFmt(total) + ' đ';
-
-  const items = Array.isArray(hd.items) ? hd.items : [];
-  let totalDetail = 0;
-  document.getElementById('phdc-tbody').innerHTML = items.map(it => {
-    const st = (it.sl || 0) * (it.donGia || 0);
-    totalDetail += st;
-    return `<tr>
-      <td style="padding:8px 10px; border:1px solid #1a1814;">${x(it.name)}</td>
-      <td style="padding:8px 10px; border:1px solid #1a1814; text-align:center;">${x(it.donVi || '—')}</td>
-      <td style="padding:8px 10px; border:1px solid #1a1814; text-align:center;">${it.sl || 0}</td>
-      <td style="padding:8px 10px; border:1px solid #1a1814; text-align:right;">${numFmt(it.donGia || 0)}</td>
-      <td style="padding:8px 10px; border:1px solid #1a1814; text-align:right; font-weight:700;">${numFmt(st)}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('phdc-total-detail').textContent = numFmt(totalDetail) + ' đ';
-
-  const tpl = document.getElementById('hdchinh-template');
-  tpl.style.display = 'block';
-  toast('⏳ Đang tạo phiếu HĐ Công ty...', 'info');
-
-  html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 800 }).then(canvas => {
-    tpl.style.display = 'none';
-    const link = document.createElement('a');
-    link.download = 'HDChinh_' + removeVietnameseTones(ctName) + '_' + today() + '.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    toast('✅ Đã xuất phiếu HĐ Công ty!', 'success');
-  }).catch(err => { tpl.style.display = 'none'; toast('❌ Lỗi: ' + err.message, 'error'); });
-}
-
+// (30/10/2026) Đã gỡ exportHdcToImage / exportHdcRowToImage — bỏ tính năng xuất phiếu HĐ chính (ảnh PNG)
 function exportHdtpToImage() {
   const checked = [...document.querySelectorAll('.hdtp-row-chk:checked')];
   if (!checked.length) { toast('⚠️ Vui lòng tick chọn ít nhất 1 HĐ thầu phụ!', 'error'); return; }
@@ -1025,48 +974,6 @@ function exportThuToImage(oneId) {
 }
 
 // ── Per-row export helpers (không cần tick checkbox) ──────────
-function exportHdcRowToImage(keyId) {
-  const hd = hopDongData[keyId];
-  if (!hd) return;
-  const ctName = (typeof projects !== 'undefined' ? projects : []).find(p => p.id === keyId)?.name || keyId;
-  const total = (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
-
-  document.getElementById('phdc-ct-name').textContent = ctName;
-  document.getElementById('phdc-ct-label').textContent = ctName;
-  document.getElementById('phdc-date').textContent = hd.ngay || today();
-  document.getElementById('phdc-nguoi').textContent = recCatName(hd, 'hopdong', 'nguoi') || '—';
-  document.getElementById('phdc-giatri').textContent = numFmt(hd.giaTri || 0) + ' đ';
-  document.getElementById('phdc-phatsinh').textContent = numFmt((hd.giaTriphu || 0) + (hd.phatSinh || 0)) + ' đ';
-  document.getElementById('phdc-tong').textContent = numFmt(total) + ' đ';
-
-  const items = Array.isArray(hd.items) ? hd.items : [];
-  let totalDetail = 0;
-  document.getElementById('phdc-tbody').innerHTML = items.map(it => {
-    const st = (it.sl || 0) * (it.donGia || 0);
-    totalDetail += st;
-    return `<tr>
-      <td style="padding:8px 10px;border:1px solid #1a1814">${x(it.name)}</td>
-      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:center">${x(it.donVi || '—')}</td>
-      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:center">${it.sl || 0}</td>
-      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:right">${numFmt(it.donGia || 0)}</td>
-      <td style="padding:8px 10px;border:1px solid #1a1814;text-align:right;font-weight:700">${numFmt(st)}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('phdc-total-detail').textContent = numFmt(totalDetail) + ' đ';
-
-  const tpl = document.getElementById('hdchinh-template');
-  tpl.style.display = 'block';
-  toast('⏳ Đang tạo phiếu...', 'info');
-  html2canvas(tpl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 800 }).then(canvas => {
-    tpl.style.display = 'none';
-    const link = document.createElement('a');
-    link.download = 'HDChinh_' + removeVietnameseTones(ctName) + '_' + today() + '.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    toast('✅ Đã xuất phiếu HĐ Chính!', 'success');
-  }).catch(err => { tpl.style.display = 'none'; toast('❌ Lỗi: ' + err.message, 'error'); });
-}
-
 function exportThuRowToImage(id) {
   const r = thuRecords.find(t => t.id === id);
   if (!r) return;

@@ -42,10 +42,10 @@ function _dtHdcTong(hd) {
   return (hd.giaTri || 0) + (hd.giaTriphu || 0) + (hd.phatSinh || 0);
 }
 
-// ── Nút Xuất phiếu (🖨️) / Sửa / Xóa HĐ chính (key truyền qua data-ct để an toàn với tên có dấu nháy) ──
+// ── Nút Sửa / Xóa HĐ chính (key truyền qua data-ct để an toàn với tên có dấu nháy) ──
+// (30/10/2026) Đã gỡ tính năng xuất phiếu HĐ chính (ảnh PNG)
 function _dtHdcActions(keyId) {
   return `<div class="d-flex gap-1 justify-content-center">
-    <button class="btn btn-outline-secondary btn-sm" title="Xuất phiếu HĐ chính (ảnh PNG)" onclick="exportHdcToImage(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-printer"></i></button>
     <button class="btn btn-outline-primary btn-sm" title="Sửa" onclick="editHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-pencil-fill"></i></button>
     <button class="btn btn-outline-danger btn-sm" title="Xóa" onclick="delHopDongChinh(this.dataset.ct)" data-ct="${x(keyId)}"><i class="bi bi-trash-fill"></i></button>
   </div>`;
@@ -345,7 +345,6 @@ function renderHdcTableTk(page) {
   tbody.innerHTML = slice.map(([keyId, hd]) => {
     const tong = _dtHdcTong(hd);
     return `<tr class="${keyId === _dtHdcLastKey ? 'dt-row-new' : ''}">
-      <td style="text-align:center;padding:4px 6px"><input type="checkbox" class="hdc-row-chk" data-id="${x(keyId)}"></td>
       <td class="text-body-secondary" style="white-space:nowrap;font-size:12px">${fmtISODate(hd.ngay)}</td>
       <td style="font-weight:600;white-space:nowrap">${x(_dtHdcCtName(keyId))}</td>
       <td class="text-end font-monospace" style="white-space:nowrap">${hd.giaTri ? fmtS(hd.giaTri) : '<span class="text-body-secondary">—</span>'}</td>

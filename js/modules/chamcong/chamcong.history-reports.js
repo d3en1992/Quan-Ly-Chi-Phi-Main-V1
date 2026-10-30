@@ -551,10 +551,13 @@ function exportCCHistCSV(){
   dlCSV(rows,'lich_su_cham_cong_'+label+'_'+today()+'.csv');
 }
 
-// [MODULE: PHIẾU LƯƠNG] — xuatPhieuLuong · html2canvas
+// [MODULE: PHIẾU LƯƠNG] — sao chép phiếu lương dạng chữ gửi Zalo
 // Ctrl+F → "MODULE: PHIẾU LƯƠNG"
+// (30/10/2026) Thay tính năng xuất phiếu lương ảnh PNG (html2canvas). Dùng chung cho bản máy tính
+// (nút ở bảng Tổng Lương Tuần) và giao diện điện thoại (mobile.screens.js → mbCcPayslipText).
 // ══════════════════════════════════════════════════════════════
 
+// Bỏ dấu tiếng Việt để đặt tên file (dùng cho phiếu tạm ứng PNG bên dưới)
 function removeVietnameseTones(str) {
   if (!str) return '';
   return str
@@ -566,139 +569,95 @@ function removeVietnameseTones(str) {
     .replace(/\s+/g, '_');
 }
 
-function xuatPhieuLuong() {
-  // 1. Thu thập công nhân được tick từ bảng Tổng Lương Tuần
-  //    Hỗ trợ cả table row (desktop) và card div (mobile)
-  const rows = [];
-  document.querySelectorAll('.cc-tlt-chk:checked').forEach(chk => {
-    const container = chk.closest('[data-name]');
-    if (!container) return;
-    const name     = container.dataset.name || '(Chưa đặt tên)';
-    const fromDate = container.dataset.from  || '';
-    const toDate   = container.dataset.to    || '';
-    const tc       = parseFloat(container.dataset.tc)   || 0;
-    const tl       = parseInt(container.dataset.tl)     || 0; // tc * luong
-    const pc       = parseInt(container.dataset.pc)     || 0; // phụ cấp
-    const hdml     = parseInt(container.dataset.hdml)   || 0; // HĐ mua lẻ
-    const loan     = parseInt(container.dataset.loan)   || 0; // vay mới
-    const tru      = parseInt(container.dataset.tru)    || 0; // trừ nợ ứng
-    const tladj    = parseInt(container.dataset.tladj)  || 0; // điều chỉnh từ phiếu ứng/trả có tick (±)
-    const noCon    = parseInt(container.dataset.noCon)  || 0; // nợ còn
-    const cts      = (container.dataset.cts || '').split('|').filter(Boolean);
-    const tongCong = tl + pc;
-    const luongTB  = tc > 0 ? Math.round(tl / tc) : 0;
-    rows.push({ name, fromDate, toDate, tc, tl, pc, hdml, loan, cts, tongCong, luongTB, tru, tladj, noCon });
-  });
-
-  if (!rows.length) {
-    toast('⚠️ Tick chọn ít nhất 1 công nhân trong bảng Tổng Lương Tuần!', 'error');
-    return;
-  }
-
-  // 2. Tổng hợp thông tin chung
-  const allFrom = rows.map(r => r.fromDate).filter(Boolean).sort();
-  const allTo   = rows.map(r => r.toDate).filter(Boolean).sort();
-  const fromDt  = allFrom[0] || '';
-  const toDt    = allTo[allTo.length - 1] || '';
-  const period  = fromDt && toDt ? _fmtDate(fromDt) + ' — ' + _fmtDate(toDt) : '(Chưa rõ)';
-
-  const allCts     = [...new Set(rows.flatMap(r => r.cts))];
-  const ctLabel    = allCts.join(', ') || '(Nhiều công trình)';
-  const today_     = new Date().toLocaleDateString('vi-VN');
-  const tongThanhToan  = rows.reduce((s, r) => s + r.tongCong, 0); // sum(tl+pc)
-  // Điều chỉnh từ phiếu ứng/trả có tick "tính vào Thực Lãnh":
-  //   phần dương (Ứng) gộp vào VAY MỚI, phần âm (Trả) gộp vào TRỪ — để phần
-  //   breakdown trên phiếu vẫn khớp với dòng THỰC LÃNH và Nợ hiện tại.
-  const tongTLAdjPos_  = rows.reduce((s, r) => s + Math.max(0,  r.tladj), 0);
-  const tongTLAdjNeg_  = rows.reduce((s, r) => s + Math.max(0, -r.tladj), 0);
-  const tongTru_       = rows.reduce((s, r) => s + r.tru,      0) + tongTLAdjNeg_;
-  const tongLoan_      = rows.reduce((s, r) => s + r.loan,     0) + tongTLAdjPos_;
-  const tongHDML_      = rows.reduce((s, r) => s + r.hdml,     0);
-  const tongThucLanh_  = tongThanhToan + tongHDML_ + tongLoan_ - tongTru_;
-  const _seenCNNames = new Set();
-  let tongNoCon_ = 0; // tổng nợ cũ (trước tuần) — mỗi CN chỉ tính 1 lần
-  rows.forEach(r => { if(!_seenCNNames.has(r.name)){ _seenCNNames.add(r.name); tongNoCon_ += r.noCon; } });
-  const tongNoHienTai_ = tongNoCon_ + tongLoan_ - tongTru_; // nợ còn sau tuần này
-
-  // 3. Đổ dữ liệu vào template
-  document.getElementById('pl-ct-name').textContent = ctLabel;
-  document.getElementById('pl-ct-label').textContent = ctLabel;
-  document.getElementById('pl-period').textContent   = period;
-  document.getElementById('pl-date').textContent     = today_;
-
-  document.getElementById('pl-tbody').innerHTML = rows.map(r => `
-    <tr>
-      <td>${x(r.name)}</td>
-      <td>${r.tc}</td>
-      <td>${r.luongTB ? numFmt(r.luongTB) + ' đ' : '—'}</td>
-      <td>${r.pc ? numFmt(r.pc) + ' đ' : '—'}</td>
-      <td style="font-weight:700;color:#c8870a">${numFmt(r.tongCong)} đ</td>
-    </tr>`).join('');
-
-  document.getElementById('pl-total-cell').textContent = numFmt(tongThanhToan) + ' đ';
-
-  // ── Phần tổng hợp chi phí & công nợ ──────────────────────────────
-  document.getElementById('pl-sum-hdml').textContent =
-    tongHDML_ ? numFmt(tongHDML_) + ' đ' : '—';
-  document.getElementById('pl-sum-thuclanh').textContent =
-    numFmt(tongThanhToan + tongHDML_) + ' đ'; // (lương+PC) + HĐ mua lẻ
-  document.getElementById('pl-sum-tru').textContent =
-    tongTru_ ? numFmt(tongTru_) + ' đ' : '—';
-  document.getElementById('pl-sum-loan').textContent =
-    tongLoan_ ? numFmt(tongLoan_) + ' đ' : '—';
-  const _noConEl    = document.getElementById('pl-sum-nocon');
-  const _noConStr   = tongNoHienTai_ > 0 ? numFmt(tongNoHienTai_) + ' (nợ)'
-                    : tongNoHienTai_ < 0 ? numFmt(-tongNoHienTai_) + ' (dư)'
-                    : '0 đ';
-  const _noConColor = tongNoHienTai_ > 0 ? '#c0392b'
-                    : tongNoHienTai_ < 0 ? '#1a6e3a' : '#555';
-  if (_noConEl) { _noConEl.textContent = _noConStr; _noConEl.style.color = _noConColor; }
-
-  // Grand total — luôn hiển thị Thực Lãnh
-  document.getElementById('pl-grand-total').textContent =
-    'THỰC LÃNH: ' + numFmt(Math.max(0, tongThucLanh_)) + ' đồng';
-
-  // 4. Hiện template tạm để chụp
-  const tpl = document.getElementById('phieu-luong-template');
-  tpl.style.display = 'block';
-
-  // 5. Chụp bằng html2canvas
-  const _now = new Date();
-  const _dd = String(_now.getDate()).padStart(2, '0');
-  const _mm = String(_now.getMonth() + 1).padStart(2, '0');
-  const _yy = String(_now.getFullYear()).slice(-2);
-  const _datePart = _dd + _mm + _yy;
-  const _wParts = rows.map(r =>
-    removeVietnameseTones(r.name) + '_' + r.tc + 'c'
-  ).join('_');
-  const _ctList = allCts.slice(0, 3).map(ct => removeVietnameseTones(ct).slice(0, 3));
-  const _ctPart = _ctList.join('_') + (allCts.length > 3 ? '_etc' : '');
-  const fileName = 'Phieuluong_' + _datePart + '_' + _wParts + (_ctPart ? '_' + _ctPart : '');
-  toast('⏳ Đang tạo phiếu lương...', 'info');
-
-  document.fonts.ready.then(() => {
-    html2canvas(tpl, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      windowWidth: 760
-    }).then(canvas => {
-      tpl.style.display = 'none';
-      const link = document.createElement('a');
-      link.download = fileName + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      toast('✅ Đã xuất phiếu lương ' + rows.length + ' người!', 'success');
-    }).catch(err => {
-      tpl.style.display = 'none';
-      console.error('html2canvas error:', err);
-      toast('❌ Lỗi khi tạo ảnh: ' + err.message, 'error');
+/**
+ * Số liệu phiếu lương của 1 người lao động trong khoảng [from, to] (1 tuần: CN → T7), gộp MỌI công trình.
+ * Thực lãnh = công × lương + phụ cấp + mua vật tư lẻ + ứng − trả nợ — khớp cột Thực Lãnh của bảng
+ * Tổng Lương Tuần (renderCCTLT: tl + pc + loan + hdml − tru + ccThucLanhLedgerAdj).
+ *   ung — phiếu ỨNG TIỀN có tick "tính vào Thực Lãnh" + loanAmount (dữ liệu chấm công đời cũ)
+ *   tra — phiếu TRẢ NỢ có tick "tính vào Thực Lãnh" + tru (dữ liệu đời cũ)
+ * @returns {{ name, from, to, cts: [{ ct, congs, luong }], congs, luong, pc, hdml, ung, tra, net, debt }}
+ */
+function ccPayslipData(name, from, to) {
+  const d = { name, from, to, cts: [], congs: 0, luong: 0, pc: 0, hdml: 0, ung: 0, tra: 0 };
+  ccData.forEach(w => {
+    if (w.deletedAt || !w.fromDate || w.fromDate < from || w.fromDate > to) return;
+    (w.workers || []).forEach(wk => {
+      if ((wk.name || '') !== name) return;
+      const c = round1((wk.d || []).reduce((s, v) => s + (v || 0), 0));
+      d.congs += c;
+      d.luong += c * (wk.luong || 0);
+      d.pc    += (wk.phucap || 0);
+      d.hdml  += (wk.hdmuale || 0);
+      d.ung   += (wk.loanAmount || 0);
+      d.tra   += (wk.tru || 0);
+      d.cts.push({ ct: _resolveCtName(w) || w.ct || '—', congs: c, luong: wk.luong || 0 });
     });
   });
+  _ccUngRecs(name).forEach(r => {
+    if (!r.tinhVaoThucLanh || !r.ngay || r.ngay < from || r.ngay > to) return;
+    if (_ccKind(r) === 'tra') d.tra += Number(r.tien) || 0;
+    else d.ung += Number(r.tien) || 0;
+  });
+  d.congs = round1(d.congs);
+  d.net   = d.luong + d.pc + d.hdml + d.ung - d.tra;
+  d.debt  = ccWorkerDebtUpTo(name, to);
+  return d;
 }
 
-// Helper: format ngày YYYY-MM-DD → DD/MM/YYYY
+/** Văn bản phiếu lương sạch, xuống dòng rõ ràng — dán thẳng vào Zalo cho người lao động */
+function ccPayslipText(d) {
+  const money = v => fmtM(Math.round(v || 0));
+  const L = [
+    'PHIẾU LƯƠNG TUẦN ' + weekLabel(d.from),
+    'Người lao động: ' + d.name,
+    '────────────',
+    ...d.cts.map(c => '• ' + c.ct + ': ' + c.congs + ' công × ' + money(c.luong)),
+    'Lương chính: ' + money(d.luong),
+  ];
+  if (d.pc)   L.push('Phụ cấp: ' + money(d.pc));
+  if (d.hdml) L.push('Mua vật tư lẻ: ' + money(d.hdml));
+  if (d.tra)  L.push('Trừ trả nợ: −' + money(d.tra));
+  if (d.ung)  L.push('Cộng tiền ứng: ' + money(d.ung));
+  L.push('────────────', 'THỰC LÃNH: ' + money(d.net));
+  if (Math.round(d.debt)) L.push('Nợ còn lại: ' + money(d.debt));
+  L.push('— CTY NGUYỄN HỮU');
+  return L.join('\n');
+}
+
+/** Sao chép chữ vào clipboard; trình duyệt chặn navigator.clipboard thì dùng execCommand('copy') */
+function _ccCopyText(text, okMsg) {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) toast(okMsg, 'success');
+    else { toast('Trình duyệt không cho sao chép tự động — hãy sao chép thủ công', 'error'); prompt('Sao chép nội dung:', text); }
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => toast(okMsg, 'success'), fallback);
+  } else fallback();
+}
+
+// Nút "📋 Sao chép phiếu lương (gửi Zalo)" ở bảng Tổng Lương Tuần:
+// lọc 1 tuần → tick người lao động → bấm. Tick nhiều người → các phiếu cách nhau 1 dòng trống.
+function ccCopyPhieuLuong() {
+  const names = [...new Set([...document.querySelectorAll('.cc-tlt-chk:checked')]
+    .map(chk => chk.closest('[data-name]')?.dataset.name)
+    .filter(Boolean))];
+  if (!names.length) { toast('⚠️ Tick chọn ít nhất 1 người lao động trong bảng Tổng Lương Tuần!', 'error'); return; }
+  const fWk = document.getElementById('cc-tlt-week')?.value || '';
+  if (!fWk) { toast('⚠️ Chọn 1 tuần ở ô lọc tuần trước — phiếu lương tính theo từng tuần', 'error'); return; }
+  const to = ccSaturdayISO(fWk);
+  const text = names.map(n => ccPayslipText(ccPayslipData(n, fWk, to))).join('\n\n');
+  _ccCopyText(text, '📋 Đã sao chép phiếu lương ' + names.length + ' người — dán vào Zalo');
+}
+
 // Lõi xuất phiếu ứng PNG — tách riêng theo từng bảng (TP / NCC) để không xuất lẫn lộn.
 //  scopeId     : id container của bảng cần lấy checkbox ('ung-all-section' — bảng Thống kê ứng gộp TP + NCC)
 //  sourceRecs  : danh sách bản ghi tương ứng để lấy dữ liệu (filteredUngTp | filteredUngNcc)

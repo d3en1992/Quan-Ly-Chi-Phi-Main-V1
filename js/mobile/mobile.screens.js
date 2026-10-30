@@ -976,8 +976,15 @@ function mbCcLedgerSplit(name, from, to) {
   return { ung, tra };
 }
 
-/** Đoạn văn bản phiếu lương 1 người lao động — dán thẳng vào Zalo */
+/**
+ * Đoạn văn bản phiếu lương 1 người lao động — dán thẳng vào Zalo.
+ * (30/10/2026) Dùng chung hàm của bản máy tính (chamcong.history-reports.js) để 2 giao diện
+ * luôn ra CÙNG 1 mẫu phiếu; phần dưới chỉ là dự phòng khi module chấm công chưa nạp.
+ */
 function mbCcPayslipText(r, from, to) {
+  if (typeof ccPayslipData === 'function' && typeof ccPayslipText === 'function') {
+    return ccPayslipText(ccPayslipData(r.name, from, to));
+  }
   const wl  = (typeof weekLabel === 'function') ? weekLabel(from) : (mbDate(from) + ' – ' + mbDate(to));
   const r1  = v => Math.round(v * 10) / 10;
   const L   = [
