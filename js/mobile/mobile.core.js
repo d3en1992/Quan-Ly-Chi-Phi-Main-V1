@@ -49,7 +49,40 @@ const MB = {
     chamcong: 'so',       // so | baocao | ung
     tienung:  'nhap',     // nhap | thongke
     doanhthu: 'thu',      // thu | thongke | loinhuan  (27/10/2026: bỏ khai báo HĐ chính trên điện thoại)
+    tytrong:  'tong',     // tong | dinhmuc | sosanh   (31/10/2026)
+    quyettoan: 'ds',      // ds | lichsu              (31/10/2026)
   },
+
+  // ── Tỉ trọng & Định mức (31/10/2026) ──
+  tytCt:       '',        // projectId công trình đang xem
+  tytAllYears: true,      // true = trọn vòng đời (khớp mặc định desktop), false = năm đang lọc
+  tytOpen:     {},        // { khóa node cây 4 nhóm / 'chua' / 'm2' / 'loai': true } — đang bung
+  tytLim:      {},        // { khóa node loại chi phí: số khoản đang hiện } (mặc định 20)
+  tytDm:       '',        // id bộ định mức đang chọn ('' = bộ đầu tiên có số 4 trụ cột)
+  tytDt:       '',        // diện tích kiểm soát ('' = tổng sàn công trình)
+  tytKsOpen:   {},        // { trụ cột: true } — đang bung loại chi phí
+  tytSsChe:    'n1',      // so sánh: n1 (Thô & NC / m²) | all (toàn bộ / m²)
+  tytSsXong:   '0',       // so sánh: '1' = chỉ công trình đã xong
+  tytKlEdit:   null,      // bảng M2 đang sửa: [{ ten, dvt, kl, heSo, tinh }] (null = không sửa)
+  _tytCache:   {},        // kết quả tytTongHop trong 1 lần render (xóa đầu mỗi mbRender)
+
+  // ── Quyết toán (31/10/2026) ──
+  qtFilter:    'chua',    // danh sách: chua | da | all
+  qtSearch:    '',        // danh sách: tìm công trình
+  qtHisSearch: '',        // lịch sử: tìm công trình / nội dung / người
+  qtHisLimit:  20,        // lịch sử: số thẻ đang hiện
+  qtCt:        '',        // projectId đang mở form quyết toán ('' = đang ở danh sách)
+  qtLocked:    false,     // form đang ở chế độ chỉ xem (công trình đã có quyết toán)
+  qtForm:      { editId: '', loai: 'tang', soTien: '', ngay: '', nguoi: '', nd: '', chot: false, thuConLai: false },
+
+  // ── Danh mục (31/10/2026) ──
+  dmType:     'loaiChiPhi', // loaiChiPhi | nhaCungCap | nguoiTH | thauPhu | congNhan | tbTen
+  dmSearch:   '',
+  dmNew:      '',
+  dmAllYears: false,      // true = hiện cả mục chỉ dùng ở năm khác
+  dmEditIdx:  -1,         // chỉ số gốc trong cats[dmType] của dòng đang sửa tên (-1 = không sửa)
+  dmEditVal:  '',
+  dmLimit:    60,
 
   // Bộ lọc / tìm kiếm
   search:       '',       // tìm công trình
@@ -85,6 +118,7 @@ const MB = {
   projForm:     { id: null, loai: 'CT', kh: '', phone: '', name: '', diachi: '', ngay: '', heSo: '1' },
   hdtpForm:     { ct: '', tp: '', giaTri: '', phatSinh: '', nd: '', ngay: '' },
   ttLast:       null,     // { id, msg } lần tất toán vừa làm trên điện thoại (cho nút Hoàn tác)
+  backPid:      '',       // vào Tỉ trọng / Quyết toán từ Chi tiết CT → Back quay lại công trình này
   // Loại phiếu ứng — CHỈ thầu phụ / nhà cung cấp.
   // Ứng công nhân cố ý không nằm ở đây: nó là sổ nợ riêng (ung_v1 với
   // loai='congnhan' + cnKind), nhập tại tab Chấm công → "Ứng CN", đúng như
@@ -297,6 +331,8 @@ function mbTitles() {
   const P    = mbProjects();
   const act  = P.filter(p => p.status === 'active').length;
   const sel  = MB.projectId ? mbProject(MB.projectId) : null;
+  const qtP  = MB.qtCt ? mbProject(MB.qtCt) : null;
+  const tytP = MB.tytCt ? mbProject(MB.tytCt) : null;
   const year = mbYearLabel();
   return {
     dashboard: ['Tổng Quan',      'Dashboard chi phí ' + year],
@@ -309,6 +345,9 @@ function mbTitles() {
     congno:    ['Công Nợ Đối Tác', 'Thầu phụ & Nhà cung cấp'],
     thietbi:   ['Thiết Bị & Kho', 'Kho tổng & tại công trình'],
     thongke:   ['Cơ Cấu Chi Phí', 'Chi phí theo loại'],
+    quyettoan: ['Quyết Toán',     qtP ? qtP.name : 'Chốt doanh thu với Chủ đầu tư'],
+    tytrong:   ['Tỉ Trọng & Định Mức', tytP ? tytP.name : 'Chọn công trình'],
+    danhmuc:   ['Danh Mục',       'Loại chi phí · Đối tác · Công nhân · Thiết bị'],
     more:      ['Thêm',           'Tất cả chức năng'],
   };
 }
@@ -317,7 +356,8 @@ function mbTitles() {
 // Tiền ứng đã lên bottom nav nên KHÔNG còn ở đây; đổi lại Tổng quan rời nav
 // xuống đây để vẫn xem được.
 // (27/10/2026) Bỏ Quyết toán / Danh mục / Thùng rác khỏi điện thoại — làm trên máy tính.
-const MB_MORE_TABS = ['dashboard', 'doanhthu', 'congno', 'thietbi', 'thongke'];
+// (31/10/2026) Đưa lại Quyết toán / Tỉ trọng & Định mức / Danh mục (nhóm "Quản lý & Phân tích").
+const MB_MORE_TABS = ['dashboard', 'doanhthu', 'congno', 'thietbi', 'thongke', 'quyettoan', 'tytrong', 'danhmuc'];
 
 // Bottom nav: [id, nhãn, icon Material Symbols] — 5 mục, "Nhập chi phí" đặt giữa cho dễ bấm
 const MB_NAV = [
@@ -336,11 +376,18 @@ const MB_SEGS = {
   chamcong: ['chamcong', [['so', 'Sổ chấm công'], ['baocao', 'Tổng lương'], ['ung', 'Ứng công nhân']]],
   tienung:  ['tienung',  [['nhap', 'Nhập ứng'], ['thongke', 'Thống kê ứng']]],
   doanhthu: ['doanhthu', [['thu', 'Thu tiền'], ['thongke', 'Tiến độ thu'], ['loinhuan', 'Lợi nhuận']]],
+  // Nhãn có thể là hàm (tính lúc vẽ) — vd tab Định mức hiện số trụ cột đang vượt
+  tytrong:  ['tytrong',  [['tong', 'Tổng quan'], ['dinhmuc', () => mbTytDmTabLabel()], ['sosanh', 'So sánh']]],
+  quyettoan: ['quyettoan', [['ds', 'Công trình'], ['lichsu', 'Lịch sử quyết toán']]],
 };
 
 /** Chuyển màn hình */
 function mbGo(tab, extra) {
   if (!mbCanSee(tab)) { mbToast('Vai trò của bạn không xem được mục này', 'error'); return; }
+  // Vào Quyết toán từ màn khác (menu Thêm, cảnh báo...) → mở danh sách, không mở lại form cũ
+  if (tab === 'quyettoan' && MB.tab !== 'quyettoan' && !(extra && 'qtCt' in extra)) MB.qtCt = '';
+  // Rời Tỉ trọng / Quyết toán → bỏ ghi nhớ "Back về chi tiết công trình"
+  if (tab !== 'tytrong' && tab !== 'quyettoan') MB.backPid = '';
   MB.tab = tab;
   MB.yearOpen = false;
   if (extra) Object.assign(MB, extra);
@@ -390,6 +437,9 @@ function mbRouteFromHash() {
 /** Render lại toàn bộ shell (header + năm + tab con + nội dung + nav) */
 function mbRender() {
   if (!MB.on || !MB.ready) return;
+
+  // Kết quả tytTongHop chỉ dùng lại trong 1 lần vẽ → dữ liệu vừa ghi / vừa đồng bộ luôn được tính lại
+  MB._tytCache = {};
 
   // Giữ nguyên ô đang gõ: nhớ id + vị trí con trỏ trước khi thay HTML
   const act    = document.activeElement;
@@ -472,11 +522,12 @@ function mbRenderSubtabs() {
   const el = document.getElementById('mb-subtabs');
   if (!el) return;
   const def = MB_SEGS[MB.tab];
-  if (!def) { el.style.display = 'none'; return; }
+  // Đang mở form quyết toán của 1 công trình → ẩn tab con (nút Back đưa về danh sách)
+  if (!def || (MB.tab === 'quyettoan' && MB.qtCt)) { el.style.display = 'none'; return; }
   const [key, items] = def;
   el.style.display = 'flex';
   el.innerHTML = items.map(([id, label]) =>
-    `<div class="mb-subtab${MB.seg[key] === id ? ' on' : ''}" data-act="seg" data-arg="${key}|${id}">${mbX(label)}</div>`
+    `<div class="mb-subtab${MB.seg[key] === id ? ' on' : ''}" data-act="seg" data-arg="${key}|${id}">${mbX(typeof label === 'function' ? label() : label)}</div>`
   ).join('');
 }
 
@@ -561,8 +612,13 @@ const MB_ACTS = {
   seg:  (arg) => { const [k, v] = arg.split('|'); mbSeg(k, v); },
   back: () => {
     if (MB.tab === 'detail') mbGo('congtrinh');
+    // Vào từ lối tắt ở Chi tiết công trình → Back quay lại đúng công trình đó
+    else if (MB.backPid && (MB.tab === 'tytrong' || MB.tab === 'quyettoan')) mbOpenProject(MB.backPid);
+    else if (MB.tab === 'quyettoan' && MB.qtCt) mbGo('quyettoan', { qtCt: '' });   // form → danh sách
     else mbGo('more');
   },
+  // Vẽ lại sau khi rời ô nhập (dùng với data-onchange cho ô số cần tính nặng — không vẽ theo từng phím)
+  rerender: () => mbRender(),
   toggleYear: () => { MB.yearOpen = !MB.yearOpen; mbRender(); },
   // Bật/tắt một năm. Dùng lại đúng hàm multi-select của desktop:
   //   onYearToggle(y) — thêm/bớt y khỏi activeYears rồi gọi onYearChange()
@@ -644,6 +700,7 @@ async function initMobile() {
   if (!MB.dtForm.ngay)     MB.dtForm.ngay     = today;
   if (!MB.hdtpForm.ngay)   MB.hdtpForm.ngay   = today;
   if (!MB.ccUngForm.ngay)  MB.ccUngForm.ngay  = today;
+  if (!MB.qtForm.ngay)     MB.qtForm.ngay     = today;
 
   // Kế toán không vào được Tổng quan → mở thẳng Công trình
   if (!mbCanSee(MB.tab)) MB.tab = 'congtrinh';
@@ -663,6 +720,7 @@ const MB_TO_DESKTOP = {
   dashboard: 'dashboard', congtrinh: 'congtrinh', detail: 'congtrinh',
   nhap: 'nhap', chamcong: 'chamcong', tienung: 'nhapung',
   doanhthu: 'doanhthu', congno: 'congno', thietbi: 'thietbi', thongke: 'thongkecphd',
+  quyettoan: 'quyettoan', tytrong: 'tytrong', danhmuc: 'danhmuc',
   more: 'congtrinh',
 };
 

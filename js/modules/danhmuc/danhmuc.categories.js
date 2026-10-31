@@ -618,12 +618,24 @@ function finishEdit(catId,idx) {
   // Danh mục vừa được đồng bộ từ máy khác → idx trên giao diện có thể đã lệch
   if (!_dmIdxStillValid(catId, idx)) return;
   inp.value = newVal; // cập nhật input để hiển thị tên đã chuẩn hóa
-  const old=cats[catId][idx];
-  if(newVal===old){cancelEdit(catId,idx);return;} // không thay đổi thực sự
+  if (!dmDoiTen(catId, idx, newVal)) cancelEdit(catId, idx);
+}
+
+// ══ LÕI ĐỔI TÊN 1 MỤC DANH MỤC (31/10/2026 — tách khỏi finishEdit, KHÔNG đọc ô nhập DOM) ══
+// Dùng chung cho bản máy tính (finishEdit) và giao diện điện thoại (saveDmNameMb).
+// Chuẩn hóa tên → chống trùng → đổi master tại chỗ → lan tên mới vào mọi hóa đơn / phiếu ứng /
+// chấm công / thiết bị đã lưu → lưu + vẽ lại. Trả về true nếu đã đổi tên; false nếu không đổi
+// (tên rỗng, trùng tên cũ, trùng mục khác — trường hợp trùng có toast báo lỗi).
+function dmDoiTen(catId, idx, rawVal) {
+  if (catId === 'congTrinh' || !cats[catId]) return false;
+  const newVal = normalizeName(catId, rawVal);
+  const old = cats[catId][idx];
+  if (!newVal || old === undefined) return false;
+  if (newVal === old) return false; // không thay đổi thực sự
   // Chống trùng: so sánh sau khi bỏ dấu + lowercase
   const normNew = normalizeKey(newVal);
   const isDup = cats[catId].some((existing, i) => i !== idx && normalizeKey(existing) === normNew);
-  if(isDup){toast(`⚠️ "${newVal}" đã tồn tại trong danh mục!`,'error');cancelEdit(catId,idx);return;}
+  if(isDup){toast(`⚠️ "${newVal}" đã tồn tại trong danh mục!`,'error');return false;}
   cats[catId][idx]=newVal;
   // normalizeKey(old) dùng để so sánh — bắt được cả trường hợp cũ sai hoa/thường
   const normOld = normalizeKey(old);
@@ -668,6 +680,7 @@ function finishEdit(catId,idx) {
   renderSettings(); updateTop();
   try { dtPopulateSels(); } catch(e) {}
   toast('✅ Đã cập nhật "'+newVal+'"','success');
+  return true;
 }
 function addItem(catId) {
   // congTrinh không được thêm trực tiếp — phải tạo qua Tab Công Trình (projects_v1)

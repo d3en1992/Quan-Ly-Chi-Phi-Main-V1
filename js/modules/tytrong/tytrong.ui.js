@@ -1391,6 +1391,8 @@ function _tytEnsureYears(years) {
       if (typeof clearInvoiceCache === 'function') clearInvoiceCache();
       toast(`✅ Đã tải dữ liệu năm ${miss.join(', ')} để xem trọn vòng đời công trình`, 'success');
       _tytRecalc();
+      // (31/10/2026) Giao diện điện thoại cũng gọi hàm này (mbTytEnsureYears) → vẽ lại màn điện thoại
+      if (typeof MB !== 'undefined' && MB.on && typeof mbRender === 'function') mbRender();
       return;
     }
     // Đang có lượt đồng bộ khác chạy → chờ rồi thử lại (pullChanges tự bỏ qua khi đang pull)

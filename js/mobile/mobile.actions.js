@@ -626,6 +626,12 @@ Object.assign(MB_ACTS, {
 
   // Khối "⚡ Việc cần chú ý" ở Tổng quan
   alertGo: (arg) => {
+    // (31/10/2026) "Đã hoàn thành chưa quyết toán" → mở thẳng danh sách Quyết toán (Kế toán: lọc ở Công trình)
+    if (arg === 'completed' && mbCanSee('quyettoan')) {
+      Object.assign(MB, { qtFilter: 'chua', qtSearch: '', seg: Object.assign({}, MB.seg, { quyettoan: 'ds' }) });
+      mbGo('quyettoan');
+      return;
+    }
     if (arg === 'over' || arg === 'completed') { MB.statusFilter = arg; MB.search = ''; mbGo('congtrinh'); }
     if (arg === 'congno')  mbGo('congno');
     if (arg === 'thietbi') { MB.tbWarn = '1'; MB.tbCt = ''; mbGo('thietbi'); }
@@ -936,5 +942,296 @@ Object.assign(MB_ACTS, {
     MB.ungKind = r.group === 'nhacungcap' ? 'nhacungcap' : 'thauphu';
     Object.assign(MB.ungForm, { tp: r.partner || '', ct: r.ctName || '', tien: '', nd: '' });
     mbGo('tienung', { seg: Object.assign({}, MB.seg, { tienung: 'nhap' }) });
+  },
+});
+
+// ══════════════════════════════════════════════════════════════
+//  TỈ TRỌNG & ĐỊNH MỨC (31/10/2026) — điều hướng / bung thu trên màn chỉ xem
+// ══════════════════════════════════════════════════════════════
+Object.assign(MB_ACTS, {
+  // Đổi công trình ở dropdown → bỏ trạng thái bung / diện tích của công trình cũ
+  tytPickCt: () => {
+    Object.assign(MB, { tytOpen: {}, tytLim: {}, tytKsOpen: {}, tytDt: '', tytKlEdit: null, tytDm: mbTytDmRemembered(MB.tytCt) });
+    mbRender();
+  },
+
+  tytScope: (arg) => { MB.tytAllYears = arg === '1'; mbRender(); },
+
+  // Bung / thu 1 node (khóa node cây 4 nhóm, hoặc 'chua' / 'm2' / 'loai')
+  tytToggle: (key) => { MB.tytOpen[key] = !MB.tytOpen[key]; mbRender(); },
+
+  // Loại chi phí đang bung → hiện thêm 20 khoản
+  tytMore: (key) => { MB.tytLim[key] = (MB.tytLim[key] || 20) + 20; mbRender(); },
+
+  tytKsToggle: (k) => { MB.tytKsOpen[k] = !MB.tytKsOpen[k]; mbRender(); },
+
+  tytDtReset: () => { MB.tytDt = ''; mbRender(); },
+
+  // Bấm 1 công trình ở tab So sánh → xem tổng quan công trình đó
+  tytOpenCt: (pid) => {
+    Object.assign(MB, { tytCt: pid, tytOpen: {}, tytLim: {}, tytKsOpen: {}, tytDt: '', tytKlEdit: null, tytDm: mbTytDmRemembered(pid) });
+    mbSeg('tytrong', 'tong');
+  },
+
+  // Năm tải lỗi → cho phép thử tải lại (giống tytTaiLai desktop)
+  tytRetry: () => {
+    const p = mbProject(MB.tytCt);
+    if (p && typeof _tytTried !== 'undefined') tytNamVongDoi(p).forEach(y => _tytTried.delete(String(y)));
+    mbRender();
+  },
+
+  // Lối tắt từ Chi tiết công trình
+  openTyTrong: (pid) => {
+    if (pid !== MB.tytCt) Object.assign(MB, { tytCt: pid, tytOpen: {}, tytLim: {}, tytKsOpen: {}, tytDt: '', tytKlEdit: null, tytDm: mbTytDmRemembered(pid) });
+    mbGo('tytrong', { backPid: pid, seg: Object.assign({}, MB.seg, { tytrong: 'tong' }) });
+  },
+});
+
+// ══════════════════════════════════════════════════════════════
+//  QUYẾT TOÁN (31/10/2026) — lưu qua qtLuuQuyetToan() của desktop (1 logic duy nhất)
+// ══════════════════════════════════════════════════════════════
+
+/** Nạp form quyết toán của 1 công trình. Đã có quyết toán → nạp bản đó ở chế độ CHỈ XEM (quy tắc 1-1). */
+function mbQtLoadForm(pid, preferId) {
+  const { rec } = (typeof _qtRecordOfCt === 'function') ? _qtRecordOfCt(pid, preferId) : { rec: null };
+  MB.qtCt = pid;
+  if (rec) {
+    const v = qtSoTien(rec);
+    MB.qtForm = {
+      editId: rec.id, loai: qtLoaiOf(rec), soTien: v ? mbGroup(v) : '', ngay: rec.ngay || mbToday(),
+      nguoi: rec.nguoi || '', nd: rec.nd || '', chot: !!rec.chot,
+      thuConLai: !!(typeof _qtAutoThuOf === 'function' && _qtAutoThuOf(rec.id)),   // đang có phiếu tự động → giữ bật
+    };
+    MB.qtLocked = true;
+  } else {
+    MB.qtForm = { editId: '', loai: 'tang', soTien: '', ngay: mbToday(), nguoi: '', nd: '', chot: false, thuConLai: false };
+    MB.qtLocked = false;
+  }
+}
+
+Object.assign(MB_ACTS, {
+  openQtForm: (pid) => {
+    mbQtLoadForm(pid);
+    mbGo('quyettoan', { qtCt: pid, backPid: MB.backPid });
+  },
+
+  // Lối tắt từ Chi tiết công trình → Back quay lại công trình
+  openQtFor: (pid) => {
+    mbQtLoadForm(pid);
+    mbGo('quyettoan', { qtCt: pid, backPid: pid });
+  },
+
+  qtSetLoai: (loai) => {
+    if (MB.qtLocked || !QT_LOAI[loai]) return;
+    MB.qtForm.loai = loai;
+    // Giống qtOnLoaiChange desktop: "Thay thế" thường là bản chốt cuối → tự bật Chốt sổ khi nhập MỚI
+    if (!MB.qtForm.editId) MB.qtForm.chot = loai === 'thaythe';
+    mbRender();
+  },
+
+  qtToggle: (key) => {
+    if (MB.qtLocked || (key !== 'chot' && key !== 'thuConLai')) return;
+    MB.qtForm[key] = !MB.qtForm[key];
+    mbRender();
+  },
+
+  qtUnlock: () => {
+    if (!mbQtCanEdit()) { mbToast('Chỉ Quản trị viên hoặc Giám đốc được sửa quyết toán', 'error'); return; }
+    MB.qtLocked = false;
+    mbRender();
+  },
+
+  // Đang sửa bản đã lưu → nạp lại + khóa; đang thêm mới → về danh sách (hoặc chi tiết CT)
+  qtCancel: () => {
+    if (MB.qtForm.editId) { mbQtLoadForm(MB.qtCt); mbRender(); return; }
+    MB_ACTS.back();
+  },
+
+  saveQtMb: () => {
+    const F = MB.qtForm;
+    const kq = qtLuuQuyetToan({
+      pid: MB.qtCt, editId: F.editId, loai: F.loai, soTien: mbMoney(F.soTien), ngay: F.ngay,
+      nd: F.nd, nguoi: F.nguoi, chot: F.chot, wantThu: !!F.thuConLai,
+    });
+    if (!kq.ok) return;
+    const back = MB.backPid;
+    mbAfterWrite();
+    if (back) mbOpenProject(back);
+    else mbGo('quyettoan', { qtCt: '' });
+  },
+
+  // Sửa từ lịch sử → mở form ở chế độ đã mở khóa
+  editQtMb: (id) => {
+    const r = quyetToanRecords.find(x => String(x.id) === String(id) && !x.deletedAt);
+    const p = r ? (_qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh)) : null;
+    if (!p) { mbToast('Không tìm thấy công trình của bản quyết toán', 'error'); return; }
+    mbQtLoadForm(p.id, r.id);
+    MB.qtLocked = !mbQtCanEdit();
+    mbGo('quyettoan', { qtCt: p.id });
+  },
+
+  // Xóa mềm — qtDelete() desktop đã có hộp xác nhận + gỡ phiếu thu tự động đi kèm
+  delQtMb: (id) => {
+    if (typeof qtDelete !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+    qtDelete(id);
+    mbAfterWrite();
+  },
+
+  moreQtHis: () => { MB.qtHisLimit += 20; mbRender(); },
+});
+
+// ══════════════════════════════════════════════════════════════
+//  DANH MỤC (31/10/2026) — ghi qua đúng hàm desktop: addItem · dmDoiTen · delItem · updateCNRole
+// ══════════════════════════════════════════════════════════════
+
+/** Dòng idx còn đúng là tên lúc vẽ không? (danh mục vừa đồng bộ từ máy khác → idx có thể lệch) */
+function mbDmIdxOk(idx) {
+  const want = (MB._dmRowNames || {})[idx];
+  if (want !== undefined && (cats[MB.dmType] || [])[idx] === want) return true;
+  mbToast('🔄 Danh mục vừa được đồng bộ từ thiết bị khác — đã tải lại, vui lòng thao tác lại', 'info');
+  MB.dmEditIdx = -1;
+  mbRender();
+  return false;
+}
+
+Object.assign(MB_ACTS, {
+  dmPickType: (catId) => {
+    Object.assign(MB, { dmType: catId, dmSearch: '', dmNew: '', dmEditIdx: -1, dmEditVal: '', dmLimit: 60 });
+    mbRender();
+  },
+
+  toggleDmAllYears: () => { MB.dmAllYears = !MB.dmAllYears; mbRender(); },
+
+  moreDm: () => { MB.dmLimit += 60; mbRender(); },
+
+  // addItem() desktop tự chuẩn hóa tên + chống trùng (toast báo trùng) + lưu cloud
+  addDmMb: () => {
+    const val = (MB.dmNew || '').trim();
+    if (!val) { mbToast('Nhập tên mục mới', 'error'); return; }
+    const before = (cats[MB.dmType] || []).length;
+    mbAddCat(MB.dmType, val);
+    if ((cats[MB.dmType] || []).length > before) MB.dmNew = '';
+    mbAfterWrite();
+  },
+
+  editDmMb: (arg) => {
+    const idx = parseInt(arg, 10);
+    if (!mbDmIdxOk(idx)) return;
+    MB.dmEditIdx = idx;
+    MB.dmEditVal = cats[MB.dmType][idx];
+    mbRender();
+    const el = document.getElementById('mb-dm-edit');
+    if (el) { el.focus(); try { el.select(); } catch (e) { /* bỏ qua */ } }
+  },
+
+  cancelDmEdit: () => { MB.dmEditIdx = -1; MB.dmEditVal = ''; mbRender(); },
+
+  saveDmNameMb: () => {
+    const idx = MB.dmEditIdx;
+    if (idx < 0 || !mbDmIdxOk(idx)) return;
+    if (typeof dmDoiTen !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+    const old = cats[MB.dmType][idx];
+    const val = (MB.dmEditVal || '').trim();
+    if (!val) { mbToast('Tên không được để trống', 'error'); return; }
+    const norm = normalizeName(MB.dmType, val);
+    if (norm === old) { MB_ACTS.cancelDmEdit(); return; }   // không đổi gì
+    if (!confirm(`Đổi tên "${old}" → "${norm}"?\nTên mới sẽ được cập nhật vào mọi hóa đơn / phiếu ứng / chấm công đã lưu.`)) return;
+    if (!dmDoiTen(MB.dmType, idx, val)) { mbRender(); return; }   // trùng tên mục khác → giữ ô sửa (đã có toast)
+    MB.dmEditIdx = -1; MB.dmEditVal = '';
+    mbAfterWrite();
+  },
+
+  // delItem() desktop: chặn mục đang dùng + hỏi xác nhận + xóa mềm master
+  delDmMb: (arg) => {
+    const idx = parseInt(arg, 10);
+    if (!mbDmIdxOk(idx)) return;
+    if (typeof delItem !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+    delItem(MB.dmType, idx);
+    MB.dmEditIdx = -1;
+    mbAfterWrite();
+  },
+
+  // data-arg="idx|vai trò" ('' = bỏ vai trò)
+  setCnRoleMb: (arg) => {
+    const cut = arg.indexOf('|');
+    const idx = parseInt(arg.slice(0, cut), 10);
+    if (MB.dmType !== 'congNhan' || !mbDmIdxOk(idx)) return;
+    if (typeof updateCNRole !== 'function') { mbToast('Chưa sẵn sàng', 'error'); return; }
+    updateCNRole(idx, arg.slice(cut + 1));
+    mbAfterWrite();
+  },
+});
+
+// ══════════════════════════════════════════════════════════════
+//  TỈ TRỌNG — nâng cao (31/10/2026): gán nhóm 1 chạm · sửa bảng M2 · nhớ bộ định mức theo công trình
+// ══════════════════════════════════════════════════════════════
+const MB_TYT_DM_KEY = '_mbTytDmTheoCt';   // localStorage: { projectId: id bộ định mức } — tiện ích riêng máy này
+
+function mbTytDmMap() {
+  try { return JSON.parse(localStorage.getItem(MB_TYT_DM_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+
+/** Bộ định mức đã chọn lần trước cho công trình (không có → '' = bộ đầu tiên) */
+function mbTytDmRemembered(pid) { return (pid && mbTytDmMap()[pid]) || ''; }
+
+Object.assign(MB_ACTS, {
+  // Xếp 1 khoản "chưa xếp nhóm" vào nhóm n — giống tytChuaNhomKhoan desktop (gán tay, chỉ CT này).
+  // data-arg="n|khóa khoản" (khóa có thể chứa "|" → cắt ở dấu đầu tiên)
+  tytGanNhom: (arg) => {
+    const cut = arg.indexOf('|');
+    const n   = parseInt(arg.slice(0, cut), 10);
+    const key = arg.slice(cut + 1);
+    const p   = mbProject(MB.tytCt);
+    if (!p || !key || !TYT_NHOM_DS.includes(n)) return;
+    const st = tytStructOf(p.id);
+    st.nhomTay[key] = n;
+    tytSaveStruct(p.id, { nhomTay: st.nhomTay });
+    mbToast(`✅ Đã xếp vào Nhóm ${n}: ${TYT_NHOM[n].ten}`, 'success');
+    mbAfterWrite();
+  },
+
+  // Đổi bộ định mức → nhớ cho công trình đang xem
+  tytPickDm: () => {
+    if (MB.tytCt) {
+      const m = mbTytDmMap();
+      m[MB.tytCt] = MB.tytDm;
+      try { localStorage.setItem(MB_TYT_DM_KEY, JSON.stringify(m)); } catch (e) { /* trình duyệt chặn lưu → bỏ qua */ }
+    }
+    mbRender();
+  },
+
+  // ── Bảng M2: sửa trên bản nháp MB.tytKlEdit, Lưu mới ghi vào công trình ──
+  tytKlStart: () => {
+    const p = mbProject(MB.tytCt);
+    if (!p) return;
+    const src = Array.isArray(p.khoiLuong) && p.khoiLuong.length ? p.khoiLuong : [{}, {}, {}];
+    const num = v => (v === 0 || v) ? String(v).replace('.', ',') : '';
+    MB.tytKlEdit = src.map(x => ({
+      ten: (x && x.ten) || '', dvt: (x && x.dvt !== undefined) ? x.dvt : 'm2',
+      kl: num(x && x.kl), heSo: (x && (x.heSo === 0 || x.heSo)) ? num(x.heSo) : '1', tinh: tytKlTinh(x),
+    }));
+    mbRender();
+  },
+  tytKlAdd:  () => { MB.tytKlEdit.push({ ten: '', dvt: 'm2', kl: '', heSo: '1', tinh: true }); mbRender(); },
+  tytKlDel:  (i) => { MB.tytKlEdit.splice(parseInt(i, 10), 1); mbRender(); },
+  tytKlTinh: (i) => { const x = MB.tytKlEdit[parseInt(i, 10)]; if (x) x.tinh = !x.tinh; mbRender(); },
+  tytKlCancel: () => { MB.tytKlEdit = null; mbRender(); },
+
+  // Cùng cách đọc + ghi như _tytKlRead / tytKlSave desktop
+  tytKlSaveMb: () => {
+    const p = mbProject(MB.tytCt);
+    if (!p || !MB.tytKlEdit) return;
+    const khoiLuong = [];
+    MB.tytKlEdit.forEach(x => {
+      const ten = (x.ten || '').trim(), klRaw = String(x.kl || '').trim(), hsRaw = String(x.heSo || '').trim();
+      if (!ten && !klRaw) return;
+      const heSo = hsRaw === '' ? 1 : tytKlNum(hsRaw);
+      khoiLuong.push({ ten, dvt: (x.dvt || '').trim(), kl: tytKlNum(klRaw), heSo: heSo >= 0 ? heSo : 1, tinh: !!x.tinh });
+    });
+    try { updateProject(p.id, { khoiLuong }); }
+    catch (e) { mbToast('❌ ' + ((e && e.message) || 'Không lưu được bảng M2'), 'error'); return; }
+    MB.tytKlEdit = null;
+    mbToast(`✅ Đã lưu bảng M2 — tổng sàn ${tytFmtM2(tytTongSanRows(khoiLuong))} m²`, 'success');
+    mbAfterWrite();
   },
 });

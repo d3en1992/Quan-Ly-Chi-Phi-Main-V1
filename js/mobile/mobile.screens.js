@@ -93,6 +93,9 @@ function mbScreen(tab) {
     case 'congno':    return mbScrCongNo();
     case 'thietbi':   return mbScrThietBi();
     case 'thongke':   return mbScrThongKe();
+    case 'tytrong':   return mbScrTyTrong();
+    case 'quyettoan': return mbScrQuyetToan();
+    case 'danhmuc':   return mbScrDanhMuc();
     case 'more':      return mbScrMore();
     default:          return `<div class="mb-pad"><div class="mb-empty">Màn hình chưa có</div></div>`;
   }
@@ -336,16 +339,17 @@ function mbScrProjectDetail() {
   if (seg === 'ung')  return mbPdTienUng(p);
 
   // ── Tổng quan ──
-  // Kế toán: ẩn doanh thu / lãi lỗ / đơn giá + không đổi trạng thái (khớp phân quyền bản desktop)
+  // Kế toán: ẩn doanh thu / lãi lỗ + không đổi trạng thái (khớp phân quyền bản desktop); đơn giá đ/m² vẫn xem được
   const isKt = mbRole() === 'ketoan';
   const lai  = st.thu - st.chi;
   const days = (typeof getProjectDays === 'function') ? getProjectDays(p) : 0;
   const k    = (typeof getProjectK === 'function') ? getProjectK(p) : 1;
   const pct  = mbPct(st.chi, st.hd);
 
-  // Chỉ số Tỉ trọng 3.0 (diện tích sàn + 4 nhóm chi phí) — trọn vòng đời công trình
+  // Chỉ số Tỉ trọng 3.0 (diện tích sàn + 4 nhóm chi phí) — trọn vòng đời công trình.
+  // (31/10/2026) Mở cho cả Kế toán — khớp desktop (tab Tỉ trọng mở mọi vai trò từ 09/10/2026).
   let tyt = null;
-  if (!isKt && typeof tytTongHop === 'function') {
+  if (typeof tytTongHop === 'function') {
     try { tyt = tytTongHop(p, { allYears: true }); } catch (e) { console.warn('[mobile] tytTongHop', e); }
   }
   const m2 = v => (typeof tytFmtM2 === 'function') ? tytFmtM2(v) : String(Math.round(v * 100) / 100);
@@ -364,9 +368,9 @@ function mbScrProjectDetail() {
     ['Số ngày thi công',  days + ' ngày (Hệ số ' + k + ')', '', false],
   ];
   if (tyt && tyt.tongSan > 0) rows.push(
-    ['Tổng diện tích sàn quy đổi',          m2(tyt.tongSan) + ' m²',         'var(--mb-purple)', true],
-    ['Đơn giá Phần thô & Nhân công / m²',   mbFull(tyt.cpM2N1 || 0) + '/m²', 'var(--mb-purple)', true],
-    ['Đơn giá Toàn bộ công trình / m²',     mbFull(tyt.cpM2 || 0) + '/m²',   'var(--mb-purple)', true],
+    ['Tổng diện tích sàn quy đổi',          m2(tyt.tongSan) + ' m²',         'var(--mb-purple)', false],
+    ['Đơn giá Phần thô & Nhân công / m²',   mbFull(tyt.cpM2N1 || 0) + '/m²', 'var(--mb-purple)', false],
+    ['Đơn giá Toàn bộ công trình / m²',     mbFull(tyt.cpM2 || 0) + '/m²',   'var(--mb-purple)', false],
   );
   const shownRows = rows.filter(r => !(isKt && r[3]));
 
@@ -392,7 +396,7 @@ function mbScrProjectDetail() {
   const nhomRows = tyt ? [1, 2, 3, 4, 0]
     .map(n => [n, (tyt.theoNhom && tyt.theoNhom[n]) || 0])
     .filter(([n, v]) => n !== 0 || v > 0) : [];
-  const NHOM_COLOR = { 1: 'var(--mb-primary)', 2: 'var(--mb-green)', 3: 'var(--mb-amber)', 4: 'var(--mb-purple)', 0: 'var(--mb-muted-2)' };
+  const NHOM_COLOR = MB_NHOM_COLOR;
 
   return `<div class="mb-pad">
     ${editing ? mbProjFormHtml() : `<div class="mb-card mb-card-sm" style="display:flex;align-items:center;gap:10px">
@@ -448,6 +452,11 @@ function mbScrProjectDetail() {
         </div>`).join('')}
       </div>
     </div>` : ''}
+
+    <div class="mb-btn-row">
+      ${mbCanSee('quyettoan') ? `<button class="mb-btn-outline green" data-act="openQtFor" data-arg="${mbX(p.id)}">${mbIcon('fact_check', 16)} Quyết toán</button>` : ''}
+      <button class="mb-btn-outline blue" data-act="openTyTrong" data-arg="${mbX(p.id)}">${mbIcon('stacked_bar_chart', 16)} Tỉ trọng & định mức</button>
+    </div>
   </div>`;
 }
 
@@ -1816,6 +1825,808 @@ function mbCnCongNo() {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  16 · DANH MỤC (31/10/2026) — xem · thêm · sửa tên · xóa mục chưa dùng · vai trò công nhân.
+//       Ghi qua đúng hàm desktop: addItem (mbAddCat) · dmDoiTen · delItem · updateCNRole.
+//       Khối Tools (sao lưu, import / export, reset, xóa theo công trình) KHÔNG đưa lên điện thoại.
+// ══════════════════════════════════════════════════════════════
+const MB_DM_TYPES = [
+  ['loaiChiPhi', 'Loại chi phí'], ['nhaCungCap', 'Nhà cung cấp'], ['nguoiTH', 'Người thực hiện'],
+  ['thauPhu', 'Thầu phụ'], ['congNhan', 'Công nhân'], ['tbTen', 'Máy / thiết bị'],
+];
+
+/** Các mục của 1 danh mục, gộp trùng theo normalizeKey (ưu tiên bản đúng chuẩn) — giống renderSettings.
+ *  Trả về [{ item, idx }] với idx = chỉ số GỐC trong cats[catId] (dùng cho sửa / xóa). */
+function mbDmItems(catId) {
+  const map = new Map();
+  (cats[catId] || []).forEach((item, idx) => {
+    const k = normalizeKey(item);
+    if (!k) return;
+    const ex = map.get(k);
+    if (!ex) { map.set(k, { item, idx }); return; }
+    const canon = normalizeName(catId, item);
+    if (item === canon && ex.item !== canon) map.set(k, { item, idx });
+  });
+  return [...map.values()];
+}
+
+function mbScrDanhMuc() {
+  const catId = MB_DM_TYPES.some(t => t[0] === MB.dmType) ? MB.dmType : 'loaiChiPhi';
+  const label = (MB_DM_TYPES.find(t => t[0] === catId) || [])[1] || '';
+  const all = mbDmItems(catId);
+  // Lọc theo năm (giống desktop): thiết bị luôn hiện đủ; mục khác ẩn nếu CHỈ dùng ở năm khác
+  const inYear = catId === 'tbTen' ? all : all.filter(({ item }) =>
+    _isDmItemUsedInYear(catId, item) || !_isDmItemUsedAnytime(catId, item));
+  const hidden = all.length - inYear.length;
+  const q = (MB.dmSearch || '').trim().toLowerCase();
+  const list = (MB.dmAllYears ? all : inYear)
+    .filter(({ item }) => !q || String(item).toLowerCase().includes(q))
+    .sort((a, b) => String(a.item || '').localeCompare(String(b.item || ''), 'vi'));
+  const shown = list.slice(0, MB.dmLimit);
+  MB._dmRowNames = {};                       // idx → tên lúc vẽ (chống sửa / xóa nhầm khi vừa đồng bộ)
+  shown.forEach(({ item, idx }) => { MB._dmRowNames[idx] = item; });
+
+  const row = ({ item, idx }) => {
+    if (MB.dmEditIdx === idx) {
+      return `<div class="mb-dm-row" style="display:block;background:var(--mb-primary-l)">
+        <input id="mb-dm-edit" class="mb-input" data-in="dmEditVal" value="${mbX(MB.dmEditVal)}"/>
+        <div style="font-size:11px;color:var(--mb-primary-d);margin:6px 0 8px">ⓘ Đổi tên sẽ cập nhật vào mọi hóa đơn / phiếu ứng / chấm công đã lưu.</div>
+        <div class="mb-btn-row">
+          <button class="mb-btn-outline" data-act="cancelDmEdit">Hủy</button>
+          <button class="mb-btn-outline blue" data-act="saveDmNameMb">💾 Lưu tên</button>
+        </div>
+      </div>`;
+    }
+    const inUse = isItemInUse(catId, item);
+    const role  = catId === 'congNhan' ? ((typeof cnRoles !== 'undefined' && cnRoles[item]) || '') : null;
+    return `<div class="mb-dm-row">
+      <span class="mb-dm-name">${mbX(item)}</span>
+      ${role !== null ? `<span class="mb-role">${['C', 'T', 'P'].map(r =>
+        `<b class="${role === r ? 'on' : ''}" data-act="setCnRoleMb" data-arg="${idx}|${role === r ? '' : r}" title="${r === 'C' ? 'Cái' : r === 'T' ? 'Thợ' : 'Phụ'}">${r}</b>`).join('')}</span>` : ''}
+      <button class="mb-icon-btn" data-act="editDmMb" data-arg="${idx}" title="Sửa tên">${mbIcon('edit', 17)}</button>
+      ${inUse
+        ? `<span class="mb-icon-btn lock" title="Đang được sử dụng — không thể xóa">${mbIcon('lock', 17)}</span>`
+        : `<button class="mb-icon-btn red" data-act="delDmMb" data-arg="${idx}" title="Xóa (chưa được sử dụng)">${mbIcon('close', 17)}</button>`}
+    </div>`;
+  };
+
+  return `<div class="mb-pad">
+    <div class="mb-chips">
+      ${MB_DM_TYPES.map(([k, l]) => `<div class="mb-chip${catId === k ? ' on' : ''}" data-act="dmPickType" data-arg="${k}">${l} (${mbDmItems(k).length})</div>`).join('')}
+    </div>
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-dmsearch" data-in="dmSearch" data-live="1" value="${mbX(MB.dmSearch)}" placeholder="Tìm trong ${mbX(label.toLowerCase())}..."/>
+    </div>
+    <div style="display:flex;gap:8px">
+      <input id="mb-dm-new" class="mb-input" data-in="dmNew" value="${mbX(MB.dmNew)}" placeholder="Thêm ${mbX(label.toLowerCase())} mới..."/>
+      <button class="mb-btn amber" style="width:auto;padding:10px 15px;font-size:13px;flex-shrink:0" data-act="addDmMb">+ Thêm</button>
+    </div>
+    <div class="mb-row-between" style="font-size:11px;color:var(--mb-muted-2);align-items:center">
+      <span>${list.length} mục${q ? ' khớp tìm kiếm' : ''} · 🔒 = đang dùng, không xóa được</span>
+      ${hidden > 0 ? `<span class="mb-link" style="font-size:11px" data-act="toggleDmAllYears">${MB.dmAllYears ? 'Ẩn ' + hidden + ' mục năm khác' : '+' + hidden + ' mục năm khác'}</span>` : ''}
+    </div>
+    <div class="mb-list">
+      ${shown.length ? shown.map(row).join('') : `<div class="mb-empty" style="padding:24px 0">${q ? 'Không có mục phù hợp' : 'Danh mục trống'}</div>`}
+    </div>
+    ${list.length > shown.length ? `<button class="mb-btn gray" data-act="moreDm">Xem thêm (còn ${list.length - shown.length})</button>` : ''}
+    <div style="font-size:11px;color:var(--mb-muted-2);text-align:center">Sao lưu & công cụ dữ liệu (xuất / nhập, khôi phục, xóa theo công trình): dùng bản máy tính.</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  15 · QUYẾT TOÁN CÔNG TRÌNH (31/10/2026) — xem + nhập / sửa / xóa (Admin, Giám đốc).
+//       THEO NĂM ĐANG LỌC như bản máy tính (qtCtInYear / _dtInYear).
+//       Xem trước số "sau quyết toán" = _qtFin(qtTaoNhap(...)); lưu = qtLuuQuyetToan() — cùng
+//       đúng 1 logic với tab Quyết Toán desktop (kể cả phiếu thu tự động + chốt sổ).
+// ══════════════════════════════════════════════════════════════
+const MB_QT_TAG = { tang: ['Tăng', 'green'], giam: ['Giảm', 'red'], thaythe: ['Thay thế', 'blue'] };
+
+function mbQtCanEdit() { return (typeof _qtCanEdit === 'function') ? _qtCanEdit() : mbRole() !== 'ketoan'; }
+
+/** Nhãn loại quyết toán (+ 🔒 nếu chốt sổ) */
+function mbQtTag(r) {
+  const [lb, cls] = MB_QT_TAG[qtLoaiOf(r)] || ['—', 'gray'];
+  return `<span class="mb-tag ${cls}">${lb}${r.chot ? ' 🔒' : ''}</span>`;
+}
+
+function mbScrQuyetToan() {
+  if (MB.qtCt) return mbQtForm();
+  return MB.seg.quyettoan === 'lichsu' ? mbQtLichSu() : mbQtDanhSach();
+}
+
+// ── Tab con 1: danh sách công trình ──
+function mbQtDanhSach() {
+  const invMap = mbInvMap();
+  const all = mbProjects()
+    .filter(p => typeof qtCtInYear !== 'function' || qtCtInYear(p.name))
+    .map(p => {
+      const rec = (typeof _qtRecordOfCt === 'function') ? _qtRecordOfCt(p.id).rec : null;
+      return { p, rec, da: !!rec || p.status === 'closed' };
+    });
+  const cnt = { chua: all.filter(x => !x.da).length, da: all.filter(x => x.da).length, all: all.length };
+  const q = (MB.qtSearch || '').toLowerCase();
+  const rank = s => (s === 'completed' ? 0 : s === 'active' ? 1 : 2);
+  const rows = all
+    .filter(x => MB.qtFilter === 'all' || (MB.qtFilter === 'da' ? x.da : !x.da))
+    .filter(x => !q || (x.p.name || '').toLowerCase().includes(q))
+    .map(x => Object.assign(x, { d: calcTongDoanhThu(x.p), st: mbProjStats(x.p, invMap) }))
+    .sort((a, b) => (a.da === b.da ? 0 : a.da ? 1 : -1) || rank(a.p.status) - rank(b.p.status) || b.d.conPhaiThu - a.d.conPhaiThu);
+  const chips = [['chua', 'Chưa quyết toán'], ['da', 'Đã quyết toán'], ['all', 'Tất cả']];
+
+  return `<div class="mb-pad">
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-qtsearch" data-in="qtSearch" data-live="1" value="${mbX(MB.qtSearch)}" placeholder="Tìm công trình..."/>
+    </div>
+    <div class="mb-chips">
+      ${chips.map(([k, l]) => `<div class="mb-chip${MB.qtFilter === k ? ' on' : ''}" data-act="setFilter" data-arg="qtFilter|${k}">${l} (${cnt[k]})</div>`).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">Số liệu theo năm đang chọn (${mbX(mbYearLabel())}). Bấm vào công trình để nhập / xem quyết toán.</div>
+
+    <div class="mb-col" style="gap:9px">
+      ${rows.length ? rows.map(({ p, rec, da, d, st }) => {
+        const [stLabel, stCls] = MB_STATUS[p.status] || ['—', 'gray'];
+        const lai = st.thu - st.chi;
+        return `<div class="mb-card tap" style="padding:13px" data-act="openQtForm" data-arg="${mbX(p.id)}">
+          <div style="font-size:13.5px;font-weight:700;margin-bottom:6px">${mbX(p.name)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">
+            <span class="mb-tag ${stCls}">${stLabel}</span>
+            ${rec ? mbQtTag(rec) : (da ? '' : `<span class="mb-tag amber">Chưa quyết toán</span>`)}
+          </div>
+          <div class="mb-grid3" style="margin-bottom:9px">
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">HĐ gốc</div><div style="font-size:12px;font-weight:700">${mbFmt(d.hdGoc)}</div></div>
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">Quyết toán</div><div style="font-size:12px;font-weight:700;color:${d.qt < 0 ? 'var(--mb-red)' : d.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'}">${d.qt ? (d.qt > 0 ? '+' : '') + mbFmtSigned(d.qt) : '0'}</div></div>
+            <div><div style="font-size:10px;color:var(--mb-muted-2)">HĐ sau quyết toán</div><div style="font-size:12px;font-weight:800;color:var(--mb-primary)">${mbFmt(d.tongDT)}</div></div>
+          </div>
+          <div class="mb-bar"><i style="width:${mbBarW(d.daThu, d.tongDT)};background:var(--mb-green)"></i></div>
+          <div class="mb-row-between" style="margin-top:5px;font-size:11px;color:var(--mb-muted-2)">
+            <span>Đã thu ${mbFmt(d.daThu)} (${mbPct(d.daThu, d.tongDT)}%)</span>
+            <span style="font-weight:700;color:${d.conPhaiThu < 0 ? 'var(--mb-red)' : 'var(--mb-text-2)'}">Còn ${mbFmtSigned(d.conPhaiThu)}</span>
+          </div>
+          <div class="mb-row-between" style="margin-top:8px;align-items:center">
+            <span style="font-size:11.5px;color:var(--mb-muted)">Lãi tạm tính <b style="color:${lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)'}">${mbFmtSigned(lai)}</b></span>
+            <span class="mb-btn-outline ${rec ? 'blue' : 'green'}">${rec ? 'Xem quyết toán ›' : 'Quyết toán ›'}</span>
+          </div>
+        </div>`;
+      }).join('') : `<div class="mb-empty">${q ? 'Không có công trình phù hợp' : (MB.qtFilter === 'chua' ? '🎉 Mọi công trình trong năm đã quyết toán' : 'Chưa có công trình')}</div>`}
+    </div>
+  </div>`;
+}
+
+/** Dòng gợi ý dưới công tắc "Ghi nhận phiếu thu tiền còn lại" (giống _qtUpdateThuConLaiHint) */
+function mbQtThuHint(f, p) {
+  const cu = f.editId && typeof _qtAutoThuOf === 'function' ? _qtAutoThuOf(f.editId) : null;
+  if (!MB.qtForm.thuConLai) {
+    return cu ? `<span style="color:var(--mb-red)">⚠ Đang tắt: phiếu thu tự động ${mbFull(cu.tien)} sẽ bị xóa khi lưu.</span>` : '';
+  }
+  if (typeof _qtTinhConLai !== 'function') return '';
+  const opts = f.soTien > 0 ? { excludeId: f.editId || undefined, extra: f.fake } : {};
+  const con  = _qtTinhConLai(p, f.editId, opts);
+  if (con <= 0) {
+    return `<span style="color:var(--mb-green)">Công trình đã thu đủ${con < 0 ? ` (đang thu vượt ${mbFull(-con)})` : ''} — sẽ không tạo phiếu thu.</span>` +
+      (cu ? ` <span style="color:var(--mb-red)">Phiếu tự động cũ ${mbFull(cu.tien)} sẽ bị gỡ.</span>` : '');
+  }
+  return cu && cu.tien !== con
+    ? `→ Phiếu tự động ${mbFull(cu.tien)} sẽ cập nhật thành <b style="color:var(--mb-green)">${mbFull(con)}</b> (ngày ${mbDate(f.ngay)}).`
+    : `→ ${cu ? 'Giữ' : 'Sẽ tạo'} phiếu thu <b style="color:var(--mb-green)">${mbFull(con)}</b> ngày ${mbDate(f.ngay)} — còn phải thu sau quyết toán, tính trên toàn bộ các năm.`;
+}
+
+// ── Form quyết toán của 1 công trình ──
+function mbQtForm() {
+  const p = mbProject(MB.qtCt);
+  if (!p) return `<div class="mb-pad"><div class="mb-empty">Không tìm thấy công trình</div></div>`;
+  const F       = MB.qtForm;
+  const canEdit = mbQtCanEdit();
+  const locked  = MB.qtLocked || !canEdit;
+  const soTien  = mbMoney(F.soTien);
+  const f       = qtTaoNhap(p.id, F.editId, F.loai, soTien, F.ngay);
+  const { truoc, sau } = _qtFin(f);
+  const { rec, count } = _qtRecordOfCt(p.id, F.editId || undefined);
+
+  const dtSau = sau ? sau.giaTriHD : truoc.giaTriHD;
+  const lnSau = dtSau - truoc.chiThucTe;
+  const chenh = dtSau - truoc.giaTriHD;
+  const sgn   = v => (v < 0 ? '−' : '') + mbFull(Math.abs(v));
+  const colOf = v => (v >= 0 ? 'var(--mb-green)' : 'var(--mb-red)');
+  const cell  = (cls, lb, val, hint, col) => `<div class="mb-kpi ${cls}" style="padding:11px">
+      <div class="mb-kpi-label">${lb}</div>
+      <div class="mb-kpi-value" style="font-size:14px${col ? ';color:' + col : ''}">${val}</div>
+      ${hint ? `<div class="mb-kpi-hint">${hint}</div>` : ''}</div>`;
+
+  const summary = `<div class="mb-grid2">
+      ${cell('', 'Giá trị HĐ gốc', mbFull(truoc.X), '')}
+      ${cell('', 'Chi phí thực tế đã chi', mbFull(truoc.chiThucTe), truoc.chiChung > 0 ? 'gồm ' + mbFmt(truoc.chiChung) + ' chi phí chia tỉ trọng' : '', 'var(--mb-red)')}
+      ${cell('', 'Doanh thu hiện tại', mbFull(truoc.tongThu), 'Đã thu' + (truoc.soDotThu ? ' · ' + truoc.soDotThu + ' đợt' : ''), 'var(--mb-green)')}
+      ${cell('', 'Lợi nhuận hiện tại', sgn(truoc.hieuQua), truoc.isActive ? 'Đang thi công — đã thu − chi thực tế' : 'Lãi / lỗ cuối', colOf(truoc.hieuQua))}
+      ${cell('blue', 'Doanh thu sau quyết toán', mbFull(dtSau), sau ? (chenh ? (chenh > 0 ? '▲ +' : '▼ −') + mbFmt(Math.abs(chenh)) : 'không đổi') + ' so với hiện hành' : 'Chưa nhập số tiền — bằng HĐ + QT hiện hành')}
+      ${cell('blue', 'Lợi nhuận sau quyết toán', sgn(lnSau), 'DT sau QT − chi phí đã chi', colOf(lnSau))}
+    </div>`;
+
+  // ── Chế độ CHỈ XEM: công trình đã có quyết toán ──
+  if (locked && rec) {
+    const thuAuto = (typeof _qtAutoThuOf === 'function') ? _qtAutoThuOf(rec.id) : null;
+    return `<div class="mb-pad">
+      ${p.status === 'closed' ? '<div><span class="mb-tag red">🔒 Đã quyết toán</span></div>' : ''}
+      ${summary}
+      ${count > 1 ? `<div class="mb-card mb-card-sm" style="background:var(--mb-amber-l);border-color:var(--mb-amber-b);font-size:12px">⚠ Công trình đang có ${count} bản quyết toán (dữ liệu cũ) — mỗi công trình chỉ 01 bản; xóa bản thừa ở tab Lịch sử.</div>` : ''}
+      <div class="mb-card">
+        <div class="mb-row-between" style="margin-bottom:8px;align-items:center">
+          <div class="mb-sec-title">Quyết toán đã lưu</div>${mbQtTag(rec)}
+        </div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:6px">${mbX(qtSoTienTxt(rec, mbFull))}</div>
+        <div style="font-size:12px;color:var(--mb-text-2);line-height:1.6">
+          Ngày ${mbDate(rec.ngay)} · ${mbX(rec.nguoi || 'Chưa ghi người thực hiện')}<br>
+          ${mbX(rec.nd || '')}
+          ${rec.chot ? '<br>🔒 Quyết toán cuối cùng (đã chốt sổ)' : ''}
+          ${thuAuto ? `<br>🧾 Phiếu thu tự động ${mbFull(thuAuto.tien)} (ngày ${mbDate(thuAuto.ngay)})` : ''}
+        </div>
+      </div>
+      ${canEdit
+        ? `<button class="mb-btn" data-act="qtUnlock">✏️ Sửa quyết toán</button>`
+        : '<div style="font-size:11.5px;color:var(--mb-muted-2);text-align:center">Chỉ Quản trị viên hoặc Giám đốc được sửa quyết toán.</div>'}
+    </div>`;
+  }
+
+  // ── Chế độ NHẬP / SỬA ──
+  const loais = [['tang', '+ Tăng', 'green'], ['giam', '− Giảm', 'red'], ['thaythe', '= Thay thế', 'blue']];
+  const warns = [];
+  if (sau) {
+    if (sau.giaTriHD < 0) warns.push(['red', 'Doanh thu sau quyết toán bị ÂM — kiểm tra lại số tiền giảm trừ.']);
+    else if (sau.conPhaiThu < 0) warns.push(['amber', `Đã thu VƯỢT doanh thu sau quyết toán ${mbFull(-sau.conPhaiThu)} — có thể phải hoàn trả Chủ đầu tư.`]);
+    if (F.loai === 'thaythe' && F.ngay) {
+      const others = quyetToanRecords.filter(r => !r.deletedAt && r.id !== F.editId && _qtMatchProj(r, p) && (r.ngay || '') > F.ngay);
+      const tt = others.filter(r => qtLoaiOf(r) === 'thaythe');
+      if (tt.length) warns.push(['amber', `Đã có bản THAY THẾ ngày ${mbDate(tt[tt.length - 1].ngay)} mới hơn → bản mới hơn quyết định doanh thu, bản này không còn tác dụng.`]);
+      else if (others.length) warns.push(['blue', `Có ${others.length} phát sinh tăng / giảm sau ngày này — vẫn được cộng / trừ tiếp sau giá trị thay thế.`]);
+    }
+    if (F.ngay && typeof _dtInYear === 'function' && !_dtInYear(F.ngay)) warns.push(['blue', 'Ngày quyết toán nằm ngoài năm đang lọc — số "sau quyết toán" ở trên chưa tính bản này.']);
+  }
+  const WARN_STY = { red: 'background:var(--mb-red-l);color:var(--mb-red)', amber: 'background:var(--mb-amber-l);color:#92400E', blue: 'background:var(--mb-primary-l);color:var(--mb-primary-d)' };
+  const sw = (key, on, title, sub) => `<div class="mb-switch-row" data-act="qtToggle" data-arg="${key}">
+      <span class="mb-switch${on ? ' on' : ''}"><i></i></span>
+      <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700">${title}</div>${sub ? `<div style="font-size:11px;color:var(--mb-muted);margin-top:2px">${sub}</div>` : ''}</div>
+    </div>`;
+  const thuHint = mbQtThuHint(f, p);
+
+  return `<div class="mb-pad">
+    ${summary}
+    <div class="mb-card" style="display:flex;flex-direction:column;gap:11px">
+      <div class="mb-sec-title">${F.editId ? 'Sửa quyết toán' : 'Thêm quyết toán'}</div>
+      <div>
+        <div class="mb-label">Loại quyết toán *</div>
+        <div class="mb-seg3">
+          ${loais.map(([k, l, c]) => `<div class="${F.loai === k ? 'on ' + c : ''}" data-act="qtSetLoai" data-arg="${k}">${l}</div>`).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--mb-muted);margin-top:5px;font-style:italic">${mbX((typeof _QT_HINT !== 'undefined' && _QT_HINT[F.loai]) || '')}</div>
+      </div>
+      <div>
+        <div class="mb-label">${mbX((typeof _QT_SOTIEN_LABEL !== 'undefined' && _QT_SOTIEN_LABEL[F.loai]) || 'Số tiền (đ)')}</div>
+        <input id="mb-qt-sotien" class="mb-input money-lg" inputmode="numeric" data-money="1" data-in="qtForm.soTien" data-live="1" value="${mbX(F.soTien)}" placeholder="VD: 50.000.000"/>
+        ${mbQuickMoney('qtForm.soTien', F.soTien)}
+        <div style="font-size:12px;margin-top:6px;${sau ? 'font-weight:700;color:' + (chenh < 0 ? 'var(--mb-red)' : 'var(--mb-green)') : 'color:var(--mb-muted)'}">${sau
+          ? `💡 Doanh thu mới: ${mbFull(sau.giaTriHD)} <span style="font-weight:500">(${chenh ? (chenh > 0 ? '▲ +' : '▼ −') + mbFmt(Math.abs(chenh)) : 'không đổi'} · còn phải thu ${sgn(sau.conPhaiThu)})</span>`
+          : (F.loai === 'tang' ? 'Để trống / 0 = quyết toán ĐÚNG HĐ GỐC (không phát sinh). Gõ số tiền để xem doanh thu mới.' : 'Gõ số tiền để xem doanh thu mới.')}</div>
+        ${warns.map(([t, m]) => `<div style="font-size:11.5px;border-radius:8px;padding:7px 9px;margin-top:6px;${WARN_STY[t]}">${t === 'blue' ? 'ℹ' : '⚠'} ${mbX(m)}</div>`).join('')}
+      </div>
+      <div class="mb-row">
+        <div class="mb-field"><div class="mb-label">Ngày thực hiện *</div>
+          <input id="mb-qt-ngay" class="mb-input" type="date" data-in="qtForm.ngay" value="${mbX(F.ngay)}"/></div>
+        <div class="mb-field"><div class="mb-label">Người thực hiện</div>
+          <select id="mb-qt-nguoi" class="mb-select" data-in="qtForm.nguoi">${mbOptionsKeep(cats.nguoiTH, F.nguoi, '-- Chọn --')}</select></div>
+      </div>
+      <div><div class="mb-label">Nội dung / Lý do *</div>
+        <textarea id="mb-qt-nd" class="mb-input" rows="2" data-in="qtForm.nd" placeholder="VD: Phát sinh ốp lát tầng 2 / Quyết toán cuối theo biên bản ngày...">${mbX(F.nd)}</textarea></div>
+      ${sw('chot', F.chot, 'Quyết toán cuối cùng (Chốt sổ)', 'Chuyển công trình sang "Đã quyết toán" — không nhập thêm chi phí')}
+      ${sw('thuConLai', F.thuConLai, 'Ghi nhận phiếu thu tiền còn lại', thuHint || 'Tự tạo phiếu thu cho số tiền còn phải thu (khóa, không sửa / xóa ở tab Thu tiền)')}
+    </div>
+    <div class="mb-sticky-bar">
+      <button class="mb-btn gray" style="flex:1" data-act="qtCancel">${F.editId ? 'Hủy thay đổi' : 'Hủy'}</button>
+      <button class="mb-btn amber" style="flex:2" data-act="saveQtMb">💾 ${F.editId ? 'Cập nhật quyết toán' : 'Lưu quyết toán'}</button>
+    </div>
+  </div>`;
+}
+
+// ── Tab con 2: lịch sử quyết toán (năm đang lọc) ──
+function mbQtLichSu() {
+  const q = (MB.qtHisSearch || '').toLowerCase();
+  const nameOf = r => (typeof _resolveCtName === 'function' ? _resolveCtName(r) : '') || r.congtrinh || '—';
+  let list = (typeof quyetToanRecords !== 'undefined' ? quyetToanRecords : [])
+    .filter(r => !r.deletedAt && (typeof _dtInYear !== 'function' || _dtInYear(r.ngay)));
+  if (q) list = list.filter(r => (nameOf(r) + ' ' + (r.nd || '') + ' ' + (r.nguoi || '')).toLowerCase().includes(q));
+  list.sort((a, b) => _qtSortAsc(b, a));     // mới nhất lên đầu
+
+  // Ảnh hưởng doanh thu + DT sau QT cộng dồn theo từng công trình (giống qtRenderHistory)
+  const cache = new Map();
+  const calcFor = r => {
+    const p = _qtResolveProj(r.projectId) || _qtResolveProj(r.congtrinh);
+    if (!p) return null;
+    if (!cache.has(p.id)) {
+      const { recs, deltas } = qtTinhDelta(p);
+      let run = qtHdGocCuaCT(p);
+      const runDT = new Map();
+      recs.forEach(x2 => { run += deltas.get(x2.id) || 0; runDT.set(x2.id, run); });
+      cache.set(p.id, { deltas, runDT });
+    }
+    return cache.get(p.id);
+  };
+  const canEdit = mbQtCanEdit();
+  const shown = list.slice(0, MB.qtHisLimit);
+
+  return `<div class="mb-pad">
+    <div class="mb-search">
+      ${mbSearchIcon()}
+      <input id="mb-in-qthis" data-in="qtHisSearch" data-live="1" value="${mbX(MB.qtHisSearch)}" placeholder="Tìm công trình, nội dung, người..."/>
+    </div>
+    <div style="font-size:11px;color:var(--mb-muted-2)">${list.length} bản quyết toán · năm ${mbX(mbYearLabel())} · mỗi công trình 01 bản.</div>
+    <div class="mb-col" style="gap:9px">
+      ${shown.length ? shown.map(r => {
+        const c = calcFor(r);
+        const d = c ? (c.deltas.get(r.id) || 0) : 0;
+        return `<div class="mb-card mb-card-sm">
+          <div class="mb-row-between" style="margin-bottom:5px">
+            <span style="font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(nameOf(r))}</span>
+            <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbX(qtSoTienTxt(r, mbFmt))}</span>
+          </div>
+          <div style="font-size:11px;color:var(--mb-muted-2);margin-bottom:4px">${mbQtTag(r)} · ${mbDate(r.ngay)} · ${mbX(r.nguoi || '—')}</div>
+          <div style="font-size:11.5px;color:var(--mb-text-2)">Ảnh hưởng DT <b style="color:${d < 0 ? 'var(--mb-red)' : d > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'}">${d ? (d > 0 ? '+' : '-') + mbFmt(Math.abs(d)) : '0'}</b> · DT sau QT <b>${c ? mbFmt(c.runDT.get(r.id) || 0) : '—'}</b></div>
+          ${r.nd ? `<div style="font-size:11.5px;color:var(--mb-muted);margin-top:3px">${mbX(r.nd)}</div>` : ''}
+          ${canEdit ? `<div class="mb-btn-row" style="margin-top:8px">
+            <button class="mb-btn-outline blue" data-act="editQtMb" data-arg="${mbX(r.id)}">Sửa</button>
+            <button class="mb-btn-outline red" data-act="delQtMb" data-arg="${mbX(r.id)}">Xóa</button>
+          </div>` : ''}
+        </div>`;
+      }).join('') : `<div class="mb-empty">Chưa có quyết toán nào${q ? ' khớp tìm kiếm' : ''}</div>`}
+    </div>
+    ${list.length > shown.length ? `<button class="mb-btn gray" data-act="moreQtHis">Xem thêm (còn ${list.length - shown.length})</button>` : ''}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  14 · TỈ TRỌNG & ĐỊNH MỨC (31/10/2026) — chủ yếu XEM.
+//       Số liệu 100% từ tytrong.core.js (tytTongHop / tytCayNhom / tytKiemSoat / tytXuHuongM2)
+//       → khớp từng đồng với tab Tỉ Trọng bản máy tính.
+//       Cấu hình phân nhóm, gán hàng loạt, tạo / sửa bộ định mức… vẫn làm trên máy tính.
+// ══════════════════════════════════════════════════════════════
+const MB_NHOM_COLOR = { 1: 'var(--mb-primary)', 2: 'var(--mb-green)', 3: 'var(--mb-amber)', 4: 'var(--mb-purple)', 0: 'var(--mb-muted-2)' };
+
+function mbTytOpts() { return { allYears: !!MB.tytAllYears }; }
+
+/** tytTongHop của 1 công trình — nhớ trong 1 lần vẽ (MB._tytCache xóa đầu mỗi mbRender) */
+function mbTyt(p) {
+  if (!p || typeof tytTongHop !== 'function') return null;
+  const k = p.id + '|' + (MB.tytAllYears ? 1 : 0);
+  if (!MB._tytCache[k]) {
+    try { MB._tytCache[k] = tytTongHop(p, mbTytOpts()); }
+    catch (e) { console.warn('[mobile] tytTongHop', e); return null; }
+  }
+  return MB._tytCache[k];
+}
+
+/** Trọn vòng đời: tải các năm còn thiếu (dùng lại _tytEnsureYears của desktop — tải xong tự mbRender) */
+function mbTytEnsureYears(years) {
+  if (!MB.tytAllYears || typeof _tytEnsureYears !== 'function' || !years || !years.length) return;
+  try { _tytEnsureYears(years); } catch (e) { console.warn('[mobile] _tytEnsureYears', e); }
+}
+
+/** % một chữ số thập phân kiểu Việt Nam ("27,4%") */
+function mbTytPct(v, tong) { return tong ? (Math.round(v / tong * 1000) / 10).toString().replace('.', ',') + '%' : '—'; }
+
+/** Dòng trạng thái phạm vi dưới 2 chip (giống _tytRenderScope desktop) */
+function mbTytScopeTxt(p) {
+  if (!MB.tytAllYears) return `Đang tính theo năm đang lọc (${mbYearLabel()}).`;
+  const ys = tytNamVongDoi(p);
+  const range = ys.length > 1 ? ys[0] + '–' + ys[ys.length - 1] : ys[0];
+  if (typeof _tytLoading !== 'undefined' && _tytLoading) return `⏳ Đang tải dữ liệu năm ${(_tytLoadingYrs || []).join(', ')}…`;
+  const thieu = (typeof _tytMissingYears === 'function') ? _tytMissingYears(ys) : [];
+  if (thieu.length && typeof fbReady === 'function' && fbReady()) {
+    return `Vòng đời ${range} · <span style="color:var(--mb-amber)">⚠ chưa tải được năm ${thieu.join(', ')} — số liệu có thể thiếu</span> <span class="mb-link" style="font-size:11px" data-act="tytRetry">Thử lại</span>`;
+  }
+  return `Vòng đời ${range} · đã đủ dữ liệu các năm.`;
+}
+
+/** Dropdown công trình: vòng đời → mọi CT; theo năm → CT thuộc năm đang lọc (giữ CT đang chọn) */
+function mbTytCtOptions() {
+  let list = mbProjects();
+  if (!MB.tytAllYears) list = list.filter(p => p.id === MB.tytCt || typeof qtCtInYear !== 'function' || qtCtInYear(p.name));
+  list = list.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
+  return '<option value="">-- Chọn công trình --</option>' + list.map(p =>
+    `<option value="${mbX(p.id)}"${p.id === MB.tytCt ? ' selected' : ''}>${mbX(p.name)}${tytTongSan(p) > 0 ? '' : ' · chưa có M2'}</option>`).join('');
+}
+
+/** Phần đầu màn (mọi tab con): chọn công trình + phạm vi */
+function mbTytHead(p) {
+  return `<select id="mb-tyt-ct" class="mb-select" data-in="tytCt" data-onchange="tytPickCt">${mbTytCtOptions()}</select>
+    <div class="mb-chips even">
+      <div class="mb-chip${MB.tytAllYears ? ' on' : ''}" data-act="tytScope" data-arg="1">Trọn vòng đời</div>
+      <div class="mb-chip${MB.tytAllYears ? '' : ' on'}" data-act="tytScope" data-arg="0">Năm đang lọc</div>
+    </div>
+    ${p ? `<div style="font-size:11px;color:var(--mb-muted-2);margin-top:-4px">${mbTytScopeTxt(p)}</div>` : ''}`;
+}
+
+function mbScrTyTrong() {
+  const p   = mbProject(MB.tytCt);
+  const seg = MB.seg.tytrong;
+  if (seg === 'sosanh') {
+    const body = mbTytSoSanh(p);          // tính trước để dòng trạng thái thấy lượt tải năm vừa bắt đầu
+    return `<div class="mb-pad">${mbTytHead(p)}${body}</div>`;
+  }
+  if (!p) {
+    return `<div class="mb-pad">${mbTytHead(null)}
+      <div class="mb-card" style="text-align:center;color:var(--mb-muted);font-size:13px;padding:28px 14px">
+        ${mbIcon('touch_app', 30)}<div style="margin-top:6px">Chọn công trình để xem tỉ trọng chi phí.</div>
+      </div></div>`;
+  }
+  mbTytEnsureYears(tytNamVongDoi(p));
+  const r = mbTyt(p);
+  if (!r) return `<div class="mb-pad">${mbTytHead(p)}<div class="mb-empty">Không tính được tỉ trọng cho công trình này.</div></div>`;
+  return `<div class="mb-pad">${mbTytHead(p)}${seg === 'dinhmuc' ? mbTytDinhMuc(p, r) : mbTytTongQuan(p, r)}</div>`;
+}
+
+// ── Tab con 1: TỔNG QUAN ──
+function mbTytTongQuan(p, r) {
+  const coSan = r.tongSan > 0;
+  const kpi = (cls, label, value, hint) => `<div class="mb-kpi ${cls}">
+      <div class="mb-kpi-label">${label}</div><div class="mb-kpi-value" style="font-size:15px">${value}</div>
+      <div class="mb-kpi-hint">${hint}</div></div>`;
+
+  // Nhóm chính của từng loại chi phí (để gắn nhãn N1..N4 ở bảng theo loại)
+  const nhomLoai = {};
+  r.lines.forEach(l => l.parts.forEach(pt => {
+    const m = nhomLoai[l.loai] || (nhomLoai[l.loai] = {});
+    m[pt.nhom] = (m[pt.nhom] || 0) + pt.tien;
+  }));
+  const nhomOf = loai => { const m = nhomLoai[loai] || {}; return +(Object.keys(m).sort((a, b) => m[b] - m[a])[0] || 0); };
+  const loaiAll  = !!MB.tytOpen.loai;
+  const loaiRows = loaiAll ? r.theoLoai : r.theoLoai.slice(0, 10);
+  const maxLoai  = r.theoLoai.length ? r.theoLoai[0].tien : 1;
+
+  return `<div class="mb-grid2">
+      ${kpi('red', 'Tổng chi phí thực tế', mbFmt(r.tongChi), r.lines.length + ' khoản chi')}
+      ${kpi('', 'Tổng diện tích sàn', coSan ? tytFmtM2(r.tongSan) + ' m²' : 'Chưa nhập', coSan ? 'Bảng M2 bên dưới' : 'Nhập ở bảng M2 bên dưới')}
+      ${kpi('blue', 'Đơn giá Thô & NC / m²', coSan ? mbFull(Math.round(r.cpM2N1)) : '—', 'Nhóm 1 ÷ tổng sàn')}
+      ${kpi('', 'Đơn giá toàn bộ / m²', coSan ? mbFull(Math.round(r.cpM2)) : '—', 'Tổng chi ÷ tổng sàn')}
+    </div>
+
+    ${mbTytChuaNhom(r)}
+
+    <div class="mb-sec-head" style="margin:4px 0 -2px">
+      <div class="mb-sec-title">Tỷ trọng theo 4 nhóm chi phí</div>
+      <div style="font-size:11px;color:var(--mb-muted-2)">bấm để xem chi tiết</div>
+    </div>
+    ${r.lines.length ? tytCayNhom(r).map(n => mbTytNhomCard(n, r)).join('') : '<div class="mb-empty">Chưa có khoản chi nào</div>'}
+
+    ${mbTytM2Card(p, r)}
+
+    ${r.theoLoai.length ? `<div class="mb-card">
+      <div class="mb-sec-head" style="margin-bottom:11px">
+        <div class="mb-sec-title">Theo loại chi phí</div>
+        <div style="font-size:11px;color:var(--mb-muted-2)">${r.theoLoai.length} loại</div>
+      </div>
+      <div class="mb-col" style="gap:10px">
+        ${loaiRows.map(o => {
+          const n = nhomOf(o.loai);
+          return `<div>
+            <div class="mb-row-between" style="margin-bottom:4px;align-items:center">
+              <span style="font-size:12px;color:var(--mb-text-2);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(o.loai)} <span class="mb-nh-tag n${n}">${n ? 'N' + n : '?'}</span></span>
+              <span style="font-size:12.5px;font-weight:800;flex-shrink:0">${mbFmt(o.tien)} <span style="font-weight:600;color:var(--mb-muted-2)">· ${mbTytPct(o.tien, r.tongChi)}</span></span>
+            </div>
+            <div class="mb-bar"><i style="width:${mbBarW(o.tien, maxLoai)};background:${MB_NHOM_COLOR[n]}"></i></div>
+            ${coSan ? `<div style="font-size:10.5px;color:var(--mb-muted-2);margin-top:2px">${mbFull(Math.round(o.tien / r.tongSan))}/m²</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+      ${r.theoLoai.length > 10 ? `<div class="mb-link" style="text-align:center;margin-top:10px" data-act="tytToggle" data-arg="loai">${loaiAll ? 'Thu gọn ▲' : 'Xem tất cả ' + r.theoLoai.length + ' loại ▼'}</div>` : ''}
+    </div>` : ''}
+
+    <div style="font-size:11px;color:var(--mb-muted-2);text-align:center">Gán nhóm theo HĐ thầu phụ, gán hàng loạt và cấu hình phân nhóm: dùng bản máy tính.</div>`;
+}
+
+/** Thẻ 1 nhóm chi phí (bấm → bung trụ cột / loại chi phí / khoản chi) */
+function mbTytNhomCard(n, r) {
+  const open = !!MB.tytOpen[n.key];
+  const col  = MB_NHOM_COLOR[n.nhom];
+  const ten  = n.nhom ? `Nhóm ${n.nhom} · ${(TYT_NHOM[n.nhom] || {}).ten || ''}` : 'Chưa xếp nhóm';
+  const m2   = r.tongSan > 0 ? ' · ' + mbFull(Math.round(n.tien / r.tongSan)) + '/m²' : '';
+  return `<div class="mb-card" style="padding:12px 13px${n.nhom ? '' : ';border-color:var(--mb-red-b)'}">
+    <div class="mb-acc-head" data-act="tytToggle" data-arg="${mbX(n.key)}">
+      <span class="mb-nh-dot" style="background:${col}"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">${mbX(ten)}</div>
+        <div style="font-size:11px;color:var(--mb-muted-2)">${mbFmt(n.tien)} · ${mbTytPct(n.tien, r.tongChi)}${m2}</div>
+      </div>
+      <span class="mb-acc-caret">${open ? '▲' : '▼'}</span>
+    </div>
+    <div class="mb-bar" style="margin-top:8px"><i style="width:${mbBarW(n.tien, r.tongChi)};background:${col}"></i></div>
+    ${open ? `<div class="mb-acc-body">${n.children.map(c => mbTytNode(c, r, 0)).join('') || '<div class="mb-tyt-note" style="padding:6px 0">Chưa có khoản chi</div>'}</div>` : ''}
+  </div>`;
+}
+
+/** 1 dòng trụ cột / loại chi phí trong thẻ nhóm (đệ quy) */
+function mbTytNode(n, r, depth) {
+  const has  = n.children.length > 0;
+  const open = has && !!MB.tytOpen[n.key];
+  const pad  = depth * 12;
+  const ten  = n.kind === 'tru'
+    ? `<b>${mbX(n.ten)}</b>`
+    : `${mbX(n.ten)} <span class="mb-tyt-note">(${n.soDong} khoản)</span>`;
+  let body = '';
+  if (open) {
+    if (n.kind === 'loai') {
+      const lim  = MB.tytLim[n.key] || 20;
+      const more = n.children.length - lim;
+      body = n.children.slice(0, lim).map(c => mbTytLine(c, depth + 1)).join('') +
+        (more > 0 ? `<div class="mb-link" style="padding:6px 0 4px ${pad + 30}px;font-size:11.5px" data-act="tytMore" data-arg="${mbX(n.key)}">Xem thêm ${Math.min(20, more)} khoản (còn ${more}) ›</div>` : '');
+    } else {
+      body = n.children.map(c => mbTytNode(c, r, depth + 1)).join('');
+    }
+  }
+  return `<div class="mb-tyt-row${has ? ' tap' : ''}" style="padding-left:${pad}px"${has ? ` data-act="tytToggle" data-arg="${mbX(n.key)}"` : ''}>
+      <span class="mb-tyt-tg">${has ? (open ? '▾' : '▸') : ''}</span>
+      <span class="mb-tyt-name">${ten}</span>
+      <span class="mb-tyt-val">${mbFmt(n.tien)} <span class="mb-tyt-note">· ${mbTytPct(n.tien, r.tongChi)}</span></span>
+    </div>${body}`;
+}
+
+/** 1 khoản chi (cấp cuối của cây) */
+function mbTytLine(c, depth) {
+  const l = c.line, pt = c.part;
+  const ten = pt.mon ? pt.ten : (l.nd || '—');
+  return `<div class="mb-tyt-line" style="padding-left:${depth * 12 + 16}px">
+      <div style="flex:1;min-width:0">
+        <div class="mb-tyt-ln-t">${mbX(ten)}</div>
+        <div class="mb-tyt-note">${mbDate(l.ngay)}${l.doiTuong ? ' · ' + mbX(l.doiTuong) : ''}${pt.mon ? ' · món của hóa đơn' : ''}${pt.nhomSrc === 'tay' ? ' · gán tay' : ''}</div>
+      </div>
+      <span class="mb-tyt-val">${mbFmt(pt.tien)}</span>
+    </div>`;
+}
+
+/** Cảnh báo "Chưa xếp nhóm" — bấm để xem các khoản */
+function mbTytChuaNhom(r) {
+  if (!r.chuaNhom.length) return '';
+  const open = !!MB.tytOpen.chua;
+  const tien = r.theoNhom[0] || 0;
+  const ls = r.chuaNhom.map(l => ({ l, tien: l.parts.filter(pt => pt.nhom === 0).reduce((s, pt) => s + pt.tien, 0) }));
+  return `<div class="mb-card mb-card-sm" style="border-color:var(--mb-red-b);background:var(--mb-red-l)">
+    <div class="mb-acc-head" data-act="tytToggle" data-arg="chua">
+      <span style="flex:1;font-size:12.5px;font-weight:700;color:var(--mb-red)">⚠ Chưa xếp nhóm: ${r.chuaNhom.length} khoản · ${mbFmt(tien)}</span>
+      <span class="mb-acc-caret" style="color:var(--mb-red)">${open ? '▲' : '▼'}</span>
+    </div>
+    ${open ? `<div class="mb-acc-body" style="border-top-color:var(--mb-red-b)">
+      <div class="mb-tyt-note" style="padding-bottom:4px">Bấm 1 · 2 · 3 · 4 để xếp khoản vào nhóm (gán tay — chỉ công trình này).</div>
+      ${ls.slice(0, 40).map(({ l, tien: t }) => `<div class="mb-tyt-line" style="padding-left:0;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div class="mb-tyt-ln-t">${mbX(l.nd || '—')}</div>
+          <div class="mb-tyt-note">${mbDate(l.ngay)} · ${mbX(l.loai)}${l.doiTuong ? ' · ' + mbX(l.doiTuong) : ''}</div>
+        </div>
+        <span class="mb-tyt-val">${mbFmt(t)}</span>
+        <div class="mb-nh-pick">${[1, 2, 3, 4].map(n =>
+          `<b class="n${n}" data-act="tytGanNhom" data-arg="${n}|${mbX(l.key)}" title="Nhóm ${n}: ${mbX((TYT_NHOM[n] || {}).ten || '')}">${n}</b>`).join('')}</div>
+      </div>`).join('')}
+      ${ls.length > 40 ? `<div class="mb-tyt-note" style="padding-top:6px">… và ${ls.length - 40} khoản nữa — xếp xong 40 khoản đầu sẽ hiện tiếp.</div>` : ''}
+      <div class="mb-tyt-note" style="padding-top:6px">Xếp cả một loại chi phí (áp cho mọi công trình): dùng bản máy tính.</div>
+    </div>` : ''}
+  </div>`;
+}
+
+/** Bảng diện tích sàn (field khoiLuong của công trình) — xem + sửa (ghi qua updateProject như tytKlSave) */
+function mbTytM2Card(p, r) {
+  if (MB.tytKlEdit) return mbTytM2Edit();
+  const rows = (Array.isArray(p.khoiLuong) ? p.khoiLuong : []).filter(x => x && (x.ten || tytKlNum(x.kl)));
+  const open = !!MB.tytOpen.m2;
+  return `<div class="mb-card mb-card-sm">
+    <div class="mb-acc-head" data-act="tytToggle" data-arg="m2">
+      ${mbIcon('square_foot', 20)}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">Bảng diện tích sàn</div>
+        <div style="font-size:11px;color:var(--mb-muted-2)">${rows.length ? rows.length + ' dòng · tổng ' + tytFmtM2(r.tongSan) + ' m²' : 'Chưa nhập'}</div>
+      </div>
+      <span class="mb-acc-caret">${open ? '▲' : '▼'}</span>
+    </div>
+    ${open ? `<div class="mb-acc-body">
+      ${rows.length ? rows.map(x => {
+        const tinh = tytKlTinh(x), hs = tytKlHeSo(x);
+        return `<div class="mb-tyt-line" style="padding-left:0${tinh ? '' : ';opacity:.55'}">
+          <div style="flex:1;min-width:0">
+            <div class="mb-tyt-ln-t">${mbX(x.ten || '(không tên)')}</div>
+            <div class="mb-tyt-note">${tytFmtM2(tytKlNum(x.kl))} ${mbX(x.dvt || 'm2')}${hs !== 1 ? ' × hệ số ' + tytFmtM2(hs) : ''}${tinh ? '' : ' · không tính vào tổng'}</div>
+          </div>
+          <span class="mb-tyt-val">${tinh ? tytFmtM2(tytKlNum(x.kl) * hs) + ' m²' : '—'}</span>
+        </div>`;
+      }).join('') : '<div class="mb-tyt-note" style="padding:4px 0">Chưa có bảng M2 — chưa tính được đơn giá đ/m².</div>'}
+      <button class="mb-btn-outline blue" style="margin-top:8px" data-act="tytKlStart">✏️ ${rows.length ? 'Sửa bảng M2' : 'Nhập bảng M2'}</button>
+    </div>` : ''}
+  </div>`;
+}
+
+/** Form sửa bảng M2: mỗi dòng = tên · khối lượng · hệ số · có tính vào tổng không */
+function mbTytM2Edit() {
+  const rows = MB.tytKlEdit;
+  const tong = tytTongSanRows(rows.map(x => ({ kl: tytKlNum(x.kl), heSo: x.heSo === '' ? 1 : tytKlNum(x.heSo), tinh: x.tinh })));
+  return `<div class="mb-card" style="display:flex;flex-direction:column;gap:9px;border-color:#BFDBFE">
+    <div class="mb-row-between" style="align-items:center">
+      <div class="mb-sec-title">Sửa bảng diện tích sàn</div>
+      <span style="font-size:12.5px;font-weight:800;color:var(--mb-primary)">${tytFmtM2(tong)} m²</span>
+    </div>
+    <div style="font-size:11px;color:var(--mb-muted)">Hệ số quy đổi: mái, sân thường 0,5 (mặc định 1). Tắt "Tính" = không cộng vào tổng sàn.</div>
+    ${rows.map((x, i) => `<div class="mb-kl-row">
+      <div class="mb-row" style="gap:6px;align-items:center">
+        <input id="mb-kl-ten-${i}" class="mb-input" style="flex:1" data-in="tytKlEdit.${i}.ten" value="${mbX(x.ten)}" placeholder="Tên: Trệt, Lầu 1, Mái..."/>
+        <button class="mb-icon-btn red" data-act="tytKlDel" data-arg="${i}" title="Xóa dòng">${mbIcon('close', 17)}</button>
+      </div>
+      <div class="mb-row" style="gap:6px;align-items:flex-end;margin-top:6px">
+        <div class="mb-field"><div class="mb-label">Khối lượng (${mbX(x.dvt || 'm2')})</div>
+          <input id="mb-kl-kl-${i}" class="mb-input" inputmode="decimal" data-in="tytKlEdit.${i}.kl" data-onchange="rerender" value="${mbX(x.kl)}" placeholder="0"/></div>
+        <div class="mb-field" style="flex:.7"><div class="mb-label">Hệ số</div>
+          <input id="mb-kl-hs-${i}" class="mb-input" inputmode="decimal" data-in="tytKlEdit.${i}.heSo" data-onchange="rerender" value="${mbX(x.heSo)}" placeholder="1"/></div>
+        <div class="mb-chip${x.tinh ? ' on' : ''}" style="padding:10px 12px;border-radius:9px" data-act="tytKlTinh" data-arg="${i}">${x.tinh ? '✓ Tính' : 'Không tính'}</div>
+      </div>
+    </div>`).join('')}
+    <button class="mb-btn dashed" data-act="tytKlAdd">+ Thêm 1 dòng</button>
+    <div style="display:flex;gap:9px">
+      <button class="mb-btn gray" style="flex:1" data-act="tytKlCancel">Hủy</button>
+      <button class="mb-btn" style="flex:2" data-act="tytKlSaveMb">💾 Lưu bảng M2</button>
+    </div>
+  </div>`;
+}
+
+// ── Tab con 2: ĐỊNH MỨC (kiểm soát Nhóm 1) ──
+/** Bộ định mức có số 4 trụ cột (dùng được để kiểm soát) */
+function mbTytDmList() {
+  return (typeof tytDinhMucList === 'function' ? tytDinhMucList() : [])
+    .filter(d => typeof tytDmCoRo1 !== 'function' || tytDmCoRo1(d));
+}
+function mbTytDmCur() {
+  const ds = mbTytDmList();
+  return ds.find(d => d.id === MB.tytDm) || ds[0] || null;
+}
+/** { dm, dt, ks } của công trình đang xem — ks = null khi chưa có diện tích */
+function mbTytKs(r) {
+  const dm = mbTytDmCur();
+  if (!dm || typeof tytKiemSoat !== 'function') return null;
+  const dt = MB.tytDt === '' ? r.tongSan : tytKlNum(MB.tytDt);
+  return { dm, dt, ks: dt > 0 ? tytKiemSoat(dm, dt, r) : null };
+}
+/** Nhãn tab con "Định mức" — kèm số trụ cột đang vượt */
+function mbTytDmTabLabel() {
+  const p = mbProject(MB.tytCt);
+  const r = p ? mbTyt(p) : null;
+  const o = r ? mbTytKs(r) : null;
+  const n = (o && o.ks) ? o.ks.soVuot : 0;
+  return 'Định mức' + (n ? ` (${n} vượt)` : '');
+}
+
+function mbTytDinhMuc(p, r) {
+  const ds = mbTytDmList();
+  if (!ds.length) {
+    return `<div class="mb-card" style="font-size:12.5px;color:var(--mb-text-2);line-height:1.55">
+      Chưa có bộ định mức nào có số 4 trụ cột.<br>Tạo trên máy tính: tab <b>Tỉ trọng</b> → <b>Kiểm soát định mức</b> → "Lưu từ CT này" (công trình đã quyết toán) hoặc "Nhập tay".
+    </div>`;
+  }
+  const o  = mbTytKs(r);
+  const dm = o.dm;
+  const dtShow = MB.tytDt === '' ? (r.tongSan > 0 ? tytFmtM2(r.tongSan) : '') : MB.tytDt;
+  const form = `<div class="mb-card" style="display:flex;flex-direction:column;gap:10px">
+    <div><div class="mb-label">Bộ định mức</div>
+      <select id="mb-tyt-dm" class="mb-select" data-in="tytDm" data-onchange="tytPickDm">${ds.map(d =>
+        `<option value="${mbX(d.id)}"${d.id === dm.id ? ' selected' : ''}>${mbX(d.ten)} · Nhóm 1 ${mbFmt(d.dgRo1 || 0)}/m²</option>`).join('')}</select></div>
+    <div class="mb-row" style="align-items:flex-end">
+      <div class="mb-field"><div class="mb-label">Diện tích kiểm soát (m²)</div>
+        <input id="mb-tyt-dt" class="mb-input" inputmode="decimal" data-in="tytDt" data-onchange="rerender" value="${mbX(dtShow)}" placeholder="Nhập diện tích"/></div>
+      <button class="mb-btn-outline" style="height:40px;flex-shrink:0" data-act="tytDtReset" title="Lấy tổng sàn của công trình">↺ Sàn công trình</button>
+    </div>
+  </div>`;
+  if (!o.ks) return form + '<div class="mb-empty" style="padding:24px 0">Nhập diện tích để tính ngân sách Nhóm 1.</div>';
+
+  const ks = o.ks, t = ks.tong;
+  const cell = (cls, lb, val, hint) => `<div class="mb-kpi ${cls}" style="padding:10px">
+      <div class="mb-kpi-label">${lb}</div><div class="mb-kpi-value" style="font-size:13.5px">${val}</div>
+      ${hint ? `<div class="mb-kpi-hint">${hint}</div>` : ''}</div>`;
+  const pctTxt = v => v === Infinity ? 'ngoài ĐM' : (Math.round(v * 10) / 10).toString().replace('.', ',') + '%';
+
+  return form + `<div class="mb-grid3">
+      ${cell('blue', 'Ngân sách Nhóm 1', mbFmt(t.ns), tytFmtM2(o.dt) + ' m²')}
+      ${cell('', 'Thực tế Nhóm 1', mbFmt(t.tt), pctTxt(t.pct))}
+      ${cell(t.vuot ? 'red' : 'green', t.vuot ? 'Đã vượt' : 'Còn dư', mbFmt(Math.abs(t.conLai)), ks.soVuot ? ks.soVuot + ' dòng vượt' : 'Chưa vượt')}
+    </div>
+
+    ${ks.rows.map(x => {
+      const kk   = x.k || 'x';
+      const open = !!MB.tytKsOpen[kk];
+      const col  = x.vuot ? 'var(--mb-red)' : 'var(--mb-primary)';
+      const barW = x.pct === Infinity ? 100 : Math.max(0, Math.min(100, x.pct));
+      const con  = Math.abs(x.conLai) < 1000 ? '≈ 0' : (x.vuot ? 'Vượt ' + mbFmt(-x.conLai) : 'Dư ' + mbFmt(x.conLai));
+      return `<div class="mb-card mb-card-sm${x.vuot ? ' mb-over' : ''}">
+        <div class="mb-acc-head" data-act="tytKsToggle" data-arg="${kk}">
+          <div style="flex:1;min-width:0;font-size:13px;font-weight:700">${mbX(x.ten)}${x.k === 'quy' ? ' <span class="mb-tyt-note">mức trần chung</span>' : ''}${x.vuot ? ' <span class="mb-tag red">VƯỢT</span>' : ''}</div>
+          <span style="font-size:13px;font-weight:800;color:${col};flex-shrink:0">${pctTxt(x.pct)}</span>
+          ${x.loais.length ? `<span class="mb-acc-caret">${open ? '▲' : '▼'}</span>` : ''}
+        </div>
+        <div class="mb-bar" style="margin:7px 0 6px"><i style="width:${barW}%;background:${col}"></i></div>
+        <div style="font-size:11.5px;color:var(--mb-text-2)">Thực tế ${mbFmt(x.tt)} / Ngân sách ${mbFmt(x.ns)} · <b style="color:${x.vuot ? 'var(--mb-red)' : 'inherit'}">${con}</b></div>
+        <div class="mb-tyt-note">${r.tongSan > 0 ? mbFull(Math.round(x.tt / r.tongSan)) + '/m² thực tế' : 'Chưa có tổng sàn'} · định mức ${x.dg ? mbFull(x.dg) + '/m²' : '—'}</div>
+        ${open ? `<div class="mb-acc-body">${x.loais.map(z => `<div class="mb-tyt-line" style="padding-left:0">
+            <div style="flex:1;min-width:0"><div class="mb-tyt-ln-t">${mbX(z.loai)}</div></div>
+            <span class="mb-tyt-val">${mbFmt(z.tien)} <span class="mb-tyt-note">· ${mbTytPct(z.tien, x.tt)}</span></span>
+          </div>`).join('')}</div>` : ''}
+      </div>`;
+    }).join('')}
+
+    <div style="font-size:11px;color:var(--mb-muted-2);text-align:center">Tạo / sửa bộ định mức và mức trần Quỹ phụ phí: dùng bản máy tính.</div>`;
+}
+
+// ── Tab con 3: SO SÁNH (đ/m² các công trình xây mới có bảng M2) + XU HƯỚNG theo năm ──
+function mbTytSoSanh(pCur) {
+  const laCT = p => (typeof ctLoaiOf === 'function' ? ctLoaiOf(p) : 'CT') === 'CT';
+  const xong = p => p.status === 'closed' || p.status === 'completed';
+  let base = mbProjects().filter(laCT);
+  if (!MB.tytAllYears) base = base.filter(p => typeof qtCtInYear !== 'function' || qtCtInYear(p.name));
+  const coM2 = base.filter(p => tytTongSan(p) > 0);
+  mbTytEnsureYears([...new Set(coM2.flatMap(p => tytNamVongDoi(p)))]);
+  const list = coM2.filter(p => MB.tytSsXong !== '1' || xong(p));
+  const n1   = MB.tytSsChe !== 'all';
+  const rows = list.map(p => {
+    const r = mbTyt(p);
+    return r ? { p, r, v: n1 ? r.cpM2N1 : r.cpM2 } : null;
+  }).filter(Boolean).sort((a, b) => b.v - a.v);
+  const max = rows.length ? rows[0].v : 1;
+  const thieu = base.length - coM2.length;
+
+  // Xu hướng đ/m² Nhóm 1 theo năm công trình (năm hoàn thành; CT đang làm tính năm nay)
+  let xhHtml = '';
+  if (typeof tytXuHuongM2 === 'function' && list.length) {
+    const xh = tytXuHuongM2(list, mbTytOpts());
+    const hq = (typeof tytHoiQuy === 'function') ? tytHoiQuy(xh.nams.map(n => ({ x: +n.nam, y: n.m2.n1 }))) : null;
+    const namSau = xh.nams.length ? String(+xh.nams[xh.nams.length - 1].nam + 1) : '';
+    xhHtml = `<div class="mb-card">
+      <div class="mb-sec-head" style="margin-bottom:8px">
+        <div class="mb-sec-title">Xu hướng Thô & NC / m² theo năm</div>
+      </div>
+      <div class="mb-col" style="gap:0">
+        ${xh.nams.map((n, i) => {
+          const prev = i ? xh.nams[i - 1].m2.n1 : 0;
+          const d = prev ? (n.m2.n1 - prev) / prev * 100 : null;
+          return `<div class="mb-tyt-line" style="padding-left:0">
+            <div style="flex:1;min-width:0"><div class="mb-tyt-ln-t"><b>${n.nam}</b></div>
+              <div class="mb-tyt-note">${n.soCT} công trình${n.dangLam ? ' (' + n.dangLam + ' đang làm)' : ''} · ${tytFmtM2(n.san)} m²</div></div>
+            <span class="mb-tyt-val">${mbFull(Math.round(n.m2.n1))}${d == null ? '' : `<div style="font-size:10.5px;font-weight:700;color:${d > 0 ? 'var(--mb-red)' : 'var(--mb-green)'}">${d > 0 ? '▲' : '▼'} ${Math.abs(Math.round(d * 10) / 10).toString().replace('.', ',')}%</div>`}</span>
+          </div>`;
+        }).join('')}
+        ${hq ? `<div class="mb-tyt-line" style="padding-left:0;background:var(--mb-amber-l);border-radius:8px;padding:8px">
+          <div style="flex:1;min-width:0"><div class="mb-tyt-ln-t"><b>${namSau}</b> <span class="mb-tag amber">ước tính</span></div>
+            <div class="mb-tyt-note">Dự báo theo ${hq.n} năm dữ liệu</div></div>
+          <span class="mb-tyt-val">≈ ${mbFull(Math.round(hq.du(+namSau)))}</span>
+        </div>` : `<div class="mb-tyt-note" style="padding-top:6px">Cần ≥ ${typeof TYT_DB_MIN !== 'undefined' ? TYT_DB_MIN : 3} năm dữ liệu mới dự báo được năm tới.</div>`}
+      </div>
+    </div>`;
+  }
+
+  return `<div class="mb-chips even">
+      <div class="mb-chip${n1 ? ' on' : ''}" data-act="setFilter" data-arg="tytSsChe|n1">Thô & NC / m²</div>
+      <div class="mb-chip${n1 ? '' : ' on'}" data-act="setFilter" data-arg="tytSsChe|all">Toàn bộ / m²</div>
+    </div>
+    <div class="mb-chips">
+      <div class="mb-chip${MB.tytSsXong === '1' ? ' on' : ''}" data-act="setFilter" data-arg="tytSsXong|${MB.tytSsXong === '1' ? '0' : '1'}">Chỉ công trình đã xong</div>
+    </div>
+    ${rows.length ? `<div class="mb-list">
+      ${rows.map(({ p, r, v }) => {
+        const cur = pCur && p.id === pCur.id;
+        const [stLabel] = MB_STATUS[p.status] || ['—'];
+        return `<div class="mb-list-row tap" style="display:block;cursor:pointer${cur ? ';background:var(--mb-amber-l)' : ''}" data-act="tytOpenCt" data-arg="${mbX(p.id)}">
+          <div class="mb-row-between" style="margin-bottom:5px">
+            <span style="font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mbX(p.name)}${cur ? ' <span class="mb-tag amber">đang xem</span>' : ''}</span>
+            <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFull(Math.round(v))}</span>
+          </div>
+          <div class="mb-bar thin"><i style="width:${mbBarW(v, max)};background:${n1 ? 'var(--mb-primary)' : 'var(--mb-purple)'}"></i></div>
+          <div class="mb-tyt-note" style="margin-top:4px">${tytFmtM2(r.tongSan)} m² · tổng ${mbFmt(n1 ? r.theoNhom[1] : r.tongChi)} · ${mbX(stLabel)}</div>
+        </div>`;
+      }).join('')}
+    </div>` : '<div class="mb-empty">Chưa có công trình xây mới nào có bảng M2' + (MB.tytSsXong === '1' ? ' (đã xong)' : '') + '.</div>'}
+    ${thieu > 0 ? `<div style="font-size:11px;color:var(--mb-muted-2)">${thieu} công trình xây mới chưa có bảng M2 nên chưa so sánh được.</div>` : ''}
+    ${xhHtml}
+    <div style="font-size:11px;color:var(--mb-muted-2);text-align:center">Bảng so sánh theo từng loại chi phí, xuất Excel và biến động giá vật tư: dùng bản máy tính.</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
 //  13 · THÊM (menu)
 // ══════════════════════════════════════════════════════════════
 function mbScrMore() {
@@ -1826,6 +2637,7 @@ function mbScrMore() {
   const pending = mbPending();
 
   // (27/10/2026) Rút gọn: bỏ Quyết toán / Danh mục / Thùng rác (làm trên máy tính).
+  // (31/10/2026) Quyết toán / Tỉ trọng / Danh mục quay lại ở nhóm "Quản lý & Phân tích" bên dưới.
   // [màn hình, nhãn, gợi ý, icon Material Symbols, nền, màu icon]
   const rows = [
     ['dashboard', 'Tổng Quan',            'Dashboard chi phí ' + mbYearLabel(), 'analytics',              '#EFF6FF', '#2563EB'],
@@ -1833,6 +2645,15 @@ function mbScrMore() {
     ['congno',    'Công Nợ Đối Tác',      'Thầu phụ & Nhà cung cấp · Tất toán', 'request_quote',          '#FEF2F2', '#DC2626'],
     ['thietbi',   'Thiết Bị & Kho',       'Kho tổng & tại công trình',          'handyman',               '#FFFBEB', '#D97706'],
     ['thongke',   'Cơ Cấu Chi Phí',       'Chi phí theo loại · từng công trình', 'pie_chart',             '#F5F3FF', '#7C3AED'],
+  ].filter(r => mbCanSee(r[0]));
+
+  // (31/10/2026) Nhóm "Quản lý & Phân tích": Quyết toán (ẩn với Kế toán) · Tỉ trọng · Danh mục
+  const nChuaQt = mbCanSee('quyettoan') && typeof _qtRecordOfCt === 'function'
+    ? mbProjects().filter(p => p.status === 'completed' && !_qtRecordOfCt(p.id).rec).length : 0;
+  const mgmt = [
+    ['quyettoan', 'Quyết Toán Công Trình', nChuaQt ? nChuaQt + ' công trình đã xong chưa quyết toán' : 'Chốt doanh thu với Chủ đầu tư', 'fact_check',        '#ECFDF5', '#059669'],
+    ['tytrong',   'Tỉ Trọng & Định Mức',   'Đơn giá đ/m² · 4 nhóm chi phí · định mức',                                            'stacked_bar_chart', '#F5F3FF', '#7C3AED'],
+    ['danhmuc',   'Danh Mục',              'Loại chi phí · Nhà cung cấp · Thầu phụ · Công nhân',                                    'folder_managed',    '#F3F4F6', '#4B5563'],
   ].filter(r => mbCanSee(r[0]));
 
   const sys = [
@@ -1863,6 +2684,11 @@ function mbScrMore() {
     <div>
       <div style="font-size:12px;font-weight:700;color:var(--mb-muted);margin-bottom:9px;letter-spacing:0.3px">NGHIỆP VỤ</div>
       <div class="mb-list">${rows.map(r => rowHtml(r, true)).join('')}</div>
+    </div>
+
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--mb-muted);margin-bottom:9px;letter-spacing:0.3px">QUẢN LÝ & PHÂN TÍCH</div>
+      <div class="mb-list">${mgmt.map(r => rowHtml(r, true)).join('')}</div>
     </div>
 
     <div>

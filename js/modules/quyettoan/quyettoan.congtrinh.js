@@ -415,12 +415,19 @@ function qtOnCtChange(opts) {
 
 // ── Gom dữ liệu form thành 1 bản ghi giả định (phục vụ preview + lưu) ──
 function _qtReadForm() {
-  const pid    = document.getElementById('qtf-ct')?.value || '';
-  const editId = document.getElementById('qtf-edit-id')?.value || '';
-  const loai   = _qtGetLoai();
-  const soTien = _readMoneyInput('qtf-sotien');
-  const ngay   = document.getElementById('qtf-ngay')?.value || '';
-  const orig   = editId ? quyetToanRecords.find(r => r.id === editId) : null;
+  return qtTaoNhap(
+    document.getElementById('qtf-ct')?.value || '',
+    document.getElementById('qtf-edit-id')?.value || '',
+    _qtGetLoai(),
+    _readMoneyInput('qtf-sotien'),
+    document.getElementById('qtf-ngay')?.value || '');
+}
+
+// (31/10/2026) Phần lõi của _qtReadForm, KHÔNG đọc DOM — giao diện điện thoại dùng chung để dựng
+// đối tượng f cho _qtFin() (xem trước số "sau quyết toán") và qtLuuQuyetToan().
+function qtTaoNhap(pid, editId, loai, soTien, ngay) {
+  loai = QT_LOAI[loai] ? loai : 'tang';
+  const orig = editId ? quyetToanRecords.find(r => r.id === editId) : null;
   return {
     pid, editId, loai, soTien, ngay, orig,
     proj: pid ? _qtResolveProj(pid) : null,
@@ -535,8 +542,41 @@ function qtUpdatePreview() {
 function qtSave() {
   if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được lưu quyết toán', 'error'); return; }
   if (_qtLocked) { toast('Bấm "Sửa Quyết toán" để mở khóa trước khi lưu', 'error'); return; }
-  const f = _qtReadForm();
-  if (!f.proj)    { toast('Vui lòng chọn Công Trình!', 'error'); return; }
+  // wantThu = null khi form không có ô tick (giao diện khác) → KHÔNG đụng phiếu đang có.
+  const thuChk = document.getElementById('qtf-thu-conlai');
+  const kq = qtLuuQuyetToan({
+    pid:     document.getElementById('qtf-ct')?.value || '',
+    editId:  document.getElementById('qtf-edit-id')?.value || '',
+    loai:    _qtGetLoai(),
+    soTien:  _readMoneyInput('qtf-sotien'),
+    ngay:    document.getElementById('qtf-ngay')?.value || '',
+    nd:      document.getElementById('qtf-nd')?.value || '',
+    nguoi:   document.getElementById('qtf-nguoi')?.value || '',
+    chot:    !!document.getElementById('qtf-chot')?.checked,
+    wantThu: thuChk ? thuChk.checked : null,
+  });
+  if (!kq.ok) return;
+
+  if (kq.chot && typeof renderProjectsPage === 'function') renderProjectsPage();
+  qtPopulateSels();          // cập nhật nhãn "(đã QT)" nếu vừa đóng CT
+  // Lưu / Cập nhật xong → LÀM SẠCH toàn bộ form, ô công trình về "-- Chọn công trình --"
+  // (tránh người dùng thao tác nhầm tiếp vào công trình cũ). Bảng lịch sử vẫn thấy bản vừa lưu.
+  qtResetForm(false);
+  _qtRefreshOtherTabs();
+  if (kq.thuChanged && typeof renderDashboard === 'function') renderDashboard();   // tổng đã thu đổi
+}
+
+// ══ LÕI LƯU QUYẾT TOÁN (31/10/2026 — tách khỏi qtSave, KHÔNG đọc / vẽ DOM) ══════════
+// Dùng chung cho bản máy tính (qtSave) và giao diện điện thoại (saveQtMb) → 1 logic duy nhất.
+// input = { pid, editId, loai, soTien, ngay, nd, nguoi, chot, wantThu }
+//   wantThu: true / false = có / không giữ phiếu thu tự động "tiền còn lại"; null = không đụng phiếu.
+// Giữ nguyên mọi kiểm tra + hộp xác nhận + toast của qtSave cũ.
+// Trả về { ok, qtRec, thuChanged, chot } — ok = false khi dừng (thiếu dữ liệu / người dùng bấm Hủy).
+function qtLuuQuyetToan(input) {
+  const FAIL = { ok: false };
+  if (!_qtCanEdit()) { toast('Chỉ Quản trị viên hoặc Giám đốc được lưu quyết toán', 'error'); return FAIL; }
+  const f = qtTaoNhap(input.pid || '', input.editId || '', input.loai, input.soTien, input.ngay || '');
+  if (!f.proj)    { toast('Vui lòng chọn Công Trình!', 'error'); return FAIL; }
   // QUY TẮC 1-1: CT đã có quyết toán mà form đang ở chế độ Thêm → chuyển thành CẬP NHẬT bản hiện có
   if (!f.editId) {
     const { rec } = _qtRecordOfCt(f.proj.id);
@@ -545,39 +585,37 @@ function qtSave() {
       toast('Công trình đã có quyết toán — sẽ cập nhật trên bản hiện có (mỗi công trình chỉ 01 bản)', 'info');
     }
   }
-  if (!f.ngay)    { toast('Vui lòng chọn Ngày thực hiện!', 'error'); return; }
+  if (!f.ngay)    { toast('Vui lòng chọn Ngày thực hiện!', 'error'); return FAIL; }
   // (05/10/2026) Phát sinh TĂNG được để trống / 0 = công trình hoàn thiện ĐÚNG HĐ gốc, không phát sinh.
   //   → vẫn lưu 1 bản quyết toán giaTri = 0 (đánh dấu "đã quyết toán", doanh thu = HĐ gốc).
   //   Giảm / Thay thế vẫn bắt buộc số tiền > 0.
   if (f.loai === 'tang') { if (!(f.soTien >= 0)) f.soTien = 0; }
-  else if (!(f.soTien > 0)) { toast('Vui lòng nhập Số tiền lớn hơn 0!', 'error'); return; }
-  const nd = (document.getElementById('qtf-nd')?.value || '').trim();
-  if (!nd) { toast('Vui lòng nhập Nội dung / lý do quyết toán!', 'error'); return; }
-  const nguoi = (document.getElementById('qtf-nguoi')?.value || '').trim();
-  const chot  = !!document.getElementById('qtf-chot')?.checked;
+  else if (!(f.soTien > 0)) { toast('Vui lòng nhập Số tiền lớn hơn 0!', 'error'); return FAIL; }
+  const nd = String(input.nd || '').trim();
+  if (!nd) { toast('Vui lòng nhập Nội dung / lý do quyết toán!', 'error'); return FAIL; }
+  const nguoi = String(input.nguoi || '').trim();
+  const chot  = !!input.chot;
 
   // Kiểm tra kết quả trước khi ghi (cùng công thức với preview)
   f.forceSau = true;
   const { sau } = _qtFin(f);
-  if (sau.giaTriHD < 0) { toast('Doanh thu sau quyết toán bị âm — kiểm tra lại số tiền!', 'error'); return; }
+  if (sau.giaTriHD < 0) { toast('Doanh thu sau quyết toán bị âm — kiểm tra lại số tiền!', 'error'); return FAIL; }
   if (sau.conPhaiThu < 0 &&
-      !confirm(`Đã thu vượt doanh thu sau quyết toán ${fmtM(-sau.conPhaiThu)}.\nVẫn lưu quyết toán này?`)) return;
+      !confirm(`Đã thu vượt doanh thu sau quyết toán ${fmtM(-sau.conPhaiThu)}.\nVẫn lưu quyết toán này?`)) return FAIL;
   if (chot && f.proj.status !== 'closed' &&
-      !confirm(`Đánh dấu quyết toán cuối cùng → chuyển "${f.proj.name}" sang trạng thái "Đã quyết toán"?`)) return;
+      !confirm(`Đánh dấu quyết toán cuối cùng → chuyển "${f.proj.name}" sang trạng thái "Đã quyết toán"?`)) return FAIL;
 
   // ── Phiếu thu tự động "tiền còn lại" (03/10/2026) ──
-  // wantThu = null khi form không có ô tick (giao diện khác) → KHÔNG đụng phiếu đang có.
-  const thuChk  = document.getElementById('qtf-thu-conlai');
-  const wantThu = thuChk ? thuChk.checked : null;
+  const wantThu = (input.wantThu === true || input.wantThu === false) ? input.wantThu : null;
   const thuCu   = f.editId ? _qtAutoThuOf(f.editId) : null;
   if (wantThu === false && thuCu &&
-      !confirm(`Bỏ tick "Ghi nhận phiếu thu tiền còn lại" → phiếu thu tự động ${fmtM(thuCu.tien)} (ngày ${fmtISODate(thuCu.ngay)}) sẽ bị XÓA.\nTiếp tục?`)) return;
+      !confirm(`Bỏ tick "Ghi nhận phiếu thu tiền còn lại" → phiếu thu tự động ${fmtM(thuCu.tien)} (ngày ${fmtISODate(thuCu.ngay)}) sẽ bị XÓA.\nTiếp tục?`)) return FAIL;
   if (wantThu) {
     // Còn phải thu tính trên TOÀN BỘ các năm → máy chưa tải đủ năm thì số có thể thiếu/thừa
     const thieu = (typeof qtMissingYears === 'function') ? qtMissingYears() : [];
     if (thieu.length && !confirm(
       `Máy chưa tải dữ liệu năm ${thieu.join(', ')} — số "còn phải thu" dùng để tạo phiếu thu có thể CHƯA ĐÚNG ` +
-      `(thiếu các đợt thu của những năm này).\n\nBấm Hủy, chọn "Tất cả năm" để tải đủ rồi lưu lại (khuyên dùng).\nBấm OK để vẫn lưu.`)) return;
+      `(thiếu các đợt thu của những năm này).\n\nBấm Hủy, chọn "Tất cả năm" để tải đủ rồi lưu lại (khuyên dùng).\nBấm OK để vẫn lưu.`)) return FAIL;
   }
 
   const fields = {
@@ -617,15 +655,8 @@ function qtSave() {
   // Quyết toán cuối cùng → đóng công trình (trạng thái "Đã quyết toán" + ngày quyết toán)
   if (chot && typeof updateProject === 'function') {
     updateProject(f.proj.id, { status: 'closed', closedDate: f.ngay });
-    if (typeof renderProjectsPage === 'function') renderProjectsPage();
   }
-
-  qtPopulateSels();          // cập nhật nhãn "(đã QT)" nếu vừa đóng CT
-  // Lưu / Cập nhật xong → LÀM SẠCH toàn bộ form, ô công trình về "-- Chọn công trình --"
-  // (tránh người dùng thao tác nhầm tiếp vào công trình cũ). Bảng lịch sử vẫn thấy bản vừa lưu.
-  qtResetForm(false);
-  _qtRefreshOtherTabs();
-  if (thuChanged && typeof renderDashboard === 'function') renderDashboard();   // tổng đã thu đổi
+  return { ok: true, qtRec, thuChanged, chot };
 }
 
 // ── Sửa: chọn công trình của bản ghi → qtOnCtChange tự nạp bản đó (chế độ Sửa) ──
@@ -781,3 +812,5 @@ window.initQuyetToan = initQuyetToan;
 window.qtRefresh     = qtRefresh;
 window.qtOpenEdit    = qtOpenEdit;
 window.qtDelete      = qtDelete;
+window.qtLuuQuyetToan = qtLuuQuyetToan;   // (31/10/2026) dùng chung với giao diện điện thoại
+window.qtTaoNhap      = qtTaoNhap;
