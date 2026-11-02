@@ -147,16 +147,16 @@ function _ctGetCostsFromMap(project, invMap) {
   };
 }
 
-// ── Tính TỔNG CHI thực tế của một công trình (single source of truth) ──
-// Trả về cùng giá trị "Tổng Chi Công Trình" như trong modal chi tiết, để
-// thẻ ngoài Dashboard và modal luôn khớp nhau. KHÔNG bao gồm chi phí chung
-// CÔNG TY phân bổ (đó là số phụ hiển thị riêng "/X").
+// ── Tính CHI PHÍ TRỰC TIẾP của một công trình (single source of truth) ──
+// KHÔNG bao gồm chi phí chung CÔNG TY phân bổ — phần đó cộng ở ctLaiLo().
 //
-// Công thức: tổng HĐ + ứng thầu phụ + ứng NCC − công nợ NCC (đã nằm trong HĐ)
+// Công thức: Tổng HĐ + ứng thầu phụ − HĐ của các NCC trong danh sách ứng + ứng NCC
 //   - ungTp  : ứng thầu phụ (loai='thauphu') của CT, theo năm đang chọn
 //   - ungNcc : ứng nhà cung cấp (loai='nhacungcap') của CT, theo năm đang chọn
-//   - tongHopDongNcc: phần HĐ thuộc các NCC mà CT này đã ứng → trừ ra để tránh
-//     double-count (vì các HĐ đó đã được cộng trong c.total)
+//   - tongHopDongNcc: TOÀN BỘ HĐ tại CT này của mọi NCC CÓ TÊN trong danh sách ứng
+//     của CT (kể cả dòng ứng 0đ / chưa ứng) → trừ ra, vì dòng tiền thực chi cho NCC
+//     đó là số tiền đã ứng (ungNcc), không phải số hóa đơn.
+//   VD CT A Huynh: 481 + 20 − 178,1 + 105 = 427,9 tr
 //
 // @param {Object} p  Project (cần p.id, p.name)
 // @param {Object} c  Cost object từ _ctGetCosts / _ctGetCostsFromMap ({ total, invs })
@@ -193,6 +193,36 @@ function _ctTongChi(p, c) {
   return { tongChi, ungTp, ungNcc, tongHopDongNcc };
 }
 
+// ── Map id công trình → chi phí chung CÔNG TY phân bổ (tính 1 lần cho cả lưới thẻ) ──
+function _ctChiChungMap() {
+  const m = new Map();
+  if (typeof allocateCompanyCost === 'function')
+    allocateCompanyCost().forEach(a => { if (a && a.p) m.set(a.p.id, a.allocated || 0); });
+  return m;
+}
+
+// ══ TỔNG CHI THỰC TẾ + LÃI/LỖ của 1 CT (single source of truth) ══════
+// Dùng CHUNG cho thẻ công trình ngoài Dashboard, popup chi tiết (qua ctTaiChinh) và tab Quyết Toán
+// → ngoài thẻ báo Lãi/Lỗ bao nhiêu thì trong popup đúng bấy nhiêu.
+//   Chi trực tiếp    = _ctTongChi(p, c).tongChi
+//   Tổng chi thực tế = Chi trực tiếp + CP công ty phân bổ
+//   Lãi / Lỗ         = Đã thu (năm đang lọc) − Tổng chi thực tế
+// @param chiChungMap  (tùy chọn) kết quả _ctChiChungMap() — truyền khi tính nhiều CT để khỏi phân bổ lại
+// @returns {{ tc, tongThu, soDotThu, chiChung, chiThucTe, laiHienTai }}
+function ctLaiLo(p, c, chiChungMap) {
+  const tc = _ctTongChi(p, c);
+  const thuList = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
+    if (r.deletedAt || !inActiveYear(r.ngay)) return false;
+    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
+  }) : [];
+  const tongThu   = thuList.reduce((s, r) => s + (r.tien || 0), 0);
+  const chiChung  = (p.id !== 'COMPANY' && p.startDate)
+    ? ((chiChungMap || _ctChiChungMap()).get(p.id) || 0) : 0;
+  const chiThucTe = tc.tongChi + chiChung;
+  return { tc, tongThu, soDotThu: thuList.length, chiChung, chiThucTe, laiHienTai: tongThu - chiThucTe };
+}
+window.ctLaiLo = ctLaiLo;
+
 // ══ TÀI CHÍNH CỐT LÕI CỦA 1 CÔNG TRÌNH (single source of truth) ══════
 // Dùng CHUNG cho modal chi tiết công trình (openCTDetail) và tab QUYẾT TOÁN
 // (quyettoan.congtrinh.js) → 2 nơi luôn cùng số. Theo NĂM ĐANG LỌC như modal:
@@ -210,7 +240,8 @@ function _ctTongChi(p, c) {
 function ctTaiChinh(p, opts) {
   opts = opts || {};
   const c  = _ctGetCosts(p);
-  const tc = _ctTongChi(p, c);
+  const ll = ctLaiLo(p, c);   // chi trực tiếp + CP công ty + đã thu + lãi/lỗ — cùng số thẻ ngoài Dashboard
+  const tc = ll.tc;
   const _match = r => r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
 
   // (X) HĐ chính (giaTri + giaTriphu + phatSinh) — như modal: không lọc năm
@@ -219,19 +250,15 @@ function ctTaiChinh(p, opts) {
     : ((typeof hopDongData !== 'undefined' && hopDongData[p.name] && !hopDongData[p.name].deletedAt) ? hopDongData[p.name] : null);
   const X = hdct ? (hdct.giaTri || 0) + (hdct.giaTriphu || 0) + (hdct.phatSinh || 0) : 0;
 
-  // Đã thu (năm đang lọc) + số đợt
-  const thuList = (typeof thuRecords !== 'undefined')
-    ? thuRecords.filter(r => !r.deletedAt && inActiveYear(r.ngay) && _match(r)) : [];
-  const tongThu = thuList.reduce((s, r) => s + (r.tien || 0), 0);
+  // Đã thu (năm đang lọc)
+  const tongThu = ll.tongThu;
 
   // (B) tổng HĐ thầu phụ
   const tongHDTP = (typeof thauPhuContracts !== 'undefined')
     ? thauPhuContracts.filter(r => !r.deletedAt && _match(r)).reduce((s, r) => s + (r.giaTri || 0) + (r.phatSinh || 0), 0) : 0;
 
   // (C) chi phí chung CÔNG TY chia tỉ trọng
-  const _alloc = (p.id !== 'COMPANY' && p.startDate && typeof allocateCompanyCost === 'function')
-    ? allocateCompanyCost().find(a => a.p.id === p.id) : null;
-  const chiChung = _alloc ? _alloc.allocated : 0;
+  const chiChung = ll.chiChung;
 
   // (Y) quyết toán đã quy đổi delta (tăng/giảm/thay thế) trong năm đang lọc — quyettoan.core.js
   const qtSum = (typeof qtTongQuyetToan === 'function')
@@ -244,11 +271,11 @@ function ctTaiChinh(p, opts) {
   const doanhThu   = tongThu;                       // doanh thu = tiền thực thu
   const chiPhiTong = (c.total || 0) + tongHDTP + chiChung;
   const loiNhuan   = doanhThu - chiPhiTong;
-  const chiThucTe  = tc.tongChi + chiChung;
-  const laiHienTai = tongThu - chiThucTe;
+  const chiThucTe  = ll.chiThucTe;
+  const laiHienTai = ll.laiHienTai;
   const isActive   = (p.status === 'active' || p.status === 'planning');
   return {
-    c, tc, X, Y, qtSum, tongThu, soDotThu: thuList.length, tongHDTP, chiChung,
+    c, tc, X, Y, qtSum, tongThu, soDotThu: ll.soDotThu, tongHDTP, chiChung,
     doanhThu, giaTriHD, chiPhiTong, loiNhuan, chiThucTe, laiHienTai, isActive,
     hieuQua: isActive ? laiHienTai : loiNhuan,
     conPhaiThu: giaTriHD - tongThu,
@@ -540,8 +567,10 @@ function _ctCardHtml(it) {
     ? `<span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">schedule</span> ${d} ngày thi công`
     : '<span class="ghost">Chưa có ngày thi công</span>';
   const addr = (p.note || '').trim();
-  // [FIX] Hiển thị TỔNG CHI thực tế (gồm ứng thầu phụ / NCC) thay vì chỉ tổng hóa đơn
+  // TỔNG CHI THỰC TẾ = chi trực tiếp + CP công ty phân bổ (ctLaiLo) — đúng số "Tổng chi thực tế" trong popup,
+  // nên Đã thu − số này = Lãi/Lỗ ở đáy thẻ. Rê chuột xem phân rã.
   const total = noCost ? '<span class="text-secondary">—</span>' : fmtS(tongChi);
+  const totalTip = noCost ? '' : `Tổng chi thực tế = Trực tiếp ${fmtS(it.chiTrucTiep || 0)}${it.chiChung > 0 ? ` + CP công ty ${fmtS(it.chiChung)}` : ''}`;
   return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
     <div class="ct-card-head" style="align-items:flex-start">
       <div style="flex:1;min-width:0">
@@ -552,14 +581,14 @@ function _ctCardHtml(it) {
         <div style="margin:5px 0 3px">${_ptStatusBadge(p.status)}</div>
         <div class="ct-card-count">${dayLine}</div>
       </div>
-      <div class="ct-card-total" style="margin-left:8px">${total}</div>
+      <div class="ct-card-total" style="margin-left:8px"${totalTip ? ` title="${x(totalTip)}"` : ''}>${total}</div>
     </div>
     ${_ctCardHealth(it)}
   </div>`;
 }
 
 // (27/10/2026) Dòng nhỏ đáy thẻ — sức khỏe tài chính: "Đã thu 900 tr · Lãi +22,6 tr" (theo năm đang lọc,
-// Lãi = Đã thu − Tổng chi trên thẻ). Ẩn với Kế toán (không xem doanh thu / lãi lỗ) và thẻ chưa phát sinh.
+// Lãi = Đã thu − Tổng chi thực tế trên thẻ = ctLaiLo().laiHienTai, khớp thẻ Hiệu Quả trong popup). Ẩn với Kế toán (không xem doanh thu / lãi lỗ) và thẻ chưa phát sinh.
 function _ctCardHealth(it) {
   if (it.noCost || it.thu === undefined || (typeof isKetoan === 'function' && isKetoan())) return '';
   const lai = it.laiLo || 0;
@@ -847,17 +876,14 @@ function _ctRenderGrid() {
   }
   // [END ADDED] no_cost block
 
+  const chiChungMap = _ctChiChungMap();   // phân bổ CP công ty 1 lần cho cả lưới
   let withData = projects.filter(_isValidProject).map(p => {
-    const c     = _ctGetCostsFromMap(p, invMap);
-    const thu   = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
-      if (r.deletedAt || !inActiveYear(r.ngay)) return false;
-      return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-    }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
-    // Tổng chi thực tế (HĐ + ứng thầu phụ + ứng NCC − công nợ NCC) — dùng chung với modal
-    const { tongChi, ungTp } = _ctTongChi(p, c);
-    const laiLo = thu - tongChi;
-    const days  = _ptDurationDays(p, c.invs);
-    return { p, c, tongChi, laiLo, days, thu, ungTp };
+    const c  = _ctGetCostsFromMap(p, invMap);
+    // Tổng chi thực tế (chi trực tiếp + CP công ty) & Lãi/Lỗ — CÙNG hàm ctLaiLo với popup chi tiết
+    const ll = ctLaiLo(p, c, chiChungMap);
+    const days = _ptDurationDays(p, c.invs);
+    return { p, c, tongChi: ll.chiThucTe, chiTrucTiep: ll.tc.tongChi, chiChung: ll.chiChung,
+             laiLo: ll.laiHienTai, days, thu: ll.tongThu, ungTp: ll.tc.ungTp };
   });
 
   // Chỉ giữ CT có hóa đơn hợp lệ theo năm đang chọn:
@@ -998,9 +1024,10 @@ function openCTDetail(id) {
   const matCost  = c.invs.filter(i => i.source !== 'cc').reduce((s,i) => s+(i.thanhtien||i.tien||0), 0);
   const labCost  = c.invs.filter(i => i.source === 'cc').reduce((s,i) => s+(i.thanhtien||i.tien||0), 0);
 
-  // Tổng chi thực tế — dùng chung helper _ctTongChi (single source of truth với thẻ Dashboard)
-  // Trả về: tongChi, ungTp (ứng thầu phụ), ungNcc (ứng NCC), tongHopDongNcc (công nợ NCC)
-  const _tc = _ctTongChi(p, c);
+  // Số tài chính cốt lõi — ctTaiChinh() → ctLaiLo(): CÙNG hàm với thẻ ngoài Dashboard & tab Quyết Toán
+  const _fin = ctTaiChinh(p);
+  // Chi trực tiếp: tongChi, ungTp (ứng thầu phụ), ungNcc (ứng NCC), tongHopDongNcc (HĐ của NCC trong ds ứng)
+  const _tc = _fin.tc;
   const ungTpCost            = _tc.ungTp;
   const ungNccCost           = _tc.ungNcc;
   const tongHopDongNhaCungCap = _tc.tongHopDongNcc;
@@ -1012,11 +1039,7 @@ function openCTDetail(id) {
                        : ((typeof hopDongData !== 'undefined' && hopDongData[p.name] && !hopDongData[p.name].deletedAt) ? hopDongData[p.name] : null);
   const tongGiaTriHD = hdct ? (hdct.giaTri||0) + (hdct.giaTriphu||0) + (hdct.phatSinh||0) : 0;
 
-  const tongThu = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
-    if (r.deletedAt) return false;
-    if (!inActiveYear(r.ngay)) return false;
-    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-  }).reduce((s,r) => s+(r.tien||0), 0) : 0;
+  const tongThu = _fin.tongThu;
 
   const tongHDTP = (typeof thauPhuContracts !== 'undefined') ? thauPhuContracts.filter(r => {
     if (r.deletedAt) return false;
@@ -1028,11 +1051,7 @@ function openCTDetail(id) {
   const tongChiPhiDuToan = (c.total || 0) + tongHDTP;
 
   // ── Bổ sung data nhỏ ─────────────────────────────────────────────────
-  const soDotThu = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
-    if (r.deletedAt) return false;
-    if (!inActiveYear(r.ngay)) return false;
-    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-  }).length : 0;
+  const soDotThu = _fin.soDotThu;
 
   // ── Chi phí chung phân bổ theo trọng số CT ───────────────────────────
   // Fix: chỉ lấy chi phí của project CÔNG TY, KHÔNG dùng tổng tất cả project
@@ -1055,16 +1074,14 @@ function openCTDetail(id) {
   const _durLabel    = durationDays > 0 ? `${durationDays} ngày` : '';
   const _sd          = _ctStartDate;
 
-  // Phân bổ chi phí chung: dùng allocateCompanyCost() (weight = days × factor theo tên)
-  const _allocEntry = (!isCompany && p.startDate) ? allocateCompanyCost().find(a => a.p.id === p.id) : null;
-  const _chiPhiChungFixed = _allocEntry ? _allocEntry.allocated : 0;
+  // Phân bổ chi phí chung CÔNG TY (allocateCompanyCost: weight = days × k) — lấy từ ctLaiLo
+  const _chiPhiChungFixed = _fin.chiChung;
 
   // ══ TÍNH TOÁN TÀI CHÍNH CỐT LÕI — dùng CÙNG công thức bảng "Lợi Nhuận" ══
   //   Chi phí   = A(hóa đơn/vật tư) + B(HĐ thầu phụ) + C(chi phí chung phân bổ)
   //   Doanh thu = tổng đã thu thực tế (cash-basis)
   //   Lợi nhuận = Doanh thu − Chi phí  → khớp tuyệt đối với tab Doanh Thu → Lợi Nhuận
-  // Số liệu cốt lõi lấy từ ctTaiChinh() — DÙNG CHUNG với tab QUYẾT TOÁN (cùng công thức, cùng số)
-  const _fin = ctTaiChinh(p);
+  // Số liệu cốt lõi lấy từ _fin = ctTaiChinh() (ở trên) — DÙNG CHUNG với tab QUYẾT TOÁN (cùng công thức, cùng số)
   const _A = c.total;            // (A) hóa đơn/vật tư của CT
   const _B = tongHDTP;           // (B) tổng giá trị HĐ thầu phụ
   const _C = _chiPhiChungFixed;  // (C) chi phí chung CÔNG TY phân bổ cho CT
@@ -1192,9 +1209,9 @@ function openCTDetail(id) {
   // Cột 2 — CHI PHÍ THỰC TẾ ĐÃ CHI = chi trực tiếp + chi phí chia tỉ trọng (giá vốn thật của CT)
   const _over = pctChi > 100;
   // Tổng chi phí thực tế hiển thị = chi trực tiếp (tongChiCongTrinh) + chi phí chia tỉ trọng
-  const _tongChiHienThi = tongChiCongTrinh + _chiPhiChungFixed;
+  const _tongChiHienThi = _fin.chiThucTe;   // = ctLaiLo().chiThucTe — đúng số góc phải thẻ ngoài Dashboard
   // (27/10/2026) Dòng công thức DÙNG CHUNG cho thẻ Chi phí & thẻ Hiệu quả → 2 thẻ cùng 1 con số Tổng chi thực tế
-  const _ctdCongThucChi = `<div class="text-secondary" style="font-size:11px;margin-top:2px" title="Trực tiếp = hóa đơn + ứng thầu phụ + ứng NCC (đúng số trên thẻ công trình) · CP công ty = chi phí chung CÔNG TY chia theo tỉ trọng">
+  const _ctdCongThucChi = `<div class="text-secondary" style="font-size:11px;margin-top:2px" title="Trực tiếp = Tổng hóa đơn + ứng thầu phụ − HĐ của các NCC trong danh sách ứng + ứng NCC · CP công ty = chi phí chung CÔNG TY chia theo tỉ trọng · Tổng = số góc phải thẻ công trình">
     Trực tiếp ${fmtS(tongChiCongTrinh)}${_chiPhiChungFixed > 0 ? ` + CP công ty ${fmtS(_chiPhiChungFixed)} = <b style="color:var(--bs-body-color)">${fmtS(_tongChiHienThi)}</b>` : ''}</div>`;
   const _colCost = `
     <div style="${_bxR}">
@@ -1221,7 +1238,7 @@ function openCTDetail(id) {
   //   cùng phạm vi năm đang lọc) → 3 thẻ đọc liền mạch. Số lợi nhuận hạch toán của tab LỢI NHUẬN (lnHieuQuaCT)
   //   hiện thành dòng tham chiếu bên dưới khi khác số chính.
   const _hq = (typeof lnHieuQuaCT === 'function') ? lnHieuQuaCT(p) : null;
-  const _hqNum    = tongThu - _tongChiHienThi;
+  const _hqNum    = _fin.laiHienTai;          // = ctLaiLo().laiHienTai — đúng số Lãi/Lỗ đáy thẻ ngoài Dashboard
   const _hqDt     = tongThu;
   const _hqMargin = _hqDt > 0 ? _hqNum / _hqDt * 100 : null;   // chia cho 0 → null
   const _hqPos   = _hqNum >= 0;
