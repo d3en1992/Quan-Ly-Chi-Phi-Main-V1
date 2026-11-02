@@ -591,7 +591,16 @@ function mbBindEvents() {
     if (!el) return;
     if (el.dataset.money === '1') mbFormatMoneyInput(el);
     mbSetPath(el.dataset.in, el.value);
+    // Bộ gõ tiếng Việt (Gboard/Laban Telex) đang ghép chữ → chưa vẽ lại,
+    // thay ô nhập giữa chừng làm lặp/mất dấu ("sơn" → "sson"). Vẽ ở compositionend.
+    if (ev.isComposing) return;
     if (el.dataset.live === '1') mbRender();   // ô cần tính lại ngay (vd: thành tiền)
+  });
+  shell.addEventListener('compositionend', ev => {
+    const el = ev.target.closest('[data-in]');
+    if (!el) return;
+    mbSetPath(el.dataset.in, el.value);
+    if (el.dataset.live === '1') mbRender();
   });
 
   // Select / date → cập nhật rồi render lại

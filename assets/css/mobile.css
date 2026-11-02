@@ -50,6 +50,9 @@ body.mb-on #mb-shell {
   font-family: -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif;
   color: var(--mb-text);
   overflow: hidden;
+  /* Bấm nhanh liên tiếp (ô ngày chấm công...) không bị phóng to trang, bỏ vệt xanh khi chạm */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   /* Chừa chỗ cho tai thỏ / thanh cử chỉ trên iOS + Android */
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -74,6 +77,8 @@ body.mb-on .app-toast {
   top: auto !important;
   transform: none !important;
   z-index: 1300 !important;
+  /* Toast ẩn (opacity 0) vẫn nằm đè đúng vị trí nút "Lưu" của thanh dính đáy → không được nuốt cú chạm */
+  pointer-events: none;
 }
 
 /* ══════════════════════════════
