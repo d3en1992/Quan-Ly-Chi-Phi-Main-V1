@@ -2330,9 +2330,10 @@ Lỗi: thẻ ngoài Dashboard lấy `Đã thu − Chi trực tiếp` (VD CT A Hu
 - `ctTaiChinh()` lấy tongThu / soDotThu / chiChung / chiThucTe / laiHienTai từ `ctLaiLo` (bỏ tính lặp).
 - `_ctRenderGrid`: mỗi thẻ dùng `ctLaiLo` → `it.tongChi` = **Tổng chi thực tế** (góc phải thẻ, rê chuột xem "Trực tiếp … + CP công ty …"), `it.laiLo` = cùng số thẻ Hiệu Quả trong popup. Tổng chi ở tiêu đề phân khu / nhóm khách hàng và bộ lọc Có lãi / Đang lỗ cũng theo số mới.
 - `openCTDetail`: `_tc`, `tongThu`, `soDotThu`, `_chiPhiChungFixed`, `_tongChiHienThi`, `_hqNum` đều lấy từ `_fin = ctTaiChinh(p)` (không tự tính lại).
-- Chưa đổi: giao diện điện thoại (`mbProjStats.chi` vẫn là chi trực tiếp); tab Lợi Nhuận (`lnTinhCongTrinh`, hạch toán theo năm — chỉ hiện làm dòng tham chiếu trong popup).
+- **Điện thoại** (`mobile.screens.js`): `mbProjStats` gọi `ctLaiLo` (map CP công ty cache theo `invMap` qua WeakMap `_mbChiChungCache`) → `st.chi` = Tổng chi thực tế, thêm `st.chiTrucTiep`, `st.chiChung`, `st.lai`. Mọi chỗ `st.thu - st.chi` đổi thành `st.lai` (danh sách CT, chi tiết CT, Lãi/lỗ theo CT, Quyết toán). Chi tiết CT: dòng "Tổng chi thực tế" + "— chi trực tiếp" + "— CP công ty phân bổ" (thay 2 dòng hóa đơn / ứng thầu phụ).
+- Chưa đổi: tab Lợi Nhuận (`lnTinhCongTrinh`, hạch toán theo năm — chỉ hiện làm dòng tham chiếu trong popup); khối "Cơ cấu lợi nhuận" tổng công ty trên điện thoại.
 
-**File đã sửa:** `js/modules/projects/projects.ui.js`.
+**File đã sửa:** `js/modules/projects/projects.ui.js`, `js/mobile/mobile.screens.js`.
 
 ---
 

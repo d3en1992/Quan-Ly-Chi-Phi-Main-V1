@@ -31,36 +31,43 @@ function mbInvMap() {
 
 /**
  * Chỉ số tài chính của một công trình — DÙNG ĐÚNG công thức của bản desktop.
- * @returns {{ hd, dt, qt, conThu, chi, thu, invs, hoaDon, ungTp, ungNcc }}
+ * @returns {{ hd, dt, qt, conThu, chi, chiTrucTiep, chiChung, lai, thu, invs, hoaDon, ungTp, ungNcc }}
  *   hd     — tổng giá trị hợp đồng chính (giaTri + giaTriphu + phatSinh)
  *   dt     — DOANH THU SAU QUYẾT TOÁN (năm đang chọn) — calcTongDoanhThu() của desktop
  *   qt     — tổng ảnh hưởng quyết toán (±) · conThu — còn phải thu = dt − đã thu
- *   chi    — TỔNG CHI công trình (_ctTongChi: HĐ + ứng TP + ứng NCC − công nợ NCC)
+ *   chi    — TỔNG CHI THỰC TẾ = chi trực tiếp + CP công ty phân bổ (ctLaiLo — cùng số thẻ/popup desktop)
+ *   chiTrucTiep — _ctTongChi: HĐ + ứng TP − HĐ của NCC trong ds ứng + ứng NCC · chiChung — CP công ty
+ *   lai    — Lãi/Lỗ = đã thu − chi (ctLaiLo().laiHienTai)
  *   thu    — tổng tiền đã thu trong năm
  *   hoaDon — tổng tiền hóa đơn thuần (c.total)
  */
+// Map CP công ty phân bổ — tính 1 lần cho mỗi invMap (mỗi lần vẽ màn hình), tránh phân bổ lại từng CT
+const _mbChiChungCache = new WeakMap();
 function mbProjStats(p, invMap) {
+  invMap = invMap || mbInvMap();
   const c = (typeof _ctGetCostsFromMap === 'function')
-    ? _ctGetCostsFromMap(p, invMap || mbInvMap())
+    ? _ctGetCostsFromMap(p, invMap)
     : { total: 0, count: 0, invs: [] };
 
-  const tc = (typeof _ctTongChi === 'function')
-    ? _ctTongChi(p, c)
-    : { tongChi: c.total, ungTp: 0, ungNcc: 0 };
+  let ll;
+  if (typeof ctLaiLo === 'function') {
+    let ccMap = _mbChiChungCache.get(invMap);
+    if (!ccMap) { ccMap = _ctChiChungMap(); _mbChiChungCache.set(invMap, ccMap); }
+    ll = ctLaiLo(p, c, ccMap);
+  } else {
+    ll = { tc: { tongChi: c.total, ungTp: 0, ungNcc: 0 }, tongThu: 0, chiChung: 0, chiThucTe: c.total, laiHienTai: -c.total };
+  }
+  const tc = ll.tc, thu = ll.tongThu;
 
   const hdct = (typeof _hdLookup === 'function') ? (_hdLookup(p.id) || _hdLookup(p.name)) : null;
   const hd   = hdct ? (hdct.giaTri || 0) + (hdct.giaTriphu || 0) + (hdct.phatSinh || 0) : 0;
-
-  const thu = (typeof thuRecords !== 'undefined') ? thuRecords.filter(r => {
-    if (r.deletedAt || !inActiveYear(r.ngay)) return false;
-    return r.projectId ? r.projectId === p.id : r.congtrinh === p.name;
-  }).reduce((s, r) => s + (r.tien || 0), 0) : 0;
 
   // Doanh thu sau quyết toán — cùng công thức với tab Doanh Thu / Quyết Toán bản desktop
   const d = (typeof calcTongDoanhThu === 'function') ? calcTongDoanhThu(p) : { tongDT: hd, qt: 0 };
 
   return { hd, dt: d.tongDT, qt: d.qt, conThu: d.tongDT - thu,
-           chi: tc.tongChi, thu, invs: c.invs, hoaDon: c.total, ungTp: tc.ungTp, ungNcc: tc.ungNcc };
+           chi: ll.chiThucTe, chiTrucTiep: tc.tongChi, chiChung: ll.chiChung, lai: ll.laiHienTai,
+           thu, invs: c.invs, hoaDon: c.total, ungTp: tc.ungTp, ungNcc: tc.ungNcc };
 }
 
 /** Bản ghi (hóa đơn/ứng/thu...) có thuộc công trình p không */
@@ -240,7 +247,7 @@ function mbScrProjects() {
 
     <div class="mb-col" style="gap:10px">
       ${list.length ? list.map(({ p, st }) => {
-        const lai = st.thu - st.chi;
+        const lai = st.lai;
         const pct = mbPct(st.chi, st.hd);
         const [stLabel, stCls] = MB_STATUS[p.status] || ['—', 'gray'];
         const days = (typeof getProjectDays === 'function') ? getProjectDays(p) : 0;
@@ -341,7 +348,7 @@ function mbScrProjectDetail() {
   // ── Tổng quan ──
   // Kế toán: ẩn doanh thu / lãi lỗ + không đổi trạng thái (khớp phân quyền bản desktop); đơn giá đ/m² vẫn xem được
   const isKt = mbRole() === 'ketoan';
-  const lai  = st.thu - st.chi;
+  const lai  = st.lai;
   const days = (typeof getProjectDays === 'function') ? getProjectDays(p) : 0;
   const k    = (typeof getProjectK === 'function') ? getProjectK(p) : 1;
   const pct  = mbPct(st.chi, st.hd);
@@ -359,9 +366,9 @@ function mbScrProjectDetail() {
     ['Giá trị hợp đồng',  mbFull(st.hd),           '', true],
     ['Quyết toán (±)',    st.qt ? (st.qt > 0 ? '+' : '-') + mbFull(Math.abs(st.qt)) : '0 đ', st.qt < 0 ? 'var(--mb-red)' : (st.qt > 0 ? 'var(--mb-green)' : 'var(--mb-muted)'), true],
     ['Hợp đồng sau quyết toán', mbFull(st.dt),     'var(--mb-primary)', true],
-    ['Tổng chi phí',      mbFull(st.chi),          '', false],
-    ['— trong đó hóa đơn', mbFull(st.hoaDon),      'var(--mb-muted)', false],
-    ['— ứng thầu phụ',    mbFull(st.ungTp),        'var(--mb-muted)', false],
+    ['Tổng chi thực tế',  mbFull(st.chi),          '', false],
+    ['— chi trực tiếp',   mbFull(st.chiTrucTiep),  'var(--mb-muted)', false],
+    ['— CP công ty phân bổ', mbFull(st.chiChung),  'var(--mb-muted)', false],
     ['Đã thu',            mbFull(st.thu),          'var(--mb-green)', true],
     ['Còn phải thu',      mbFull(st.conThu),       st.conThu < 0 ? 'var(--mb-red)' : 'var(--mb-amber)', true],
     ['Lãi / lỗ tạm tính', mbFull(lai),             lai >= 0 ? 'var(--mb-green)' : 'var(--mb-red)', true],
@@ -1481,7 +1488,7 @@ function mbDtLoiNhuan() {
     <div class="mb-sec-title">Lãi/lỗ theo công trình</div>
     <div class="mb-col">
       ${rows.length ? rows.map(({ p, st }) => {
-        const lai = st.thu - st.chi;
+        const lai = st.lai;
         const pct = mbPct(Math.abs(lai), st.thu);
         return `<div class="mb-card mb-card-sm tap" data-act="openProject" data-arg="${mbX(p.id)}">
           <div class="mb-row-between" style="margin-bottom:5px">
@@ -1966,7 +1973,7 @@ function mbQtDanhSach() {
     <div class="mb-col" style="gap:9px">
       ${rows.length ? rows.map(({ p, rec, da, d, st }) => {
         const [stLabel, stCls] = MB_STATUS[p.status] || ['—', 'gray'];
-        const lai = st.thu - st.chi;
+        const lai = st.lai;
         return `<div class="mb-card tap" style="padding:13px" data-act="openQtForm" data-arg="${mbX(p.id)}">
           <div style="font-size:13.5px;font-weight:700;margin-bottom:6px">${mbX(p.name)}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">
