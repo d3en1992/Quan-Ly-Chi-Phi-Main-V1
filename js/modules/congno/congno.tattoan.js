@@ -502,8 +502,8 @@ function cnGoSub(btn, id) {
 // Init page Công Nợ (gọi từ goPage / renderActiveTab / sau khi nhập Excel)
 function initCongNo() {
   // goPage()/renderActiveTab() đã gọi _reloadGlobals(); vẫn reload phòng khi gọi trực tiếp.
-  hopDongData      = load('hopdong_v1', {});
-  thauPhuContracts = load('thauphu_v1', []);
+  hopDongData      = loadView('hopdong_v1', {});
+  thauPhuContracts = loadView('thauphu_v1', []);
 
   ttRender();   // sub-tab CÔNG NỢ (tất toán)
   // Chuẩn bị sẵn dữ liệu sub-tab HỢP ĐỒNG THẦU PHỤ (bảng ẩn — sẽ hiện khi bấm sub-tab)

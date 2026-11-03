@@ -5,7 +5,7 @@
 //  GLOBAL STATE
 // ══════════════════════════════
 // ungRecords là global shared — nhapxuat.js, projects.js, doanhthu.js đọc/gán lại
-let ungRecords = load('ung_v1', []);
+let ungRecords = loadView('ung_v1', []);
 let filteredUng = [];
 let filteredUngTp = [];
 let filteredUngNcc = [];

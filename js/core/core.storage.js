@@ -108,6 +108,7 @@ const DB_KEY_MAP = {
   'cat_ct_years': { table: 'settings',   isArr: false, rowId: 'cat_ct_years'},
   'cat_cn_roles': { table: 'settings',   isArr: false, rowId: 'cat_cn_roles'},
   'cat_items_v1': { table: 'settings',   isArr: false, rowId: 'catItems'     },
+  'import_lots_v1': { table: 'settings', isArr: false, rowId: 'import_lots'  }, // (03/11/2026) Lô nhập gói công trình — doc meta_lo_nhap
 };
 
 // ── In-memory runtime cache — nguồn đọc duy nhất sau khi dbInit() chạy xong ──
@@ -117,10 +118,96 @@ const _mem = {};
 // Dùng cho dữ liệu đến từ cloud (pull/merge) và chuẩn hóa nội bộ (migration, dựng lại
 // danh mục...) → KHÔNG phải thay đổi của người dùng → chỉ cập nhật "bảng bóng" (_shadow)
 // cho khớp, KHÔNG đánh dấu outbox.
+// (03/11/2026) _memSet = đường ghi của CODE APP (migration, chuẩn hóa trên biến global):
+//   giá trị truyền vào có thể là bản ĐÃ LỌC NHÁP (loadView) → tự trả lại dòng bị ẩn.
+//   _memSetRaw = đường ghi của SYNC (dữ liệu cloud đã gộp đủ) — ghi nguyên văn.
 function _memSet(k, v) {
+  _memSetRaw(k, _draftKeepHidden(k, v));
+}
+function _memSetRaw(k, v) {
   _mem[k] = v;
   _dbSave(k, v).catch(e => console.warn('[IDB] _memSet lỗi:', k, e));
   if (typeof _shadowSet === 'function') _shadowSet(k, v);
+}
+
+
+// ══ LỚP XEM DỮ LIỆU NHÁP (lô nhập gói công trình — 03/11/2026) ═══════════════
+// Record của lô nháp mang draft:true. Người không phải admin (hoặc admin bật "Xem như
+// giám đốc") KHÔNG được thấy chúng. Record mà lô nháp sẽ xóa (deleteFirst) mang
+// draftHide:<lot id> — admin (xem bình thường) không thấy, người khác vẫn thấy cho tới
+// khi lô được "Đưa vào dữ liệu chung".
+// Nguyên tắc an toàn:
+//   • _mem LUÔN giữ đủ dữ liệu (load() = bản thô, dùng cho sync / payload cloud / sao lưu).
+//   • Biến global dùng để vẽ/tính (invoices, ccData, projects, hopDongData...) lấy từ
+//     loadView() = bản đã lọc.
+//   • save()/_memSet() nhận lại mảng đã lọc → _draftKeepHidden() gắn lại các dòng bị ẩn
+//     → IDB không xóa dòng nháp, bảng bóng không thấy id biến mất → doc KHÔNG bị bẩn.
+const _DRAFT_KEYS = new Set(['inv_v3','ung_v1','cc_v2','thu_v1','thauphu_v1','tb_v1','projects_v1','hopdong_v1']);
+const DRAFT_VIEW_GD_KEY = 'cpct_view_as_gd';
+// true = đang ẩn nháp (không phải admin, hoặc admin bật "Xem như giám đốc")
+function draftViewIsGD() {
+  let admin = false;
+  try { admin = typeof isAdmin === 'function' && isAdmin(); } catch (e) {}
+  if (!admin) return true;
+  try { return localStorage.getItem(DRAFT_VIEW_GD_KEY) === '1'; } catch (e) { return false; }
+}
+function _draftHidden(r, gd) {
+  if (!r || typeof r !== 'object') return false;
+  return gd ? r.draft === true : !!r.draftHide;
+}
+const _draftViewCache = {};
+function _draftViewReset() { Object.keys(_draftViewCache).forEach(k => delete _draftViewCache[k]); }
+// Bản lọc của 1 giá trị (không có gì cần ẩn → trả về CHÍNH nó, không sao chép)
+function _draftView(k, v) {
+  if (!_DRAFT_KEYS.has(k) || !v || typeof v !== 'object') return v;
+  const gd = draftViewIsGD();
+  const c = _draftViewCache[k];
+  if (c && c.src === v && c.gd === gd && c.len === (Array.isArray(v) ? v.length : -1)) return c.out;
+  let out = v;
+  if (Array.isArray(v)) {
+    if (v.some(r => _draftHidden(r, gd))) out = v.filter(r => !_draftHidden(r, gd));
+  } else if (gd && Object.values(v).some(h => h && h.draft === true)) {
+    // HĐ chính: HĐ nháp → người khác thấy bản HĐ CŨ (draftBefore), chưa có thì ẩn
+    out = {};
+    Object.entries(v).forEach(([key, h]) => {
+      if (h && h.draft === true) { if (h.draftBefore && typeof h.draftBefore === 'object') out[key] = h.draftBefore; }
+      else out[key] = h;
+    });
+  }
+  _draftViewCache[k] = { src: v, gd, len: Array.isArray(v) ? v.length : -1, out };
+  return out;
+}
+function loadView(k, def) { return _draftView(k, load(k, def)); }
+// Gắn lại các dòng đang bị ẩn (có trong _mem nhưng không có trong v) trước khi ghi.
+// purge: id cố ý xóa cứng → không gắn lại.
+function _draftKeepHidden(k, v, purge) {
+  if (!_DRAFT_KEYS.has(k) || !v || typeof v !== 'object') return v;
+  const old = _mem[k];
+  if (!old || old === v || typeof old !== 'object') return v;
+  const gd = draftViewIsGD();
+  const pset = new Set((purge || []).map(String));
+  if (Array.isArray(v)) {
+    if (!Array.isArray(old)) return v;
+    const hidden = old.filter(r => _draftHidden(r, gd));
+    if (!hidden.length) return v;
+    const ids = new Set(v.map(r => r && String(r.id)));
+    const add = hidden.filter(r => !ids.has(String(r.id)) && !pset.has(String(r.id)));
+    return add.length ? v.concat(add) : v;
+  }
+  if (!gd || Array.isArray(old)) return v;
+  let out = null;
+  Object.entries(old).forEach(([key, h]) => {
+    if (!h || h.draft !== true || pset.has(key)) return;
+    const cur = v[key];
+    const before = (h.draftBefore && typeof h.draftBefore === 'object') ? h.draftBefore : null;
+    let keep = h;
+    if (cur !== undefined && cur !== h && cur !== before && JSON.stringify(cur) !== JSON.stringify(before)) {
+      // Người khác sửa HĐ CŨ của CT đang có HĐ nháp → giữ HĐ nháp, cập nhật bản cũ bên trong
+      keep = { ...h, draftBefore: cur, updatedAt: Math.max(Number(h.updatedAt) || 0, Number(cur.updatedAt) || 0, Date.now()) };
+    }
+    if (keep !== cur) { out = out || { ...v }; out[key] = keep; }
+  });
+  return out || v;
 }
 
 // Dedup array by id — keep record with highest updatedAt per id.
@@ -236,6 +323,7 @@ const _SYNC_DATA_KEYS = new Set([
   'cat_ct_years',  // năm theo công trình — save() từ saveCats('congTrinh')
   // cat_items_v1: source of truth per-item — cần pending khi canonicalize tên để push cloud
   'cat_items_v1',
+  'import_lots_v1', // (03/11/2026) lô nhập gói công trình
 ]);
 
 // ══ BẢNG ÁNH XẠ key local → document cloud (dùng chung toàn app) ══════════
@@ -269,6 +357,7 @@ const _META_KEY_DOC = {
   thauphu_v1:   'meta_hop_dong',
   quyettoan_v1: 'meta_quyet_toan',  // (03/10/2026) tách khỏi meta_hop_dong → doc riêng, dễ xem trên Firebase Console
   tytrong_v1:   'meta_ty_trong',    // (05/10/2026) tab Tỉ Trọng Chi Phí — doc riêng
+  import_lots_v1: 'meta_lo_nhap',   // (03/11/2026) lô nhập gói công trình — doc riêng
 };
 // Key có thuộc nhóm meta không (thay cho _META_TRIGGER_KEYS cục bộ cũ trong pushChanges)
 function _isMetaKey(k) { return Object.prototype.hasOwnProperty.call(_META_KEY_DOC, k); }
@@ -566,6 +655,10 @@ function _shadowDiffMark(k, v, purge) {
 // opts.purge = [id...] → các id (hopdong_v1: key) người gọi CỐ Ý XÓA CỨNG khỏi mảng
 //   (thùng rác xóa vĩnh viễn, xóa theo công trình...) — xem _shadowDiffMark()
 function save(k, v, opts) {
+  // (03/11/2026) Lô nhập: v có thể là bản đã lọc nháp → gắn lại dòng ẩn; giữ dấu lô khi sửa,
+  // hỏi gắn lô nháp khi thêm mới (loOnSave — lonhap.js)
+  v = _draftKeepHidden(k, v, opts?.purge);
+  if (typeof loOnSave === 'function' && _DRAFT_KEYS.has(k)) v = loOnSave(k, v, _mem[k]) || v;
   if (typeof stampCatIds === 'function' && _CAT_STAMP_KIND[k] && v) {
     const kind = _CAT_STAMP_KIND[k];
     if (Array.isArray(v)) v.forEach(r => r && typeof r === 'object' && stampCatIds(r, kind));

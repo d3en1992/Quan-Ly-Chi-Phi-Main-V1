@@ -229,7 +229,7 @@ function _mergeKey(key, cloudExpanded) {
   if (!cloudExpanded || !cloudExpanded.length) return 0;
   const local  = load(key, []);
   const merged = mergeDatasets(local, cloudExpanded);
-  _memSet(key, merged);
+  _memSetRaw(key, merged);
   return merged.length - local.length;
 }
 
@@ -248,7 +248,7 @@ function _replaceYearData(key, cloudArr, yrStr) {
     return !(d && d.length >= 4 && d.slice(0, 4) === y);
   });
   const result = [...kept, ...(cloudArr || [])];
-  _memSet(key, result);
+  _memSetRaw(key, result);
 }
 
 // Gộp danh mục dạng object {tên: dữ liệu} theo LWW (max của updatedAt & deletedAt)
@@ -328,7 +328,7 @@ function _applyCatItemArrays(merged) {
   // giữ danh sách CŨ (còn tên đã xóa ở máy khác) cho tới khi chuyển tab → thao tác danh
   // mục kế tiếp lưu ngược danh sách cũ lên cloud.
   const _set = (sk, catId, arr) => {
-    _memSet(sk, arr);
+    _memSetRaw(sk, arr);
     if (typeof cats !== 'undefined') cats[catId] = arr;
   };
   if (merged.loai)  _set('cat_loai',  'loaiChiPhi', nameArr(merged.loai,  'loai'));
@@ -364,18 +364,19 @@ const _RELINK_KEYS = new Set(['inv_v3', 'ung_v1', 'cc_v2', 'tb_v1', 'thu_v1', 't
 
 function _refreshGlobal(key) {
   switch (key) {
-    case 'inv_v3':       if (typeof invoices         !== 'undefined') invoices         = load(key, []); break;
-    case 'ung_v1':       if (typeof ungRecords       !== 'undefined') ungRecords       = load(key, []); break;
-    case 'cc_v2':        if (typeof ccData           !== 'undefined') ccData           = load(key, []); break;
-    case 'tb_v1':        if (typeof tbData           !== 'undefined') tbData           = load(key, []); break;
-    case 'thu_v1':       if (typeof thuRecords       !== 'undefined') thuRecords       = load(key, []); break;
-    case 'projects_v1':  if (typeof projects         !== 'undefined') projects         = load(key, []); break;
+    case 'inv_v3':       if (typeof invoices         !== 'undefined') invoices         = loadView(key, []); break;
+    case 'ung_v1':       if (typeof ungRecords       !== 'undefined') ungRecords       = loadView(key, []); break;
+    case 'cc_v2':        if (typeof ccData           !== 'undefined') ccData           = loadView(key, []); break;
+    case 'tb_v1':        if (typeof tbData           !== 'undefined') tbData           = loadView(key, []); break;
+    case 'thu_v1':       if (typeof thuRecords       !== 'undefined') thuRecords       = loadView(key, []); break;
+    case 'projects_v1':  if (typeof projects         !== 'undefined') projects         = loadView(key, []); break;
     case 'customers_v1': if (typeof customers        !== 'undefined') customers        = load(key, []); break;
-    case 'hopdong_v1':   if (typeof hopDongData      !== 'undefined') hopDongData      = load(key, {}); break;
-    case 'thauphu_v1':   if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = load(key, []); break;
+    case 'hopdong_v1':   if (typeof hopDongData      !== 'undefined') hopDongData      = loadView(key, {}); break;
+    case 'thauphu_v1':   if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = loadView(key, []); break;
     case 'quyettoan_v1': if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load(key, []); break;
     case 'tytrong_v1':   if (typeof tyTrongRecords   !== 'undefined') tyTrongRecords   = load(key, []); break;
     case 'cat_cn_roles': if (typeof cnRoles          !== 'undefined') cnRoles          = load(key, {}); break;
+    case 'import_lots_v1': if (typeof loAfterLotsChanged === 'function') loAfterLotsChanged(); break;
   }
   // (04/10/2026) Dữ liệu vừa thay từ cloud mang tên CT có thể đã cũ → viết lại bản sao tên
   // theo projectId (trên RAM). projects_v1 đổi (máy khác đổi tên) → áp cho mọi kho.
@@ -404,7 +405,7 @@ function _mergeYearIntoLocal(key, cloudRecs, purge) {
     ? normalizeCC([...local, ...(cloudRecs || [])])
     : mergeDatasets(local, cloudRecs || []);
   if (purge && purge.size) merged = merged.filter(r => !(r && purge.has(String(r.id))));
-  _memSet(key, merged);
+  _memSetRaw(key, merged);
   _refreshGlobal(key);
 }
 
@@ -420,7 +421,8 @@ function _parseYearDocId(docId) {
 // ⚠️ THỨ TỰ: meta_hop_dong PHẢI đứng TRƯỚC meta_quyet_toan — khi đọc meta_hop_dong còn field
 //    quyetToan đời cũ, dữ liệu đó được gộp vào local trước, rồi mới xử lý doc quyết toán riêng.
 // (05/10/2026) + meta_ty_trong (tab Tỉ Trọng Chi Phí) — doc mới, chưa có trên cloud thì pull bỏ qua.
-const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong', 'meta_quyet_toan', 'meta_ty_trong'];
+// (03/11/2026) + meta_lo_nhap (lô nhập gói công trình) — đứng cuối; doc chưa có thì pull bỏ qua.
+const _META_DOCS = ['meta_cong_trinh', 'meta_khach_hang', 'meta_danh_muc', 'meta_tai_khoan', 'meta_hop_dong', 'meta_quyet_toan', 'meta_ty_trong', 'meta_lo_nhap'];
 
 function _metaPayload(docId) {
   switch (docId) {
@@ -431,6 +433,7 @@ function _metaPayload(docId) {
     case 'meta_hop_dong':   return fbMetaHDPayload();
     case 'meta_quyet_toan': return fbMetaQTPayload();
     case 'meta_ty_trong':   return fbMetaTTPayload();
+    case 'meta_lo_nhap':    return fbMetaLNPayload();
   }
   return null;
 }
@@ -445,7 +448,7 @@ function _metaPayload(docId) {
 function _qtMigrateLegacy(legacyArr, purge) {
   if (!Array.isArray(legacyArr) || !legacyArr.length) return false;
   const v = _purgeArr(mergeDatasets(load('quyettoan_v1', []), legacyArr), 'quyettoan_v1', purge);
-  _memSet('quyettoan_v1', v);
+  _memSetRaw('quyettoan_v1', v);
   _refreshGlobal('quyettoan_v1');
   if (typeof _outboxMark === 'function') {
     _outboxMark('meta_quyet_toan');
@@ -481,7 +484,7 @@ function _metaApply(docId, d, mode, purge) {
     case 'meta_cong_trinh': {
       if (!Array.isArray(d.projects)) return false;
       let v = merge ? _purgeArr(mergeDatasets(load('projects_v1', []), d.projects), 'projects_v1', purge) : d.projects;
-      _memSet('projects_v1', v);
+      _memSetRaw('projects_v1', v);
       _refreshGlobal('projects_v1');
       if (typeof rebuildCatCTFromProjects === 'function') rebuildCatCTFromProjects();
       return true;
@@ -489,24 +492,24 @@ function _metaApply(docId, d, mode, purge) {
     case 'meta_khach_hang': {
       if (!Array.isArray(d.customers)) return false;
       let v = merge ? _purgeArr(mergeDatasets(load('customers_v1', []), d.customers), 'customers_v1', purge) : d.customers;
-      _memSet('customers_v1', v);
+      _memSetRaw('customers_v1', v);
       _refreshGlobal('customers_v1');
       return true;
     }
     case 'meta_danh_muc': {
       if (d.catItems && typeof d.catItems === 'object') {
         const v = merge ? _mergeCatItems(load('cat_items_v1', {}), d.catItems) : d.catItems;
-        _memSet('cat_items_v1', v);
+        _memSetRaw('cat_items_v1', v);
         _applyCatItemArrays(v); // dựng lại cat_loai, cat_ncc... từ bản đã gộp/thay
       }
       if (d.cnRoles && typeof d.cnRoles === 'object') {
         const v = merge ? { ...d.cnRoles, ...load('cat_cn_roles', {}) } : d.cnRoles;
-        _memSet('cat_cn_roles', v);
+        _memSetRaw('cat_cn_roles', v);
         _refreshGlobal('cat_cn_roles');
       }
       if (d.ctYears && typeof d.ctYears === 'object') {
         const v = merge ? { ...d.ctYears, ...load('cat_ct_years', {}) } : d.ctYears;
-        _memSet('cat_ct_years', v);
+        _memSetRaw('cat_ct_years', v);
         if (typeof cats !== 'undefined') cats.congTrinhYears = v;
       }
       return true;
@@ -528,7 +531,7 @@ function _metaApply(docId, d, mode, purge) {
           return u;
         });
       }
-      _memSet('users_v1', v);
+      _memSetRaw('users_v1', v);
       return true;
     }
     case 'meta_hop_dong': {
@@ -538,12 +541,12 @@ function _metaApply(docId, d, mode, purge) {
           v = _mergeHopDong(load('hopdong_v1', {}), d.hopDong);
           if (purge && purge.size) Object.keys(v).forEach(k => { if (purge.has(`hopdong_v1:${k}`)) delete v[k]; });
         }
-        _memSet('hopdong_v1', v);
+        _memSetRaw('hopdong_v1', v);
         _refreshGlobal('hopdong_v1');
       }
       if (Array.isArray(d.thauPhu)) {
         const v = merge ? _purgeArr(mergeDatasets(load('thauphu_v1', []), d.thauPhu), 'thauphu_v1', purge) : d.thauPhu;
-        _memSet('thauphu_v1', v);
+        _memSetRaw('thauphu_v1', v);
         _refreshGlobal('thauphu_v1');
       }
       // Field quyetToan ĐỜI CŨ (trước 03/10/2026) → luôn GỘP sang local + đánh dấu chuyển doc.
@@ -554,7 +557,7 @@ function _metaApply(docId, d, mode, purge) {
     case 'meta_quyet_toan': {
       if (!Array.isArray(d.quyetToan)) return false;
       const v = merge ? _purgeArr(mergeDatasets(load('quyettoan_v1', []), d.quyetToan), 'quyettoan_v1', purge) : d.quyetToan;
-      _memSet('quyettoan_v1', v);
+      _memSetRaw('quyettoan_v1', v);
       _refreshGlobal('quyettoan_v1');
       return true;
     }
@@ -562,8 +565,16 @@ function _metaApply(docId, d, mode, purge) {
       // (05/10/2026) Tỉ trọng chi phí — mảng có id → mergeDatasets (tombstone + bản sửa sau thắng)
       if (!Array.isArray(d.tyTrong)) return false;
       const v = merge ? _purgeArr(mergeDatasets(load('tytrong_v1', []), d.tyTrong), 'tytrong_v1', purge) : d.tyTrong;
-      _memSet('tytrong_v1', v);
+      _memSetRaw('tytrong_v1', v);
       _refreshGlobal('tytrong_v1');
+      return true;
+    }
+    case 'meta_lo_nhap': {
+      // (03/11/2026) Lô nhập gói công trình — mảng có id → mergeDatasets
+      if (!Array.isArray(d.lots)) return false;
+      const v = merge ? _purgeArr(mergeDatasets(load('import_lots_v1', []), d.lots), 'import_lots_v1', purge) : d.lots;
+      _memSetRaw('import_lots_v1', v);
+      _refreshGlobal('import_lots_v1');
       return true;
     }
   }
@@ -741,7 +752,10 @@ async function pushChanges(opts = {}) {
         if (has || _outboxHas(docId)) addYear(docId);
       });
     });
-    metaTargets.push(..._META_DOCS);
+    // meta_lo_nhap: chỉ đẩy khi có lô hoặc đang bẩn — máy chưa từng dùng Lô nhập không tạo doc
+    // (và không báo lỗi khi Firestore Rules chưa mở doc này)
+    metaTargets.push(..._META_DOCS.filter(d => d !== 'meta_lo_nhap'
+      || _outboxHas(d) || (load('import_lots_v1', []) || []).length > 0));
   } else {
     dirtyIds.forEach(id => {
       if (_META_DOCS.includes(id)) metaTargets.push(id);
@@ -774,6 +788,7 @@ async function pushChanges(opts = {}) {
       } catch (e) {
         fail++;
         console.warn(`[Sync] ✗ ${docId} lỗi — GIỮ trong outbox, KHÔNG ghi đè cloud:`, e.message || e);
+        if (docId === 'meta_lo_nhap' && typeof loRulesWarn === 'function') loRulesWarn(e);
       }
     }
   } catch (e) {
@@ -849,6 +864,7 @@ async function _pullMeta() {
       if (_metaApply(docId, d, dirty ? 'merge' : 'replace', dirty ? _purgeSetOf(docId) : null)) changed = true;
     } catch (e) {
       console.warn(`[Sync] ${docId} pull lỗi — giữ nguyên local:`, e.message || e);
+      if (docId === 'meta_lo_nhap' && typeof loRulesWarn === 'function') loRulesWarn(e);
     }
   }
   if (changed) console.log('[Sync] ▼ danh mục đã cập nhật theo cloud');
@@ -911,7 +927,7 @@ async function pullChanges(yr, callback, opts = {}) {
         return !(d && d.length >= 4 && d.slice(0, 4) === y);
       });
       const normalized = normalizeCC([...kept, ...(cloudCC || [])]);
-      _memSet('cc_v2', normalized);
+      _memSetRaw('cc_v2', normalized);
       _refreshGlobal('cc_v2');
     };
 

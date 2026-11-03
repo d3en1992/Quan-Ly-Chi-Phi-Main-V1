@@ -27,7 +27,7 @@ const TB_STATUS_STYLE = {
   'Cần sửa chữa':   'background:var(--bs-danger-subtle);color:var(--bs-danger);'
 };
 
-let tbData = load('tb_v1', []);
+let tbData = loadView('tb_v1', []);
 
 // ── Helper: record thuộc 1 trong 2 KHO (không phải công trình) ────
 function isKhoTong(r) {

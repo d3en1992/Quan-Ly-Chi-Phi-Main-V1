@@ -124,7 +124,7 @@ function _ungTableHTML(pagedRecs, allRecs, paginationFn, curPage) {
         <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${fmtISODate(r.ngay)}</td>
         <td class="ung-sticky-name" style="font-weight:600;font-size:12px;white-space:nowrap">${x(recCatName(r,'ung','tp'))}${tag(r)}</td>
         <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
-        <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
+        <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${typeof loDraftTag==='function'?loDraftTag(r):''}${x(r.nd||'—')}</td>
         <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
         <td style="white-space:nowrap">
           ${_ungActionsHtml(r)}
@@ -211,7 +211,7 @@ function renderUngMini() {
       <td style="text-align:center">${badge}</td>
       <td style="font-weight:600;font-size:12px;white-space:nowrap">${x(recCatName(r,'ung','tp'))}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(resolveProjectName(r)||'—')}</td>
-      <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${x(r.nd||'—')}</td>
+      <td class="text-secondary" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd)}">${typeof loDraftTag==='function'?loDraftTag(r):''}${x(r.nd||'—')}</td>
       <td class="text-end font-monospace fw-semibold text-primary" style="white-space:nowrap">${numFmt(r.tien||0)}</td>
       <td style="white-space:nowrap">
         ${_ungActionsHtml(r)}

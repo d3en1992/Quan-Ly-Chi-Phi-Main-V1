@@ -536,7 +536,7 @@ function _applyImport() {
     }
     // Re-stamp CC records với updatedAt = apply time
     const stampedCC = ccRecs.map(r => ({ ...r, updatedAt: _applyNow, deviceId: _applyDev || r.deviceId }));
-    const merged = mergeUnique(load('cc_v2', []), stampedCC);
+    const merged = mergeUnique(loadView('cc_v2', []), stampedCC);
     save('cc_v2', merged); // save → increment pending → force push đẩy lên cloud
     ccData = merged;
     if (typeof normalizeAllChamCong  === 'function') normalizeAllChamCong();
@@ -559,7 +559,7 @@ function _applyImport() {
   // HopDong — upsert theo CT name
   if (selected.has('hd') && sh.hd && sh.hd.records.length) {
     const now = Date.now();
-    const existing = load('hopdong_v1', {});
+    const existing = loadView('hopdong_v1', {});
     sh.hd.records.forEach(row => {
       if (!existing[row.ct] || existing[row.ct].deletedAt) {
         existing[row.ct] = {
@@ -586,7 +586,7 @@ function _applyImport() {
       }
     });
     save('hopdong_v1', existing);
-    hopDongData = load('hopdong_v1', {});
+    hopDongData = loadView('hopdong_v1', {});
     sh.hd.errors.slice(0, 30).forEach(e => _log('hd', `❌ ${_fmtErr(e)}`));
     totalAdded += sh.hd.records.length;
   }

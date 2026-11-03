@@ -71,7 +71,7 @@ function ungPartnerDebt(loai, tp, excludeId) {
   } else {
     // Thầu phụ: giá trị hợp đồng thầu phụ
     const hdtp = (typeof thauPhuContracts !== 'undefined' && Array.isArray(thauPhuContracts))
-      ? thauPhuContracts : load('thauphu_v1', []);
+      ? thauPhuContracts : loadView('thauphu_v1', []);
     hdtp.forEach(r => {
       if (!r || r.deletedAt) return;
       if (normalizeKey(recCatName(r, 'thauphu', 'thauphu') || r.thauphu || '') !== nTp) return;

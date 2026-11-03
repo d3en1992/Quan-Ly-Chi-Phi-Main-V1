@@ -574,7 +574,7 @@ function _ctCardHtml(it) {
   return `<div class="ct-card card shadow-sm overflow-hidden" onclick="openCTDetail('${p.id}')" style="cursor:pointer;${dim}">
     <div class="ct-card-head" style="align-items:flex-start">
       <div style="flex:1;min-width:0">
-        <div class="ct-card-name">${x(p.name)}${cross ? ` <span style="vertical-align:middle">${cross}</span>` : ''}</div>
+        <div class="ct-card-name">${x(p.name)}${cross ? ` <span style="vertical-align:middle">${cross}</span>` : ''}${typeof loCtDraftBadge === 'function' ? loCtDraftBadge(p.id) : ''}</div>
         <div class="ct-card-addr" title="${x(addr || 'Chưa có địa chỉ công trình')}">
           <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">location_on</span>${addr ? x(addr) : '<span class="ghost">Chưa có địa chỉ</span>'}
         </div>
@@ -1016,7 +1016,7 @@ function openCTDetail(id) {
     ? `<span style="font-size:10px;font-weight:700;color:#d9480f;background:rgba(253,126,20,.14);border-radius:6px;padding:2px 8px;white-space:nowrap">Vắt năm ${String(_mCross.startY).slice(-2)}-${String(_mCross.endY).slice(-2)}</span>`
     : '';
   document.getElementById('modal-title').innerHTML =
-    `<span class="material-symbols-outlined msi-gap">construction</span>${x(_mCat.display)} ${_mCatBadge} ${_ctdStatusBadge(p.status)} ${_mCrossBadge}`;
+    `<span class="material-symbols-outlined msi-gap">construction</span>${x(_mCat.display)} ${_mCatBadge} ${_ctdStatusBadge(p.status)} ${_mCrossBadge}${typeof loCtDraftBadge === 'function' ? loCtDraftBadge(p.id, true) : ''}`;
 
   let html = '';
 

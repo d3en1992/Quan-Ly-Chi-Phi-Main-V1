@@ -2,9 +2,9 @@
 // Load order: sau thietbi.js, trước doanhthu.forms.js
 
 // ─── Biến toàn cục (main.js sẽ gán lại sau dbInit) ─────────────
-let hopDongData      = load('hopdong_v1', {});
-let thuRecords       = load('thu_v1', []);
-let thauPhuContracts = load('thauphu_v1', []);
+let hopDongData      = loadView('hopdong_v1', {});
+let thuRecords       = loadView('thu_v1', []);
+let thauPhuContracts = loadView('thauphu_v1', []);
 let quyetToanRecords = load('quyettoan_v1', []); // Quyết toán chi phí (phát sinh tăng/giảm, cho phép âm)
 
 // [ADDED] — Normalize thuRecords to projectId at runtime

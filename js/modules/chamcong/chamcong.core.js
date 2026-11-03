@@ -47,7 +47,7 @@ function _dedupCC(arr) {
   return [...byKey.values(), ...tombs.values()];
 }
 
-let ccData = _dedupCC(load('cc_v2', [])).filter(x=>{
+let ccData = _dedupCC(loadView('cc_v2', [])).filter(x=>{
   if(!x||!x.fromDate||typeof x.fromDate!=='string'){ console.warn('Invalid CC record (no fromDate):', x); return false; }
   return true;
 });

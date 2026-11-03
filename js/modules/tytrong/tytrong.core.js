@@ -822,7 +822,7 @@ function tytKyKe(k, che) {
 // Đơn giá VẬT TƯ theo kỳ từ các món hóa đơn chi tiết (mọi công trình, mọi năm ĐÃ TẢI vào máy).
 // Trả về [{ key, ten, dv, loai, soLan, tien, ky: { <kỳ>: { sl, tien, gia } }, kys: [kỳ có mua] }] — nhiều lần mua nhất trước
 function tytGiaVatTu(che) {
-  const raw = (typeof load === 'function') ? load('inv_v3', []) : [];
+  const raw = (typeof load === 'function') ? loadView('inv_v3', []) : [];
   const m = new Map();
   raw.forEach(inv => {
     if (!inv || inv.deletedAt || !Array.isArray(inv.items) || !inv.items.length) return;
@@ -848,7 +848,7 @@ function tytGiaVatTu(che) {
 
 // Đơn giá CÔNG NHẬT bình quân theo kỳ (chấm công, bỏ CT "CÔNG TY"): { <kỳ>: { cong, tien, gia } }
 function tytGiaCong(che) {
-  const raw = (typeof load === 'function') ? load('cc_v2', []) : [];
+  const raw = (typeof load === 'function') ? loadView('cc_v2', []) : [];
   const out = {};
   raw.forEach(w => {
     if (!w || w.deletedAt || !Array.isArray(w.workers) || w.projectId === 'COMPANY') return;

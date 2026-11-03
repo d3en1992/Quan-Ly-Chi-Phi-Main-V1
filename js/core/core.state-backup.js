@@ -212,6 +212,7 @@ const BACKUP_KEYS = [
   'cat_ct_years', // Năm theo công trình
   'cat_cn_roles', // Vai trò công nhân
   'cat_items_v1', // Danh mục per-item (soft-delete, cross-device sync)
+  'import_lots_v1', // (03/11/2026) Lô nhập gói công trình
 ];
 
 const BACKUP_KEY  = 'backup_auto';
@@ -259,7 +260,7 @@ function _restoreStore(store) {
         ? { ...r, id: crypto.randomUUID(), updatedAt: r.updatedAt || now }
         : r);
     }
-    _memSet(k, v);
+    _memSetRaw(k, v); // khôi phục = thay toàn bộ → ghi nguyên văn (không gắn lại dòng nháp cũ)
   });
 }
 
@@ -273,7 +274,7 @@ function clearAllCache() {
 // ── Selector đơn nhất cho UI — đọc từ _mem (single source of truth) ──────
 // Dùng thay cho truy cập trực tiếp globals trong render functions.
 function getState(key, def) {
-  return load(key, def !== undefined ? def : []);
+  return loadView(key, def !== undefined ? def : []);
 }
 
 // ── Hàm thống nhất sau mọi thay đổi data lớn (pull/import/delete/restore) ─
@@ -287,21 +288,23 @@ function afterDataChange() {
 
 // ── Reload tất cả global vars sau restore ─────────────────────
 function _reloadGlobals() {
-  invoices   = load('inv_v3', []);
-  ungRecords = load('ung_v1', []);
+  // (03/11/2026) Biến global = bản đã lọc dữ liệu nháp (loadView) — xem core.storage.js
+  if (typeof _draftViewReset === 'function') _draftViewReset();
+  invoices   = loadView('inv_v3', []);
+  ungRecords = loadView('ung_v1', []);
   // cc_v2: fill projectId + dedup theo logical key (fromDate+projectId)
   // Luôn persist kết quả — _fillCCProjectId có thể đã thêm projectId mới vào records
   {
     const raw = load('cc_v2', []);
     if (typeof _dedupCC === 'function') {
       const deduped = _dedupCC(raw); // gọi normalizeCC nếu sync.js đã load (có fill+safeTs)
-      ccData = deduped;
       _memSet('cc_v2', deduped);     // không tăng pending — đây là normalization, không phải user action
+      ccData = loadView('cc_v2', []);
     } else {
-      ccData = raw;
+      ccData = loadView('cc_v2', []);
     }
   }
-  tbData     = load('tb_v1',  []);
+  tbData     = loadView('tb_v1',  []);
   cats.congTrinh      = load('cat_ct',       DEFAULTS.congTrinh);
   cats.congTrinhYears = load('cat_ct_years', {});
   cats.loaiChiPhi     = load('cat_loai',     DEFAULTS.loaiChiPhi);
@@ -311,9 +314,9 @@ function _reloadGlobals() {
   cats.congNhan       = load('cat_cn',       []);
   cats.tbTen          = load('cat_tbteb',    DEFAULTS.tbTen);
   // Module doanhtu.js (load sau core.js)
-  if (typeof hopDongData      !== 'undefined') hopDongData      = load('hopdong_v1', {});
-  if (typeof thuRecords       !== 'undefined') thuRecords       = load('thu_v1',     []);
-  if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = load('thauphu_v1', []);
+  if (typeof hopDongData      !== 'undefined') hopDongData      = loadView('hopdong_v1', {});
+  if (typeof thuRecords       !== 'undefined') thuRecords       = loadView('thu_v1',     []);
+  if (typeof thauPhuContracts !== 'undefined') thauPhuContracts = loadView('thauphu_v1', []);
   if (typeof quyetToanRecords !== 'undefined') quyetToanRecords = load('quyettoan_v1', []);
   if (typeof tyTrongRecords   !== 'undefined') tyTrongRecords   = load('tytrong_v1',   []);   // (05/10/2026) tab Tỉ Trọng
   // Migration hopdong_v1: chuyển key tên CT → projectId (chạy sau khi projects đã load)
@@ -321,7 +324,7 @@ function _reloadGlobals() {
   // Module chamcong.js — cnRoles
   if (typeof cnRoles !== 'undefined') cnRoles = load('cat_cn_roles', {});
   // Module projects.js
-  if (typeof projects !== 'undefined') projects = load('projects_v1', []);
+  if (typeof projects !== 'undefined') projects = loadView('projects_v1', []);
   // (04/10/2026) Tên CT trên mọi bản ghi = bản sao theo projectId → viết lại theo tên mới nhất
   // (chỉ trên RAM, không ghi cloud) — xem relinkProjectNames (projects.model.js)
   if (typeof relinkProjectNames === 'function') relinkProjectNames();
@@ -776,7 +779,7 @@ async function importJSONFull(data, opts) {
         console.warn('[Import] Không liệt kê được doc cloud — chỉ ghi đè các năm có dữ liệu:', e.message || e);
       }
       // (c) 7 doc meta (meta_quyet_toan tách riêng từ 03/10/2026, meta_ty_trong thêm 05/10/2026)
-      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong','meta_quyet_toan','meta_ty_trong']
+      ['meta_cong_trinh','meta_khach_hang','meta_danh_muc','meta_tai_khoan','meta_hop_dong','meta_quyet_toan','meta_ty_trong','meta_lo_nhap']
         .forEach(id => docIds.add(id));
       // overwrite:true → nếu phải đẩy bù sau khi tải lại app, doc này vẫn được GHI ĐÈ
       // (không gộp dữ liệu cloud cũ vào — đúng ý nghĩa "khôi phục")
@@ -842,7 +845,7 @@ let cats = {
 };
 let cnRoles = load('cat_cn_roles', {}); // { "Tên CN": "C/T/P" }
 
-let invoices = load('inv_v3', []);
+let invoices = loadView('inv_v3', []);
 let filteredInvs = [];
 let curPage = 1;
 const PG = 20;

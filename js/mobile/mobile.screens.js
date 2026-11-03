@@ -254,7 +254,7 @@ function mbScrProjects() {
         const type = p.type === 'CT' ? 'Công trình mới' : p.type === 'SC' ? 'Sửa chữa' : 'Khác';
         return `<div class="mb-card tap" data-act="openProject" data-arg="${mbX(p.id)}">
           <div class="mb-row-between" style="margin-bottom:5px">
-            <div style="font-size:14.5px;font-weight:700;line-height:1.25">${mbX(p.name)}</div>
+            <div style="font-size:14.5px;font-weight:700;line-height:1.25">${mbX(p.name)}${typeof loCtDraftBadge === 'function' ? loCtDraftBadge(p.id) : ''}</div>
             <span class="mb-tag ${stCls}">${stLabel}</span>
           </div>
           <div style="font-size:11.5px;color:var(--mb-muted);margin-bottom:11px">${mbX(p.chuDauTu || 'Chưa có Chủ đầu tư')} · ${type} · ${days} ngày</div>
@@ -406,6 +406,7 @@ function mbScrProjectDetail() {
   const NHOM_COLOR = MB_NHOM_COLOR;
 
   return `<div class="mb-pad">
+    ${typeof loMbProjectCard === 'function' ? loMbProjectCard(p.id) : ''}
     ${editing ? mbProjFormHtml() : `<div class="mb-card mb-card-sm" style="display:flex;align-items:center;gap:10px">
       <div style="width:36px;height:36px;border-radius:18px;background:var(--mb-primary-l);color:var(--mb-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0">${mbIcon('person', 20)}</div>
       <div style="flex:1;min-width:0">
@@ -506,7 +507,7 @@ function mbPdChiPhi(p, st) {
 
     ${list.length ? list.map(i => `<div class="mb-card mb-card-sm">
       <div class="mb-row-between" style="margin-bottom:4px">
-        <span style="font-size:13px;font-weight:700">${mbX(i.nd || '(không có nội dung)')}</span>
+        <span style="font-size:13px;font-weight:700">${typeof loDraftTag === 'function' ? loDraftTag(i) : ''}${mbX(i.nd || '(không có nội dung)')}</span>
         <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(mbInvAmount(i))}</span>
       </div>
       <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(i.loai || '—')} · ${mbX(i.ncc || '—')} · ${mbDate(i.ngay)}</div>
@@ -566,7 +567,7 @@ function mbUngCard(u, showTp) {
   const meta  = [showTp === false ? '' : (u.congtrinh || '—'), MB_UNG_LABEL[u.loai] || '', u.nd || '', mbDate(u.ngay)].filter(Boolean).join(' · ');
   return `<div class="mb-card mb-card-sm">
     <div class="mb-row-between" style="margin-bottom:4px">
-      <span style="font-size:13px;font-weight:700">${mbX(title)}</span>
+      <span style="font-size:13px;font-weight:700">${typeof loDraftTag === 'function' ? loDraftTag(u) : ''}${mbX(title)}</span>
       <span style="font-size:13px;font-weight:800;color:var(--mb-amber);flex-shrink:0">${mbFmt(u.tien)}</span>
     </div>
     <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(meta)}</div>
@@ -620,7 +621,7 @@ function mbInvCard(i, editable) {
   const src = (i.source === 'cc' || i.ccKey) ? 'Từ chấm công' : (i.source === 'detail' || hasItems) ? 'Hóa đơn chi tiết' : 'Nhập nhanh';
   return `<div class="mb-card mb-card-sm">
     <div class="mb-row-between" style="margin-bottom:4px">
-      <span style="font-size:13px;font-weight:700">${mbX(i.nd || '(không có nội dung)')}</span>
+      <span style="font-size:13px;font-weight:700">${typeof loDraftTag === 'function' ? loDraftTag(i) : ''}${mbX(i.nd || '(không có nội dung)')}</span>
       <span style="font-size:13px;font-weight:800;flex-shrink:0">${mbFmt(mbInvAmount(i))}</span>
     </div>
     <div style="font-size:11px;color:var(--mb-muted-2)">${mbX(i.congtrinh || '—')}${i.ncc ? ' · ' + mbX(i.ncc) : ''} · ${mbDate(i.ngay)}</div>
@@ -1917,6 +1918,7 @@ function mbScrDanhMuc() {
     </div>
     ${list.length > shown.length ? `<button class="mb-btn gray" data-act="moreDm">Xem thêm (còn ${list.length - shown.length})</button>` : ''}
     <div style="font-size:11px;color:var(--mb-muted-2);text-align:center">Sao lưu & công cụ dữ liệu (xuất / nhập, khôi phục, xóa theo công trình): dùng bản máy tính.</div>
+    ${typeof loMbSection === 'function' ? loMbSection() : ''}
   </div>`;
 }
 

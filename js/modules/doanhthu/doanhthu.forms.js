@@ -592,7 +592,7 @@ function renderThuTableTk(page) {
       <td style="white-space:nowrap">${_dtLoaiThuBadge(r)}</td>
       <td class="text-end font-monospace fw-semibold text-success" style="white-space:nowrap">${fmtM(r.tien)}</td>
       <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r,'thu','nguoi') || '—')}</td>
-      <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+      <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${typeof loDraftTag==='function'?loDraftTag(r):''}${x(r.nd || '—')}</td>
       <td class="action-col">${_dtThuActions(r)}</td>
     </tr>`;
   }).join('');
@@ -765,7 +765,7 @@ function _dtTienDoDetailRow(g) {
         <td class="text-end font-monospace" style="white-space:nowrap">${fmtM(luyKe)}</td>
         <td class="text-end font-monospace text-secondary" style="white-space:nowrap">${pctLk}</td>
         <td class="text-secondary" style="white-space:nowrap">${x(recCatName(r, 'thu', 'nguoi') || '—')}</td>
-        <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${x(r.nd || '—')}</td>
+        <td class="text-body-secondary" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(r.nd || '')}">${typeof loDraftTag==='function'?loDraftTag(r):''}${x(r.nd || '—')}</td>
         <td class="action-col">${_dtThuActions(r)}</td>
       </tr>`;
     }).join('');

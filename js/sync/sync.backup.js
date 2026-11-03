@@ -216,6 +216,10 @@ async function _bkCollectCloudData() {
         // (05/10/2026) Tỉ trọng chi phí — doc riêng
         if (Array.isArray(d.tyTrong)) data.tytrong_v1 = d.tyTrong;
         metaDocs++; break;
+      case 'meta_lo_nhap':
+        // (03/11/2026) Lô nhập gói công trình — doc riêng
+        if (Array.isArray(d.lots)) data.import_lots_v1 = d.lots;
+        metaDocs++; break;
     }
   }
   if (!data.customers_v1 && legacyCustomers) data.customers_v1 = legacyCustomers;

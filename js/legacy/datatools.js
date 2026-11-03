@@ -154,6 +154,7 @@ async function _doResetAll() {
     _mem['cat_ct_years'] = {};   // năm theo công trình
     _mem['cat_cn_roles'] = {};   // vai trò công nhân
     _mem['tytrong_v1']   = [];   // (05/10/2026) tỉ trọng chi phí — gắn theo công trình nên xóa cùng
+    _mem['import_lots_v1'] = []; // (03/11/2026) lô nhập gói công trình
     if (typeof tyTrongRecords !== 'undefined') tyTrongRecords = [];
 
     // cat_items_v1 là nguồn gốc khiến danh mục "hồi sinh" sau reset+sync.
@@ -196,6 +197,8 @@ async function _doResetAll() {
         await fsSet(fbDocMetaHD(), fbMetaHDPayload());
         await fsSet(fbDocMetaQT(), fbMetaQTPayload());   // (03/10/2026) doc quyết toán riêng
         await fsSet(fbDocMetaTT(), fbMetaTTPayload());   // (05/10/2026) doc tỉ trọng chi phí (rỗng)
+        try { await fsSet(fbDocMetaLN(), fbMetaLNPayload()); } // (03/11/2026) doc lô nhập (rỗng) — Rules chưa mở thì bỏ qua
+        catch (e) { console.warn('[Reset] meta_lo_nhap:', e.message || e); }
 
         // 4c. Dọn doc rác cấu trúc cũ (y2025/y2026 gộp, cats, V2 lạc...)
         const nDel = (typeof _wipeOrphanCloudDocs === 'function')

@@ -134,7 +134,7 @@ function renderTable() {
     <td><span class="tag tag-gold">${x(recCatName(inv,'inv','loai'))}</span></td>
     <td class="hide-mobile text-secondary">${x(recCatName(inv,'inv','nguoi')||'—')}</td>
     <td class="hide-mobile text-secondary">${x(recCatName(inv,'inv','ncc')||'—')}</td>
-    <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${x(inv.nd||'—')}</td>
+    <td class="text-secondary" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x(inv.nd)}">${typeof loDraftTag==='function'?loDraftTag(inv):''}${x(inv.nd||'—')}</td>
     <td class="text-end font-monospace fw-semibold text-success" title="Đơn giá: ${numFmt(inv.tien||0)}${inv.sl&&inv.sl!==1?' × '+inv.sl:''}">${numFmt(inv.thanhtien||inv.tien||0)}</td>
     <td style="white-space:nowrap">${actionBtn}</td>
   </tr>`;}).join('');

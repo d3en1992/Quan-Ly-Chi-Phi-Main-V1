@@ -754,8 +754,8 @@ function _lnRevenueX(p) {
 // ── Init tab Doanh Thu khi mở ─────────────────────────────────
 function initDoanhThu() {
   // Reload dữ liệu mới nhất từ _mem (đã được dbInit() populate từ IDB)
-  hopDongData      = load('hopdong_v1', {});
-  thauPhuContracts = load('thauphu_v1', []);
+  hopDongData      = loadView('hopdong_v1', {});
+  thauPhuContracts = loadView('thauphu_v1', []);
   quyetToanRecords = load('quyettoan_v1', []);
 
   // Nạp dropdown 2 form + bộ lọc + vẽ 3 thẻ thống kê và mọi bảng của 2 subtab
@@ -782,9 +782,9 @@ function initLoiNhuan() {
   // (04/10/2026) Phòng thủ: bỏ cache hóa đơn + nạp lại phiếu ứng từ bộ nhớ → mở tab là tính trên
   // dữ liệu MỚI NHẤT (hóa đơn vừa chuyển CT bị trừ ở CT cũ, cộng vào CT mới).
   if (typeof clearInvoiceCache === 'function') clearInvoiceCache();
-  if (typeof ungRecords !== 'undefined') ungRecords = load('ung_v1', []);
-  hopDongData      = load('hopdong_v1', {});
-  thauPhuContracts = load('thauphu_v1', []);
+  if (typeof ungRecords !== 'undefined') ungRecords = loadView('ung_v1', []);
+  hopDongData      = loadView('hopdong_v1', {});
+  thauPhuContracts = loadView('thauphu_v1', []);
   quyetToanRecords = load('quyettoan_v1', []);
   renderLoiNhuan();
 }

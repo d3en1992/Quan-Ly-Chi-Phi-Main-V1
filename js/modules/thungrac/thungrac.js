@@ -102,7 +102,10 @@ function _trashSort(arr) {
 }
 // Bản ghi nằm trong thùng rác = đã xóa mềm (deletedAt) và CHƯA xóa vĩnh viễn (purgedAt).
 // Bản có purgedAt là "bia mộ" — ẩn khỏi thùng rác, chỉ giữ lại để báo cho các máy khác.
-const _trashIn = r => r && r.deletedAt && !r.purgedAt;
+// (03/11/2026) Bản ghi bị "Gỡ toàn bộ lô" (lô nhập gói công trình) KHÔNG hiện ở đây — quản lý ở
+// màn Lô nhập (khôi phục / xóa hẳn theo cả lô) — xem loHiddenFromTrash (lonhap.js).
+const _trashIn = r => r && r.deletedAt && !r.purgedAt
+  && !(typeof loHiddenFromTrash === 'function' && loHiddenFromTrash(r));
 function _trashGetRecords(type) {
   if (type === 'hoadon')   return _trashSort((invoices || []).filter(_trashIn));
   if (type === 'chamcong') return _trashSort((ccData || []).filter(_trashIn));

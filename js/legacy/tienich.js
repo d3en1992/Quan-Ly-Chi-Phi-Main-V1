@@ -56,8 +56,8 @@ function buildInvoices() {
   // ── Đọc trực tiếp từ _mem (load) — PURE, không phụ thuộc global invoices/ccData ──
   // Lý do: globals có thể stale sau pull nếu _reloadGlobals() chưa chạy;
   // _mem luôn được cập nhật ngay qua save() + _memSet() trong pullChanges merge.
-  const _invRaw = (typeof load === 'function') ? load('inv_v3', []) : (typeof invoices !== 'undefined' ? invoices : []);
-  const _ccRaw  = (typeof load === 'function') ? load('cc_v2',  []) : (typeof ccData  !== 'undefined' ? ccData  : []);
+  const _invRaw = (typeof load === 'function') ? loadView('inv_v3', []) : (typeof invoices !== 'undefined' ? invoices : []);
+  const _ccRaw  = (typeof load === 'function') ? loadView('cc_v2',  []) : (typeof ccData  !== 'undefined' ? ccData  : []);
 
   // 1. Manual invoices — chỉ những HĐ nhập tay, không có ccKey, chưa bị xóa mềm
   const manual = _invRaw
@@ -90,7 +90,8 @@ function buildInvoices() {
         ngay:toDate, congtrinh:ct, projectId:week.projectId||null, loai:'Hóa Đơn Lẻ',
         nguoi:wk.name, ncc:CC_DEFAULT_NCC, // NCC mặc định cho HĐ chấm công
         nd: wk.nd || ('HĐ mua lẻ – '+wk.name+' ('+_vi(fromDate)+'–'+_vi(toDate)+')'),
-        tien:wk.hdmuale, thanhtien:wk.hdmuale, _ts:0
+        tien:wk.hdmuale, thanhtien:wk.hdmuale, _ts:0,
+        ...(week.importLot ? { importLot: week.importLot, draft: week.draft === true } : {})
       });
     });
     // HĐ Nhân Công — 1 dòng mỗi tuần+CT
@@ -105,7 +106,8 @@ function buildInvoices() {
         ngay:toDate, congtrinh:ct, projectId:week.projectId||null, loai:'Nhân Công',
         nguoi:fw, ncc:CC_DEFAULT_NCC, // NCC mặc định cho HĐ chấm công
         nd:'Lương tuần '+_vi(fromDate)+'–'+_vi(toDate),
-        tien:totalLuong, thanhtien:totalLuong, _ts:0
+        tien:totalLuong, thanhtien:totalLuong, _ts:0,
+        ...(week.importLot ? { importLot: week.importLot, draft: week.draft === true } : {})
       });
     }
   });

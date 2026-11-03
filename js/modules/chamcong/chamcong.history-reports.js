@@ -64,6 +64,7 @@ function renderCCHistory(){
         toDate:w.toDate,
         ct:ctDisplay,                  // [MODIFIED] — resolved name
         projectId:w.projectId||null,
+        draft:w.draft===true, importLot:w.importLot||null,
         d:[0,0,0,0,0,0,0],
         tc:0, tl:0, pc:0, hd:0, tongcong:0,
         luongList:[],
@@ -110,7 +111,7 @@ function renderCCHistory(){
 
   tbody.innerHTML=paged.map(r=>`<tr>
     <td class="text-secondary font-monospace" style="font-size:11px;white-space:nowrap">${viShort(r.fromDate)}<br><span class="text-secondary">${viShort(r.toDate)}</span></td>
-    <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x(r.ct||'—')}</td>
+    <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${typeof loDraftTag==='function'?loDraftTag(r):''}${x(r.ct||'—')}</td>
     ${r.d.map(v=>`<td class="${v===1?'text-success':v>0?'text-primary':'text-body-secondary'}" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px">${v||'·'}</td>`).join('')}
     <td class="text-warning" style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${r.tc}</td>
     <td class="text-secondary" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px">${r.avgLuong?numFmt(r.avgLuong):'—'}</td>

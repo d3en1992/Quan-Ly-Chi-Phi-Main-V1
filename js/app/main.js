@@ -95,12 +95,12 @@ function init() {
     // pull trả về null (vd: bị chặn 2h sau khi nhập JSON, hoặc đang có pull khác
     // chạy song song). Trước đây dòng `if(!data) return` khiến app bỏ qua luôn
     // bước render khi pull null → màn hình trắng / chỉ thấy năm hiện tại.
-    invoices    = load('inv_v3', []);
-    ungRecords  = load('ung_v1', []);
-    ccData      = load('cc_v2', []);
-    tbData      = load('tb_v1', []);
-    thuRecords  = load('thu_v1', []);
-    projects    = load('projects_v1', []);
+    invoices    = loadView('inv_v3', []);
+    ungRecords  = loadView('ung_v1', []);
+    ccData      = loadView('cc_v2', []);
+    tbData      = loadView('tb_v1', []);
+    thuRecords  = loadView('thu_v1', []);
+    projects    = loadView('projects_v1', []);
     customers   = load('customers_v1', []); // Chủ đầu tư (CRM) — nạp sau pull cloud
     cats.congTrinh      = load('cat_ct',       DEFAULTS.congTrinh);
     cats.congTrinhYears = load('cat_ct_years', {});
@@ -136,6 +136,11 @@ function init() {
     if (data && typeof cloudDailyBackup === 'function') {
       setTimeout(() => { cloudDailyBackup(); }, 8000);
     }
+    // (03/11/2026) Lô nhập: lô đã gỡ quá 30 ngày → tự xóa hẳn (chỉ máy admin, sau khi đã pull)
+    if (data && typeof loAutoPurge === 'function') {
+      setTimeout(() => { loAutoPurge().catch(e => console.warn('[Lô nhập] Tự xóa hẳn lỗi:', e)); }, 12000);
+    }
+    if (typeof loUpdateGDUi === 'function') loUpdateGDUi();
   });
 }
 
@@ -162,11 +167,11 @@ function _autoSelectYearsWithData() {
     const d = r[field];
     if (d && d.length >= 4) yrs.add(parseInt(d.slice(0, 4)));
   });
-  addYrs(load('inv_v3', []), 'ngay');
-  addYrs(load('ung_v1', []), 'ngay');
-  addYrs(load('cc_v2',  []), 'fromDate');
-  addYrs(load('tb_v1',  []), 'ngay');
-  addYrs(load('thu_v1', []), 'ngay');
+  addYrs(loadView('inv_v3', []), 'ngay');
+  addYrs(loadView('ung_v1', []), 'ngay');
+  addYrs(loadView('cc_v2',  []), 'fromDate');
+  addYrs(loadView('tb_v1',  []), 'ngay');
+  addYrs(loadView('thu_v1', []), 'ngay');
 
   if (yrs.has(cur)) return;     // năm hiện tại đã có dữ liệu → giữ nguyên
   if (yrs.size === 0) return;   // chưa có dữ liệu năm nào (sẽ chờ cloud pull) → giữ nguyên
@@ -559,14 +564,14 @@ window._dataReady = false;
 
   await dbInit();
   // Re-load globals từ _mem (đã được dbInit() populate từ IDB)
-  invoices    = load('inv_v3', []);
-  ungRecords  = load('ung_v1', []);
-  ccData      = load('cc_v2', []);
-  tbData      = load('tb_v1', []);
-  hopDongData      = load('hopdong_v1',  {});
-  thuRecords       = load('thu_v1',      []);
-  thauPhuContracts = load('thauphu_v1',  []);
-  projects         = load('projects_v1', []);
+  invoices    = loadView('inv_v3', []);
+  ungRecords  = loadView('ung_v1', []);
+  ccData      = loadView('cc_v2', []);
+  tbData      = loadView('tb_v1', []);
+  hopDongData      = loadView('hopdong_v1',  {});
+  thuRecords       = loadView('thu_v1',      []);
+  thauPhuContracts = loadView('thauphu_v1',  []);
+  projects         = loadView('projects_v1', []);
   customers        = load('customers_v1', []); // Chủ đầu tư (CRM)
   _migrateProjectDates(); // year → startDate/endDate migration (idempotent)
   if (typeof _migrateChuDauTuFromHopDong === 'function') _migrateChuDauTuFromHopDong(); // backfill chuDauTu từ hopdong_v1.khachHang
