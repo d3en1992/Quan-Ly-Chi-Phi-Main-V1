@@ -615,6 +615,21 @@ function mbBindEvents() {
   });
 }
 
+/**
+ * Tải mới JS/CSS của app vào cache HTTP trước khi reload.
+ * location.reload() chỉ kiểm tra lại index.html, còn file JS/CSS không có ?v= nên
+ * vẫn có thể lấy bản cũ từ cache. Tối đa 8 giây để mạng yếu không làm treo nút.
+ */
+function mbRefreshAppFiles() {
+  const urls = [...document.scripts].map(s => s.src)
+    .concat([...document.querySelectorAll('link[rel="stylesheet"]')].map(l => l.href))
+    .filter(u => u && new URL(u).origin === location.origin);
+  return Promise.race([
+    Promise.allSettled(urls.map(u => fetch(u, { cache: 'reload' }))),
+    new Promise(done => setTimeout(done, 8000)),
+  ]);
+}
+
 // Bảng hành động — mobile.actions.js sẽ bổ sung thêm các hành động ghi dữ liệu
 const MB_ACTS = {
   go:   (arg) => mbGo(arg),
@@ -655,6 +670,21 @@ const MB_ACTS = {
   },
   openProject: (arg) => mbOpenProject(arg),
   logout: () => { if (typeof logout === 'function') logout(); },
+  reloadApp: async () => {
+    if (!navigator.onLine) { mbToast('Không có mạng — chưa tải lại được', 'error'); return; }
+    if (MB.reloading) return;
+    MB.reloading = true;
+    mbToast('Đang tải bản mới nhất…');
+    try {
+      // Còn thay đổi chưa đẩy → đẩy trước. Nếu đẩy lỗi, dữ liệu vẫn an toàn trong outbox (IDB)
+      if (mbPending() > 0 && typeof manualSync === 'function') await manualSync();
+      await mbRefreshAppFiles();
+    } catch (e) {
+      console.warn('[mobile] Tải lại:', e);
+    }
+    location.reload();
+    MB.reloading = false;                      // huỷ ở hộp cảnh báo beforeunload → còn bấm lại được
+  },
   useDesktop: () => {
     localStorage.setItem(MB_FORCE_KEY, '1');
     location.hash = '';

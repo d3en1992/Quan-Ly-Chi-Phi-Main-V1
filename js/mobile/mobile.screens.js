@@ -2667,6 +2667,7 @@ function mbScrMore() {
 
   const sys = [
     ['sync',       'Đồng bộ Firebase', pending > 0 ? pending + ' thay đổi chờ đẩy lên' : 'Đã đồng bộ', 'sync',            '#EFF6FF', '#2563EB'],
+    ['reloadApp',  'Tải lại trang',    'Lấy bản mới nhất của ứng dụng',                               'refresh',         '#ECFDF5', '#059669'],
     ['useDesktop', 'Mở bản máy tính',  'Dùng giao diện đầy đủ trên máy này',                          'desktop_windows', '#F3F4F6', '#4B5563'],
   ];
 
